@@ -22,7 +22,7 @@ import "github.com/haraldrudell/parl"
 ```
 ## Documentation
 
-<a href=https://raw.githubusercontent.com/haraldrudell/parl/main/assets/doc/pkg/github.com/haraldrudell/index.html>on github</a>
+<a href=./parl/main/assets/doc/pkg/github.com/haraldrudell/index.html>on github</a>
 <br />
 <br />
 On 3/16/2022 Parl was open-sourced under an ISC License<br />
