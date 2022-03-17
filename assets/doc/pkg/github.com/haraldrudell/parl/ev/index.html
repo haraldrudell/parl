@@ -7,16 +7,16 @@
 
   <title>ev - Parl</title>
 
-<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css">
+<link type="text/css" rel="stylesheet" href="https://github.com/haraldrudell/parl/blob/main/assets/doc/lib/godoc/style.css">
 
 <script>window.initFuncs = [];</script>
-<script src="http://localhost:8080/lib/godoc/jquery.js" defer></script>
+<script src="https://github.com/haraldrudell/parl/blob/main/assets/doc/lib/godoc/jquery.js" defer></script>
 
 
 
 
 <script>var goVersion = "go1.17.8";</script>
-<script src="http://localhost:8080/lib/godoc/godocs.js" defer></script>
+<script src="https://github.com/haraldrudell/parl/blob/main/assets/doc/lib/godoc/godocs.js" defer></script>
 
 </head>
 <body>
@@ -26,8 +26,8 @@
 </div><!-- #lowframe -->
 
 <div id="topbar" class="wide"><div class="container">
-<div class="top-heading" id="heading-wide"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">Parl | © 2022 Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)</a></div>
-<div class="top-heading" id="heading-narrow"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">Parl</a></div>
+<div class="top-heading" id="heading-wide"><a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/github.com/haraldrudell/parl/">Parl | © 2022 Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)</a></div>
+<div class="top-heading" id="heading-narrow"><a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/github.com/haraldrudell/parl/">Parl</a></div>
 <a href="#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
 
 </div></div>
@@ -264,19 +264,19 @@ ctx.Result is defered by a gorutine, captures panics and sends the goroutine’s
 			<p>
 			<span style="font-size:90%">
 			
-				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go">callee.go</a>
+				<a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/callee.go">callee.go</a>
 			
-				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/dataevent.go">dataevent.go</a>
+				<a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/dataevent.go">dataevent.go</a>
 			
-				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/emptyevent.go">emptyevent.go</a>
+				<a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/emptyevent.go">emptyevent.go</a>
 			
-				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go">ev.go</a>
+				<a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/ev.go">ev.go</a>
 			
-				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/exitevent.go">exitevent.go</a>
+				<a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/exitevent.go">exitevent.go</a>
 			
-				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go">manager.go</a>
+				<a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go">manager.go</a>
 			
-				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/thread.go">thread.go</a>
+				<a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/thread.go">thread.go</a>
 			
 			</span>
 			</p>
@@ -292,7 +292,7 @@ ctx.Result is defered by a gorutine, captures panics and sends the goroutine’s
 		
 			
 			
-			<h2 id="Callee">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L37">Callee</a>
+			<h2 id="Callee">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/ev.go#L37">Callee</a>
 				<a class="permalink" href="#Callee">&#xb6;</a>
 				
 				
@@ -302,12 +302,12 @@ Callee provides functions for a called goroutine
 </p>
 
 			<pre>type Callee interface {
-    <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>                                <span class="comment">// Deadline Done Err Value</span>
+    <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/context/">context</a>.<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/context/#Context">Context</a>                                <span class="comment">// Deadline Done Err Value</span>
     Success()                                      <span class="comment">// Success indicates this goruote terminated successfully</span>
-    Failure(err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)                             <span class="comment">// Failure indicates this goroutine failed with err</span>
-    Result(errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>)                            <span class="comment">// recovery for gorutines: usage: defer ctx.Result(&amp;err)</span>
-    ResultV(errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>, recoverValue interface{}) <span class="comment">// recovery for gorutines</span>
-    Thread() (name <a href="http://localhost:8080/pkg/builtin/#string">string</a>, ID <a href="#GoID">GoID</a>)                <span class="comment">// Thread provides information about the thread</span>
+    Failure(err <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>)                             <span class="comment">// Failure indicates this goroutine failed with err</span>
+    Result(errp *<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>)                            <span class="comment">// recovery for gorutines: usage: defer ctx.Result(&amp;err)</span>
+    ResultV(errp *<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>, recoverValue interface{}) <span class="comment">// recovery for gorutines</span>
+    Thread() (name <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#string">string</a>, ID <a href="#GoID">GoID</a>)                <span class="comment">// Thread provides information about the thread</span>
     Send(payload interface{})                      <span class="comment">// Send allows a goroutine to send custom types</span>
 }</pre>
 
@@ -321,12 +321,12 @@ Callee provides functions for a called goroutine
 
 			
 				
-				<h3 id="NewCallee">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L27">NewCallee</a>
+				<h3 id="NewCallee">func <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/callee.go#L27">NewCallee</a>
 					<a class="permalink" href="#NewCallee">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func NewCallee(name <a href="http://localhost:8080/pkg/builtin/#string">string</a>, gID <a href="#GoID">GoID</a>, eventTx chan&lt;- <a href="#Event">Event</a>, ctx0 <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>) (ctx <a href="#Callee">Callee</a>)</pre>
+				<pre>func NewCallee(name <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#string">string</a>, gID <a href="#GoID">GoID</a>, eventTx chan&lt;- <a href="#Event">Event</a>, ctx0 <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/context/">context</a>.<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/context/#Context">Context</a>) (ctx <a href="#Callee">Callee</a>)</pre>
 				<p>
 NewCallee provides a Calle implementation, data used by a managed goroutine
 </p>
@@ -339,7 +339,7 @@ NewCallee provides a Calle implementation, data used by a managed goroutine
 		
 			
 			
-			<h2 id="CalleeContext">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L17">CalleeContext</a>
+			<h2 id="CalleeContext">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/callee.go#L17">CalleeContext</a>
 				<a class="permalink" href="#CalleeContext">&#xb6;</a>
 				
 				
@@ -349,7 +349,7 @@ CalleeContext provides for a goroutine to communicate with the caller
 </p>
 
 			<pre>type CalleeContext struct {
-    <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>
+    <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/context/">context</a>.<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/context/#Context">Context</a>
     <span class="comment">// contains filtered or unexported fields</span>
 }
 </pre>
@@ -366,43 +366,43 @@ CalleeContext provides for a goroutine to communicate with the caller
 
 			
 				
-				<h3 id="CalleeContext.Failure">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L36">Failure</a>
+				<h3 id="CalleeContext.Failure">func (*CalleeContext) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/callee.go#L36">Failure</a>
 					<a class="permalink" href="#CalleeContext.Failure">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Failure(err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Failure(err <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>)</pre>
 				
 				
 				
 				
 			
 				
-				<h3 id="CalleeContext.Result">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L51">Result</a>
+				<h3 id="CalleeContext.Result">func (*CalleeContext) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/callee.go#L51">Result</a>
 					<a class="permalink" href="#CalleeContext.Result">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Result(errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Result(errp *<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>)</pre>
 				
 				
 				
 				
 			
 				
-				<h3 id="CalleeContext.ResultV">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L55">ResultV</a>
+				<h3 id="CalleeContext.ResultV">func (*CalleeContext) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/callee.go#L55">ResultV</a>
 					<a class="permalink" href="#CalleeContext.ResultV">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) ResultV(errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>, recoverValue interface{})</pre>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) ResultV(errp *<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>, recoverValue interface{})</pre>
 				
 				
 				
 				
 			
 				
-				<h3 id="CalleeContext.Send">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L88">Send</a>
+				<h3 id="CalleeContext.Send">func (*CalleeContext) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/callee.go#L88">Send</a>
 					<a class="permalink" href="#CalleeContext.Send">&#xb6;</a>
 					
 					
@@ -417,7 +417,7 @@ Send allows a groutine to send any event
 				
 			
 				
-				<h3 id="CalleeContext.Success">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L32">Success</a>
+				<h3 id="CalleeContext.Success">func (*CalleeContext) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/callee.go#L32">Success</a>
 					<a class="permalink" href="#CalleeContext.Success">&#xb6;</a>
 					
 					
@@ -429,12 +429,12 @@ Send allows a groutine to send any event
 				
 			
 				
-				<h3 id="CalleeContext.Thread">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L81">Thread</a>
+				<h3 id="CalleeContext.Thread">func (*CalleeContext) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/callee.go#L81">Thread</a>
 					<a class="permalink" href="#CalleeContext.Thread">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Thread() (name <a href="http://localhost:8080/pkg/builtin/#string">string</a>, gID <a href="#GoID">GoID</a>)</pre>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Thread() (name <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#string">string</a>, gID <a href="#GoID">GoID</a>)</pre>
 				
 				
 				
@@ -443,7 +443,7 @@ Send allows a groutine to send any event
 		
 			
 			
-			<h2 id="CancelAction">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L57">CancelAction</a>
+			<h2 id="CancelAction">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/ev.go#L57">CancelAction</a>
 				<a class="permalink" href="#CancelAction">&#xb6;</a>
 				
 				
@@ -452,13 +452,13 @@ Send allows a groutine to send any event
 CancelAction holds strategy for when a goruotine terminates
 </p>
 
-			<pre>type CancelAction <a href="http://localhost:8080/pkg/builtin/#uint8">uint8</a></pre>
+			<pre>type CancelAction <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#uint8">uint8</a></pre>
 
 			
 				
 				<pre>const (
     <span class="comment">// TerminateAll terminates other goroutines on first termination</span>
-    <span id="TerminateAll">TerminateAll</span> <a href="#CancelAction">CancelAction</a> = <a href="http://localhost:8080/pkg/builtin/#iota">iota</a>
+    <span id="TerminateAll">TerminateAll</span> <a href="#CancelAction">CancelAction</a> = <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#iota">iota</a>
     <span class="comment">// KeepGoing waits for all goroutines to complete even on errors</span>
     <span id="KeepGoing">KeepGoing</span>
     <span class="comment">// WhileOk terminates if any goroutine errors</span>
@@ -478,7 +478,7 @@ CancelAction holds strategy for when a goruotine terminates
 		
 			
 			
-			<h2 id="DataEvent">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/dataevent.go#L11">DataEvent</a>
+			<h2 id="DataEvent">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/dataevent.go#L11">DataEvent</a>
 				<a class="permalink" href="#DataEvent">&#xb6;</a>
 				
 				
@@ -507,7 +507,7 @@ The main evvent loop checks the type of the pyload against the exported unique t
 
 			
 				
-				<h3 id="DataEvent.Payload">func (*DataEvent) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/dataevent.go#L24">Payload</a>
+				<h3 id="DataEvent.Payload">func (*DataEvent) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/dataevent.go#L24">Payload</a>
 					<a class="permalink" href="#DataEvent.Payload">&#xb6;</a>
 					
 					
@@ -524,7 +524,7 @@ Payload returns the data value of a DataEvent
 		
 			
 			
-			<h2 id="EmptyEvent">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/emptyevent.go#L9">EmptyEvent</a>
+			<h2 id="EmptyEvent">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/emptyevent.go#L9">EmptyEvent</a>
 				<a class="permalink" href="#EmptyEvent">&#xb6;</a>
 				
 				
@@ -548,7 +548,7 @@ EmptyEvent is an event with no data
 
 			
 				
-				<h3 id="NewEmptyEvent">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/emptyevent.go#L15">NewEmptyEvent</a>
+				<h3 id="NewEmptyEvent">func <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/emptyevent.go#L15">NewEmptyEvent</a>
 					<a class="permalink" href="#NewEmptyEvent">&#xb6;</a>
 					
 					
@@ -561,7 +561,7 @@ EmptyEvent is an event with no data
 
 			
 				
-				<h3 id="EmptyEvent.GoID">func (*EmptyEvent) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/emptyevent.go#L20">GoID</a>
+				<h3 id="EmptyEvent.GoID">func (*EmptyEvent) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/emptyevent.go#L20">GoID</a>
 					<a class="permalink" href="#EmptyEvent.GoID">&#xb6;</a>
 					
 					
@@ -578,7 +578,7 @@ GoID returns the id of the sending goroutine
 		
 			
 			
-			<h2 id="EvThread">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/thread.go#L11">EvThread</a>
+			<h2 id="EvThread">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/thread.go#L11">EvThread</a>
 				<a class="permalink" href="#EvThread">&#xb6;</a>
 				
 				
@@ -589,7 +589,7 @@ EvThread holds manager information for a running goroutine
 
 			<pre>type EvThread struct {
 <span id="EvThread.ID"></span>    ID   <a href="#GoID">GoID</a>
-<span id="EvThread.Name"></span>    Name <a href="http://localhost:8080/pkg/builtin/#string">string</a>
+<span id="EvThread.Name"></span>    Name <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#string">string</a>
 }
 </pre>
 
@@ -603,12 +603,12 @@ EvThread holds manager information for a running goroutine
 
 			
 				
-				<h3 id="NewEvThread">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/thread.go#L17">NewEvThread</a>
+				<h3 id="NewEvThread">func <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/thread.go#L17">NewEvThread</a>
 					<a class="permalink" href="#NewEvThread">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func NewEvThread(name <a href="http://localhost:8080/pkg/builtin/#string">string</a>) (ti *<a href="#EvThread">EvThread</a>)</pre>
+				<pre>func NewEvThread(name <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#string">string</a>) (ti *<a href="#EvThread">EvThread</a>)</pre>
 				<p>
 NewEvThread holds manager information for a running goroutine
 </p>
@@ -621,7 +621,7 @@ NewEvThread holds manager information for a running goroutine
 		
 			
 			
-			<h2 id="Event">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L60">Event</a>
+			<h2 id="Event">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/ev.go#L60">Event</a>
 				<a class="permalink" href="#Event">&#xb6;</a>
 				
 				
@@ -644,7 +644,7 @@ Event is a message passed from goroutines
 
 			
 				
-				<h3 id="NewDataEvent">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/dataevent.go#L19">NewDataEvent</a>
+				<h3 id="NewDataEvent">func <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/dataevent.go#L19">NewDataEvent</a>
 					<a class="permalink" href="#NewDataEvent">&#xb6;</a>
 					
 					
@@ -658,12 +658,12 @@ NewDataEvent creates an event with payload of a single data value
 				
 			
 				
-				<h3 id="NewExitEvent">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/exitevent.go#L17">NewExitEvent</a>
+				<h3 id="NewExitEvent">func <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/exitevent.go#L17">NewExitEvent</a>
 					<a class="permalink" href="#NewExitEvent">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func NewExitEvent(e <a href="http://localhost:8080/pkg/builtin/#error">error</a>, gID <a href="#GoID">GoID</a>) (evt <a href="#Event">Event</a>)</pre>
+				<pre>func NewExitEvent(e <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>, gID <a href="#GoID">GoID</a>) (evt <a href="#Event">Event</a>)</pre>
 				<p>
 NewExitEvent holds the outcome of a goruotine
 </p>
@@ -676,7 +676,7 @@ NewExitEvent holds the outcome of a goruotine
 		
 			
 			
-			<h2 id="EventRx">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L31">EventRx</a>
+			<h2 id="EventRx">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/ev.go#L31">EventRx</a>
 				<a class="permalink" href="#EventRx">&#xb6;</a>
 				
 				
@@ -701,7 +701,7 @@ EventRx receives events from goroutines
 		
 			
 			
-			<h2 id="ExitEvent">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/exitevent.go#L9">ExitEvent</a>
+			<h2 id="ExitEvent">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/exitevent.go#L9">ExitEvent</a>
 				<a class="permalink" href="#ExitEvent">&#xb6;</a>
 				
 				
@@ -712,9 +712,9 @@ ExitEvent holds the outcome of a goruotine
 
 			<pre>type ExitEvent struct {
     <a href="#EmptyEvent">EmptyEvent</a>
-<span id="ExitEvent.Err"></span>    Err       <a href="http://localhost:8080/pkg/builtin/#error">error</a>
-<span id="ExitEvent.IsCancel"></span>    IsCancel  <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>
-<span id="ExitEvent.IsTimeout"></span>    IsTimeout <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>
+<span id="ExitEvent.Err"></span>    Err       <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>
+<span id="ExitEvent.IsCancel"></span>    IsCancel  <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#bool">bool</a>
+<span id="ExitEvent.IsTimeout"></span>    IsTimeout <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#bool">bool</a>
 }
 </pre>
 
@@ -732,7 +732,7 @@ ExitEvent holds the outcome of a goruotine
 		
 			
 			
-			<h2 id="GoID">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L34">GoID</a>
+			<h2 id="GoID">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/ev.go#L34">GoID</a>
 				<a class="permalink" href="#GoID">&#xb6;</a>
 				
 				
@@ -741,7 +741,7 @@ ExitEvent holds the outcome of a goruotine
 GoID is a unique value identifying a goroutine
 </p>
 
-			<pre>type GoID <a href="http://localhost:8080/pkg/github.com/google/uuid/">uuid</a>.<a href="http://localhost:8080/pkg/github.com/google/uuid/#UUID">UUID</a></pre>
+			<pre>type GoID <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/github.com/google/uuid/">uuid</a>.<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/github.com/google/uuid/#UUID">UUID</a></pre>
 
 			
 
@@ -757,7 +757,7 @@ GoID is a unique value identifying a goroutine
 		
 			
 			
-			<h2 id="Manager">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L65">Manager</a>
+			<h2 id="Manager">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/ev.go#L65">Manager</a>
 				<a class="permalink" href="#Manager">&#xb6;</a>
 				
 				
@@ -767,13 +767,13 @@ Manager provides management of goroutines
 </p>
 
 			<pre>type Manager interface {
-    Cancel() (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)                    <span class="comment">// Cancel signals to all goroutines to terminate</span>
+    Cancel() (isEnd <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#bool">bool</a>)                    <span class="comment">// Cancel signals to all goroutines to terminate</span>
     Events() (ch <a href="#EventRx">EventRx</a>)                    <span class="comment">// Events provides the channel emitting events from goroutines</span>
-    CalleeContext(ID ...<a href="http://localhost:8080/pkg/builtin/#string">string</a>) (ctx <a href="#Callee">Callee</a>) <span class="comment">// CalleeContext context for a new goroutine, 0 or 1 argument</span>
-    ProcessEvent(event <a href="#Event">Event</a>) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)    <span class="comment">// ProcessEvent sanity checks an EventRx event</span>
-    Action(evResult <a href="http://localhost:8080/pkg/builtin/#error">error</a>, action <a href="#CancelAction">CancelAction</a>) (awaitThreads <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)
-    IsEnd() (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)                   <span class="comment">// IsEnd returns true if all goroutines have terminated</span>
-    Threads() (names []<a href="http://localhost:8080/pkg/builtin/#string">string</a>, IDs []<a href="#GoID">GoID</a>) <span class="comment">// Threads provide information on currently managed goroutines</span>
+    CalleeContext(ID ...<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#string">string</a>) (ctx <a href="#Callee">Callee</a>) <span class="comment">// CalleeContext context for a new goroutine, 0 or 1 argument</span>
+    ProcessEvent(event <a href="#Event">Event</a>) (err <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>)    <span class="comment">// ProcessEvent sanity checks an EventRx event</span>
+    Action(evResult <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>, action <a href="#CancelAction">CancelAction</a>) (awaitThreads <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#bool">bool</a>)
+    IsEnd() (isEnd <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#bool">bool</a>)                   <span class="comment">// IsEnd returns true if all goroutines have terminated</span>
+    Threads() (names []<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#string">string</a>, IDs []<a href="#GoID">GoID</a>) <span class="comment">// Threads provide information on currently managed goroutines</span>
 }</pre>
 
 			
@@ -786,12 +786,12 @@ Manager provides management of goroutines
 
 			
 				
-				<h3 id="NewManager">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L35">NewManager</a>
+				<h3 id="NewManager">func <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L35">NewManager</a>
 					<a class="permalink" href="#NewManager">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func NewManager(ctx0 <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>) (mgr <a href="#Manager">Manager</a>)</pre>
+				<pre>func NewManager(ctx0 <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/context/">context</a>.<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/context/#Context">Context</a>) (mgr <a href="#Manager">Manager</a>)</pre>
 				<p>
 NewManager obtains instance for executing goroutines
 </p>
@@ -804,7 +804,7 @@ NewManager obtains instance for executing goroutines
 		
 			
 			
-			<h2 id="ThreadManager">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L21">ThreadManager</a>
+			<h2 id="ThreadManager">type <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L21">ThreadManager</a>
 				<a class="permalink" href="#ThreadManager">&#xb6;</a>
 				
 				
@@ -814,7 +814,7 @@ ThreadManager provides thread-safe management of go routines
 </p>
 
 			<pre>type ThreadManager struct {
-<span id="ThreadManager.Launch"></span>    Launch <a href="http://localhost:8080/pkg/time/">time</a>.<a href="http://localhost:8080/pkg/time/#Time">Time</a>
+<span id="ThreadManager.Launch"></span>    Launch <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/time/">time</a>.<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/time/#Time">Time</a>
     <span class="comment">// contains filtered or unexported fields</span>
 }
 </pre>
@@ -831,12 +831,12 @@ ThreadManager provides thread-safe management of go routines
 
 			
 				
-				<h3 id="ThreadManager.Action">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L82">Action</a>
+				<h3 id="ThreadManager.Action">func (*ThreadManager) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L82">Action</a>
 					<a class="permalink" href="#ThreadManager.Action">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Action(threadResult <a href="http://localhost:8080/pkg/builtin/#error">error</a>, action <a href="#CancelAction">CancelAction</a>) (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Action(threadResult <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>, action <a href="#CancelAction">CancelAction</a>) (isEnd <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#bool">bool</a>)</pre>
 				<p>
 Action determines whether the executable should continue to wait for additional threads
 </p>
@@ -846,12 +846,12 @@ Action determines whether the executable should continue to wait for additional 
 				
 			
 				
-				<h3 id="ThreadManager.CalleeContext">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L49">CalleeContext</a>
+				<h3 id="ThreadManager.CalleeContext">func (*ThreadManager) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L49">CalleeContext</a>
 					<a class="permalink" href="#ThreadManager.CalleeContext">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) CalleeContext(ID ...<a href="http://localhost:8080/pkg/builtin/#string">string</a>) (env <a href="#Callee">Callee</a>)</pre>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) CalleeContext(ID ...<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#string">string</a>) (env <a href="#Callee">Callee</a>)</pre>
 				<p>
 CalleeContext produces an environment for calling a goroutine - thread safe
 </p>
@@ -861,12 +861,12 @@ CalleeContext produces an environment for calling a goroutine - thread safe
 				
 			
 				
-				<h3 id="ThreadManager.Cancel">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L131">Cancel</a>
+				<h3 id="ThreadManager.Cancel">func (*ThreadManager) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L131">Cancel</a>
 					<a class="permalink" href="#ThreadManager.Cancel">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Cancel() (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Cancel() (isEnd <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#bool">bool</a>)</pre>
 				<p>
 Cancel shuts down all goroutines
 </p>
@@ -876,12 +876,12 @@ Cancel shuts down all goroutines
 				
 			
 				
-				<h3 id="ThreadManager.Count">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L107">Count</a>
+				<h3 id="ThreadManager.Count">func (*ThreadManager) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L107">Count</a>
 					<a class="permalink" href="#ThreadManager.Count">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Count() (count <a href="http://localhost:8080/pkg/builtin/#int64">int64</a>)</pre>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Count() (count <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#int64">int64</a>)</pre>
 				<p>
 Count determines remaining goroutines
 </p>
@@ -891,7 +891,7 @@ Count determines remaining goroutines
 				
 			
 				
-				<h3 id="ThreadManager.Events">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L44">Events</a>
+				<h3 id="ThreadManager.Events">func (*ThreadManager) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L44">Events</a>
 					<a class="permalink" href="#ThreadManager.Events">&#xb6;</a>
 					
 					
@@ -906,12 +906,12 @@ Events gets the channel emitting messages from goroutines
 				
 			
 				
-				<h3 id="ThreadManager.IsEnd">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L102">IsEnd</a>
+				<h3 id="ThreadManager.IsEnd">func (*ThreadManager) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L102">IsEnd</a>
 					<a class="permalink" href="#ThreadManager.IsEnd">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) IsEnd() (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) IsEnd() (isEnd <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#bool">bool</a>)</pre>
 				<p>
 IsEnd determines if all goroutines have terminated
 </p>
@@ -921,12 +921,12 @@ IsEnd determines if all goroutines have terminated
 				
 			
 				
-				<h3 id="ThreadManager.ProcessEvent">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L66">ProcessEvent</a>
+				<h3 id="ThreadManager.ProcessEvent">func (*ThreadManager) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L66">ProcessEvent</a>
 					<a class="permalink" href="#ThreadManager.ProcessEvent">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) ProcessEvent(ev <a href="#Event">Event</a>) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) ProcessEvent(ev <a href="#Event">Event</a>) (err <a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#error">error</a>)</pre>
 				<p>
 ProcessExit indicates whether this event is the final event from a terminating goroutine
 </p>
@@ -936,12 +936,12 @@ ProcessExit indicates whether this event is the final event from a terminating g
 				
 			
 				
-				<h3 id="ThreadManager.Threads">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L112">Threads</a>
+				<h3 id="ThreadManager.Threads">func (*ThreadManager) <a href="./https:/github.com/haraldrudell/parl/blob/main/assets/doc/src/github.com/haraldrudell/parl/ev/manager.go#L112">Threads</a>
 					<a class="permalink" href="#ThreadManager.Threads">&#xb6;</a>
 					
 					
 				</h3>
-				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Threads() (names []<a href="http://localhost:8080/pkg/builtin/#string">string</a>, IDs []<a href="#GoID">GoID</a>)</pre>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Threads() (names []<a href="https:/github.com/haraldrudell/parl/blob/main/assets/doc/pkg/builtin/#string">string</a>, IDs []<a href="#GoID">GoID</a>)</pre>
 				
 				
 				

@@ -2,8 +2,14 @@
 # © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 # docit
 # 220316 macOS 12.2.1
+if [ $# -eq 0 ]; then
+  BASE=https://raw.githubusercontent.com/haraldrudell/parl/main/assets/doc
+else
+  BASE=http://localhost:8080
+fi
+
 CMD=(gopages
-  -base http://localhost:8080
+  -base "$BASE"
   -brand-description "© 2022 Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)"
   -brand-title Parl
   -out assets/doc
