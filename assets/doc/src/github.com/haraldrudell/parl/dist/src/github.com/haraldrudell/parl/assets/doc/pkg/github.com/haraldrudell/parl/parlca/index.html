@@ -1,0 +1,765 @@
+<!DOCTYPE html><html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#375EAB"/>
+
+  <title>parlca - TITLE</title>
+
+<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css"/>
+
+<script>window.initFuncs = [];</script>
+<script src="http://localhost:8080/lib/godoc/jquery.js" defer=""></script>
+
+
+
+
+<script>var goVersion = "go1.17.8";</script>
+<script src="http://localhost:8080/lib/godoc/godocs.js" defer=""></script>
+
+</head>
+<body>
+
+<div id="lowframe" style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">TITLE | DESCRIPTION</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">TITLE</a></div>
+<a href="#" id="menu-button"><span id="menu-button-arrow">▽</span></a>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Package parlca
+    <span class="text-muted"></span>
+  </h1>
+
+
+
+
+
+
+
+<div id="nav"></div>
+
+
+<!--
+	Copyright 2009 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
+-->
+<!--
+	Note: Static (i.e., not template-generated) href and id
+	attributes start with "pkg-" to make it impossible for
+	them to conflict with generated attributes (some of which
+	correspond to Go identifiers).
+-->
+
+	<script>
+	document.ANALYSIS_DATA = null;
+	document.CALLGRAPH = null;
+	</script>
+
+	
+		
+		<div id="short-nav">
+			<dl>
+			<dd><code>import &#34;github.com/haraldrudell/parl/parlca&#34;</code></dd>
+			</dl>
+			<dl>
+			<dd><a href="#pkg-overview" class="overviewLink">Overview</a></dd>
+			<dd><a href="#pkg-index" class="indexLink">Index</a></dd>
+			
+			
+			</dl>
+		</div>
+		<!-- The package's Name is printed as title by the top-level template -->
+		<div id="pkg-overview" class="toggleVisible">
+			<div class="collapsed">
+				<h2 class="toggleButton" title="Click to show Overview section">Overview ▹</h2>
+			</div>
+			<div class="expanded">
+				<h2 class="toggleButton" title="Click to hide Overview section">Overview ▾</h2>
+				<p>
+Package parlca provides a self-signed certificate authority
+</p>
+<p>
+© 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (<a href="https://haraldrudell.github.io/haraldrudell/">https://haraldrudell.github.io/haraldrudell/</a>)
+</p>
+
+				
+			</div>
+		</div>
+
+		<div id="pkg-index" class="toggleVisible">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Index section">Index ▹</h2>
+		</div>
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Index section">Index ▾</h2>
+
+		<!-- Table of contents for API; must be named manual-nav to turn off auto nav. -->
+			<div id="manual-nav">
+			<dl>
+			
+				<dd><a href="#pkg-constants">Constants</a></dd>
+			
+			
+			
+				
+				<dd><a href="#EnsureClient">func EnsureClient(cert *x509.Certificate)</a></dd>
+			
+				
+				<dd><a href="#EnsureSelfSigned">func EnsureSelfSigned(cert *x509.Certificate)</a></dd>
+			
+				
+				<dd><a href="#EnsureServer">func EnsureServer(cert *x509.Certificate)</a></dd>
+			
+				
+				<dd><a href="#EnsureTemplate">func EnsureTemplate(cert *x509.Certificate)</a></dd>
+			
+			
+				
+				<dd><a href="#Certificate">type Certificate</a></dd>
+				
+				
+			
+				
+				<dd><a href="#CertificateAuthority">type CertificateAuthority</a></dd>
+				
+					
+					<dd>    <a href="#NewSelfSigned">func NewSelfSigned(canonicalName string) (ca CertificateAuthority)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#CertificateDER">type CertificateDER</a></dd>
+				
+				
+			
+				
+				<dd><a href="#DER">type DER</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Ed25519KeyPair">type Ed25519KeyPair</a></dd>
+				
+				
+					
+					<dd>    <a href="#Ed25519KeyPair.Algo">func (key *Ed25519KeyPair) Algo() (algo x509.PublicKeyAlgorithm)</a></dd>
+				
+					
+					<dd>    <a href="#Ed25519KeyPair.Bytes">func (key *Ed25519KeyPair) Bytes() (bytes KeyDER, err error)</a></dd>
+				
+					
+					<dd>    <a href="#Ed25519KeyPair.HasKey">func (key *Ed25519KeyPair) HasKey() (hasKey bool)</a></dd>
+				
+					
+					<dd>    <a href="#Ed25519KeyPair.Private">func (key *Ed25519KeyPair) Private() (signer crypto.Signer)</a></dd>
+				
+					
+					<dd>    <a href="#Ed25519KeyPair.PrivateBytes">func (key *Ed25519KeyPair) PrivateBytes() (bytes []byte)</a></dd>
+				
+					
+					<dd>    <a href="#Ed25519KeyPair.PublicBytes">func (key *Ed25519KeyPair) PublicBytes() (bytes []byte)</a></dd>
+				
+			
+				
+				<dd><a href="#KeyDER">type KeyDER</a></dd>
+				
+				
+			
+				
+				<dd><a href="#KeyGenerator">type KeyGenerator</a></dd>
+				
+				
+			
+				
+				<dd><a href="#KeyPair">type KeyPair</a></dd>
+				
+					
+					<dd>    <a href="#GenerateEd25519">func GenerateEd25519(reader io.Reader) (keyPair KeyPair, err error)</a></dd>
+				
+					
+					<dd>    <a href="#NewEd25519">func NewEd25519() (keyPair KeyPair, err error)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#PrivateKey">type PrivateKey</a></dd>
+				
+				
+			
+				
+				<dd><a href="#SelfSigned">type SelfSigned</a></dd>
+				
+				
+					
+					<dd>    <a href="#SelfSigned.Check">func (ca *SelfSigned) Check() (isValid bool, cert *x509.Certificate, err error)</a></dd>
+				
+					
+					<dd>    <a href="#SelfSigned.DER">func (ca *SelfSigned) DER() (bytes CertificateDER)</a></dd>
+				
+					
+					<dd>    <a href="#SelfSigned.HasDER">func (ca *SelfSigned) HasDER() (hasDER bool)</a></dd>
+				
+					
+					<dd>    <a href="#SelfSigned.SetReader">func (ca *SelfSigned) SetReader(reader io.Reader)</a></dd>
+				
+					
+					<dd>    <a href="#SelfSigned.Sign">func (ca *SelfSigned) Sign(template *x509.Certificate, publicKey crypto.PublicKey) (certDER CertificateDER, err error)</a></dd>
+				
+			
+			
+			</dl>
+			</div><!-- #manual-nav -->
+
+		
+
+		
+			<h3>Package files</h3>
+			<p>
+			<span style="font-size:90%">
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/certificate.go">certificate.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ecdsa.go">ecdsa.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go">ed25519.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/parlca.go">parlca.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/rsa.go">rsa.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go">selfsigned.go</a>
+			
+			</span>
+			</p>
+		
+		</div><!-- .expanded -->
+		</div><!-- #pkg-index -->
+
+		
+
+		
+			<h2 id="pkg-constants">Constants</h2>
+			
+				
+				<pre>const (
+    <span class="comment">/*
+        NoPassword       PasswordType = &#34;\tnoPassword&#34;
+        GeneratePassword PasswordType = &#34;\tgeneratePassword&#34;
+        GenerateOnTheFly Strategy     = iota &lt;&lt; 0
+        UseFileSystem
+        DefaultStrategy = GenerateOnTheFly
+    */</span>
+    <span id="DefaultCountry">DefaultCountry</span> = &#34;US&#34;
+)</pre>
+			
+		
+		
+		
+			
+			
+			<h2 id="EnsureClient">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L159">EnsureClient</a>
+				<a class="permalink" href="#EnsureClient">¶</a>
+				
+				
+			</h2>
+			<pre>func EnsureClient(cert *<a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#Certificate">Certificate</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="EnsureSelfSigned">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L131">EnsureSelfSigned</a>
+				<a class="permalink" href="#EnsureSelfSigned">¶</a>
+				
+				
+			</h2>
+			<pre>func EnsureSelfSigned(cert *<a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#Certificate">Certificate</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="EnsureServer">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L153">EnsureServer</a>
+				<a class="permalink" href="#EnsureServer">¶</a>
+				
+				
+			</h2>
+			<pre>func EnsureServer(cert *<a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#Certificate">Certificate</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="EnsureTemplate">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L101">EnsureTemplate</a>
+				<a class="permalink" href="#EnsureTemplate">¶</a>
+				
+				
+			</h2>
+			<pre>func EnsureTemplate(cert *<a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#Certificate">Certificate</a>)</pre>
+			
+			
+			
+
+		
+		
+			
+			
+			<h2 id="Certificate">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/parlca.go#L19">Certificate</a>
+				<a class="permalink" href="#Certificate">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type Certificate interface {
+    DER() (der <a href="#CertificateDER">CertificateDER</a>)
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="CertificateAuthority">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/parlca.go#L41">CertificateAuthority</a>
+				<a class="permalink" href="#CertificateAuthority">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type CertificateAuthority interface {
+    Check() (isValid <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>, cert *<a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#Certificate">Certificate</a>, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>) <span class="comment">// gets x509.Certificate version</span>
+    DER() (bytes <a href="#CertificateDER">CertificateDER</a>)                              <span class="comment">// untyped bytes, der: Distinguished Encoding Rules binary format</span>
+    Sign(template *<a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#Certificate">Certificate</a>, publicKey <a href="http://localhost:8080/pkg/crypto/">crypto</a>.<a href="http://localhost:8080/pkg/crypto/#PublicKey">PublicKey</a>) (certDER <a href="#CertificateDER">CertificateDER</a>, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)
+    SetReader(reader <a href="http://localhost:8080/pkg/io/">io</a>.<a href="http://localhost:8080/pkg/io/#Reader">Reader</a>)
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewSelfSigned">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L30">NewSelfSigned</a>
+					<a class="permalink" href="#NewSelfSigned">¶</a>
+					
+					
+				</h3>
+				<pre>func NewSelfSigned(canonicalName <a href="http://localhost:8080/pkg/builtin/#string">string</a>) (ca <a href="#CertificateAuthority">CertificateAuthority</a>)</pre>
+				<p>
+func NewCertificateAuthority()
+</p>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="CertificateDER">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/parlca.go#L23">CertificateDER</a>
+				<a class="permalink" href="#CertificateDER">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type CertificateDER []<a href="http://localhost:8080/pkg/builtin/#byte">byte</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="DER">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L27">DER</a>
+				<a class="permalink" href="#DER">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type DER []<a href="http://localhost:8080/pkg/builtin/#byte">byte</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Ed25519KeyPair">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go#L18">Ed25519KeyPair</a>
+				<a class="permalink" href="#Ed25519KeyPair">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type Ed25519KeyPair struct {
+    <span class="comment">// func (ed25519.PrivateKey).Equal(x crypto.PrivateKey) bool</span>
+    <span class="comment">// func (ed25519.PrivateKey).Public() crypto.PublicKey</span>
+    <span class="comment">// func (ed25519.PrivateKey).Seed() []byte</span>
+    <span class="comment">// func (ed25519.PrivateKey).Sign(rand io.Reader, message []byte, opts crypto.SignerOpts) (signature []byte, err error)</span>
+    <span class="comment">// implements crypto.Signer: Public, Sign</span>
+    <a href="http://localhost:8080/pkg/crypto/ed25519/">ed25519</a>.<a href="http://localhost:8080/pkg/crypto/ed25519/#PrivateKey">PrivateKey</a> <span class="comment">// type: []byte</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Ed25519KeyPair.Algo">func (*Ed25519KeyPair) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go#L41">Algo</a>
+					<a class="permalink" href="#Ed25519KeyPair.Algo">¶</a>
+					
+					
+				</h3>
+				<pre>func (key *<a href="#Ed25519KeyPair">Ed25519KeyPair</a>) Algo() (algo <a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#PublicKeyAlgorithm">PublicKeyAlgorithm</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Ed25519KeyPair.Bytes">func (*Ed25519KeyPair) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go#L45">Bytes</a>
+					<a class="permalink" href="#Ed25519KeyPair.Bytes">¶</a>
+					
+					
+				</h3>
+				<pre>func (key *<a href="#Ed25519KeyPair">Ed25519KeyPair</a>) Bytes() (bytes <a href="#KeyDER">KeyDER</a>, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Ed25519KeyPair.HasKey">func (*Ed25519KeyPair) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go#L52">HasKey</a>
+					<a class="permalink" href="#Ed25519KeyPair.HasKey">¶</a>
+					
+					
+				</h3>
+				<pre>func (key *<a href="#Ed25519KeyPair">Ed25519KeyPair</a>) HasKey() (hasKey <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Ed25519KeyPair.Private">func (*Ed25519KeyPair) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go#L72">Private</a>
+					<a class="permalink" href="#Ed25519KeyPair.Private">¶</a>
+					
+					
+				</h3>
+				<pre>func (key *<a href="#Ed25519KeyPair">Ed25519KeyPair</a>) Private() (signer <a href="http://localhost:8080/pkg/crypto/">crypto</a>.<a href="http://localhost:8080/pkg/crypto/#Signer">Signer</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Ed25519KeyPair.PrivateBytes">func (*Ed25519KeyPair) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go#L68">PrivateBytes</a>
+					<a class="permalink" href="#Ed25519KeyPair.PrivateBytes">¶</a>
+					
+					
+				</h3>
+				<pre>func (key *<a href="#Ed25519KeyPair">Ed25519KeyPair</a>) PrivateBytes() (bytes []<a href="http://localhost:8080/pkg/builtin/#byte">byte</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Ed25519KeyPair.PublicBytes">func (*Ed25519KeyPair) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go#L56">PublicBytes</a>
+					<a class="permalink" href="#Ed25519KeyPair.PublicBytes">¶</a>
+					
+					
+				</h3>
+				<pre>func (key *<a href="#Ed25519KeyPair">Ed25519KeyPair</a>) PublicBytes() (bytes []<a href="http://localhost:8080/pkg/builtin/#byte">byte</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="KeyDER">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/parlca.go#L24">KeyDER</a>
+				<a class="permalink" href="#KeyDER">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type KeyDER []<a href="http://localhost:8080/pkg/builtin/#byte">byte</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="KeyGenerator">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/parlca.go#L48">KeyGenerator</a>
+				<a class="permalink" href="#KeyGenerator">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type KeyGenerator func(<a href="http://localhost:8080/pkg/io/">io</a>.<a href="http://localhost:8080/pkg/io/#Reader">Reader</a>) (keyPair <a href="#KeyPair">KeyPair</a>, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>) <span class="comment">// creates private key, returns public key</span>
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="KeyPair">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/parlca.go#L34">KeyPair</a>
+				<a class="permalink" href="#KeyPair">¶</a>
+				
+				
+			</h2>
+			<p>
+KeyPair implements crypto.Signer and can therefore be used as tls.Certificate.PrivateKey
+</p>
+
+			<pre>type KeyPair interface {
+    <a href="#PrivateKey">PrivateKey</a>
+    Bytes() (bytes <a href="#KeyDER">KeyDER</a>, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>) <span class="comment">// untyped key material, both private and public keys</span>
+    PublicBytes() (bytes []<a href="http://localhost:8080/pkg/builtin/#byte">byte</a>)      <span class="comment">// untyped public key material</span>
+    Private() (signer <a href="http://localhost:8080/pkg/crypto/">crypto</a>.<a href="http://localhost:8080/pkg/crypto/#Signer">Signer</a>)  <span class="comment">// typed key material implementing crypto.Signer for x509.CreateCertificate and tls.Certificate.PrivateKey</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="GenerateEd25519">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go#L31">GenerateEd25519</a>
+					<a class="permalink" href="#GenerateEd25519">¶</a>
+					
+					
+				</h3>
+				<pre>func GenerateEd25519(reader <a href="http://localhost:8080/pkg/io/">io</a>.<a href="http://localhost:8080/pkg/io/#Reader">Reader</a>) (keyPair <a href="#KeyPair">KeyPair</a>, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+			
+				
+				<h3 id="NewEd25519">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/ed25519.go#L27">NewEd25519</a>
+					<a class="permalink" href="#NewEd25519">¶</a>
+					
+					
+				</h3>
+				<pre>func NewEd25519() (keyPair <a href="#KeyPair">KeyPair</a>, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="PrivateKey">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/parlca.go#L27">PrivateKey</a>
+				<a class="permalink" href="#PrivateKey">¶</a>
+				
+				
+			</h2>
+			<p>
+PrivateKey does not contain public part of a key pair, only the private key
+</p>
+
+			<pre>type PrivateKey interface {
+    HasKey() (hasKey <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>) <span class="comment">// has key material</span>
+    Algo() (algo <a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#PublicKeyAlgorithm">PublicKeyAlgorithm</a>)
+    PrivateBytes() (bytes []<a href="http://localhost:8080/pkg/builtin/#byte">byte</a>) <span class="comment">// untyped private key material</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="SelfSigned">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L21">SelfSigned</a>
+				<a class="permalink" href="#SelfSigned">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type SelfSigned struct {
+<span id="SelfSigned.Reader"></span>    Reader <a href="http://localhost:8080/pkg/io/">io</a>.<a href="http://localhost:8080/pkg/io/#Reader">Reader</a>
+<span id="SelfSigned.CaDER"></span>    CaDER  <a href="#CertificateDER">CertificateDER</a> <span class="comment">// der: Distinguished Encoding Rules is a binary format</span>
+    <a href="#KeyPair">KeyPair</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="SelfSigned.Check">func (*SelfSigned) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L87">Check</a>
+					<a class="permalink" href="#SelfSigned.Check">¶</a>
+					
+					
+				</h3>
+				<pre>func (ca *<a href="#SelfSigned">SelfSigned</a>) Check() (isValid <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>, cert *<a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#Certificate">Certificate</a>, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="SelfSigned.DER">func (*SelfSigned) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L165">DER</a>
+					<a class="permalink" href="#SelfSigned.DER">¶</a>
+					
+					
+				</h3>
+				<pre>func (ca *<a href="#SelfSigned">SelfSigned</a>) DER() (bytes <a href="#CertificateDER">CertificateDER</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="SelfSigned.HasDER">func (*SelfSigned) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L173">HasDER</a>
+					<a class="permalink" href="#SelfSigned.HasDER">¶</a>
+					
+					
+				</h3>
+				<pre>func (ca *<a href="#SelfSigned">SelfSigned</a>) HasDER() (hasDER <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="SelfSigned.SetReader">func (*SelfSigned) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L169">SetReader</a>
+					<a class="permalink" href="#SelfSigned.SetReader">¶</a>
+					
+					
+				</h3>
+				<pre>func (ca *<a href="#SelfSigned">SelfSigned</a>) SetReader(reader <a href="http://localhost:8080/pkg/io/">io</a>.<a href="http://localhost:8080/pkg/io/#Reader">Reader</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="SelfSigned.Sign">func (*SelfSigned) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parlca/selfsigned.go#L66">Sign</a>
+					<a class="permalink" href="#SelfSigned.Sign">¶</a>
+					
+					
+				</h3>
+				<pre>func (ca *<a href="#SelfSigned">SelfSigned</a>) Sign(template *<a href="http://localhost:8080/pkg/crypto/x509/">x509</a>.<a href="http://localhost:8080/pkg/crypto/x509/#Certificate">Certificate</a>, publicKey <a href="http://localhost:8080/pkg/crypto/">crypto</a>.<a href="http://localhost:8080/pkg/crypto/#PublicKey">PublicKey</a>) (certDER <a href="#CertificateDER">CertificateDER</a>, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+				
+			
+		
+	
+
+	
+
+
+
+
+
+
+
+<div id="footer">
+Build version go1.17.8.<br/>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+
+</body></html>

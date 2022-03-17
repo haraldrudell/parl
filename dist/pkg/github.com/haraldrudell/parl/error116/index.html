@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#375EAB">
+
+  <title>error116 - GoPages</title>
+
+<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css">
+
+<script>window.initFuncs = [];</script>
+<script src="http://localhost:8080/lib/godoc/jquery.js" defer></script>
+
+
+
+
+<script>var goVersion = "go1.17.8";</script>
+<script src="http://localhost:8080/lib/godoc/godocs.js" defer></script>
+
+</head>
+<body>
+
+<div id='lowframe' style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/">GoPages | Auto-generated docs</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/">GoPages</a></div>
+<a href="#" id="menu-button"><span id="menu-button-arrow">&#9661;</span></a>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Package error116
+    <span class="text-muted"></span>
+  </h1>
+
+
+
+
+
+
+
+<div id="nav"></div>
+
+
+<!--
+	Copyright 2009 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
+-->
+<!--
+	Note: Static (i.e., not template-generated) href and id
+	attributes start with "pkg-" to make it impossible for
+	them to conflict with generated attributes (some of which
+	correspond to Go identifiers).
+-->
+
+	<script>
+	document.ANALYSIS_DATA = null;
+	document.CALLGRAPH = null;
+	</script>
+
+	
+		
+		<div id="short-nav">
+			<dl>
+			<dd><code>import "github.com/haraldrudell/parl/error116"</code></dd>
+			</dl>
+			<dl>
+			<dd><a href="#pkg-overview" class="overviewLink">Overview</a></dd>
+			<dd><a href="#pkg-index" class="indexLink">Index</a></dd>
+			
+			
+			</dl>
+		</div>
+		<!-- The package's Name is printed as title by the top-level template -->
+		<div id="pkg-overview" class="toggleVisible">
+			<div class="collapsed">
+				<h2 class="toggleButton" title="Click to show Overview section">Overview ▹</h2>
+			</div>
+			<div class="expanded">
+				<h2 class="toggleButton" title="Click to hide Overview section">Overview ▾</h2>
+				<p>
+Package error116 adds stack traces and maps of values to error values.
+</p>
+<p>
+fmt.Printf(&#34;%+v&#34;, err) stack, long lines
+</p>
+<p>
+fmt.Printf(&#34;%-v&#34;, err) stack, short lines
+</p>
+<p>
+fmt.Printf(&#34;%s&#34;, err)
+</p>
+<p>
+fmt.Printf(&#34;%q&#34;, err)
+</p>
+<p>
+© 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (<a href="https://haraldrudell.github.io/haraldrudell/">https://haraldrudell.github.io/haraldrudell/</a>)
+</p>
+
+				
+			</div>
+		</div>
+
+		<div id="pkg-index" class="toggleVisible">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Index section">Index ▹</h2>
+		</div>
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Index section">Index ▾</h2>
+
+		<!-- Table of contents for API; must be named manual-nav to turn off auto nav. -->
+			<div id="manual-nav">
+			<dl>
+			
+			
+			
+				
+				<dd><a href="#AllErrors">func AllErrors(err error) (errs []error)</a></dd>
+			
+				
+				<dd><a href="#AppendError">func AppendError(err error, e2 error) (e error)</a></dd>
+			
+				
+				<dd><a href="#ChainString">func ChainString(err error, format Format) (s string)</a></dd>
+			
+				
+				<dd><a href="#DumpChain">func DumpChain(err error) (s string)</a></dd>
+			
+				
+				<dd><a href="#ErrorChainSlice">func ErrorChainSlice(err error) (errs []error)</a></dd>
+			
+				
+				<dd><a href="#ErrorData">func ErrorData(err error, m DataMap) (e2 error)</a></dd>
+			
+				
+				<dd><a href="#ErrorList">func ErrorList(err error) (errs []error)</a></dd>
+			
+				
+				<dd><a href="#Errorf">func Errorf(format string, a ...interface{}) (err error)</a></dd>
+			
+				
+				<dd><a href="#Errp">func Errp(errp *error) func(e error)</a></dd>
+			
+				
+				<dd><a href="#HasStack">func HasStack(err error) (hasStack bool)</a></dd>
+			
+				
+				<dd><a href="#IsWarning">func IsWarning(err error) bool</a></dd>
+			
+				
+				<dd><a href="#Long">func Long(err error) string</a></dd>
+			
+				
+				<dd><a href="#New">func New(s string) error</a></dd>
+			
+				
+				<dd><a href="#PackFunc">func PackFunc() (packageDotFunction string)</a></dd>
+			
+				
+				<dd><a href="#Short">func Short(err error) string</a></dd>
+			
+				
+				<dd><a href="#Stack">func Stack(err error) (err2 error)</a></dd>
+			
+				
+				<dd><a href="#Stackn">func Stackn(err error, framesToSkip int) (err2 error)</a></dd>
+			
+				
+				<dd><a href="#Warning">func Warning(err error) error</a></dd>
+			
+			
+				
+				<dd><a href="#ChainStringer">type ChainStringer</a></dd>
+				
+				
+			
+				
+				<dd><a href="#CodeLocation">type CodeLocation</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#GetCodeLocation">func GetCodeLocation(rFrame *runtime.Frame) (cl *CodeLocation)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#NewCodeLocation">func NewCodeLocation(stackFramesToSkip int) (cl *CodeLocation)</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#CodeLocation.Base">func (cl *CodeLocation) Base() (baseName string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#CodeLocation.Name">func (cl *CodeLocation) Name() (funcName string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#CodeLocation.PackFunc">func (cl *CodeLocation) PackFunc() (packageDotFunction string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#CodeLocation.Package">func (cl *CodeLocation) Package() (funcName string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#CodeLocation.Short">func (cl *CodeLocation) Short() (funcName string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#CodeLocation.String">func (cl CodeLocation) String() string</a></dd>
+				
+			
+				
+				<dd><a href="#DataMap">type DataMap</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#GetAllMaps">func GetAllMaps(err error) (maps []DataMap)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#GetLastMap">func GetLastMap(err error) (m DataMap)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#ErrorCallStacker">type ErrorCallStacker</a></dd>
+				
+				
+			
+				
+				<dd><a href="#ErrorChain">type ErrorChain</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#ErrorChain.Unwrap">func (ec *ErrorChain) Unwrap() error</a></dd>
+				
+			
+				
+				<dd><a href="#ErrorHasCode">type ErrorHasCode</a></dd>
+				
+				
+			
+				
+				<dd><a href="#ErrorHasData">type ErrorHasData</a></dd>
+				
+				
+			
+				
+				<dd><a href="#ErrorHasList">type ErrorHasList</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Errors">type Errors</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Format">type Format</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#PrintfFormat">func PrintfFormat(s fmt.State) Format</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#SuffixFormat">func SuffixFormat(format Format, didError bool) (f2 Format)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#ParlError">type ParlError</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#ParlError.Add">func (pe *ParlError) Add(err error) (e error)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#ParlError.Get">func (pe *ParlError) Get() (e error)</a></dd>
+				
+			
+				
+				<dd><a href="#StackSlice">type StackSlice</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#GetInnerMostStack">func GetInnerMostStack(err error) (stack StackSlice)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#GetStackTrace">func GetStackTrace(err error) (stack StackSlice)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#NewStackSlice">func NewStackSlice(skip int) (slice StackSlice)</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#StackSlice.Format">func (st StackSlice) Format(s fmt.State, verb rune)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#StackSlice.Short">func (st StackSlice) Short() (s string)</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#StackSlice.String">func (st StackSlice) String() (s string)</a></dd>
+				
+			
+				
+				<dd><a href="#WarningType">type WarningType</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#WarningType.Error">func (w WarningType) Error() (s string)</a></dd>
+				
+			
+				
+				<dd><a href="#Wrapper">type Wrapper</a></dd>
+				
+				
+			
+			
+			</dl>
+			</div><!-- #manual-nav -->
+
+		
+
+		
+			<h3>Package files</h3>
+			<p>
+			<span style="font-size:90%">
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/all-errors.go">all-errors.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/chainstring.go">chainstring.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go">codelocation.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go">error116.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/errorchain.go">errorchain.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/errordata.go">errordata.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/errorlist.go">errorlist.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/errorstack.go">errorstack.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/new-errorf.go">new-errorf.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/parlerror.go">parlerror.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/stackslice.go">stackslice.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/warning.go">warning.go</a>
+			
+			</span>
+			</p>
+		
+		</div><!-- .expanded -->
+		</div><!-- #pkg-index -->
+
+		
+
+		
+		
+		
+			
+			
+			<h2 id="AllErrors">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/all-errors.go#L13">AllErrors</a>
+				<a class="permalink" href="#AllErrors">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func AllErrors(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (errs []<a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+AllErrors obtains all error objects of all error lists that err and its error chain contains.
+If err is nil, errs is empty otherwise errs[0] == err.
+If err and its error chain has no lists, errs contain only err
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="AppendError">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/all-errors.go#L63">AppendError</a>
+				<a class="permalink" href="#AppendError">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func AppendError(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>, e2 <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (e <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="ChainString">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/chainstring.go#L45">ChainString</a>
+				<a class="permalink" href="#ChainString">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func ChainString(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>, format <a href="#Format">Format</a>) (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			<p>
+ChainString  can print an error chain of any errors
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="DumpChain">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L93">DumpChain</a>
+				<a class="permalink" href="#DumpChain">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func DumpChain(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			<p>
+DumpChain gets a space-separated string of error implementation type names
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ErrorChainSlice">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/all-errors.go#L45">ErrorChainSlice</a>
+				<a class="permalink" href="#ErrorChainSlice">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func ErrorChainSlice(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (errs []<a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+ErrorChainSlice returns a slice of errors from a possible error chain.
+If err is nil, an empty slice is returned.
+If err does not have an error chain, a slice of only err is returned.
+Otherwise, the slice lists each error in the chain starting with err at index 0.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ErrorData">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/errordata.go#L20">ErrorData</a>
+				<a class="permalink" href="#ErrorData">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func ErrorData(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>, m <a href="#DataMap">DataMap</a>) (e2 <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+ErrorData adds a datamap to an error chain
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ErrorList">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/all-errors.go#L56">ErrorList</a>
+				<a class="permalink" href="#ErrorList">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func ErrorList(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (errs []<a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+ErrorList obtains the error list associated with err.
+is err has no list associated or the list is empty, len(errs) == 0
+err itself is not returned
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Errorf">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/new-errorf.go#L22">Errorf</a>
+				<a class="permalink" href="#Errorf">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func Errorf(format <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, a ...interface{}) (err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+Errorf wraps error and ensure a stack exists
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Errp">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L103">Errp</a>
+				<a class="permalink" href="#Errp">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func Errp(errp *<a href="http:/localhost:8080/pkg/builtin/#error">error</a>) func(e <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="HasStack">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L67">HasStack</a>
+				<a class="permalink" href="#HasStack">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func HasStack(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (hasStack <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+			<p>
+HasStack detects if the error chain already contains a stack trace
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="IsWarning">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/warning.go#L25">IsWarning</a>
+				<a class="permalink" href="#IsWarning">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func IsWarning(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a></pre>
+			<p>
+IsWarning determines if an error is a warning
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Long">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/chainstring.go#L40">Long</a>
+				<a class="permalink" href="#Long">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func Long(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) <a href="http:/localhost:8080/pkg/builtin/#string">string</a></pre>
+			<p>
+Long stringifies errors with all extra data
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="New">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/new-errorf.go#L14">New</a>
+				<a class="permalink" href="#New">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func New(s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) <a href="http:/localhost:8080/pkg/builtin/#error">error</a></pre>
+			<p>
+New does errors.New and error116.Stack
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="PackFunc">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L59">PackFunc</a>
+				<a class="permalink" href="#PackFunc">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func PackFunc() (packageDotFunction <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="Short">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/chainstring.go#L35">Short</a>
+				<a class="permalink" href="#Short">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func Short(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) <a href="http:/localhost:8080/pkg/builtin/#string">string</a></pre>
+			<p>
+Short stringifies errors with one-line extra data
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Stack">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/new-errorf.go#L31">Stack</a>
+				<a class="permalink" href="#Stack">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func Stack(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (err2 <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+Stack ensures the error chain has a stack trace
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Stackn">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/new-errorf.go#L41">Stackn</a>
+				<a class="permalink" href="#Stackn">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func Stackn(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>, framesToSkip <a href="http:/localhost:8080/pkg/builtin/#int">int</a>) (err2 <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+Stackn is Stack but allows to skip caller stack frames and will always add a stack
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Warning">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/warning.go#L20">Warning</a>
+				<a class="permalink" href="#Warning">&#xb6;</a>
+				
+				
+			</h2>
+			<pre>func Warning(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) <a href="http:/localhost:8080/pkg/builtin/#error">error</a></pre>
+			<p>
+Warning indicates a problem of less severity than error
+</p>
+
+			
+			
+
+		
+		
+			
+			
+			<h2 id="ChainStringer">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/chainstring.go#L27">ChainStringer</a>
+				<a class="permalink" href="#ChainStringer">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+ChainStringer converts an error chain to string format
+</p>
+
+			<pre>type ChainStringer interface {
+    ChainString(format <a href="#Format">Format</a>) <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="CodeLocation">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L17">CodeLocation</a>
+				<a class="permalink" href="#CodeLocation">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+CodeLocation is similar to runtime.Frame, but includes basic types
+string and int only
+</p>
+
+			<pre>type CodeLocation struct {
+<span id="CodeLocation.File"></span>    File <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// /opt/foxyboy/sw/privates/parl/mains/executable.go</span>
+<span id="CodeLocation.Line"></span>    Line <a href="http:/localhost:8080/pkg/builtin/#int">int</a>
+    <span class="comment">// package path ending in package name, optional type information, function name</span>
+    <span class="comment">// github.com/haraldrudell/parl/mains.(*Executable).AddErr</span>
+<span id="CodeLocation.FuncName"></span>    FuncName <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="GetCodeLocation">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L49">GetCodeLocation</a>
+					<a class="permalink" href="#GetCodeLocation">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func GetCodeLocation(rFrame *<a href="http:/localhost:8080/pkg/runtime/">runtime</a>.<a href="http:/localhost:8080/pkg/runtime/#Frame">Frame</a>) (cl *<a href="#CodeLocation">CodeLocation</a>)</pre>
+				
+				
+				
+			
+				
+				<h3 id="NewCodeLocation">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L25">NewCodeLocation</a>
+					<a class="permalink" href="#NewCodeLocation">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func NewCodeLocation(stackFramesToSkip <a href="http:/localhost:8080/pkg/builtin/#int">int</a>) (cl *<a href="#CodeLocation">CodeLocation</a>)</pre>
+				
+				
+				
+			
+
+			
+				
+				<h3 id="CodeLocation.Base">func (*CodeLocation) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L87">Base</a>
+					<a class="permalink" href="#CodeLocation.Base">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (cl *<a href="#CodeLocation">CodeLocation</a>) Base() (baseName <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				<p>
+Base returns base package name, optional types and function name: &#34;mains.(*Executable).AddErr&#34;
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="CodeLocation.Name">func (*CodeLocation) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L64">Name</a>
+					<a class="permalink" href="#CodeLocation.Name">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (cl *<a href="#CodeLocation">CodeLocation</a>) Name() (funcName <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				<p>
+FuncName returns function name, characters no space: &#34;AddErr&#34;
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="CodeLocation.PackFunc">func (*CodeLocation) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L82">PackFunc</a>
+					<a class="permalink" href="#CodeLocation.PackFunc">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (cl *<a href="#CodeLocation">CodeLocation</a>) PackFunc() (packageDotFunction <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				<p>
+PackFunc return base package name and function: &#34;mains.AddErr&#34;
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="CodeLocation.Package">func (*CodeLocation) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L73">Package</a>
+					<a class="permalink" href="#CodeLocation.Package">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (cl *<a href="#CodeLocation">CodeLocation</a>) Package() (funcName <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				<p>
+Package return base package name, single word of characters no space: &#34;mains&#34;
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="CodeLocation.Short">func (*CodeLocation) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L92">Short</a>
+					<a class="permalink" href="#CodeLocation.Short">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (cl *<a href="#CodeLocation">CodeLocation</a>) Short() (funcName <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				<p>
+Short returns base package name, optional types and function name and file: &#34;mains.(*Executable).AddErr-executable.go:25&#34;
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="CodeLocation.String">func (CodeLocation) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/codelocation.go#L96">String</a>
+					<a class="permalink" href="#CodeLocation.String">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (cl <a href="#CodeLocation">CodeLocation</a>) String() <a href="http:/localhost:8080/pkg/builtin/#string">string</a></pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="DataMap">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L64">DataMap</a>
+				<a class="permalink" href="#DataMap">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+DataMap is a map of values associated with an error
+</p>
+
+			<pre>type DataMap map[<a href="http:/localhost:8080/pkg/builtin/#string">string</a>]<a href="http:/localhost:8080/pkg/builtin/#string">string</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="GetAllMaps">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L113">GetAllMaps</a>
+					<a class="permalink" href="#GetAllMaps">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func GetAllMaps(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (maps []<a href="#DataMap">DataMap</a>)</pre>
+				<p>
+GetAllMaps retrieves all maps in the error chain, last at index 0
+</p>
+
+				
+				
+			
+				
+				<h3 id="GetLastMap">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L122">GetLastMap</a>
+					<a class="permalink" href="#GetLastMap">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func GetLastMap(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (m <a href="#DataMap">DataMap</a>)</pre>
+				<p>
+GetLastMap retrieves the last map in the error chain
+</p>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="ErrorCallStacker">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L28">ErrorCallStacker</a>
+				<a class="permalink" href="#ErrorCallStacker">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+ErrorCallStacker indicates that this error is a call stack wrapping another error
+</p>
+
+			<pre>type ErrorCallStacker interface {
+    StackTrace() <a href="#StackSlice">StackSlice</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="ErrorChain">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/errorchain.go#L15">ErrorChain</a>
+				<a class="permalink" href="#ErrorChain">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+ErrorChain implements a chain of errors.
+Error chains do exist in the Go standard library but types and interfaces are not public.
+error116.ErrorChain is used as an embedded type.
+To instantiate, use a composite literal like ErrorChain{err}.
+</p>
+<p>
+error116.ErrorChainSlice returns all errors of an error chain,
+or the chain can be traversed iteratively using errors.Unwrap().
+</p>
+
+			<pre>type ErrorChain struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="ErrorChain.Unwrap">func (*ErrorChain) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/errorchain.go#L24">Unwrap</a>
+					<a class="permalink" href="#ErrorChain.Unwrap">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (ec *<a href="#ErrorChain">ErrorChain</a>) Unwrap() <a href="http:/localhost:8080/pkg/builtin/#error">error</a></pre>
+				<p>
+Unwrap is a method required to make ErrorChain an error chain
+ErrorChain.Unwrap() is used by errors.Unwrap() and error116.ErrorChainSlice
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="ErrorHasCode">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L50">ErrorHasCode</a>
+				<a class="permalink" href="#ErrorHasCode">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+ErrorHasCode allows an error to classify itself
+</p>
+
+			<pre>type ErrorHasCode interface {
+    <a href="http:/localhost:8080/pkg/builtin/#error">error</a>
+    ErrorCode(code <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (hasCode <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>)
+    ErrorCodes(codes []<a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (has []<a href="http:/localhost:8080/pkg/builtin/#string">string</a>)
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="ErrorHasData">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L44">ErrorHasData</a>
+				<a class="permalink" href="#ErrorHasData">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+ErrorHasData is an interface providing the ErrorHasData map
+</p>
+
+			<pre>type ErrorHasData interface {
+    <a href="http:/localhost:8080/pkg/builtin/#error">error</a>
+    GetMap() (ed <a href="#DataMap">DataMap</a>)
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="ErrorHasList">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L56">ErrorHasList</a>
+				<a class="permalink" href="#ErrorHasList">&#xb6;</a>
+				
+				
+			</h2>
+			
+			<pre>type ErrorHasList interface {
+    <a href="http:/localhost:8080/pkg/builtin/#error">error</a>
+    ErrorList() (errors []<a href="http:/localhost:8080/pkg/builtin/#error">error</a>)
+    Append(extra <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)
+    Count() <a href="http:/localhost:8080/pkg/builtin/#int">int</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Errors">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L32">Errors</a>
+				<a class="permalink" href="#Errors">&#xb6;</a>
+				
+				
+			</h2>
+			
+			<pre>type Errors interface {
+    <a href="http:/localhost:8080/pkg/builtin/#error">error</a> <span class="comment">// Error() string: the short error message</span>
+    Long() <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Format">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/chainstring.go#L32">Format</a>
+				<a class="permalink" href="#Format">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+Format describes string conversion of an error chain
+</p>
+
+			<pre>type Format <a href="http:/localhost:8080/pkg/builtin/#byte">byte</a></pre>
+
+			
+				
+				<pre>const (
+    <span class="comment">// DefaultFormat %v output</span>
+    <span id="DefaultFormat">DefaultFormat</span> <a href="#Format">Format</a> = <a href="http:/localhost:8080/pkg/builtin/#iota">iota</a> + 1
+    <span class="comment">// ShortFormat one-line location %-v</span>
+    <span id="ShortFormat">ShortFormat</span>
+    <span class="comment">// LongFormat full stack trace %+v</span>
+    <span id="LongFormat">LongFormat</span>
+    <span class="comment">// ShortSuffix one-line without message</span>
+    <span id="ShortSuffix">ShortSuffix</span>
+    <span class="comment">// LongSuffix full stack trace without message</span>
+    <span id="LongSuffix">LongSuffix</span>
+)</pre>
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="PrintfFormat">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/chainstring.go#L77">PrintfFormat</a>
+					<a class="permalink" href="#PrintfFormat">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func PrintfFormat(s <a href="http:/localhost:8080/pkg/fmt/">fmt</a>.<a href="http:/localhost:8080/pkg/fmt/#State">State</a>) <a href="#Format">Format</a></pre>
+				<p>
+PrintfFormat gets Format for the Printf v verb
+</p>
+
+				
+				
+			
+				
+				<h3 id="SuffixFormat">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/chainstring.go#L65">SuffixFormat</a>
+					<a class="permalink" href="#SuffixFormat">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func SuffixFormat(format <a href="#Format">Format</a>, didError <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>) (f2 <a href="#Format">Format</a>)</pre>
+				<p>
+SuffixFormat takes into account if the wrapped error chain has already been printed
+</p>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="ParlError">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/parlerror.go#L11">ParlError</a>
+				<a class="permalink" href="#ParlError">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+ParlError is a thread-safe error container
+</p>
+
+			<pre>type ParlError struct {
+    <a href="http:/localhost:8080/pkg/sync/">sync</a>.<a href="http:/localhost:8080/pkg/sync/#RWMutex">RWMutex</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="ParlError.Add">func (*ParlError) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/parlerror.go#L17">Add</a>
+					<a class="permalink" href="#ParlError.Add">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (pe *<a href="#ParlError">ParlError</a>) Add(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (e <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+Add stores additional errors in the comtainer. Thread-safe
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ParlError.Get">func (*ParlError) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/parlerror.go#L32">Get</a>
+					<a class="permalink" href="#ParlError.Get">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (pe *<a href="#ParlError">ParlError</a>) Get() (e <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+Get returns the error value enclosed in ParlError. Thread-safe
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="StackSlice">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/stackslice.go#L20">StackSlice</a>
+				<a class="permalink" href="#StackSlice">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+StackSlice represents a StackSlice of program counters.
+</p>
+
+			<pre>type StackSlice []<a href="#CodeLocation">CodeLocation</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="GetInnerMostStack">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L82">GetInnerMostStack</a>
+					<a class="permalink" href="#GetInnerMostStack">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func GetInnerMostStack(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (stack <a href="#StackSlice">StackSlice</a>)</pre>
+				<p>
+GetInnerMostStack gets the oldest stack trace in the error chain
+</p>
+
+				
+				
+			
+				
+				<h3 id="GetStackTrace">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L73">GetStackTrace</a>
+					<a class="permalink" href="#GetStackTrace">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func GetStackTrace(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (stack <a href="#StackSlice">StackSlice</a>)</pre>
+				<p>
+GetStackTrace gets the last stack trace
+</p>
+
+				
+				
+			
+				
+				<h3 id="NewStackSlice">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/stackslice.go#L23">NewStackSlice</a>
+					<a class="permalink" href="#NewStackSlice">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func NewStackSlice(skip <a href="http:/localhost:8080/pkg/builtin/#int">int</a>) (slice <a href="#StackSlice">StackSlice</a>)</pre>
+				<p>
+NewStackSlice gets a slice of stack frames
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="StackSlice.Format">func (StackSlice) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/stackslice.go#L58">Format</a>
+					<a class="permalink" href="#StackSlice.Format">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (st <a href="#StackSlice">StackSlice</a>) Format(s <a href="http:/localhost:8080/pkg/fmt/">fmt</a>.<a href="http:/localhost:8080/pkg/fmt/#State">State</a>, verb <a href="http:/localhost:8080/pkg/builtin/#rune">rune</a>)</pre>
+				<p>
+Format implements fmt.Formatter
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="StackSlice.Short">func (StackSlice) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/stackslice.go#L45">Short</a>
+					<a class="permalink" href="#StackSlice.Short">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (st <a href="#StackSlice">StackSlice</a>) Short() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="StackSlice.String">func (StackSlice) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/stackslice.go#L50">String</a>
+					<a class="permalink" href="#StackSlice.String">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (st <a href="#StackSlice">StackSlice</a>) String() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="WarningType">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/warning.go#L13">WarningType</a>
+				<a class="permalink" href="#WarningType">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+WarningType is an error with lesser impact
+</p>
+
+			<pre>type WarningType struct {
+    <a href="#ErrorChain">ErrorChain</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="WarningType.Error">func (WarningType) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/warning.go#L30">Error</a>
+					<a class="permalink" href="#WarningType.Error">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (w <a href="#WarningType">WarningType</a>) Error() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Wrapper">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/error116/error116.go#L39">Wrapper</a>
+				<a class="permalink" href="#Wrapper">&#xb6;</a>
+				
+				
+			</h2>
+			<p>
+error116.Wrapper is an interface indicating error-chain capabilities.
+It is not public in errors package
+</p>
+
+			<pre>type Wrapper interface {
+    Unwrap() <a href="http:/localhost:8080/pkg/builtin/#error">error</a> <span class="comment">// Unwrap returns the next error in the chain or nil</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+	
+
+	
+
+
+
+
+
+
+
+<div id="footer">
+Build version go1.17.8.<br>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+</body>
+</html>

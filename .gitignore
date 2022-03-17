@@ -1,0 +1,7 @@
+# © 2017–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+# ISC License
+/bin-darwin/*
+/bin-linux/*
+/bin-linux32/*
+/bin-darwin-arm64/*
+/tmp

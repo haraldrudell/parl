@@ -1,0 +1,1535 @@
+<!DOCTYPE html><html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#375EAB"/>
+
+  <title>parlfs - TITLE</title>
+
+<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css"/>
+
+<script>window.initFuncs = [];</script>
+<script src="http://localhost:8080/lib/godoc/jquery.js" defer=""></script>
+
+
+
+
+<script>var goVersion = "go1.17.8";</script>
+<script src="http://localhost:8080/lib/godoc/godocs.js" defer=""></script>
+
+</head>
+<body>
+
+<div id="lowframe" style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/">TITLE | DESCRIPTION</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/">TITLE</a></div>
+<a href="#" id="menu-button"><span id="menu-button-arrow">▽</span></a>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Package parlfs
+    <span class="text-muted"></span>
+  </h1>
+
+
+
+
+
+
+
+<div id="nav"></div>
+
+
+<!--
+	Copyright 2009 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
+-->
+<!--
+	Note: Static (i.e., not template-generated) href and id
+	attributes start with "pkg-" to make it impossible for
+	them to conflict with generated attributes (some of which
+	correspond to Go identifiers).
+-->
+
+	<script>
+	document.ANALYSIS_DATA = null;
+	document.CALLGRAPH = null;
+	</script>
+
+	
+		
+		<div id="short-nav">
+			<dl>
+			<dd><code>import &#34;github.com/haraldrudell/parl/parlfs&#34;</code></dd>
+			</dl>
+			<dl>
+			<dd><a href="#pkg-overview" class="overviewLink">Overview</a></dd>
+			<dd><a href="#pkg-index" class="indexLink">Index</a></dd>
+			
+			
+			</dl>
+		</div>
+		<!-- The package's Name is printed as title by the top-level template -->
+		<div id="pkg-overview" class="toggleVisible">
+			<div class="collapsed">
+				<h2 class="toggleButton" title="Click to show Overview section">Overview ▹</h2>
+			</div>
+			<div class="expanded">
+				<h2 class="toggleButton" title="Click to hide Overview section">Overview ▾</h2>
+				<p>
+Package parlfs provides file-system related functions
+</p>
+<h3 id="hdr-Package_parlfs_provides_file_system_related_functions">Package parlfs provides file-system related functions</h3>
+<p>
+© 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (<a href="https://haraldrudell.github.io/haraldrudell/">https://haraldrudell.github.io/haraldrudell/</a>)
+</p>
+
+				
+			</div>
+		</div>
+
+		<div id="pkg-index" class="toggleVisible">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Index section">Index ▹</h2>
+		</div>
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Index section">Index ▾</h2>
+
+		<!-- Table of contents for API; must be named manual-nav to turn off auto nav. -->
+			<div id="manual-nav">
+			<dl>
+			
+				<dd><a href="#pkg-constants">Constants</a></dd>
+			
+			
+			
+				
+				<dd><a href="#AbsEval">func AbsEval(path string) (p string, err error)</a></dd>
+			
+				
+				<dd><a href="#AppDir">func AppDir(appName string) (directory string)</a></dd>
+			
+				
+				<dd><a href="#Dirs">func Dirs(dir string) (dirs []string, err error)</a></dd>
+			
+				
+				<dd><a href="#EnsureDirectory">func EnsureDirectory(directory string, dirMode fs.FileMode)</a></dd>
+			
+				
+				<dd><a href="#Exists">func Exists(path string) (fileInfo fs.FileInfo)</a></dd>
+			
+				
+				<dd><a href="#GetModeBitValues">func GetModeBitValues() (s string)</a></dd>
+			
+				
+				<dd><a href="#IsDirectory">func IsDirectory(path string, flags IsDirectoryArg) (isDirectory bool, err error)</a></dd>
+			
+				
+				<dd><a href="#IsEmptyDirectory">func IsEmptyDirectory(path string) (isEmpty bool)</a></dd>
+			
+				
+				<dd><a href="#MoveOrMerge">func MoveOrMerge(src, dest string, outConsumer func(string)) (err error)</a></dd>
+			
+				
+				<dd><a href="#Mv">func Mv(src, dest string, outConsumer func(string)) (err error)</a></dd>
+			
+				
+				<dd><a href="#NewContextReader">func NewContextReader(ctx context.Context, reader io.Reader) io.Reader</a></dd>
+			
+				
+				<dd><a href="#Stat">func Stat(path string) (fileInfo fs.FileInfo, err error)</a></dd>
+			
+				
+				<dd><a href="#Walk">func Walk(root string, walkFn filepath.WalkFunc) (err error)</a></dd>
+			
+			
+				
+				<dd><a href="#AppDirectory">type AppDirectory</a></dd>
+				
+					
+					<dd>    <a href="#NewAppDir">func NewAppDir(appName string) (appd *AppDirectory)</a></dd>
+				
+				
+					
+					<dd>    <a href="#AppDirectory.Directory">func (appd *AppDirectory) Directory() (directory string)</a></dd>
+				
+			
+				
+				<dd><a href="#ContextReader">type ContextReader</a></dd>
+				
+				
+					
+					<dd>    <a href="#ContextReader.Read">func (cr *ContextReader) Read(p []byte) (n int, err error)</a></dd>
+				
+			
+				
+				<dd><a href="#DLEntry">type DLEntry</a></dd>
+				
+					
+					<dd>    <a href="#GetEntry">func GetEntry(rel, abs string, entry fs.DirEntry, info fs.FileInfo, stat *syscall.Stat_t) (e *DLEntry)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Directory">type Directory</a></dd>
+				
+				
+					
+					<dd>    <a href="#Directory.Walk">func (dir *Directory) Walk(path string, walkFunc filepath.WalkFunc) error</a></dd>
+				
+			
+				
+				<dd><a href="#DirectoryLister">type DirectoryLister</a></dd>
+				
+					
+					<dd>    <a href="#NewDirStream">func NewDirStream(path string, chanSize int) (dir *DirectoryLister)</a></dd>
+				
+				
+					
+					<dd>    <a href="#DirectoryLister.Shutdown">func (dir *DirectoryLister) Shutdown()</a></dd>
+				
+			
+				
+				<dd><a href="#Entry">type Entry</a></dd>
+				
+				
+					
+					<dd>    <a href="#Entry.SafeName">func (en *Entry) SafeName() string</a></dd>
+				
+					
+					<dd>    <a href="#Entry.Walk">func (en *Entry) Walk(path string, walkFunc filepath.WalkFunc) error</a></dd>
+				
+			
+				
+				<dd><a href="#EntryResult">type EntryResult</a></dd>
+				
+					
+					<dd>    <a href="#GetErrorResult">func GetErrorResult(err error) (result *EntryResult)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#FSEntry">type FSEntry</a></dd>
+				
+					
+					<dd>    <a href="#NewDirectory">func NewDirectory(path string, entry *Entry, sym func(string)) FSEntry</a></dd>
+				
+					
+					<dd>    <a href="#NewEntry">func NewEntry(path string, base string, sym func(string)) FSEntry</a></dd>
+				
+				
+			
+				
+				<dd><a href="#FileMode">type FileMode</a></dd>
+				
+				
+					
+					<dd>    <a href="#FileMode.Ch">func (fm FileMode) Ch() (s string)</a></dd>
+				
+					
+					<dd>    <a href="#FileMode.Check">func (fm FileMode) Check() (str string)</a></dd>
+				
+					
+					<dd>    <a href="#FileMode.Hex">func (fm FileMode) Hex() (s string)</a></dd>
+				
+					
+					<dd>    <a href="#FileMode.Hex8">func (fm FileMode) Hex8() (s string)</a></dd>
+				
+					
+					<dd>    <a href="#FileMode.Or">func (fm FileMode) Or() (s string)</a></dd>
+				
+					
+					<dd>    <a href="#FileMode.String">func (fm FileMode) String() (s string)</a></dd>
+				
+			
+				
+				<dd><a href="#IsDirectoryArg">type IsDirectoryArg</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Op">type Op</a></dd>
+				
+				
+					
+					<dd>    <a href="#Op.String">func (op Op) String() (s string)</a></dd>
+				
+			
+				
+				<dd><a href="#Root">type Root</a></dd>
+				
+					
+					<dd>    <a href="#NewRoot">func NewRoot(path string) (rt *Root, err error)</a></dd>
+				
+				
+					
+					<dd>    <a href="#Root.Build">func (rt *Root) Build(sym func(string))</a></dd>
+				
+					
+					<dd>    <a href="#Root.Walk">func (rt *Root) Walk(walkFunc filepath.WalkFunc) error</a></dd>
+				
+			
+				
+				<dd><a href="#Sha256">type Sha256</a></dd>
+				
+					
+					<dd>    <a href="#Sha256Context">func Sha256Context(ctx context.Context, filename string) (s2 Sha256, err error)</a></dd>
+				
+				
+					
+					<dd>    <a href="#Sha256.String">func (s2 Sha256) String() string</a></dd>
+				
+					
+					<dd>    <a href="#Sha256.Valid">func (s2 *Sha256) Valid() bool</a></dd>
+				
+			
+				
+				<dd><a href="#Tree">type Tree</a></dd>
+				
+					
+					<dd>    <a href="#NewTree">func NewTree() *Tree</a></dd>
+				
+				
+					
+					<dd>    <a href="#Tree.AddRoot">func (tree *Tree) AddRoot(path string) (symlinkTargets []string, err error)</a></dd>
+				
+					
+					<dd>    <a href="#Tree.ResolveSymlink">func (tree *Tree) ResolveSymlink(path string) (symlinkTargets []string, err error)</a></dd>
+				
+					
+					<dd>    <a href="#Tree.Walk">func (tree *Tree) Walk(walkFunc filepath.WalkFunc) error</a></dd>
+				
+			
+				
+				<dd><a href="#Watch">type Watch</a></dd>
+				
+					
+					<dd>    <a href="#NewWatch">func NewWatch(directory string, filter fsnotify.Op, ctx context.Context) (watch *Watch)</a></dd>
+				
+				
+					
+					<dd>    <a href="#Watch.Errors">func (wa *Watch) Errors() (errCh &lt;-chan error)</a></dd>
+				
+					
+					<dd>    <a href="#Watch.Events">func (wa *Watch) Events() (events &lt;-chan *WatchEvent)</a></dd>
+				
+					
+					<dd>    <a href="#Watch.Shutdown">func (wa *Watch) Shutdown()</a></dd>
+				
+			
+				
+				<dd><a href="#WatchEvent">type WatchEvent</a></dd>
+				
+				
+					
+					<dd>    <a href="#WatchEvent.String">func (we WatchEvent) String() string</a></dd>
+				
+			
+			
+			</dl>
+			</div><!-- #manual-nav -->
+
+		
+
+		
+			<h3>Package files</h3>
+			<p>
+			<span style="font-size:90%">
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/appdir.go">appdir.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/contextreader.go">contextreader.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/directory.go">directory.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/entry.go">entry.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fs.go">fs.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fsmode.go">fsmode.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/parlfs.go">parlfs.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/sha256.go">sha256.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walk.go">walk.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkdir.go">walkdir.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkentry.go">walkentry.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkroot.go">walkroot.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walktree.go">walktree.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch-event.go">watch-event.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch-op.go">watch-op.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch.go">watch.go</a>
+			
+			</span>
+			</p>
+		
+		</div><!-- .expanded -->
+		</div><!-- #pkg-index -->
+
+		
+
+		
+			<h2 id="pkg-constants">Constants</h2>
+			
+				
+				<pre>const (
+    <span id="Create">Create</span> <a href="http:/localhost:8080/pkg/github.com/fsnotify/fsnotify/">fsnotify</a>.<a href="http:/localhost:8080/pkg/github.com/fsnotify/fsnotify/#Op">Op</a> = 1 &lt;&lt; <a href="http:/localhost:8080/pkg/builtin/#iota">iota</a>
+    <span id="Write">Write</span>
+    <span id="Remove">Remove</span>
+    <span id="Rename">Rename</span>
+    <span id="Chmod">Chmod</span>
+)</pre>
+			
+				
+				<pre>const (
+    <span class="comment">// AllModeBits is all known github.com/fsnotify/fsevents.EventFlags</span>
+    <span id="AllModeBits">AllModeBits</span> <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#FileMode">FileMode</a> = <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeDir">ModeDir</a> | <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeAppend">ModeAppend</a> | <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeExclusive">ModeExclusive</a> |
+        <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeTemporary">ModeTemporary</a> | <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeSymlink">ModeSymlink</a> | <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeDevice">ModeDevice</a> | <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeNamedPipe">ModeNamedPipe</a> |
+        <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeSocket">ModeSocket</a> | <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeSetuid">ModeSetuid</a> | <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeSetgid">ModeSetgid</a> | <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeCharDevice">ModeCharDevice</a> |
+        <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeSticky">ModeSticky</a> | <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#ModeIrregular">ModeIrregular</a>
+)</pre>
+			
+				
+				<pre>const <span id="WatchOpAll">WatchOpAll</span> <a href="http:/localhost:8080/pkg/github.com/fsnotify/fsnotify/">fsnotify</a>.<a href="http:/localhost:8080/pkg/github.com/fsnotify/fsnotify/#Op">Op</a> = 0 <span class="comment">// Create|Write|Remove|Rename|Chmod</span>
+</pre>
+			
+		
+		
+		
+			
+			
+			<h2 id="AbsEval">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/parlfs.go#L19">AbsEval</a>
+				<a class="permalink" href="#AbsEval">¶</a>
+				
+				
+			</h2>
+			<pre>func AbsEval(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (p <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+AbsEval makes path absolute and resolves symlinks
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="AppDir">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/appdir.go#L24">AppDir</a>
+				<a class="permalink" href="#AppDir">¶</a>
+				
+				
+			</h2>
+			<pre>func AppDir(appName <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (directory <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			<p>
+AppDir gets an app-specific file system directory
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Dirs">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/parlfs.go#L27">Dirs</a>
+				<a class="permalink" href="#Dirs">¶</a>
+				
+				
+			</h2>
+			<pre>func Dirs(dir <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (dirs []<a href="http:/localhost:8080/pkg/builtin/#string">string</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+Dirs retrieves absolute paths to all directories, while following symlinks, from initial dir argument
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="EnsureDirectory">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fs.go#L99">EnsureDirectory</a>
+				<a class="permalink" href="#EnsureDirectory">¶</a>
+				
+				
+			</h2>
+			<pre>func EnsureDirectory(directory <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, dirMode <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#FileMode">FileMode</a>)</pre>
+			<p>
+use 0 for default file mode owner rwx
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Exists">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fs.go#L49">Exists</a>
+				<a class="permalink" href="#Exists">¶</a>
+				
+				
+			</h2>
+			<pre>func Exists(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (fileInfo <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#FileInfo">FileInfo</a>)</pre>
+			<p>
+fileInfo: does exist, nil: does not exist
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="GetModeBitValues">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fsmode.go#L50">GetModeBitValues</a>
+				<a class="permalink" href="#GetModeBitValues">¶</a>
+				
+				
+			</h2>
+			<pre>func GetModeBitValues() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="IsDirectory">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fs.go#L61">IsDirectory</a>
+				<a class="permalink" href="#IsDirectory">¶</a>
+				
+				
+			</h2>
+			<pre>func IsDirectory(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, flags <a href="#IsDirectoryArg">IsDirectoryArg</a>) (isDirectory <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="IsEmptyDirectory">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fs.go#L75">IsEmptyDirectory</a>
+				<a class="permalink" href="#IsEmptyDirectory">¶</a>
+				
+				
+			</h2>
+			<pre>func IsEmptyDirectory(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (isEmpty <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="MoveOrMerge">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fs.go#L120">MoveOrMerge</a>
+				<a class="permalink" href="#MoveOrMerge">¶</a>
+				
+				
+			</h2>
+			<pre>func MoveOrMerge(src, dest <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, outConsumer func(<a href="http:/localhost:8080/pkg/builtin/#string">string</a>)) (err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="Mv">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fs.go#L28">Mv</a>
+				<a class="permalink" href="#Mv">¶</a>
+				
+				
+			</h2>
+			<pre>func Mv(src, dest <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, outConsumer func(<a href="http:/localhost:8080/pkg/builtin/#string">string</a>)) (err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="NewContextReader">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/contextreader.go#L21">NewContextReader</a>
+				<a class="permalink" href="#NewContextReader">¶</a>
+				
+				
+			</h2>
+			<pre>func NewContextReader(ctx <a href="http:/localhost:8080/pkg/context/">context</a>.<a href="http:/localhost:8080/pkg/context/#Context">Context</a>, reader <a href="http:/localhost:8080/pkg/io/">io</a>.<a href="http:/localhost:8080/pkg/io/#Reader">Reader</a>) <a href="http:/localhost:8080/pkg/io/">io</a>.<a href="http:/localhost:8080/pkg/io/#Reader">Reader</a></pre>
+			<p>
+NewContextReader instantiates ContextReader
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Stat">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fs.go#L41">Stat</a>
+				<a class="permalink" href="#Stat">¶</a>
+				
+				
+			</h2>
+			<pre>func Stat(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (fileInfo <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#FileInfo">FileInfo</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="Walk">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walk.go#L18">Walk</a>
+				<a class="permalink" href="#Walk">¶</a>
+				
+				
+			</h2>
+			<pre>func Walk(root <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, walkFn <a href="http:/localhost:8080/pkg/path/filepath/">filepath</a>.<a href="http:/localhost:8080/pkg/path/filepath/#WalkFunc">WalkFunc</a>) (err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+Walk parlfs.Walk traverses a directory hierarchy following symlinks.
+Every entry in the hierarchy is provided exactly once to walkFn.
+To identify circular symlinks, the hierarchy is first completely scanned.
+golang has a similar built-in filepath.Walk that does not follow symlinks
+</p>
+
+			
+			
+
+		
+		
+			
+			
+			<h2 id="AppDirectory">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/appdir.go#L14">AppDirectory</a>
+				<a class="permalink" href="#AppDirectory">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type AppDirectory struct {
+<span id="AppDirectory.App"></span>    App <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewAppDir">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/appdir.go#L19">NewAppDir</a>
+					<a class="permalink" href="#NewAppDir">¶</a>
+					
+					
+				</h3>
+				<pre>func NewAppDir(appName <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (appd *<a href="#AppDirectory">AppDirectory</a>)</pre>
+				<p>
+NewAppDir returns an object providing an app-specific file system location with defered directory creation
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="AppDirectory.Directory">func (*AppDirectory) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/appdir.go#L34">Directory</a>
+					<a class="permalink" href="#AppDirectory.Directory">¶</a>
+					
+					
+				</h3>
+				<pre>func (appd *<a href="#AppDirectory">AppDirectory</a>) Directory() (directory <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="ContextReader">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/contextreader.go#L15">ContextReader</a>
+				<a class="permalink" href="#ContextReader">¶</a>
+				
+				
+			</h2>
+			<p>
+ContextReader reader terminated by context
+</p>
+
+			<pre>type ContextReader struct {
+    <a href="http:/localhost:8080/pkg/io/">io</a>.<a href="http:/localhost:8080/pkg/io/#Reader">Reader</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="ContextReader.Read">func (*ContextReader) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/contextreader.go#L25">Read</a>
+					<a class="permalink" href="#ContextReader.Read">¶</a>
+					
+					
+				</h3>
+				<pre>func (cr *<a href="#ContextReader">ContextReader</a>) Read(p []<a href="http:/localhost:8080/pkg/builtin/#byte">byte</a>) (n <a href="http:/localhost:8080/pkg/builtin/#int">int</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="DLEntry">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/entry.go#L16">DLEntry</a>
+				<a class="permalink" href="#DLEntry">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type DLEntry struct {
+<span id="DLEntry.RelDir"></span>    RelDir      <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// directory name that may begin with &#39;.&#39;</span>
+<span id="DLEntry.AbsDir"></span>    AbsDir      <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// absolute directory name</span>
+<span id="DLEntry.FqPath"></span>    FqPath      <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// fully qualified path to entry</span>
+    <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#DirEntry">DirEntry</a>        <span class="comment">// .Name() .IsDir() .Type() .Info()</span>
+<span id="DLEntry.Info"></span>    Info        <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#FileInfo">FileInfo</a>
+<span id="DLEntry.Stat"></span>    Stat        *<a href="http:/localhost:8080/pkg/syscall/">syscall</a>.<a href="http:/localhost:8080/pkg/syscall/#Stat_t">Stat_t</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="GetEntry">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/entry.go#L25">GetEntry</a>
+					<a class="permalink" href="#GetEntry">¶</a>
+					
+					
+				</h3>
+				<pre>func GetEntry(rel, abs <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, entry <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#DirEntry">DirEntry</a>, info <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#FileInfo">FileInfo</a>, stat *<a href="http:/localhost:8080/pkg/syscall/">syscall</a>.<a href="http:/localhost:8080/pkg/syscall/#Stat_t">Stat_t</a>) (e *<a href="#DLEntry">DLEntry</a>)</pre>
+				
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="Directory">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkdir.go#L15">Directory</a>
+				<a class="permalink" href="#Directory">¶</a>
+				
+				
+			</h2>
+			<p>
+Directory is a file system entry with children
+</p>
+
+			<pre>type Directory struct {
+    <a href="#Entry">Entry</a>
+<span id="Directory.Children"></span>    Children []<a href="#FSEntry">FSEntry</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Directory.Walk">func (*Directory) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkdir.go#L35">Walk</a>
+					<a class="permalink" href="#Directory.Walk">¶</a>
+					
+					
+				</h3>
+				<pre>func (dir *<a href="#Directory">Directory</a>) Walk(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, walkFunc <a href="http:/localhost:8080/pkg/path/filepath/">filepath</a>.<a href="http:/localhost:8080/pkg/path/filepath/#WalkFunc">WalkFunc</a>) <a href="http:/localhost:8080/pkg/builtin/#error">error</a></pre>
+				<p>
+Walk traverses a built root
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="DirectoryLister">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/directory.go#L20">DirectoryLister</a>
+				<a class="permalink" href="#DirectoryLister">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type DirectoryLister struct {
+<span id="DirectoryLister.Path"></span>    Path    <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// may begin with ., may be .</span>
+<span id="DirectoryLister.Abs"></span>    Abs     <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="DirectoryLister.Results"></span>    Results chan *<a href="#EntryResult">EntryResult</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewDirStream">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/directory.go#L40">NewDirStream</a>
+					<a class="permalink" href="#NewDirStream">¶</a>
+					
+					
+				</h3>
+				<pre>func NewDirStream(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, chanSize <a href="http:/localhost:8080/pkg/builtin/#int">int</a>) (dir *<a href="#DirectoryLister">DirectoryLister</a>)</pre>
+				
+				
+				
+			
+
+			
+				
+				<h3 id="DirectoryLister.Shutdown">func (*DirectoryLister) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/directory.go#L60">Shutdown</a>
+					<a class="permalink" href="#DirectoryLister.Shutdown">¶</a>
+					
+					
+				</h3>
+				<pre>func (dir *<a href="#DirectoryLister">DirectoryLister</a>) Shutdown()</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Entry">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkentry.go#L14">Entry</a>
+				<a class="permalink" href="#Entry">¶</a>
+				
+				
+			</h2>
+			<p>
+Entry is a file system entry that can be part of directory, symlink or other
+</p>
+
+			<pre>type Entry struct {
+<span id="Entry.Base"></span>    Base        <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// we can have entries with FileInfo nil, so base path must be stored</span>
+    <a href="http:/localhost:8080/pkg/os/">os</a>.<a href="http:/localhost:8080/pkg/os/#FileInfo">FileInfo</a>        <span class="comment">// info.Name() has basename, os.FileInfo: interface</span>
+<span id="Entry.Err"></span>    Err         <a href="http:/localhost:8080/pkg/builtin/#error">error</a>  <span class="comment">// a symlink may fail to resolve</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Entry.SafeName">func (*Entry) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkentry.go#L41">SafeName</a>
+					<a class="permalink" href="#Entry.SafeName">¶</a>
+					
+					
+				</h3>
+				<pre>func (en *<a href="#Entry">Entry</a>) SafeName() <a href="http:/localhost:8080/pkg/builtin/#string">string</a></pre>
+				<p>
+SafeName gets filepath.Base() in a safe way
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Entry.Walk">func (*Entry) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkentry.go#L49">Walk</a>
+					<a class="permalink" href="#Entry.Walk">¶</a>
+					
+					
+				</h3>
+				<pre>func (en *<a href="#Entry">Entry</a>) Walk(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, walkFunc <a href="http:/localhost:8080/pkg/path/filepath/">filepath</a>.<a href="http:/localhost:8080/pkg/path/filepath/#WalkFunc">WalkFunc</a>) <a href="http:/localhost:8080/pkg/builtin/#error">error</a></pre>
+				<p>
+Walk traverses a built root
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="EntryResult">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/entry.go#L29">EntryResult</a>
+				<a class="permalink" href="#EntryResult">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type EntryResult struct {
+    *<a href="#DLEntry">DLEntry</a>
+<span id="EntryResult.Err"></span>    Err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="GetErrorResult">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/entry.go#L34">GetErrorResult</a>
+					<a class="permalink" href="#GetErrorResult">¶</a>
+					
+					
+				</h3>
+				<pre>func GetErrorResult(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (result *<a href="#EntryResult">EntryResult</a>)</pre>
+				
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="FSEntry">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkroot.go#L16">FSEntry</a>
+				<a class="permalink" href="#FSEntry">¶</a>
+				
+				
+			</h2>
+			<p>
+FSEntry represnt a branch in a file system hierarchy
+FSEntry is implemented by Entry (file) or Directory or Root (walk entry point)
+</p>
+
+			<pre>type FSEntry interface {
+    SafeName() <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+    IsDir() <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>
+    Walk(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, walkFunc <a href="http:/localhost:8080/pkg/path/filepath/">filepath</a>.<a href="http:/localhost:8080/pkg/path/filepath/#WalkFunc">WalkFunc</a>) <a href="http:/localhost:8080/pkg/builtin/#error">error</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewDirectory">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkdir.go#L21">NewDirectory</a>
+					<a class="permalink" href="#NewDirectory">¶</a>
+					
+					
+				</h3>
+				<pre>func NewDirectory(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, entry *<a href="#Entry">Entry</a>, sym func(<a href="http:/localhost:8080/pkg/builtin/#string">string</a>)) <a href="#FSEntry">FSEntry</a></pre>
+				<p>
+NewDirectory instantiates FSEntry that can have children
+</p>
+
+				
+				
+			
+				
+				<h3 id="NewEntry">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkentry.go#L21">NewEntry</a>
+					<a class="permalink" href="#NewEntry">¶</a>
+					
+					
+				</h3>
+				<pre>func NewEntry(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, base <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, sym func(<a href="http:/localhost:8080/pkg/builtin/#string">string</a>)) <a href="#FSEntry">FSEntry</a></pre>
+				<p>
+NewEntry returns Entry or Directory
+</p>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="FileMode">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fsmode.go#L14">FileMode</a>
+				<a class="permalink" href="#FileMode">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type FileMode struct {
+    <a href="http:/localhost:8080/pkg/io/fs/">fs</a>.<a href="http:/localhost:8080/pkg/io/fs/#FileMode">FileMode</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="FileMode.Ch">func (FileMode) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fsmode.go#L94">Ch</a>
+					<a class="permalink" href="#FileMode.Ch">¶</a>
+					
+					
+				</h3>
+				<pre>func (fm <a href="#FileMode">FileMode</a>) Ch() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="FileMode.Check">func (FileMode) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fsmode.go#L62">Check</a>
+					<a class="permalink" href="#FileMode.Check">¶</a>
+					
+					
+				</h3>
+				<pre>func (fm <a href="#FileMode">FileMode</a>) Check() (str <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				<p>
+Check returns hex string of unknown bits, empty string if no unknown bits
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="FileMode.Hex">func (FileMode) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fsmode.go#L75">Hex</a>
+					<a class="permalink" href="#FileMode.Hex">¶</a>
+					
+					
+				</h3>
+				<pre>func (fm <a href="#FileMode">FileMode</a>) Hex() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="FileMode.Hex8">func (FileMode) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fsmode.go#L70">Hex8</a>
+					<a class="permalink" href="#FileMode.Hex8">¶</a>
+					
+					
+				</h3>
+				<pre>func (fm <a href="#FileMode">FileMode</a>) Hex8() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="FileMode.Or">func (FileMode) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fsmode.go#L80">Or</a>
+					<a class="permalink" href="#FileMode.Or">¶</a>
+					
+					
+				</h3>
+				<pre>func (fm <a href="#FileMode">FileMode</a>) Or() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="FileMode.String">func (FileMode) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fsmode.go#L104">String</a>
+					<a class="permalink" href="#FileMode.String">¶</a>
+					
+					
+				</h3>
+				<pre>func (fm <a href="#FileMode">FileMode</a>) String() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="IsDirectoryArg">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/fs.go#L26">IsDirectoryArg</a>
+				<a class="permalink" href="#IsDirectoryArg">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type IsDirectoryArg <a href="http:/localhost:8080/pkg/builtin/#byte">byte</a></pre>
+
+			
+				
+				<pre>const (
+    <span id="IsDirectoryNonExistentIsError">IsDirectoryNonExistentIsError</span> <a href="#IsDirectoryArg">IsDirectoryArg</a> = 1 &lt;&lt; <a href="http:/localhost:8080/pkg/builtin/#iota">iota</a>
+    <span id="IsDirectoryNotDirIsError">IsDirectoryNotDirIsError</span>
+)</pre>
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Op">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch-op.go#L23">Op</a>
+				<a class="permalink" href="#Op">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type Op <a href="http:/localhost:8080/pkg/github.com/fsnotify/fsnotify/">fsnotify</a>.<a href="http:/localhost:8080/pkg/github.com/fsnotify/fsnotify/#Op">Op</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Op.String">func (Op) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch-op.go#L27">String</a>
+					<a class="permalink" href="#Op.String">¶</a>
+					
+					
+				</h3>
+				<pre>func (op <a href="#Op">Op</a>) String() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Root">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkroot.go#L23">Root</a>
+				<a class="permalink" href="#Root">¶</a>
+				
+				
+			</h2>
+			<p>
+Root is a file system hierarchy
+</p>
+
+			<pre>type Root struct {
+<span id="Root.Path"></span>    Path    <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// path as provided</span>
+<span id="Root.Evaled"></span>    Evaled  <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// path after filepath.EvalSymlinks</span>
+<span id="Root.Err"></span>    Err     <a href="http:/localhost:8080/pkg/builtin/#error">error</a>
+    <a href="#FSEntry">FSEntry</a> <span class="comment">// Directory or Entry</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewRoot">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkroot.go#L31">NewRoot</a>
+					<a class="permalink" href="#NewRoot">¶</a>
+					
+					
+				</h3>
+				<pre>func NewRoot(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (rt *<a href="#Root">Root</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+NewRoot allocates a root
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Root.Build">func (*Root) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkroot.go#L41">Build</a>
+					<a class="permalink" href="#Root.Build">¶</a>
+					
+					
+				</h3>
+				<pre>func (rt *<a href="#Root">Root</a>) Build(sym func(<a href="http:/localhost:8080/pkg/builtin/#string">string</a>))</pre>
+				<p>
+Build scans the file system for this root
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Root.Walk">func (*Root) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walkroot.go#L49">Walk</a>
+					<a class="permalink" href="#Root.Walk">¶</a>
+					
+					
+				</h3>
+				<pre>func (rt *<a href="#Root">Root</a>) Walk(walkFunc <a href="http:/localhost:8080/pkg/path/filepath/">filepath</a>.<a href="http:/localhost:8080/pkg/path/filepath/#WalkFunc">WalkFunc</a>) <a href="http:/localhost:8080/pkg/builtin/#error">error</a></pre>
+				<p>
+Walk traverses the root
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Sha256">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/sha256.go#L23">Sha256</a>
+				<a class="permalink" href="#Sha256">¶</a>
+				
+				
+			</h2>
+			<p>
+Sha256 contains sha-256 hash
+</p>
+
+			<pre>type Sha256 []<a href="http:/localhost:8080/pkg/builtin/#byte">byte</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="Sha256Context">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/sha256.go#L26">Sha256Context</a>
+					<a class="permalink" href="#Sha256Context">¶</a>
+					
+					
+				</h3>
+				<pre>func Sha256Context(ctx <a href="http:/localhost:8080/pkg/context/">context</a>.<a href="http:/localhost:8080/pkg/context/#Context">Context</a>, filename <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (s2 <a href="#Sha256">Sha256</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+Sha256Context get sha256 of a file with context
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Sha256.String">func (Sha256) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/sha256.go#L49">String</a>
+					<a class="permalink" href="#Sha256.String">¶</a>
+					
+					
+				</h3>
+				<pre>func (s2 <a href="#Sha256">Sha256</a>) String() <a href="http:/localhost:8080/pkg/builtin/#string">string</a></pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Sha256.Valid">func (*Sha256) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/sha256.go#L45">Valid</a>
+					<a class="permalink" href="#Sha256.Valid">¶</a>
+					
+					
+				</h3>
+				<pre>func (s2 *<a href="#Sha256">Sha256</a>) Valid() <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a></pre>
+				<p>
+Valid determines if hash is present
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Tree">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walktree.go#L18">Tree</a>
+				<a class="permalink" href="#Tree">¶</a>
+				
+				
+			</h2>
+			<p>
+Tree consists of one or more indexed roots, each root a subhierarchy of the file system
+</p>
+
+			<pre>type Tree struct {
+<span id="Tree.List"></span>    List  []<a href="#Root">Root</a>
+<span id="Tree.Index"></span>    Index map[<a href="http:/localhost:8080/pkg/builtin/#string">string</a>]<a href="http:/localhost:8080/pkg/builtin/#int">int</a> <span class="comment">// key: evaled path, value: index in RootList</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewTree">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walktree.go#L24">NewTree</a>
+					<a class="permalink" href="#NewTree">¶</a>
+					
+					
+				</h3>
+				<pre>func NewTree() *<a href="#Tree">Tree</a></pre>
+				<p>
+NewTree allocates a Tree
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Tree.AddRoot">func (*Tree) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walktree.go#L29">AddRoot</a>
+					<a class="permalink" href="#Tree.AddRoot">¶</a>
+					
+					
+				</h3>
+				<pre>func (tree *<a href="#Tree">Tree</a>) AddRoot(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (symlinkTargets []<a href="http:/localhost:8080/pkg/builtin/#string">string</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+AddRoot adds a new root
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Tree.ResolveSymlink">func (*Tree) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walktree.go#L48">ResolveSymlink</a>
+					<a class="permalink" href="#Tree.ResolveSymlink">¶</a>
+					
+					
+				</h3>
+				<pre>func (tree *<a href="#Tree">Tree</a>) ResolveSymlink(path <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (symlinkTargets []<a href="http:/localhost:8080/pkg/builtin/#string">string</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+ResolveSymlink patches the tree for a symlink
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Tree.Walk">func (*Tree) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/walktree.go#L90">Walk</a>
+					<a class="permalink" href="#Tree.Walk">¶</a>
+					
+					
+				</h3>
+				<pre>func (tree *<a href="#Tree">Tree</a>) Walk(walkFunc <a href="http:/localhost:8080/pkg/path/filepath/">filepath</a>.<a href="http:/localhost:8080/pkg/path/filepath/#WalkFunc">WalkFunc</a>) <a href="http:/localhost:8080/pkg/builtin/#error">error</a></pre>
+				<p>
+Walk traverses the built tree
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Watch">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch.go#L23">Watch</a>
+				<a class="permalink" href="#Watch">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type Watch struct {
+<span id="Watch.Now"></span>    Now <a href="http:/localhost:8080/pkg/time/">time</a>.<a href="http:/localhost:8080/pkg/time/#Time">Time</a>
+<span id="Watch.ID"></span>    ID  <a href="http:/localhost:8080/pkg/builtin/#int64">int64</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewWatch">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch.go#L52">NewWatch</a>
+					<a class="permalink" href="#NewWatch">¶</a>
+					
+					
+				</h3>
+				<pre>func NewWatch(directory <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, filter <a href="http:/localhost:8080/pkg/github.com/fsnotify/fsnotify/">fsnotify</a>.<a href="http:/localhost:8080/pkg/github.com/fsnotify/fsnotify/#Op">Op</a>, ctx <a href="http:/localhost:8080/pkg/context/">context</a>.<a href="http:/localhost:8080/pkg/context/#Context">Context</a>) (watch *<a href="#Watch">Watch</a>)</pre>
+				<p>
+NewWatch produces events from a file-system entry and its child directories.
+WatchEvents must be listened for on the .Events() channel until it closes.
+Events that can be listened for are WatchOpAll (default: 0) Create Write Remove Rename Chmod.
+errors must be listened for on the .Errors() channel until it closes.
+Close the watcher by canceling the context or invoking .Shutdown().
+</p>
+<p>
+220315 github.com/fsnotify/fsnotify v1.4.9 does not support macOS
+220315 use the old github.com/fsnotify/fsevents v0.1.1
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Watch.Errors">func (*Watch) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch.go#L91">Errors</a>
+					<a class="permalink" href="#Watch.Errors">¶</a>
+					
+					
+				</h3>
+				<pre>func (wa *<a href="#Watch">Watch</a>) Errors() (errCh &lt;-chan <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Watch.Events">func (*Watch) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch.go#L87">Events</a>
+					<a class="permalink" href="#Watch.Events">¶</a>
+					
+					
+				</h3>
+				<pre>func (wa *<a href="#Watch">Watch</a>) Events() (events &lt;-chan *<a href="#WatchEvent">WatchEvent</a>)</pre>
+				<p>
+Events returns a receiver channel for parlfs.WatchEvent
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Watch.Shutdown">func (*Watch) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch.go#L95">Shutdown</a>
+					<a class="permalink" href="#Watch.Shutdown">¶</a>
+					
+					
+				</h3>
+				<pre>func (wa *<a href="#Watch">Watch</a>) Shutdown()</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="WatchEvent">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch-event.go#L15">WatchEvent</a>
+				<a class="permalink" href="#WatchEvent">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type WatchEvent struct {
+<span id="WatchEvent.At"></span>    At        <a href="http:/localhost:8080/pkg/time/">time</a>.<a href="http:/localhost:8080/pkg/time/#Time">Time</a> <span class="comment">// ns resolution</span>
+<span id="WatchEvent.ID"></span>    ID        <a href="http:/localhost:8080/pkg/github.com/google/uuid/">uuid</a>.<a href="http:/localhost:8080/pkg/github.com/google/uuid/#UUID">UUID</a> <span class="comment">// unique event identifier [16]byte</span>
+<span id="WatchEvent.BaseName"></span>    BaseName  <a href="http:/localhost:8080/pkg/builtin/#string">string</a>    <span class="comment">// filename.ext</span>
+<span id="WatchEvent.AbsName"></span>    AbsName   <a href="http:/localhost:8080/pkg/builtin/#string">string</a>    <span class="comment">// /absolute-path/filename.ext</span>
+<span id="WatchEvent.CleanName"></span>    CleanName <a href="http:/localhost:8080/pkg/builtin/#string">string</a>    <span class="comment">// may-have-symlinks/filename.ext</span>
+<span id="WatchEvent.Op"></span>    Op        <a href="http:/localhost:8080/pkg/builtin/#string">string</a>    <span class="comment">// CREATE|REMOVE|WRITE|RENAME|CHMOD</span>
+
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="WatchEvent.String">func (WatchEvent) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/parlfs/watch-event.go#L25">String</a>
+					<a class="permalink" href="#WatchEvent.String">¶</a>
+					
+					
+				</h3>
+				<pre>func (we <a href="#WatchEvent">WatchEvent</a>) String() <a href="http:/localhost:8080/pkg/builtin/#string">string</a></pre>
+				
+				
+				
+				
+			
+		
+	
+
+	
+
+
+
+
+
+
+
+<div id="footer">
+Build version go1.17.8.<br/>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+
+</body></html>

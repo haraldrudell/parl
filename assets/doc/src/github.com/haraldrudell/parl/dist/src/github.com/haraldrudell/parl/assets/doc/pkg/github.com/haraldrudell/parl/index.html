@@ -1,0 +1,2010 @@
+<!DOCTYPE html><html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#375EAB"/>
+
+  <title>parl - TITLE</title>
+
+<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css"/>
+
+<script>window.initFuncs = [];</script>
+<script src="http://localhost:8080/lib/godoc/jquery.js" defer=""></script>
+
+
+
+
+<script>var goVersion = "go1.17.8";</script>
+<script src="http://localhost:8080/lib/godoc/godocs.js" defer=""></script>
+
+</head>
+<body>
+
+<div id="lowframe" style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">TITLE | DESCRIPTION</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">TITLE</a></div>
+<a href="#" id="menu-button"><span id="menu-button-arrow">▽</span></a>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Package parl
+    <span class="text-muted"></span>
+  </h1>
+
+
+
+
+
+
+
+<div id="nav"></div>
+
+
+<!--
+	Copyright 2009 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
+-->
+<!--
+	Note: Static (i.e., not template-generated) href and id
+	attributes start with "pkg-" to make it impossible for
+	them to conflict with generated attributes (some of which
+	correspond to Go identifiers).
+-->
+
+	<script>
+	document.ANALYSIS_DATA = null;
+	document.CALLGRAPH = null;
+	</script>
+
+	
+		
+		<div id="short-nav">
+			<dl>
+			<dd><code>import &#34;github.com/haraldrudell/parl&#34;</code></dd>
+			</dl>
+			<dl>
+			<dd><a href="#pkg-overview" class="overviewLink">Overview</a></dd>
+			<dd><a href="#pkg-index" class="indexLink">Index</a></dd>
+			
+			
+				<dd><a href="#pkg-subdirectories">Subdirectories</a></dd>
+			
+			</dl>
+		</div>
+		<!-- The package's Name is printed as title by the top-level template -->
+		<div id="pkg-overview" class="toggleVisible">
+			<div class="collapsed">
+				<h2 class="toggleButton" title="Click to show Overview section">Overview ▹</h2>
+			</div>
+			<div class="expanded">
+				<h2 class="toggleButton" title="Click to hide Overview section">Overview ▾</h2>
+				<p>
+Package parl handles inter-thread communication and controls parallelism
+</p>
+<p>
+Logging of extected output is via Out(string, ...interface{}).
+Parl logging uses comma separator for numbers and is thread safe
+</p>
+<p>
+Log(string, ...interface{}) always outputs to stderr.
+Console is the same intended to be used for command-line interactivity.
+SetDebug(true) appends code location
+</p>
+<p>
+Info is active by default and outputs to stderr.
+SetSilent(true) removes this output.
+SetDebug(true) appends code location
+IsSilent deteremines if Info printing applies
+</p>
+<p>
+Debug only prints if SetDebug(true) or the code location matches SetInfoRegexp().
+The string matched for regular expression looks like: “github.com/haraldrudell/parl.FuncName”
+IsThisDebug determines if debug is active for the executing function
+</p>
+<p>
+parl.D is intended for temporary printouts to be removed before check-in
+</p>
+<p>
+parl provides generic recovery for goroutines and functions:
+capturing panics, annotating and storing errors and invoking an error handling function on errors:
+</p>
+<pre>  func f() (err error) {
+		defer parl.Recover(parl.Annotation(), &amp;err, onError func(e error) { … })
+	…
+</pre>
+<p>
+Default error string: “Recover from panic in somePackage.someFunction: &#39;File not found&#39;.
+For multiple errors, Recover uses error116 error lists,
+while Recover2 instead invokes onError multiple times
+</p>
+<p>
+© 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (<a href="https://haraldrudell.github.io/haraldrudell/">https://haraldrudell.github.io/haraldrudell/</a>)
+</p>
+
+				
+			</div>
+		</div>
+
+		<div id="pkg-index" class="toggleVisible">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Index section">Index ▹</h2>
+		</div>
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Index section">Index ▾</h2>
+
+		<!-- Table of contents for API; must be named manual-nav to turn off auto nav. -->
+			<div id="manual-nav">
+			<dl>
+			
+				<dd><a href="#pkg-constants">Constants</a></dd>
+			
+			
+				<dd><a href="#pkg-variables">Variables</a></dd>
+			
+			
+				
+				<dd><a href="#AddToPanic">func AddToPanic(panicValue interface{}, additionalErr error) (err error)</a></dd>
+			
+				
+				<dd><a href="#Annotation">func Annotation() (annotation string)</a></dd>
+			
+				
+				<dd><a href="#Console">func Console(format string, a ...interface{})</a></dd>
+			
+				
+				<dd><a href="#ContextTime">func ContextTime(ctx context.Context) (t time.Time, found bool)</a></dd>
+			
+				
+				<dd><a href="#D">func D(format string, a ...interface{})</a></dd>
+			
+				
+				<dd><a href="#Debug">func Debug(format string, a ...interface{})</a></dd>
+			
+				
+				<dd><a href="#DelFromContext">func DelFromContext(ctx context.Context, key string) (ok bool)</a></dd>
+			
+				
+				<dd><a href="#EnsureError">func EnsureError(panicValue interface{}) (err error)</a></dd>
+			
+				
+				<dd><a href="#HandlePanic">func HandlePanic(fn func()) (err error)</a></dd>
+			
+				
+				<dd><a href="#Info">func Info(format string, a ...interface{})</a></dd>
+			
+				
+				<dd><a href="#IsSilent">func IsSilent() (isSilent bool)</a></dd>
+			
+				
+				<dd><a href="#IsThisDebug">func IsThisDebug() bool</a></dd>
+			
+				
+				<dd><a href="#Log">func Log(format string, a ...interface{})</a></dd>
+			
+				
+				<dd><a href="#NewDebouncer">func NewDebouncer(d time.Duration, receiver ReceiverFunc, sender SenderFunc, ctx context.Context) (err error)</a></dd>
+			
+				
+				<dd><a href="#Out">func Out(format string, a ...interface{})</a></dd>
+			
+				
+				<dd><a href="#Recover">func Recover(annotation string, errp *error, onError func(error))</a></dd>
+			
+				
+				<dd><a href="#Recover2">func Recover2(annotation string, errp *error, onError func(error))</a></dd>
+			
+				
+				<dd><a href="#SetDebug">func SetDebug(debug bool)</a></dd>
+			
+				
+				<dd><a href="#SetRegexp">func SetRegexp(regExp string) (err error)</a></dd>
+			
+				
+				<dd><a href="#SetSilent">func SetSilent(silent bool)</a></dd>
+			
+				
+				<dd><a href="#StoreInContext">func StoreInContext(ctx context.Context, key string, value interface{}) (ok bool)</a></dd>
+			
+			
+				
+				<dd><a href="#AtomicBool">type AtomicBool</a></dd>
+				
+				
+					
+					<dd>    <a href="#AtomicBool.Clear">func (ab *AtomicBool) Clear() (wasSet bool)</a></dd>
+				
+					
+					<dd>    <a href="#AtomicBool.IsTrue">func (ab *AtomicBool) IsTrue() (isTrue bool)</a></dd>
+				
+					
+					<dd>    <a href="#AtomicBool.Set">func (ab *AtomicBool) Set() (wasNotSet bool)</a></dd>
+				
+			
+				
+				<dd><a href="#Context">type Context</a></dd>
+				
+					
+					<dd>    <a href="#NewContext">func NewContext(ctx ...context.Context) (c *Context)</a></dd>
+				
+				
+					
+					<dd>    <a href="#Context.Delete">func (c *Context) Delete(key string)</a></dd>
+				
+					
+					<dd>    <a href="#Context.Store">func (c *Context) Store(key string, value interface{})</a></dd>
+				
+					
+					<dd>    <a href="#Context.Value">func (c *Context) Value(key interface{}) (result interface{})</a></dd>
+				
+					
+					<dd>    <a href="#Context.Value2">func (c *Context) Value2(key interface{}) (result interface{}, ok bool)</a></dd>
+				
+			
+				
+				<dd><a href="#FSLocation">type FSLocation</a></dd>
+				
+				
+			
+				
+				<dd><a href="#FanOut">type FanOut</a></dd>
+				
+					
+					<dd>    <a href="#NewFanOut">func NewFanOut() (fo *FanOut)</a></dd>
+				
+				
+					
+					<dd>    <a href="#FanOut.Do">func (cr *FanOut) Do(name string, proc FanProc)</a></dd>
+				
+					
+					<dd>    <a href="#FanOut.Run">func (cr *FanOut) Run(name string, thunk FanThunk)</a></dd>
+				
+					
+					<dd>    <a href="#FanOut.Wait">func (cr *FanOut) Wait()</a></dd>
+				
+			
+				
+				<dd><a href="#FanProc">type FanProc</a></dd>
+				
+				
+			
+				
+				<dd><a href="#FanThunk">type FanThunk</a></dd>
+				
+				
+			
+				
+				<dd><a href="#LogInstance">type LogInstance</a></dd>
+				
+					
+					<dd>    <a href="#GetLogAndContext">func GetLogAndContext(debug bool, verbose bool, silent bool) (ctx context.Context, log *LogInstance)</a></dd>
+				
+					
+					<dd>    <a href="#GetLogFromContext">func GetLogFromContext(ctx context.Context) (log *LogInstance)</a></dd>
+				
+					
+					<dd>    <a href="#NewLog">func NewLog(writers ...io.Writer) (lg *LogInstance)</a></dd>
+				
+				
+					
+					<dd>    <a href="#LogInstance.D">func (lg *LogInstance) D(format string, a ...interface{})</a></dd>
+				
+					
+					<dd>    <a href="#LogInstance.Debug">func (lg *LogInstance) Debug(format string, a ...interface{})</a></dd>
+				
+					
+					<dd>    <a href="#LogInstance.Info">func (lg *LogInstance) Info(format string, a ...interface{})</a></dd>
+				
+					
+					<dd>    <a href="#LogInstance.IsSilent">func (lg *LogInstance) IsSilent() (isSilent bool)</a></dd>
+				
+					
+					<dd>    <a href="#LogInstance.IsThisDebug">func (lg *LogInstance) IsThisDebug() bool</a></dd>
+				
+					
+					<dd>    <a href="#LogInstance.Log">func (lg *LogInstance) Log(format string, a ...interface{})</a></dd>
+				
+					
+					<dd>    <a href="#LogInstance.SetDebug">func (lg *LogInstance) SetDebug(debug bool)</a></dd>
+				
+					
+					<dd>    <a href="#LogInstance.SetRegexp">func (lg *LogInstance) SetRegexp(regExp string) (err error)</a></dd>
+				
+					
+					<dd>    <a href="#LogInstance.SetSilent">func (lg *LogInstance) SetSilent(silent bool)</a></dd>
+				
+			
+				
+				<dd><a href="#Moderator">type Moderator</a></dd>
+				
+					
+					<dd>    <a href="#NewModerator">func NewModerator(parallelism uint64) (mo *Moderator)</a></dd>
+				
+				
+					
+					<dd>    <a href="#Moderator.Do">func (mo *Moderator) Do(fn func() error) (err error)</a></dd>
+				
+					
+					<dd>    <a href="#Moderator.Shutdown">func (mo *Moderator) Shutdown()</a></dd>
+				
+					
+					<dd>    <a href="#Moderator.Status">func (mo *Moderator) Status() (parallelism uint64, available uint64, waiting uint64, isShutdown bool)</a></dd>
+				
+					
+					<dd>    <a href="#Moderator.String">func (mo *Moderator) String() (s string)</a></dd>
+				
+			
+				
+				<dd><a href="#Password">type Password</a></dd>
+				
+				
+			
+				
+				<dd><a href="#ReceiverFunc">type ReceiverFunc</a></dd>
+				
+				
+			
+				
+				<dd><a href="#SenderFunc">type SenderFunc</a></dd>
+				
+				
+			
+				
+				<dd><a href="#SerialDo">type SerialDo</a></dd>
+				
+					
+					<dd>    <a href="#NewSerialDo">func NewSerialDo(thunk func(), eventReceiver SerialDoFunc, ctx context.Context) (sdo *SerialDo)</a></dd>
+				
+				
+					
+					<dd>    <a href="#SerialDo.Do">func (sdo *SerialDo) Do(now time.Time) (nowPending bool)</a></dd>
+				
+					
+					<dd>    <a href="#SerialDo.Shutdown">func (sdo *SerialDo) Shutdown()</a></dd>
+				
+			
+				
+				<dd><a href="#SerialDoEvent">type SerialDoEvent</a></dd>
+				
+				
+			
+				
+				<dd><a href="#SerialDoFunc">type SerialDoFunc</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Timer">type Timer</a></dd>
+				
+					
+					<dd>    <a href="#NewTimer">func NewTimer(label string) (t *Timer)</a></dd>
+				
+				
+					
+					<dd>    <a href="#Timer.End">func (t *Timer) End() (d time.Duration)</a></dd>
+				
+					
+					<dd>    <a href="#Timer.Endms">func (t *Timer) Endms() (ms string)</a></dd>
+				
+			
+				
+				<dd><a href="#TriggeringChan">type TriggeringChan</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Value">type Value</a></dd>
+				
+				
+			
+			
+			</dl>
+			</div><!-- #manual-nav -->
+
+		
+
+		
+			<h3>Package files</h3>
+			<p>
+			<span style="font-size:90%">
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/atomic-bool.go">atomic-bool.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/context.go">context.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/debouncer.go">debouncer.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/fanout.go">fanout.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-context.go">log-context.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-delegate.go">log-delegate.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go">log-instance.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go">log.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/moderator.go">moderator.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parl.go">parl.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/recover.go">recover.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/serialdo.go">serialdo.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/timectx.go">timectx.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/timer.go">timer.go</a>
+			
+			</span>
+			</p>
+		
+		</div><!-- .expanded -->
+		</div><!-- #pkg-index -->
+
+		
+
+		
+			<h2 id="pkg-constants">Constants</h2>
+			
+				
+				<pre>const (
+    <span id="Rfc3339s">Rfc3339s</span>   = &#34;2006-01-02 15:04:05-07:00&#34;
+    <span id="Rfc3339ms">Rfc3339ms</span>  = &#34;2006-01-02 15:04:05.999-07:00&#34;
+    <span id="Rfc3339us">Rfc3339us</span>  = &#34;2006-01-02 15:04:05.999999-07:00&#34;
+    <span id="Rfc3339ns">Rfc3339ns</span>  = &#34;2006-01-02 15:04:05.999999999-07:00&#34;
+    <span id="Rfc3339sz">Rfc3339sz</span>  = &#34;2006-01-02T15:04:05Z&#34;
+    <span id="Rfc3339msz">Rfc3339msz</span> = &#34;2006-01-02T15:04:05.999Z&#34;
+    <span id="Rfc3339usz">Rfc3339usz</span> = &#34;2006-01-02T15:04:05.999999Z&#34;
+    <span id="Rfc3339nsz">Rfc3339nsz</span> = &#34;2006-01-02T15:04:05.999999999Z&#34;
+)</pre>
+			
+				
+				<pre>const (
+    <span id="SerialDoReady">SerialDoReady</span>         = 0 + <a href="http://localhost:8080/pkg/builtin/#iota">iota</a>
+    <span id="SerialDoLaunch">SerialDoLaunch</span>        <span class="comment">// from idle, now time</span>
+    <span id="SerialDoPending">SerialDoPending</span>       <span class="comment">// queued up invocation, request time</span>
+    <span id="SerialDoPendingLaunch">SerialDoPendingLaunch</span> <span class="comment">// launch of pending invocation, request time</span>
+    <span id="SerialDoIdle">SerialDoIdle</span>          <span class="comment">// busy since</span>
+)</pre>
+			
+				
+				<pre>const (
+    <span class="comment">// LogObject context key for log object in valuecontext.go</span>
+    <span id="LogObject">LogObject</span> = &#34;parl.Log&#34;
+)</pre>
+			
+				
+				<pre>const (
+    <span class="comment">// TimePointer is context key for a pointer to a shared timestamp</span>
+    <span id="TimePointer">TimePointer</span> = &#34;parl.Time&#34;
+)</pre>
+			
+		
+		
+			<h2 id="pkg-variables">Variables</h2>
+			
+				
+				<pre>var <span id="ErrModeratorShutdown">ErrModeratorShutdown</span> = <a href="http://localhost:8080/pkg/errors/">errors</a>.<a href="http://localhost:8080/pkg/errors/#New">New</a>(&#34;Moderator shut down&#34;)</pre>
+			
+				
+				<pre>var <span id="Errorf">Errorf</span> = <a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/error116/">error116</a>.<a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/error116/#Errorf">Errorf</a></pre>
+			
+				
+				<pre>var <span id="New">New</span> = <a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/error116/">error116</a>.<a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/error116/#New">New</a></pre>
+			
+				
+				<pre>var <span id="NewCodeLocation">NewCodeLocation</span> = <a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/error116/">error116</a>.<a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/error116/#NewCodeLocation">NewCodeLocation</a></pre>
+			
+				
+				<pre>var <span id="PackFunc">PackFunc</span> = <a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/error116/">error116</a>.<a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/error116/#PackFunc">PackFunc</a></pre>
+			
+		
+		
+			
+			
+			<h2 id="AddToPanic">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/recover.go#L107">AddToPanic</a>
+				<a class="permalink" href="#AddToPanic">¶</a>
+				
+				
+			</h2>
+			<pre>func AddToPanic(panicValue interface{}, additionalErr <a href="http://localhost:8080/pkg/builtin/#error">error</a>) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="Annotation">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/recover.go#L77">Annotation</a>
+				<a class="permalink" href="#Annotation">¶</a>
+				
+				
+			</h2>
+			<pre>func Annotation() (annotation <a href="http://localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="Console">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L27">Console</a>
+				<a class="permalink" href="#Console">¶</a>
+				
+				
+			</h2>
+			<pre>func Console(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+			<p>
+Console always print intended for command-line interactivity
+if debug is enabled, code location is appended
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ContextTime">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/timectx.go#L21">ContextTime</a>
+				<a class="permalink" href="#ContextTime">¶</a>
+				
+				
+			</h2>
+			<pre>func ContextTime(ctx <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>) (t <a href="http://localhost:8080/pkg/time/">time</a>.<a href="http://localhost:8080/pkg/time/#Time">Time</a>, found <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+			<p>
+ContextTime obtains a shared timestamp
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="D">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L70">D</a>
+				<a class="permalink" href="#D">¶</a>
+				
+				
+			</h2>
+			<pre>func D(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+			<p>
+D prints to stderr with code location
+Thread safe. D is meant for temporary output intended to be removed before check-in
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Debug">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L39">Debug</a>
+				<a class="permalink" href="#Debug">¶</a>
+				
+				
+			</h2>
+			<pre>func Debug(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+			<p>
+Debug outputs only if debug is configured or the code location package matches regexp
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="DelFromContext">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/context.go#L43">DelFromContext</a>
+				<a class="permalink" href="#DelFromContext">¶</a>
+				
+				
+			</h2>
+			<pre>func DelFromContext(ctx <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>, key <a href="http://localhost:8080/pkg/builtin/#string">string</a>) (ok <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+			<p>
+DelFromContext removes a value from context. Thread-safe
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="EnsureError">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/recover.go#L94">EnsureError</a>
+				<a class="permalink" href="#EnsureError">¶</a>
+				
+				
+			</h2>
+			<pre>func EnsureError(panicValue interface{}) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="HandlePanic">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/recover.go#L119">HandlePanic</a>
+				<a class="permalink" href="#HandlePanic">¶</a>
+				
+				
+			</h2>
+			<pre>func HandlePanic(fn func()) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+HandlePanic executes a function wrapped in panic recovery.
+If the function panics, HandlePanic returns an error value
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Info">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L34">Info</a>
+				<a class="permalink" href="#Info">¶</a>
+				
+				
+			</h2>
+			<pre>func Info(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+			<p>
+Info prints unless silence has been configured with SetSilence(true)
+IsSilent deteremines the state of silence
+if debug is enabled, code location is appended
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="IsSilent">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L49">IsSilent</a>
+				<a class="permalink" href="#IsSilent">¶</a>
+				
+				
+			</h2>
+			<pre>func IsSilent() (isSilent <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+			<p>
+IsSilent if true it means that Info does not print
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="IsThisDebug">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L44">IsThisDebug</a>
+				<a class="permalink" href="#IsThisDebug">¶</a>
+				
+				
+			</h2>
+			<pre>func IsThisDebug() <a href="http://localhost:8080/pkg/builtin/#bool">bool</a></pre>
+			<p>
+IsThisDebug returns whether debug logging is configured for the executing function
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Log">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L21">Log</a>
+				<a class="permalink" href="#Log">¶</a>
+				
+				
+			</h2>
+			<pre>func Log(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+			<p>
+Log invocations always print
+if debug is enabled, code location is appended
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="NewDebouncer">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/debouncer.go#L31">NewDebouncer</a>
+				<a class="permalink" href="#NewDebouncer">¶</a>
+				
+				
+			</h2>
+			<pre>func NewDebouncer(d <a href="http://localhost:8080/pkg/time/">time</a>.<a href="http://localhost:8080/pkg/time/#Duration">Duration</a>, receiver <a href="#ReceiverFunc">ReceiverFunc</a>, sender <a href="#SenderFunc">SenderFunc</a>, ctx <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			<p>
+Debouncer debounces event streams of Value
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Out">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L15">Out</a>
+				<a class="permalink" href="#Out">¶</a>
+				
+				
+			</h2>
+			<pre>func Out(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+			<p>
+Out prints extected output to stdout
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Recover">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/recover.go#L23">Recover</a>
+				<a class="permalink" href="#Recover">¶</a>
+				
+				
+			</h2>
+			<pre>func Recover(annotation <a href="http://localhost:8080/pkg/builtin/#string">string</a>, errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>, onError func(<a href="http://localhost:8080/pkg/builtin/#error">error</a>))</pre>
+			<p>
+Recover recovers from a panic invoking a function no more than once.
+If there is *errp does not hold an error and there is no panic, onError is not invoked.
+Otherwise, onError is invoked exactly once.
+*errp is updated with a possible panic.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Recover2">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/recover.go#L30">Recover2</a>
+				<a class="permalink" href="#Recover2">¶</a>
+				
+				
+			</h2>
+			<pre>func Recover2(annotation <a href="http://localhost:8080/pkg/builtin/#string">string</a>, errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>, onError func(<a href="http://localhost:8080/pkg/builtin/#error">error</a>))</pre>
+			<p>
+Recover2 recovers from a panic and may invoke onError multiple times.
+onError is invoked if there is an error at *errp and on a possible panic.
+*errp is updated with a possible panic.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="SetDebug">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L64">SetDebug</a>
+				<a class="permalink" href="#SetDebug">¶</a>
+				
+				
+			</h2>
+			<pre>func SetDebug(debug <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+			<p>
+if SetDebug is true, all Debug prints everywhere produce output.
+More selective debug printing can be achieved using SetInfoRegexp that matches package names.
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="SetRegexp">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L53">SetRegexp</a>
+				<a class="permalink" href="#SetRegexp">¶</a>
+				
+				
+			</h2>
+			<pre>func SetRegexp(regExp <a href="http://localhost:8080/pkg/builtin/#string">string</a>) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+			
+			
+			
+
+		
+			
+			
+			<h2 id="SetSilent">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log.go#L58">SetSilent</a>
+				<a class="permalink" href="#SetSilent">¶</a>
+				
+				
+			</h2>
+			<pre>func SetSilent(silent <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+			<p>
+SetSilent
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="StoreInContext">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/context.go#L34">StoreInContext</a>
+				<a class="permalink" href="#StoreInContext">¶</a>
+				
+				
+			</h2>
+			<pre>func StoreInContext(ctx <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>, key <a href="http://localhost:8080/pkg/builtin/#string">string</a>, value interface{}) (ok <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+			<p>
+StoreInContext stores a value in context. Thread-safe
+</p>
+
+			
+			
+
+		
+		
+			
+			
+			<h2 id="AtomicBool">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/atomic-bool.go#L10">AtomicBool</a>
+				<a class="permalink" href="#AtomicBool">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type AtomicBool struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="AtomicBool.Clear">func (*AtomicBool) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/atomic-bool.go#L27">Clear</a>
+					<a class="permalink" href="#AtomicBool.Clear">¶</a>
+					
+					
+				</h3>
+				<pre>func (ab *<a href="#AtomicBool">AtomicBool</a>) Clear() (wasSet <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="AtomicBool.IsTrue">func (*AtomicBool) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/atomic-bool.go#L19">IsTrue</a>
+					<a class="permalink" href="#AtomicBool.IsTrue">¶</a>
+					
+					
+				</h3>
+				<pre>func (ab *<a href="#AtomicBool">AtomicBool</a>) IsTrue() (isTrue <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="AtomicBool.Set">func (*AtomicBool) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/atomic-bool.go#L23">Set</a>
+					<a class="permalink" href="#AtomicBool.Set">¶</a>
+					
+					
+				</h3>
+				<pre>func (ab *<a href="#AtomicBool">AtomicBool</a>) Set() (wasNotSet <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Context">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/context.go#L14">Context</a>
+				<a class="permalink" href="#Context">¶</a>
+				
+				
+			</h2>
+			<p>
+Context is a context.Context with a Value() implementation
+</p>
+
+			<pre>type Context struct {
+    <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>
+<span id="Context.Map"></span>    Map <a href="http://localhost:8080/pkg/sync/">sync</a>.<a href="http://localhost:8080/pkg/sync/#Map">Map</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewContext">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/context.go#L22">NewContext</a>
+					<a class="permalink" href="#NewContext">¶</a>
+					
+					
+				</h3>
+				<pre>func NewContext(ctx ...<a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>) (c *<a href="#Context">Context</a>)</pre>
+				<p>
+NewContext provides a context.Context with a Value() implementation
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Context.Delete">func (*Context) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/context.go#L68">Delete</a>
+					<a class="permalink" href="#Context.Delete">¶</a>
+					
+					
+				</h3>
+				<pre>func (c *<a href="#Context">Context</a>) Delete(key <a href="http://localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				<p>
+StoreInContext stores a value in context. Thread-safe
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Context.Store">func (*Context) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/context.go#L63">Store</a>
+					<a class="permalink" href="#Context.Store">¶</a>
+					
+					
+				</h3>
+				<pre>func (c *<a href="#Context">Context</a>) Store(key <a href="http://localhost:8080/pkg/builtin/#string">string</a>, value interface{})</pre>
+				<p>
+StoreInContext stores a value in context. Thread-safe
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Context.Value">func (*Context) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/context.go#L52">Value</a>
+					<a class="permalink" href="#Context.Value">¶</a>
+					
+					
+				</h3>
+				<pre>func (c *<a href="#Context">Context</a>) Value(key interface{}) (result interface{})</pre>
+				<p>
+Value retrieves data from context. Thread-safe
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Context.Value2">func (*Context) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/context.go#L58">Value2</a>
+					<a class="permalink" href="#Context.Value2">¶</a>
+					
+					
+				</h3>
+				<pre>func (c *<a href="#Context">Context</a>) Value2(key interface{}) (result interface{}, ok <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<p>
+Value2 retrieves data and was–present indicator from context. Thread-safe
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="FSLocation">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parl.go#L66">FSLocation</a>
+				<a class="permalink" href="#FSLocation">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type FSLocation interface {
+    Directory() (directory <a href="http://localhost:8080/pkg/builtin/#string">string</a>)
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="FanOut">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/fanout.go#L12">FanOut</a>
+				<a class="permalink" href="#FanOut">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type FanOut struct {
+<span id="FanOut.ErrCh"></span>    ErrCh   chan <a href="http://localhost:8080/pkg/builtin/#error">error</a>
+<span id="FanOut.Results"></span>    Results chan interface{}
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewFanOut">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/fanout.go#L21">NewFanOut</a>
+					<a class="permalink" href="#NewFanOut">¶</a>
+					
+					
+				</h3>
+				<pre>func NewFanOut() (fo *<a href="#FanOut">FanOut</a>)</pre>
+				
+				
+				
+			
+
+			
+				
+				<h3 id="FanOut.Do">func (*FanOut) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/fanout.go#L29">Do</a>
+					<a class="permalink" href="#FanOut.Do">¶</a>
+					
+					
+				</h3>
+				<pre>func (cr *<a href="#FanOut">FanOut</a>) Do(name <a href="http://localhost:8080/pkg/builtin/#string">string</a>, proc <a href="#FanProc">FanProc</a>)</pre>
+				<p>
+Do executes a procedure in a goroutine that has no result other than a possible non-nil error
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="FanOut.Run">func (*FanOut) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/fanout.go#L35">Run</a>
+					<a class="permalink" href="#FanOut.Run">¶</a>
+					
+					
+				</h3>
+				<pre>func (cr *<a href="#FanOut">FanOut</a>) Run(name <a href="http://localhost:8080/pkg/builtin/#string">string</a>, thunk <a href="#FanThunk">FanThunk</a>)</pre>
+				<p>
+Run executes a thunk in a goroutine with a possible non-nil result and a possible non-nil error
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="FanOut.Wait">func (*FanOut) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/fanout.go#L57">Wait</a>
+					<a class="permalink" href="#FanOut.Wait">¶</a>
+					
+					
+				</h3>
+				<pre>func (cr *<a href="#FanOut">FanOut</a>) Wait()</pre>
+				<p>
+Wait waits for all Do and Run invocations to complete, then shuts down
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="FanProc">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/fanout.go#L19">FanProc</a>
+				<a class="permalink" href="#FanProc">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type FanProc func() (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="FanThunk">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/fanout.go#L18">FanThunk</a>
+				<a class="permalink" href="#FanThunk">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type FanThunk func() (result interface{}, err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="LogInstance">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L27">LogInstance</a>
+				<a class="permalink" href="#LogInstance">¶</a>
+				
+				
+			</h2>
+			<p>
+LogInstance provide logging delegating to log.Output
+</p>
+
+			<pre>type LogInstance struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="GetLogAndContext">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-context.go#L25">GetLogAndContext</a>
+					<a class="permalink" href="#GetLogAndContext">¶</a>
+					
+					
+				</h3>
+				<pre>func GetLogAndContext(debug <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>, verbose <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>, silent <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>) (ctx <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>, log *<a href="#LogInstance">LogInstance</a>)</pre>
+				<p>
+GetLogAndContext gets a context and a log
+</p>
+
+				
+				
+			
+				
+				<h3 id="GetLogFromContext">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-context.go#L16">GetLogFromContext</a>
+					<a class="permalink" href="#GetLogFromContext">¶</a>
+					
+					
+				</h3>
+				<pre>func GetLogFromContext(ctx <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>) (log *<a href="#LogInstance">LogInstance</a>)</pre>
+				<p>
+GetLogFromContext obtains a log possibly from context
+</p>
+
+				
+				
+			
+				
+				<h3 id="NewLog">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L37">NewLog</a>
+					<a class="permalink" href="#NewLog">¶</a>
+					
+					
+				</h3>
+				<pre>func NewLog(writers ...<a href="http://localhost:8080/pkg/io/">io</a>.<a href="http://localhost:8080/pkg/io/#Writer">Writer</a>) (lg *<a href="#LogInstance">LogInstance</a>)</pre>
+				<p>
+NewLog gets a logger for Fatal and Warning for specific output
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="LogInstance.D">func (*LogInstance) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L103">D</a>
+					<a class="permalink" href="#LogInstance.D">¶</a>
+					
+					
+				</h3>
+				<pre>func (lg *<a href="#LogInstance">LogInstance</a>) D(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+				<p>
+D prints to stderr with code location
+Thread safe. D is meant for temporary output intended to be removed before check-in
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="LogInstance.Debug">func (*LogInstance) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L82">Debug</a>
+					<a class="permalink" href="#LogInstance.Debug">¶</a>
+					
+					
+				</h3>
+				<pre>func (lg *<a href="#LogInstance">LogInstance</a>) Debug(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+				<p>
+Debug outputs only if debug is configured or the code location package matches regexp
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="LogInstance.Info">func (*LogInstance) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L74">Info</a>
+					<a class="permalink" href="#LogInstance.Info">¶</a>
+					
+					
+				</h3>
+				<pre>func (lg *<a href="#LogInstance">LogInstance</a>) Info(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+				<p>
+Info prints unless silence has been configured with SetSilence(true)
+IsSilent deteremines the state of silence
+if debug is enabled, code location is appended
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="LogInstance.IsSilent">func (*LogInstance) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L154">IsSilent</a>
+					<a class="permalink" href="#LogInstance.IsSilent">¶</a>
+					
+					
+				</h3>
+				<pre>func (lg *<a href="#LogInstance">LogInstance</a>) IsSilent() (isSilent <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<p>
+IsSilent if true it means that Info does not print
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="LogInstance.IsThisDebug">func (*LogInstance) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L141">IsThisDebug</a>
+					<a class="permalink" href="#LogInstance.IsThisDebug">¶</a>
+					
+					
+				</h3>
+				<pre>func (lg *<a href="#LogInstance">LogInstance</a>) IsThisDebug() <a href="http://localhost:8080/pkg/builtin/#bool">bool</a></pre>
+				<p>
+IsThisDebug returns whether debug logging is configured
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="LogInstance.Log">func (*LogInstance) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L67">Log</a>
+					<a class="permalink" href="#LogInstance.Log">¶</a>
+					
+					
+				</h3>
+				<pre>func (lg *<a href="#LogInstance">LogInstance</a>) Log(format <a href="http://localhost:8080/pkg/builtin/#string">string</a>, a ...interface{})</pre>
+				<p>
+Log invocations always print
+if debug is enabled, code location is appended
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="LogInstance.SetDebug">func (*LogInstance) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L110">SetDebug</a>
+					<a class="permalink" href="#LogInstance.SetDebug">¶</a>
+					
+					
+				</h3>
+				<pre>func (lg *<a href="#LogInstance">LogInstance</a>) SetDebug(debug <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<p>
+SetDebug prints everything with code location: IsInfo
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="LogInstance.SetRegexp">func (*LogInstance) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L118">SetRegexp</a>
+					<a class="permalink" href="#LogInstance.SetRegexp">¶</a>
+					
+					
+				</h3>
+				<pre>func (lg *<a href="#LogInstance">LogInstance</a>) SetRegexp(regExp <a href="http://localhost:8080/pkg/builtin/#string">string</a>) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="LogInstance.SetSilent">func (*LogInstance) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/log-instance.go#L132">SetSilent</a>
+					<a class="permalink" href="#LogInstance.SetSilent">¶</a>
+					
+					
+				</h3>
+				<pre>func (lg *<a href="#LogInstance">LogInstance</a>) SetSilent(silent <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<p>
+SetSilent only prints Log
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Moderator">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/moderator.go#L21">Moderator</a>
+				<a class="permalink" href="#Moderator">¶</a>
+				
+				
+			</h2>
+			<p>
+Moderator invokes functions at a limited level of parallelism
+</p>
+
+			<pre>type Moderator struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewModerator">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/moderator.go#L34">NewModerator</a>
+					<a class="permalink" href="#NewModerator">¶</a>
+					
+					
+				</h3>
+				<pre>func NewModerator(parallelism <a href="http://localhost:8080/pkg/builtin/#uint64">uint64</a>) (mo *<a href="#Moderator">Moderator</a>)</pre>
+				<p>
+NewModerator creates a new Moderator used to limit parallelism
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Moderator.Do">func (*Moderator) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/moderator.go#L43">Do</a>
+					<a class="permalink" href="#Moderator.Do">¶</a>
+					
+					
+				</h3>
+				<pre>func (mo *<a href="#Moderator">Moderator</a>) Do(fn func() <a href="http://localhost:8080/pkg/builtin/#error">error</a>) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+Do calls fn limited by the moderator’s parallelism.
+If the moderator is shut down, ErrModeratorShutdown is returned
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Moderator.Shutdown">func (*Moderator) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/moderator.go#L131">Shutdown</a>
+					<a class="permalink" href="#Moderator.Shutdown">¶</a>
+					
+					
+				</h3>
+				<pre>func (mo *<a href="#Moderator">Moderator</a>) Shutdown()</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Moderator.Status">func (*Moderator) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/moderator.go#L104">Status</a>
+					<a class="permalink" href="#Moderator.Status">¶</a>
+					
+					
+				</h3>
+				<pre>func (mo *<a href="#Moderator">Moderator</a>) Status() (parallelism <a href="http://localhost:8080/pkg/builtin/#uint64">uint64</a>, available <a href="http://localhost:8080/pkg/builtin/#uint64">uint64</a>, waiting <a href="http://localhost:8080/pkg/builtin/#uint64">uint64</a>, isShutdown <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Moderator.String">func (*Moderator) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/moderator.go#L114">String</a>
+					<a class="permalink" href="#Moderator.String">¶</a>
+					
+					
+				</h3>
+				<pre>func (mo *<a href="#Moderator">Moderator</a>) String() (s <a href="http://localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Password">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/parl.go#L61">Password</a>
+				<a class="permalink" href="#Password">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type Password interface {
+    HasPassword() (hasPassword <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)
+    Password() (password <a href="http://localhost:8080/pkg/builtin/#string">string</a>)
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="ReceiverFunc">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/debouncer.go#L28">ReceiverFunc</a>
+				<a class="permalink" href="#ReceiverFunc">¶</a>
+				
+				
+			</h2>
+			<p>
+ReceiverFunc takes two channels, listens to them and a typed channel, returns what channel triggered and a possible untyped value
+</p>
+
+			<pre>type ReceiverFunc func(c &lt;-chan <a href="http://localhost:8080/pkg/time/">time</a>.<a href="http://localhost:8080/pkg/time/#Time">Time</a>, done &lt;-chan struct{}) (which <a href="#TriggeringChan">TriggeringChan</a>, value <a href="#Value">Value</a>)</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="SenderFunc">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/debouncer.go#L25">SenderFunc</a>
+				<a class="permalink" href="#SenderFunc">¶</a>
+				
+				
+			</h2>
+			<p>
+SenderFunc takes an untyped value, type asserts and sends on a typed channel
+</p>
+
+			<pre>type SenderFunc func([]<a href="#Value">Value</a>)</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="SerialDo">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/serialdo.go#L17">SerialDo</a>
+				<a class="permalink" href="#SerialDo">¶</a>
+				
+				
+			</h2>
+			<p>
+serialdo invokes method in sequence
+</p>
+
+			<pre>type SerialDo struct {
+<span id="SerialDo.ErrCh"></span>    ErrCh chan <a href="http://localhost:8080/pkg/builtin/#error">error</a>
+<span id="SerialDo.ID"></span>    ID    <a href="http://localhost:8080/pkg/builtin/#string">string</a>
+<span id="SerialDo.Wg"></span>    Wg    <a href="http://localhost:8080/pkg/sync/">sync</a>.<a href="http://localhost:8080/pkg/sync/#WaitGroup">WaitGroup</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewSerialDo">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/serialdo.go#L31">NewSerialDo</a>
+					<a class="permalink" href="#NewSerialDo">¶</a>
+					
+					
+				</h3>
+				<pre>func NewSerialDo(thunk func(), eventReceiver <a href="#SerialDoFunc">SerialDoFunc</a>, ctx <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>) (sdo *<a href="#SerialDo">SerialDo</a>)</pre>
+				<p>
+NewSerialDo SerialDo. errors on sdo.ErrCh
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="SerialDo.Do">func (*SerialDo) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/serialdo.go#L67">Do</a>
+					<a class="permalink" href="#SerialDo.Do">¶</a>
+					
+					
+				</h3>
+				<pre>func (sdo *<a href="#SerialDo">SerialDo</a>) Do(now <a href="http://localhost:8080/pkg/time/">time</a>.<a href="http://localhost:8080/pkg/time/#Time">Time</a>) (nowPending <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<p>
+Invoke thunk serially, maximum queue one invocation, drop additional invocation requests prior to idle. non-blocking Thread-safe
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="SerialDo.Shutdown">func (*SerialDo) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/serialdo.go#L91">Shutdown</a>
+					<a class="permalink" href="#SerialDo.Shutdown">¶</a>
+					
+					
+				</h3>
+				<pre>func (sdo *<a href="#SerialDo">SerialDo</a>) Shutdown()</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="SerialDoEvent">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/serialdo.go#L52">SerialDoEvent</a>
+				<a class="permalink" href="#SerialDoEvent">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type SerialDoEvent <a href="http://localhost:8080/pkg/builtin/#uint8">uint8</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="SerialDoFunc">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/serialdo.go#L54">SerialDoFunc</a>
+				<a class="permalink" href="#SerialDoFunc">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type SerialDoFunc func(<a href="#SerialDoEvent">SerialDoEvent</a>, *<a href="#SerialDo">SerialDo</a>, *<a href="http://localhost:8080/pkg/time/">time</a>.<a href="http://localhost:8080/pkg/time/#Time">Time</a>)</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Timer">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/timer.go#L18">Timer</a>
+				<a class="permalink" href="#Timer">¶</a>
+				
+				
+			</h2>
+			<p>
+Timer is a simple request timer
+</p>
+
+			<pre>type Timer struct {
+<span id="Timer.Label"></span>    Label <a href="http://localhost:8080/pkg/builtin/#string">string</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewTimer">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/timer.go#L25">NewTimer</a>
+					<a class="permalink" href="#NewTimer">¶</a>
+					
+					
+				</h3>
+				<pre>func NewTimer(label <a href="http://localhost:8080/pkg/builtin/#string">string</a>) (t *<a href="#Timer">Timer</a>)</pre>
+				<p>
+NewTimer gets a simple timer with duration or string output
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Timer.End">func (*Timer) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/timer.go#L31">End</a>
+					<a class="permalink" href="#Timer.End">¶</a>
+					
+					
+				</h3>
+				<pre>func (t *<a href="#Timer">Timer</a>) End() (d <a href="http://localhost:8080/pkg/time/">time</a>.<a href="http://localhost:8080/pkg/time/#Duration">Duration</a>)</pre>
+				<p>
+End gets duration
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Timer.Endms">func (*Timer) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/timer.go#L38">Endms</a>
+					<a class="permalink" href="#Timer.Endms">¶</a>
+					
+					
+				</h3>
+				<pre>func (t *<a href="#Timer">Timer</a>) Endms() (ms <a href="http://localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				<p>
+Endms gets tring with duration in ms
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="TriggeringChan">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/debouncer.go#L19">TriggeringChan</a>
+				<a class="permalink" href="#TriggeringChan">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type TriggeringChan <a href="http://localhost:8080/pkg/builtin/#uint8">uint8</a></pre>
+
+			
+				
+				<pre>const (
+    <span id="TimerCh">TimerCh</span> <a href="#TriggeringChan">TriggeringChan</a> = <a href="http://localhost:8080/pkg/builtin/#iota">iota</a>
+    <span id="DoneCh">DoneCh</span>
+    <span id="ValueCh">ValueCh</span>
+)</pre>
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Value">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/debouncer.go#L22">Value</a>
+				<a class="permalink" href="#Value">¶</a>
+				
+				
+			</h2>
+			<p>
+Value is an event value that is being debounced
+</p>
+
+			<pre>type Value interface{}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+	
+
+	
+
+
+
+
+
+	
+	
+		<h2 id="pkg-subdirectories">Subdirectories</h2>
+	
+	<div class="pkg-dir">
+		<table>
+			<tbody><tr>
+				<th class="pkg-name">Name</th>
+				<th class="pkg-synopsis">Synopsis</th>
+			</tr>
+
+			
+			<tr>
+				<td colspan="2"><a href="..">..</a></td>
+			</tr>
+			
+
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="cmd/">cmd</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 20px;">
+						<a href="cmd/parl/">parl</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						parl.go demoinstrate usage of the parl package, a go library for command-line utilities and concurrency
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="error116/">error116</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package error116 adds stack traces and maps of values to error values.
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="ev/">ev</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package ev provides standardized goroutine management events contain thread completions, failures and any type of data items.
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="evx/">evx</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package evx contains declarations not essential to event handling © 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="mains/">mains</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package mains contains functions for executing a command-line utility © 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="parlca/">parlca</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package parlca provides a self-signed certificate authority © 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="parlfs/">parlfs</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package parlfs provides file-system related functions
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="parlnet/">parlnet</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package parlnet provides IP-related functions with few dependencies beyond the net package
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="parlos/">parlos</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package parlos provides simplified functions related to the os package
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="parls/">parls</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="parltime/">parltime</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package parltime provides time utility functions
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="parltty/">parltty</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="progress/">progress</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package progress provides printable progress reporting for multi-threaded operations
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="runt/">runt</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="sqldb/">sqldb</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package sqldb interfaces database/sql
+					</td>
+				</tr>
+			
+				<tr>
+				
+					<td class="pkg-name" style="padding-left: 0px;">
+						<a href="sqlite/">sqlite</a>
+					</td>
+				
+					<td class="pkg-synopsis">
+						Package sqlite wraps modernc.org/sqlite
+					</td>
+				</tr>
+			
+		</tbody></table>
+	</div>
+
+
+
+<div id="footer">
+Build version go1.17.8.<br/>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+
+</body></html>

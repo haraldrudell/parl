@@ -1,0 +1,327 @@
+<!DOCTYPE html><html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#375EAB"/>
+
+  <title>src/github.com/haraldrudell/parl/log_test.go - Parl</title>
+
+<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css"/>
+
+<script>window.initFuncs = [];</script>
+<script src="http://localhost:8080/lib/godoc/jquery.js" defer=""></script>
+
+
+
+
+<script>var goVersion = "go1.17.8";</script>
+<script src="http://localhost:8080/lib/godoc/godocs.js" defer=""></script>
+
+</head>
+<body>
+
+<div id="lowframe" style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">Parl | © 2022 Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">Parl</a></div>
+<a href="#" id="menu-button"><span id="menu-button-arrow">▽</span></a>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:8080/src">src</a>/<a href="http://localhost:8080/src/github.com">github.com</a>/<a href="http://localhost:8080/src/github.com/haraldrudell">haraldrudell</a>/<a href="http://localhost:8080/src/github.com/haraldrudell/parl">parl</a>/<span class="text-muted">log_test.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:8080/pkg/github.com/haraldrudell/parl">github.com/haraldrudell/parl</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type="text/javascript">document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1  </span><span class="comment">/*
+<span id="L2" class="ln">     2  </span>© 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)
+<span id="L3" class="ln">     3  </span>ISC License
+<span id="L4" class="ln">     4  </span>*/</span>
+<span id="L5" class="ln">     5  </span>
+<span id="L6" class="ln">     6  </span>package parl
+<span id="L7" class="ln">     7  </span>
+<span id="L8" class="ln">     8  </span>import (
+<span id="L9" class="ln">     9  </span>	&#34;fmt&#34;
+<span id="L10" class="ln">    10  </span>	&#34;strings&#34;
+<span id="L11" class="ln">    11  </span>	&#34;sync&#34;
+<span id="L12" class="ln">    12  </span>	&#34;testing&#34;
+<span id="L13" class="ln">    13  </span>
+<span id="L14" class="ln">    14  </span>	&#34;github.com/haraldrudell/parl/error116&#34;
+<span id="L15" class="ln">    15  </span>)
+<span id="L16" class="ln">    16  </span>
+<span id="L17" class="ln">    17  </span>func TestLogLog(t *testing.T) {
+<span id="L18" class="ln">    18  </span>	<span class="comment">// reset of static loggings logInstance object</span>
+<span id="L19" class="ln">    19  </span>	output0 := stderrLogger.output
+<span id="L20" class="ln">    20  </span>	defer func() {
+<span id="L21" class="ln">    21  </span>		stderrLogger.output = output0
+<span id="L22" class="ln">    22  </span>		SetDebug(false)
+<span id="L23" class="ln">    23  </span>	}()
+<span id="L24" class="ln">    24  </span>
+<span id="L25" class="ln">    25  </span>	text1, textNewline, expectedLocation, _, writer, mockOutput := mocksLogStat()
+<span id="L26" class="ln">    26  </span>	stderrLogger.output = mockOutput
+<span id="L27" class="ln">    27  </span>
+<span id="L28" class="ln">    28  </span>	var actualSlice []string
+<span id="L29" class="ln">    29  </span>	var actual string
+<span id="L30" class="ln">    30  </span>
+<span id="L31" class="ln">    31  </span>	<span class="comment">// Log</span>
+<span id="L32" class="ln">    32  </span>	Log(text1)
+<span id="L33" class="ln">    33  </span>	actualSlice = writer.getData()
+<span id="L34" class="ln">    34  </span>	if len(actualSlice) != 1 || actualSlice[0] != textNewline {
+<span id="L35" class="ln">    35  </span>		t.Logf(&#34;.Log failed: expected: %q actual: %s&#34;, textNewline, quoteSliceLogStat(actualSlice))
+<span id="L36" class="ln">    36  </span>		t.Fail()
+<span id="L37" class="ln">    37  </span>	}
+<span id="L38" class="ln">    38  </span>
+<span id="L39" class="ln">    39  </span>	<span class="comment">// Log with Location</span>
+<span id="L40" class="ln">    40  </span>	SetDebug(true)
+<span id="L41" class="ln">    41  </span>	Log(text1 + &#34;\n&#34;)
+<span id="L42" class="ln">    42  </span>	actualSlice = writer.getData()
+<span id="L43" class="ln">    43  </span>	if len(actualSlice) != 1 {
+<span id="L44" class="ln">    44  </span>		t.Logf(&#34;Log SetDebug: invocations not 1: %d&#34;, len(actualSlice))
+<span id="L45" class="ln">    45  </span>	} else {
+<span id="L46" class="ln">    46  </span>		actual = actualSlice[0]
+<span id="L47" class="ln">    47  </span>	}
+<span id="L48" class="ln">    48  </span>	if !strings.HasPrefix(actual, text1) {
+<span id="L49" class="ln">    49  </span>		t.Logf(&#34;Log SetDebug: no text1 prefix: %q&#34;, actual)
+<span id="L50" class="ln">    50  </span>		t.Fail()
+<span id="L51" class="ln">    51  </span>	}
+<span id="L52" class="ln">    52  </span>	if !strings.Contains(actual, expectedLocation) {
+<span id="L53" class="ln">    53  </span>		t.Logf(&#34;Log SetDebug: no location: actual: %q expected: %q&#34;, actual, expectedLocation)
+<span id="L54" class="ln">    54  </span>		t.Fail()
+<span id="L55" class="ln">    55  </span>	}
+<span id="L56" class="ln">    56  </span>	if strings.Index(actual, &#34;\n&#34;) != len(actual)-1 {
+<span id="L57" class="ln">    57  </span>		t.Logf(&#34;Log SetDebug: newline not at end: actual: %q expected: %q&#34;, actual, expectedLocation)
+<span id="L58" class="ln">    58  </span>		t.Fail()
+<span id="L59" class="ln">    59  </span>	}
+<span id="L60" class="ln">    60  </span>}
+<span id="L61" class="ln">    61  </span>
+<span id="L62" class="ln">    62  </span>func TestInfoLog(t *testing.T) {
+<span id="L63" class="ln">    63  </span>	output0 := stderrLogger.output
+<span id="L64" class="ln">    64  </span>	defer func() {
+<span id="L65" class="ln">    65  </span>		stderrLogger.output = output0
+<span id="L66" class="ln">    66  </span>		SetSilent(false)
+<span id="L67" class="ln">    67  </span>	}()
+<span id="L68" class="ln">    68  </span>
+<span id="L69" class="ln">    69  </span>	text1, textNewline, _, _, writer, mockOutput := mocksLogStat()
+<span id="L70" class="ln">    70  </span>	stderrLogger.output = mockOutput
+<span id="L71" class="ln">    71  </span>
+<span id="L72" class="ln">    72  </span>	var actualSlice []string
+<span id="L73" class="ln">    73  </span>
+<span id="L74" class="ln">    74  </span>	<span class="comment">// Info</span>
+<span id="L75" class="ln">    75  </span>	Info(text1)
+<span id="L76" class="ln">    76  </span>	actualSlice = writer.getData()
+<span id="L77" class="ln">    77  </span>	if len(actualSlice) != 1 || actualSlice[0] != textNewline {
+<span id="L78" class="ln">    78  </span>		t.Logf(&#34;.Log failed: expected:\n%q actual:\n%+v&#34;, textNewline, quoteSliceLogStat(actualSlice))
+<span id="L79" class="ln">    79  </span>		t.Fail()
+<span id="L80" class="ln">    80  </span>	}
+<span id="L81" class="ln">    81  </span>	if IsSilent() {
+<span id="L82" class="ln">    82  </span>		t.Logf(&#34;SetSilent default true&#34;)
+<span id="L83" class="ln">    83  </span>		t.Fail()
+<span id="L84" class="ln">    84  </span>	}
+<span id="L85" class="ln">    85  </span>
+<span id="L86" class="ln">    86  </span>	<span class="comment">// SetSilent</span>
+<span id="L87" class="ln">    87  </span>	SetSilent(true)
+<span id="L88" class="ln">    88  </span>	if !IsSilent() {
+<span id="L89" class="ln">    89  </span>		t.Logf(&#34;SetSilent ineffective&#34;)
+<span id="L90" class="ln">    90  </span>		t.Fail()
+<span id="L91" class="ln">    91  </span>	}
+<span id="L92" class="ln">    92  </span>	Info(text1)
+<span id="L93" class="ln">    93  </span>	actualSlice = writer.getData()
+<span id="L94" class="ln">    94  </span>	if len(actualSlice) != 0 {
+<span id="L95" class="ln">    95  </span>		t.Logf(&#34;SetSilent true: Info still prints&#34;)
+<span id="L96" class="ln">    96  </span>		t.Fail()
+<span id="L97" class="ln">    97  </span>	}
+<span id="L98" class="ln">    98  </span>}
+<span id="L99" class="ln">    99  </span>
+<span id="L100" class="ln">   100  </span>func TestDebugLog(t *testing.T) {
+<span id="L101" class="ln">   101  </span>	output0 := stderrLogger.output
+<span id="L102" class="ln">   102  </span>	defer func() {
+<span id="L103" class="ln">   103  </span>		stderrLogger.output = output0
+<span id="L104" class="ln">   104  </span>		SetDebug(false)
+<span id="L105" class="ln">   105  </span>	}()
+<span id="L106" class="ln">   106  </span>
+<span id="L107" class="ln">   107  </span>	text1, textNewline, expectedLocation, _, writer, mockOutput := mocksLogStat()
+<span id="L108" class="ln">   108  </span>	stderrLogger.output = mockOutput
+<span id="L109" class="ln">   109  </span>
+<span id="L110" class="ln">   110  </span>	var actualSlice []string
+<span id="L111" class="ln">   111  </span>	var actual string
+<span id="L112" class="ln">   112  </span>
+<span id="L113" class="ln">   113  </span>	<span class="comment">// Debug off</span>
+<span id="L114" class="ln">   114  </span>	if IsThisDebug() {
+<span id="L115" class="ln">   115  </span>		t.Logf(&#34;IsThisDebug default true&#34;)
+<span id="L116" class="ln">   116  </span>		t.Fail()
+<span id="L117" class="ln">   117  </span>	}
+<span id="L118" class="ln">   118  </span>	Debug(text1)
+<span id="L119" class="ln">   119  </span>	actualSlice = writer.getData()
+<span id="L120" class="ln">   120  </span>	if len(actualSlice) != 0 {
+<span id="L121" class="ln">   121  </span>		t.Logf(&#34;Debug prints as default&#34;)
+<span id="L122" class="ln">   122  </span>		t.Fail()
+<span id="L123" class="ln">   123  </span>	}
+<span id="L124" class="ln">   124  </span>
+<span id="L125" class="ln">   125  </span>	<span class="comment">// Debug on</span>
+<span id="L126" class="ln">   126  </span>	SetDebug(true)
+<span id="L127" class="ln">   127  </span>	if !IsThisDebug() {
+<span id="L128" class="ln">   128  </span>		t.Logf(&#34;IsThisDebug ineffective&#34;)
+<span id="L129" class="ln">   129  </span>		t.Fail()
+<span id="L130" class="ln">   130  </span>	}
+<span id="L131" class="ln">   131  </span>	Debug(textNewline)
+<span id="L132" class="ln">   132  </span>	actualSlice = writer.getData()
+<span id="L133" class="ln">   133  </span>	if len(actualSlice) != 1 {
+<span id="L134" class="ln">   134  </span>		t.Logf(&#34;Log SetDebug: invocations not 1: %d&#34;, len(actualSlice))
+<span id="L135" class="ln">   135  </span>		t.FailNow()
+<span id="L136" class="ln">   136  </span>	}
+<span id="L137" class="ln">   137  </span>	actual = actualSlice[0]
+<span id="L138" class="ln">   138  </span>	if !strings.HasPrefix(actual, text1) {
+<span id="L139" class="ln">   139  </span>		t.Logf(&#34;Log SetDebug: no text1 prefix: %q&#34;, actual)
+<span id="L140" class="ln">   140  </span>		t.Fail()
+<span id="L141" class="ln">   141  </span>	}
+<span id="L142" class="ln">   142  </span>	if !strings.Contains(actual, expectedLocation) {
+<span id="L143" class="ln">   143  </span>		t.Logf(&#34;Log SetDebug: no location: actual: %q expected: %q&#34;, actual, expectedLocation)
+<span id="L144" class="ln">   144  </span>		t.Fail()
+<span id="L145" class="ln">   145  </span>	}
+<span id="L146" class="ln">   146  </span>}
+<span id="L147" class="ln">   147  </span>
+<span id="L148" class="ln">   148  </span>func TestRegexpLog(t *testing.T) {
+<span id="L149" class="ln">   149  </span>	output0 := stderrLogger.output
+<span id="L150" class="ln">   150  </span>	defer func() {
+<span id="L151" class="ln">   151  </span>		stderrLogger.output = output0
+<span id="L152" class="ln">   152  </span>		SetRegexp(&#34;&#34;)
+<span id="L153" class="ln">   153  </span>	}()
+<span id="L154" class="ln">   154  </span>
+<span id="L155" class="ln">   155  </span>	text1, textNewline, expectedLocation, regexpLocation, writer, mockOutput := mocksLogStat()
+<span id="L156" class="ln">   156  </span>	stderrLogger.output = mockOutput
+<span id="L157" class="ln">   157  </span>
+<span id="L158" class="ln">   158  </span>	matchingRegexp := regexpLocation
+<span id="L159" class="ln">   159  </span>	nonMatchingRegexp := &#34;aaa&#34;
+<span id="L160" class="ln">   160  </span>
+<span id="L161" class="ln">   161  </span>	var actualSlice []string
+<span id="L162" class="ln">   162  </span>	var actual string
+<span id="L163" class="ln">   163  </span>
+<span id="L164" class="ln">   164  </span>	<span class="comment">// matching regexp</span>
+<span id="L165" class="ln">   165  </span>	if err := SetRegexp(matchingRegexp); err != nil {
+<span id="L166" class="ln">   166  </span>		t.Logf(&#34;SetRegexp failed: input: %q err: %+v&#34;, matchingRegexp, err)
+<span id="L167" class="ln">   167  </span>		t.Fail()
+<span id="L168" class="ln">   168  </span>	}
+<span id="L169" class="ln">   169  </span>	Debug(textNewline)
+<span id="L170" class="ln">   170  </span>	actualSlice = writer.getData()
+<span id="L171" class="ln">   171  </span>	if len(actualSlice) != 1 {
+<span id="L172" class="ln">   172  </span>		t.Logf(&#34;matching regexp did not print 1: %d regexp input:\n%q compiled:\n%+v&#34;,
+<span id="L173" class="ln">   173  </span>			len(actualSlice),
+<span id="L174" class="ln">   174  </span>			matchingRegexp,
+<span id="L175" class="ln">   175  </span>			stderrLogger.infoRegexp)
+<span id="L176" class="ln">   176  </span>		t.Fail()
+<span id="L177" class="ln">   177  </span>	}
+<span id="L178" class="ln">   178  </span>	actual = actualSlice[0]
+<span id="L179" class="ln">   179  </span>	if !strings.HasPrefix(actual, text1) {
+<span id="L180" class="ln">   180  </span>		t.Logf(&#34;matching regexp: missing prefix: %q text: %q&#34;, text1, actual)
+<span id="L181" class="ln">   181  </span>		t.Fail()
+<span id="L182" class="ln">   182  </span>	}
+<span id="L183" class="ln">   183  </span>	if !strings.Contains(actual, expectedLocation) {
+<span id="L184" class="ln">   184  </span>		t.Logf(&#34;matching regexp: no location: actual:\n%q expected:\n%q&#34;,
+<span id="L185" class="ln">   185  </span>			actual,
+<span id="L186" class="ln">   186  </span>			expectedLocation)
+<span id="L187" class="ln">   187  </span>		t.Fail()
+<span id="L188" class="ln">   188  </span>	}
+<span id="L189" class="ln">   189  </span>	if strings.Index(actual, &#34;\n&#34;) != len(actual)-1 {
+<span id="L190" class="ln">   190  </span>		t.Logf(&#34;matching regexp: newline not at end: actual: %q expected: %q&#34;, actual, expectedLocation)
+<span id="L191" class="ln">   191  </span>		t.Fail()
+<span id="L192" class="ln">   192  </span>	}
+<span id="L193" class="ln">   193  </span>
+<span id="L194" class="ln">   194  </span>	<span class="comment">// non-matching regexp</span>
+<span id="L195" class="ln">   195  </span>	if err := SetRegexp(nonMatchingRegexp); err != nil {
+<span id="L196" class="ln">   196  </span>		panic(err)
+<span id="L197" class="ln">   197  </span>	}
+<span id="L198" class="ln">   198  </span>	Debug(text1)
+<span id="L199" class="ln">   199  </span>	actualSlice = writer.getData()
+<span id="L200" class="ln">   200  </span>	if len(actualSlice) &gt; 0 {
+<span id="L201" class="ln">   201  </span>		t.Logf(&#34;non-matching regexp did print: %d&#34;, len(actualSlice))
+<span id="L202" class="ln">   202  </span>		t.Fail()
+<span id="L203" class="ln">   203  </span>	}
+<span id="L204" class="ln">   204  </span>}
+<span id="L205" class="ln">   205  </span>
+<span id="L206" class="ln">   206  </span>type mockWriterLogStat struct {
+<span id="L207" class="ln">   207  </span>	lock sync.Mutex
+<span id="L208" class="ln">   208  </span>	buf  []string
+<span id="L209" class="ln">   209  </span>}
+<span id="L210" class="ln">   210  </span>
+<span id="L211" class="ln">   211  </span>func (w *mockWriterLogStat) Write(p []byte) (n int, err error) {
+<span id="L212" class="ln">   212  </span>	n = len(p)
+<span id="L213" class="ln">   213  </span>	w.lock.Lock()
+<span id="L214" class="ln">   214  </span>	defer w.lock.Unlock()
+<span id="L215" class="ln">   215  </span>	w.buf = append(w.buf, string(p))
+<span id="L216" class="ln">   216  </span>	return
+<span id="L217" class="ln">   217  </span>}
+<span id="L218" class="ln">   218  </span>
+<span id="L219" class="ln">   219  </span>func (w *mockWriterLogStat) getData() (sList []string) {
+<span id="L220" class="ln">   220  </span>	w.lock.Lock()
+<span id="L221" class="ln">   221  </span>	defer w.lock.Unlock()
+<span id="L222" class="ln">   222  </span>	sList = w.buf
+<span id="L223" class="ln">   223  </span>	w.buf = nil
+<span id="L224" class="ln">   224  </span>	return
+<span id="L225" class="ln">   225  </span>}
+<span id="L226" class="ln">   226  </span>
+<span id="L227" class="ln">   227  </span>func quoteSliceLogStat(sList []string) (s string) {
+<span id="L228" class="ln">   228  </span>	var s2 []string
+<span id="L229" class="ln">   229  </span>	for _, sx := range sList {
+<span id="L230" class="ln">   230  </span>		s2 = append(s2, fmt.Sprintf(&#34;%q&#34;, sx))
+<span id="L231" class="ln">   231  </span>	}
+<span id="L232" class="ln">   232  </span>	return strings.Join(s2, &#34;\x20&#34;)
+<span id="L233" class="ln">   233  </span>}
+<span id="L234" class="ln">   234  </span>
+<span id="L235" class="ln">   235  </span>func mocksLogStat() (text1, textNewline, expectedLocation, regexpLocation string, writer *mockWriterLogStat, mockOutput func(n int, s string) (err error)) {
+<span id="L236" class="ln">   236  </span>	text1 = &#34;abc&#34;
+<span id="L237" class="ln">   237  </span>	textNewline = text1 + &#34;\n&#34;
+<span id="L238" class="ln">   238  </span>
+<span id="L239" class="ln">   239  </span>	<span class="comment">// location text for this file</span>
+<span id="L240" class="ln">   240  </span>	location := error116.NewCodeLocation(1)
+<span id="L241" class="ln">   241  </span>	expectedLocation = location.Short()
+<span id="L242" class="ln">   242  </span>	<span class="comment">// remove line number since this changes</span>
+<span id="L243" class="ln">   243  </span>	if index := strings.Index(expectedLocation, &#34;:&#34;); index == -1 {
+<span id="L244" class="ln">   244  </span>		panic(Errorf(&#34;error116.NewCodeLocation failed: %q&#34;, expectedLocation))
+<span id="L245" class="ln">   245  </span>	} else {
+<span id="L246" class="ln">   246  </span>		expectedLocation = expectedLocation[0:index]
+<span id="L247" class="ln">   247  </span>	}
+<span id="L248" class="ln">   248  </span>	regexpLocation = location.FuncName
+<span id="L249" class="ln">   249  </span>	writer = &amp;mockWriterLogStat{}
+<span id="L250" class="ln">   250  </span>	mockOutput = func(n int, s string) (err error) {
+<span id="L251" class="ln">   251  </span>		if !strings.HasSuffix(s, &#34;\n&#34;) {
+<span id="L252" class="ln">   252  </span>			s += &#34;\n&#34;
+<span id="L253" class="ln">   253  </span>		}
+<span id="L254" class="ln">   254  </span>		_, err = writer.Write([]byte(s))
+<span id="L255" class="ln">   255  </span>		return
+<span id="L256" class="ln">   256  </span>	}
+<span id="L257" class="ln">   257  </span>	return
+<span id="L258" class="ln">   258  </span>}
+<span id="L259" class="ln">   259  </span>
+</pre><p></p>
+
+<div id="footer">
+Build version go1.17.8.<br/>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+
+</body></html>

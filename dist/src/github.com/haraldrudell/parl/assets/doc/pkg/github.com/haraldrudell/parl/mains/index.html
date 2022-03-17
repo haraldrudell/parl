@@ -1,0 +1,1037 @@
+<!DOCTYPE html><html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#375EAB"/>
+
+  <title>mains - TITLE</title>
+
+<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css"/>
+
+<script>window.initFuncs = [];</script>
+<script src="http://localhost:8080/lib/godoc/jquery.js" defer=""></script>
+
+
+
+
+<script>var goVersion = "go1.17.8";</script>
+<script src="http://localhost:8080/lib/godoc/godocs.js" defer=""></script>
+
+</head>
+<body>
+
+<div id="lowframe" style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/">TITLE | DESCRIPTION</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/">TITLE</a></div>
+<a href="#" id="menu-button"><span id="menu-button-arrow">▽</span></a>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Package mains
+    <span class="text-muted"></span>
+  </h1>
+
+
+
+
+
+
+
+<div id="nav"></div>
+
+
+<!--
+	Copyright 2009 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
+-->
+<!--
+	Note: Static (i.e., not template-generated) href and id
+	attributes start with "pkg-" to make it impossible for
+	them to conflict with generated attributes (some of which
+	correspond to Go identifiers).
+-->
+
+	<script>
+	document.ANALYSIS_DATA = null;
+	document.CALLGRAPH = null;
+	</script>
+
+	
+		
+		<div id="short-nav">
+			<dl>
+			<dd><code>import &#34;github.com/haraldrudell/parl/mains&#34;</code></dd>
+			</dl>
+			<dl>
+			<dd><a href="#pkg-overview" class="overviewLink">Overview</a></dd>
+			<dd><a href="#pkg-index" class="indexLink">Index</a></dd>
+			
+			
+			</dl>
+		</div>
+		<!-- The package's Name is printed as title by the top-level template -->
+		<div id="pkg-overview" class="toggleVisible">
+			<div class="collapsed">
+				<h2 class="toggleButton" title="Click to show Overview section">Overview ▹</h2>
+			</div>
+			<div class="expanded">
+				<h2 class="toggleButton" title="Click to hide Overview section">Overview ▾</h2>
+				<p>
+Package mains contains functions for executing a command-line utility
+</p>
+<p>
+© 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (<a href="https://haraldrudell.github.io/haraldrudell/">https://haraldrudell.github.io/haraldrudell/</a>)
+</p>
+
+				
+			</div>
+		</div>
+
+		<div id="pkg-index" class="toggleVisible">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Index section">Index ▹</h2>
+		</div>
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Index section">Index ▾</h2>
+
+		<!-- Table of contents for API; must be named manual-nav to turn off auto nav. -->
+			<div id="manual-nav">
+			<dl>
+			
+				<dd><a href="#pkg-constants">Constants</a></dd>
+			
+			
+			
+				
+				<dd><a href="#Abs">func Abs(dir string) (out string)</a></dd>
+			
+				
+				<dd><a href="#ExecDir">func ExecDir() (dir string)</a></dd>
+			
+				
+				<dd><a href="#FindFile">func FindFile(filename0, program string) (out string, bytes []byte)</a></dd>
+			
+				
+				<dd><a href="#GetStringSliceValue">func GetStringSliceValue(p *[]string, value []string) (v flag.Value)</a></dd>
+			
+				
+				<dd><a href="#GetTopLevelKey">func GetTopLevelKey(topKey string) (key string)</a></dd>
+			
+				
+				<dd><a href="#Keystrokes">func Keystrokes(ctx ev.Callee)</a></dd>
+			
+				
+				<dd><a href="#ParentDir">func ParentDir() (dir string)</a></dd>
+			
+				
+				<dd><a href="#Timer">func Timer(ctx ev.Callee)</a></dd>
+			
+				
+				<dd><a href="#UserHomeDir">func UserHomeDir() (dir string)</a></dd>
+			
+			
+				
+				<dd><a href="#ArgumentSpec">type ArgumentSpec</a></dd>
+				
+				
+			
+				
+				<dd><a href="#BaseOptionsType">type BaseOptionsType</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Executable">type Executable</a></dd>
+				
+				
+					
+					<dd>    <a href="#Executable.AddErr">func (ex *Executable) AddErr(err error) (x *Executable)</a></dd>
+				
+					
+					<dd>    <a href="#Executable.ApplyYaml">func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, om []OptionData)</a></dd>
+				
+					
+					<dd>    <a href="#Executable.ConfigureLog">func (ex *Executable) ConfigureLog() (ex1 *Executable)</a></dd>
+				
+					
+					<dd>    <a href="#Executable.Exit">func (ex *Executable) Exit()</a></dd>
+				
+					
+					<dd>    <a href="#Executable.Init">func (ex *Executable) Init() *Executable</a></dd>
+				
+					
+					<dd>    <a href="#Executable.LongErrors">func (ex *Executable) LongErrors(isLongErrors bool, isErrorLocation bool) *Executable</a></dd>
+				
+					
+					<dd>    <a href="#Executable.PrintBannerAndParseOptions">func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executable)</a></dd>
+				
+					
+					<dd>    <a href="#Executable.PrintErr">func (ex *Executable) PrintErr(err error)</a></dd>
+				
+					
+					<dd>    <a href="#Executable.Recover">func (ex *Executable) Recover()</a></dd>
+				
+			
+				
+				<dd><a href="#InputLine">type InputLine</a></dd>
+				
+				
+			
+				
+				<dd><a href="#OptionData">type OptionData</a></dd>
+				
+					
+					<dd>    <a href="#BaseOptionData">func BaseOptionData(program string, yaml YamlOption) (od []OptionData)</a></dd>
+				
+				
+					
+					<dd>    <a href="#OptionData.AddOption">func (om *OptionData) AddOption()</a></dd>
+				
+					
+					<dd>    <a href="#OptionData.ApplyYaml">func (om *OptionData) ApplyYaml() (err error)</a></dd>
+				
+			
+				
+				<dd><a href="#Status">type Status</a></dd>
+				
+					
+					<dd>    <a href="#GetStatus">func GetStatus() (stat *Status)</a></dd>
+				
+				
+					
+					<dd>    <a href="#Status.Clear">func (stat *Status) Clear()</a></dd>
+				
+					
+					<dd>    <a href="#Status.Print">func (stat *Status) Print(s string)</a></dd>
+				
+			
+				
+				<dd><a href="#StringSliceValue">type StringSliceValue</a></dd>
+				
+				
+					
+					<dd>    <a href="#StringSliceValue.Set">func (v *StringSliceValue) Set(s string) (err error)</a></dd>
+				
+					
+					<dd>    <a href="#StringSliceValue.String">func (v StringSliceValue) String() (s string)</a></dd>
+				
+			
+				
+				<dd><a href="#UnmarshalFunc">type UnmarshalFunc</a></dd>
+				
+				
+			
+				
+				<dd><a href="#UnmarshalThunk">type UnmarshalThunk</a></dd>
+				
+				
+			
+				
+				<dd><a href="#YamlOption">type YamlOption</a></dd>
+				
+				
+			
+				
+				<dd><a href="#YamlValue">type YamlValue</a></dd>
+				
+					
+					<dd>    <a href="#NewYamlValue">func NewYamlValue(instancePointer interface{}, fieldPointer interface{}) (yv *YamlValue)</a></dd>
+				
+				
+			
+			
+			</dl>
+			</div><!-- #manual-nav -->
+
+		
+
+		
+			<h3>Package files</h3>
+			<p>
+			<span style="font-size:90%">
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/baseoptions.go">baseoptions.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go">executable.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/keystrokes.go">keystrokes.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/mains.go">mains.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/optiondata.go">optiondata.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/sliceflag.go">sliceflag.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/status.go">status.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/timer.go">timer.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/yaml.go">yaml.go</a>
+			
+				<a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/yamlvalue.go">yamlvalue.go</a>
+			
+			</span>
+			</p>
+		
+		</div><!-- .expanded -->
+		</div><!-- #pkg-index -->
+
+		
+
+		
+			<h2 id="pkg-constants">Constants</h2>
+			
+				
+				<pre>const (
+    <span class="comment">// NoArguments besides switches, zero trailing arguments is allowed</span>
+    <span id="NoArguments">NoArguments</span> = 1 &lt;&lt; <a href="http:/localhost:8080/pkg/builtin/#iota">iota</a>
+    <span class="comment">// OneArgument besides switches, exactly one trailing arguments is allowed</span>
+    <span id="OneArgument">OneArgument</span>
+    <span class="comment">// ManyArguments besides switches, one or more trailing arguments is allowed</span>
+    <span id="ManyArguments">ManyArguments</span>
+)</pre>
+			
+				
+				<pre>const (
+    <span id="SilentString">SilentString</span> = &#34;-&#34; + silentOption
+)</pre>
+			
+		
+		
+		
+			
+			
+			<h2 id="Abs">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L106">Abs</a>
+				<a class="permalink" href="#Abs">¶</a>
+				
+				
+			</h2>
+			<pre>func Abs(dir <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (out <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			<p>
+Abs ensures a file system path is fully qualified
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ExecDir">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L97">ExecDir</a>
+				<a class="permalink" href="#ExecDir">¶</a>
+				
+				
+			</h2>
+			<pre>func ExecDir() (dir <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			<p>
+ExecDir gets directory where executable is located
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="FindFile">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/yaml.go#L44">FindFile</a>
+				<a class="permalink" href="#FindFile">¶</a>
+				
+				
+			</h2>
+			<pre>func FindFile(filename0, program <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (out <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, bytes []<a href="http:/localhost:8080/pkg/builtin/#byte">byte</a>)</pre>
+			<p>
+FindFile locates and read the yaml file
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="GetStringSliceValue">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/sliceflag.go#L27">GetStringSliceValue</a>
+				<a class="permalink" href="#GetStringSliceValue">¶</a>
+				
+				
+			</h2>
+			<pre>func GetStringSliceValue(p *[]<a href="http:/localhost:8080/pkg/builtin/#string">string</a>, value []<a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (v <a href="http:/localhost:8080/pkg/flag/">flag</a>.<a href="http:/localhost:8080/pkg/flag/#Value">Value</a>)</pre>
+			<p>
+GetStringSliceValue initializes
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="GetTopLevelKey">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/yaml.go#L32">GetTopLevelKey</a>
+				<a class="permalink" href="#GetTopLevelKey">¶</a>
+				
+				
+			</h2>
+			<pre>func GetTopLevelKey(topKey <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (key <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			<p>
+GetTopLevelKey gets the top level key to use
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Keystrokes">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/keystrokes.go#L27">Keystrokes</a>
+				<a class="permalink" href="#Keystrokes">¶</a>
+				
+				
+			</h2>
+			<pre>func Keystrokes(ctx <a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/ev/">ev</a>.<a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/ev/#Callee">Callee</a>)</pre>
+			<p>
+Keystrokes emits keystroke events
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="ParentDir">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L89">ParentDir</a>
+				<a class="permalink" href="#ParentDir">¶</a>
+				
+				
+			</h2>
+			<pre>func ParentDir() (dir <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			<p>
+ParentDir gets absolute path of executable parent directory
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="Timer">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/timer.go#L21">Timer</a>
+				<a class="permalink" href="#Timer">¶</a>
+				
+				
+			</h2>
+			<pre>func Timer(ctx <a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/ev/">ev</a>.<a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/ev/#Callee">Callee</a>)</pre>
+			<p>
+Timer displays a second counter and help on long-running invocations
+</p>
+
+			
+			
+
+		
+			
+			
+			<h2 id="UserHomeDir">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L115">UserHomeDir</a>
+				<a class="permalink" href="#UserHomeDir">¶</a>
+				
+				
+			</h2>
+			<pre>func UserHomeDir() (dir <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+			<p>
+UserHomeDir gets file system path of user’s home directory
+</p>
+
+			
+			
+
+		
+		
+			
+			
+			<h2 id="ArgumentSpec">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L44">ArgumentSpec</a>
+				<a class="permalink" href="#ArgumentSpec">¶</a>
+				
+				
+			</h2>
+			<p>
+ArgumentSpec bitfield for 0, 1, many arguments following command-line switches
+</p>
+
+			<pre>type ArgumentSpec <a href="http:/localhost:8080/pkg/builtin/#uint32">uint32</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="BaseOptionsType">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/baseoptions.go#L21">BaseOptionsType</a>
+				<a class="permalink" href="#BaseOptionsType">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type BaseOptionsType = struct {
+<span id="BaseOptionsType.YamlFile"></span>    YamlFile  <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="BaseOptionsType.YamlKey"></span>    YamlKey   <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="BaseOptionsType.Verbosity"></span>    Verbosity <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="BaseOptionsType.Debug"></span>    Debug     <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>
+<span id="BaseOptionsType.Silent"></span>    Silent    <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>
+}
+</pre>
+
+			
+
+			
+				
+				<pre>var <span id="BaseOptions">BaseOptions</span> <a href="#BaseOptionsType">BaseOptionsType</a></pre>
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Executable">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L47">Executable</a>
+				<a class="permalink" href="#Executable">¶</a>
+				
+				
+			</h2>
+			<p>
+Executable constant strings that describes an executable
+</p>
+
+			<pre>type Executable struct {
+<span id="Executable.Program"></span>    Program        <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// gonet</span>
+<span id="Executable.Version"></span>    Version        <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// 0.0.1</span>
+<span id="Executable.Comment"></span>    Comment        <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// [ banner text after program and version] options parsing (about this version)</span>
+<span id="Executable.Description"></span>    Description    <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// [Description part of usage] configures firewall and routing</span>
+<span id="Executable.Copyright"></span>    Copyright      <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// © 2020…</span>
+<span id="Executable.License"></span>    License        <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// ISC License</span>
+<span id="Executable.ArgumentsUsage"></span>    ArgumentsUsage <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="Executable.Arguments"></span>    Arguments      <a href="#ArgumentSpec">ArgumentSpec</a> <span class="comment">// eg. NoArguments</span>
+    <span class="comment">// fields below popualted by .Init()</span>
+<span id="Executable.Launch"></span>    Launch       <a href="http:/localhost:8080/pkg/time/">time</a>.<a href="http:/localhost:8080/pkg/time/#Time">Time</a>
+<span id="Executable.LaunchString"></span>    LaunchString <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="Executable.Host"></span>    Host         <a href="http:/localhost:8080/pkg/builtin/#string">string</a> <span class="comment">// short hostname, ie. no dots</span>
+
+<span id="Executable.ArgCount"></span>    ArgCount        <a href="http:/localhost:8080/pkg/builtin/#int">int</a>
+<span id="Executable.Arg"></span>    Arg             <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="Executable.Args"></span>    Args            []<a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="Executable.IsLongErrors"></span>    IsLongErrors    <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>
+<span id="Executable.IsErrorLocation"></span>    IsErrorLocation <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="Executable.AddErr">func (*Executable) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L292">AddErr</a>
+					<a class="permalink" href="#Executable.AddErr">¶</a>
+					
+					
+				</h3>
+				<pre>func (ex *<a href="#Executable">Executable</a>) AddErr(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) (x *<a href="#Executable">Executable</a>)</pre>
+				<p>
+AddErr extended with immediate printing of first error
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Executable.ApplyYaml">func (*Executable) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L196">ApplyYaml</a>
+					<a class="permalink" href="#Executable.ApplyYaml">¶</a>
+					
+					
+				</h3>
+				<pre>func (ex *<a href="#Executable">Executable</a>) ApplyYaml(yamlFile, yamlKey <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, thunk <a href="#UnmarshalThunk">UnmarshalThunk</a>, om []<a href="#OptionData">OptionData</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Executable.ConfigureLog">func (*Executable) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L179">ConfigureLog</a>
+					<a class="permalink" href="#Executable.ConfigureLog">¶</a>
+					
+					
+				</h3>
+				<pre>func (ex *<a href="#Executable">Executable</a>) ConfigureLog() (ex1 *<a href="#Executable">Executable</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="Executable.Exit">func (*Executable) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L332">Exit</a>
+					<a class="permalink" href="#Executable.Exit">¶</a>
+					
+					
+				</h3>
+				<pre>func (ex *<a href="#Executable">Executable</a>) Exit()</pre>
+				<p>
+Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Executable.Init">func (*Executable) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L69">Init</a>
+					<a class="permalink" href="#Executable.Init">¶</a>
+					
+					
+				</h3>
+				<pre>func (ex *<a href="#Executable">Executable</a>) Init() *<a href="#Executable">Executable</a></pre>
+				<p>
+Init populate launch time — may throw
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Executable.LongErrors">func (*Executable) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L81">LongErrors</a>
+					<a class="permalink" href="#Executable.LongErrors">¶</a>
+					
+					
+				</h3>
+				<pre>func (ex *<a href="#Executable">Executable</a>) LongErrors(isLongErrors <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>, isErrorLocation <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>) *<a href="#Executable">Executable</a></pre>
+				<p>
+LongErrors sets if errors are printed with stack trace and values
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Executable.PrintBannerAndParseOptions">func (*Executable) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L124">PrintBannerAndParseOptions</a>
+					<a class="permalink" href="#Executable.PrintBannerAndParseOptions">¶</a>
+					
+					
+				</h3>
+				<pre>func (ex *<a href="#Executable">Executable</a>) PrintBannerAndParseOptions(om []<a href="#OptionData">OptionData</a>) (ex1 *<a href="#Executable">Executable</a>)</pre>
+				<p>
+PrintBannerAndParseOptions prints greeting
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Executable.PrintErr">func (*Executable) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L321">PrintErr</a>
+					<a class="permalink" href="#Executable.PrintErr">¶</a>
+					
+					
+				</h3>
+				<pre>func (ex *<a href="#Executable">Executable</a>) PrintErr(err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+PrintErr prints an error
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Executable.Recover">func (*Executable) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/executable.go#L271">Recover</a>
+					<a class="permalink" href="#Executable.Recover">¶</a>
+					
+					
+				</h3>
+				<pre>func (ex *<a href="#Executable">Executable</a>) Recover()</pre>
+				<p>
+Recover function to be deferred in main()
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="InputLine">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/keystrokes.go#L24">InputLine</a>
+				<a class="permalink" href="#InputLine">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type InputLine <a href="http:/localhost:8080/pkg/builtin/#string">string</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="OptionData">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/optiondata.go#L22">OptionData</a>
+				<a class="permalink" href="#OptionData">¶</a>
+				
+				
+			</h2>
+			<p>
+OptionData contain options data for the flag package
+</p>
+
+			<pre>type OptionData struct {
+<span id="OptionData.P"></span>    P     interface{}
+<span id="OptionData.Name"></span>    Name  <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="OptionData.Value"></span>    Value interface{}
+<span id="OptionData.Usage"></span>    Usage <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="OptionData.Y"></span>    Y     *<a href="#YamlValue">YamlValue</a> <span class="comment">// pointer to data value from yaml</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="BaseOptionData">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/baseoptions.go#L31">BaseOptionData</a>
+					<a class="permalink" href="#BaseOptionData">¶</a>
+					
+					
+				</h3>
+				<pre>func BaseOptionData(program <a href="http:/localhost:8080/pkg/builtin/#string">string</a>, yaml <a href="#YamlOption">YamlOption</a>) (od []<a href="#OptionData">OptionData</a>)</pre>
+				
+				
+				
+			
+
+			
+				
+				<h3 id="OptionData.AddOption">func (*OptionData) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/optiondata.go#L31">AddOption</a>
+					<a class="permalink" href="#OptionData.AddOption">¶</a>
+					
+					
+				</h3>
+				<pre>func (om *<a href="#OptionData">OptionData</a>) AddOption()</pre>
+				<p>
+AddOption executes flag.BoolVar and such on the options map
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="OptionData.ApplyYaml">func (*OptionData) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/optiondata.go#L96">ApplyYaml</a>
+					<a class="permalink" href="#OptionData.ApplyYaml">¶</a>
+					
+					
+				</h3>
+				<pre>func (om *<a href="#OptionData">OptionData</a>) ApplyYaml() (err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="Status">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/status.go#L25">Status</a>
+				<a class="permalink" href="#Status">¶</a>
+				
+				
+			</h2>
+			<p>
+Status handles printing of status to stdout
+</p>
+
+			<pre>type Status struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="GetStatus">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/status.go#L19">GetStatus</a>
+					<a class="permalink" href="#GetStatus">¶</a>
+					
+					
+				</h3>
+				<pre>func GetStatus() (stat *<a href="#Status">Status</a>)</pre>
+				<p>
+GetStatus gets instance of status printer
+</p>
+
+				
+				
+			
+
+			
+				
+				<h3 id="Status.Clear">func (*Status) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/status.go#L46">Clear</a>
+					<a class="permalink" href="#Status.Clear">¶</a>
+					
+					
+				</h3>
+				<pre>func (stat *<a href="#Status">Status</a>) Clear()</pre>
+				<p>
+Clear remove previously printed status
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="Status.Print">func (*Status) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/status.go#L30">Print</a>
+					<a class="permalink" href="#Status.Print">¶</a>
+					
+					
+				</h3>
+				<pre>func (stat *<a href="#Status">Status</a>) Print(s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				<p>
+Print status information
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="StringSliceValue">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/sliceflag.go#L21">StringSliceValue</a>
+				<a class="permalink" href="#StringSliceValue">¶</a>
+				
+				
+			</h2>
+			<p>
+StringSliceValue manages a string-slice value for flag.Var
+</p>
+
+			<pre>type StringSliceValue struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="StringSliceValue.Set">func (*StringSliceValue) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/sliceflag.go#L34">Set</a>
+					<a class="permalink" href="#StringSliceValue.Set">¶</a>
+					
+					
+				</h3>
+				<pre>func (v *<a href="#StringSliceValue">StringSliceValue</a>) Set(s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+Set updates the string slice
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="StringSliceValue.String">func (StringSliceValue) <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/sliceflag.go#L43">String</a>
+					<a class="permalink" href="#StringSliceValue.String">¶</a>
+					
+					
+				</h3>
+				<pre>func (v <a href="#StringSliceValue">StringSliceValue</a>) String() (s <a href="http:/localhost:8080/pkg/builtin/#string">string</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="UnmarshalFunc">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/yaml.go#L40">UnmarshalFunc</a>
+				<a class="permalink" href="#UnmarshalFunc">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type UnmarshalFunc func(in []<a href="http:/localhost:8080/pkg/builtin/#byte">byte</a>, out interface{}) (err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>) <span class="comment">// yaml.Unmarshal</span>
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="UnmarshalThunk">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/yaml.go#L41">UnmarshalThunk</a>
+				<a class="permalink" href="#UnmarshalThunk">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type UnmarshalThunk func(bytes []<a href="http:/localhost:8080/pkg/builtin/#byte">byte</a>, unmarshal <a href="#UnmarshalFunc">UnmarshalFunc</a>, yamlKey <a href="http:/localhost:8080/pkg/builtin/#string">string</a>) (hasDate <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a>, err <a href="http:/localhost:8080/pkg/builtin/#error">error</a>)</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="YamlOption">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/baseoptions.go#L19">YamlOption</a>
+				<a class="permalink" href="#YamlOption">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type YamlOption <a href="http:/localhost:8080/pkg/builtin/#bool">bool</a></pre>
+
+			
+				
+				<pre>const (
+    <span id="YamlNo">YamlNo</span>  <a href="#YamlOption">YamlOption</a> = <a href="http:/localhost:8080/pkg/builtin/#false">false</a>
+    <span id="YamlYes">YamlYes</span> <a href="#YamlOption">YamlOption</a> = <a href="http:/localhost:8080/pkg/builtin/#true">true</a>
+)</pre>
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="YamlValue">type <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/yamlvalue.go#L15">YamlValue</a>
+				<a class="permalink" href="#YamlValue">¶</a>
+				
+				
+			</h2>
+			
+			<pre>type YamlValue struct {
+<span id="YamlValue.Name"></span>    Name    <a href="http:/localhost:8080/pkg/builtin/#string">string</a>
+<span id="YamlValue.Pointer"></span>    Pointer interface{}
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewYamlValue">func <a href="./http:/localhost:8080/src/github.com/haraldrudell/parl/mains/yamlvalue.go#L20">NewYamlValue</a>
+					<a class="permalink" href="#NewYamlValue">¶</a>
+					
+					
+				</h3>
+				<pre>func NewYamlValue(instancePointer interface{}, fieldPointer interface{}) (yv *<a href="#YamlValue">YamlValue</a>)</pre>
+				
+				
+				
+			
+
+			
+		
+	
+
+	
+
+
+
+
+
+
+
+<div id="footer">
+Build version go1.17.8.<br/>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+
+</body></html>

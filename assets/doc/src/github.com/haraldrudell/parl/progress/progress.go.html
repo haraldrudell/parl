@@ -1,0 +1,92 @@
+<!DOCTYPE html><html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#375EAB"/>
+
+  <title>src/github.com/haraldrudell/parl/progress/progress.go - Parl</title>
+
+<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css"/>
+
+<script>window.initFuncs = [];</script>
+<script src="http://localhost:8080/lib/godoc/jquery.js" defer=""></script>
+
+
+
+
+<script>var goVersion = "go1.17.8";</script>
+<script src="http://localhost:8080/lib/godoc/godocs.js" defer=""></script>
+
+</head>
+<body>
+
+<div id="lowframe" style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">Parl | © 2022 Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">Parl</a></div>
+<a href="#" id="menu-button"><span id="menu-button-arrow">▽</span></a>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http://localhost:8080/src">src</a>/<a href="http://localhost:8080/src/github.com">github.com</a>/<a href="http://localhost:8080/src/github.com/haraldrudell">haraldrudell</a>/<a href="http://localhost:8080/src/github.com/haraldrudell/parl">parl</a>/<a href="http://localhost:8080/src/github.com/haraldrudell/parl/progress">progress</a>/<span class="text-muted">progress.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/progress">github.com/haraldrudell/parl/progress</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type="text/javascript">document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1  </span><span class="comment">/*
+<span id="L2" class="ln">     2  </span>© 2021–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)
+<span id="L3" class="ln">     3  </span>ISC License
+<span id="L4" class="ln">     4  </span>*/</span>
+<span id="L5" class="ln">     5  </span>
+<span id="L6" class="ln">     6  </span><span class="comment">// Package progress provides printable progress reporting for multi-threaded operations</span>
+<span id="L7" class="ln">     7  </span>package progress
+<span id="L8" class="ln">     8  </span>
+<span id="L9" class="ln">     9  </span>const (
+<span id="L10" class="ln">    10  </span>	<span class="comment">// ValueKey returns the list of retrievable string values</span>
+<span id="L11" class="ln">    11  </span>	ValueKey = &#34;values&#34;
+<span id="L12" class="ln">    12  </span>	<span class="comment">// LogOutput to Value provides output formatted for logging</span>
+<span id="L13" class="ln">    13  </span>	LogFormat = &#34;log&#34;
+<span id="L14" class="ln">    14  </span>	<span class="comment">// TerminalFormat to Value provides output with colors</span>
+<span id="L15" class="ln">    15  </span>	TerminalFormat = &#34;log&#34;
+<span id="L16" class="ln">    16  </span>	<span class="comment">// PlainFormat contains no control characters other than newline</span>
+<span id="L17" class="ln">    17  </span>	PlainFormat = &#34;plain&#34;
+<span id="L18" class="ln">    18  </span>)
+<span id="L19" class="ln">    19  </span>
+<span id="L20" class="ln">    20  </span>type Progress interface {
+<span id="L21" class="ln">    21  </span>	Value(key string, parameter int) (value string) <span class="comment">// parameter may be available column count for formatting</span>
+<span id="L22" class="ln">    22  </span>	Values(key string, parameter int) (values []string)
+<span id="L23" class="ln">    23  </span>}
+<span id="L24" class="ln">    24  </span>
+</pre><p></p>
+
+<div id="footer">
+Build version go1.17.8.<br/>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+
+</body></html>

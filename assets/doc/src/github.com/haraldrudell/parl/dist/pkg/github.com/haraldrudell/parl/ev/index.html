@@ -1,0 +1,967 @@
+<!DOCTYPE html><html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#375EAB"/>
+
+  <title>ev - GoPages</title>
+
+<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css"/>
+
+<script>window.initFuncs = [];</script>
+<script src="http://localhost:8080/lib/godoc/jquery.js" defer=""></script>
+
+
+
+
+<script>var goVersion = "go1.17.8";</script>
+<script src="http://localhost:8080/lib/godoc/godocs.js" defer=""></script>
+
+</head>
+<body>
+
+<div id="lowframe" style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">GoPages | Auto-generated docs</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http://localhost:8080/pkg/github.com/haraldrudell/parl/">GoPages</a></div>
+<a href="#" id="menu-button"><span id="menu-button-arrow">▽</span></a>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Package ev
+    <span class="text-muted"></span>
+  </h1>
+
+
+
+
+
+
+
+<div id="nav"></div>
+
+
+<!--
+	Copyright 2009 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
+-->
+<!--
+	Note: Static (i.e., not template-generated) href and id
+	attributes start with "pkg-" to make it impossible for
+	them to conflict with generated attributes (some of which
+	correspond to Go identifiers).
+-->
+
+	<script>
+	document.ANALYSIS_DATA = null;
+	document.CALLGRAPH = null;
+	</script>
+
+	
+		
+		<div id="short-nav">
+			<dl>
+			<dd><code>import &#34;github.com/haraldrudell/parl/ev&#34;</code></dd>
+			</dl>
+			<dl>
+			<dd><a href="#pkg-overview" class="overviewLink">Overview</a></dd>
+			<dd><a href="#pkg-index" class="indexLink">Index</a></dd>
+			
+			
+			</dl>
+		</div>
+		<!-- The package's Name is printed as title by the top-level template -->
+		<div id="pkg-overview" class="toggleVisible">
+			<div class="collapsed">
+				<h2 class="toggleButton" title="Click to show Overview section">Overview ▹</h2>
+			</div>
+			<div class="expanded">
+				<h2 class="toggleButton" title="Click to hide Overview section">Overview ▾</h2>
+				<p>
+Package ev provides standardized goroutine management
+</p>
+<p>
+events contain thread completions, failures and any type of data items. A manager launches and controls a set of goroutines
+</p>
+<p>
+ctx.Result is defered by a gorutine, captures panics and sends the goroutine’s result using Success or Failure
+</p>
+<pre>func (ctx ev.Callee) {
+  var err error
+  defer func() {
+    ctx.Result(&amp;err, recover())
+  }()
+…
+</pre>
+<p>
+© 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (<a href="https://haraldrudell.github.io/haraldrudell/">https://haraldrudell.github.io/haraldrudell/</a>)
+</p>
+
+				
+			</div>
+		</div>
+
+		<div id="pkg-index" class="toggleVisible">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Index section">Index ▹</h2>
+		</div>
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Index section">Index ▾</h2>
+
+		<!-- Table of contents for API; must be named manual-nav to turn off auto nav. -->
+			<div id="manual-nav">
+			<dl>
+			
+			
+			
+			
+				
+				<dd><a href="#Callee">type Callee</a></dd>
+				
+					
+					<dd>    <a href="#NewCallee">func NewCallee(name string, gID GoID, eventTx chan&lt;- Event, ctx0 context.Context) (ctx Callee)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#CalleeContext">type CalleeContext</a></dd>
+				
+				
+					
+					<dd>    <a href="#CalleeContext.Failure">func (ctx *CalleeContext) Failure(err error)</a></dd>
+				
+					
+					<dd>    <a href="#CalleeContext.Result">func (ctx *CalleeContext) Result(errp *error)</a></dd>
+				
+					
+					<dd>    <a href="#CalleeContext.ResultV">func (ctx *CalleeContext) ResultV(errp *error, recoverValue interface{})</a></dd>
+				
+					
+					<dd>    <a href="#CalleeContext.Send">func (ctx *CalleeContext) Send(payload interface{})</a></dd>
+				
+					
+					<dd>    <a href="#CalleeContext.Success">func (ctx *CalleeContext) Success()</a></dd>
+				
+					
+					<dd>    <a href="#CalleeContext.Thread">func (ctx *CalleeContext) Thread() (name string, gID GoID)</a></dd>
+				
+			
+				
+				<dd><a href="#CancelAction">type CancelAction</a></dd>
+				
+				
+			
+				
+				<dd><a href="#DataEvent">type DataEvent</a></dd>
+				
+				
+					
+					<dd>    <a href="#DataEvent.Payload">func (ev *DataEvent) Payload() (payload interface{})</a></dd>
+				
+			
+				
+				<dd><a href="#EmptyEvent">type EmptyEvent</a></dd>
+				
+					
+					<dd>    <a href="#NewEmptyEvent">func NewEmptyEvent(gID GoID) *EmptyEvent</a></dd>
+				
+				
+					
+					<dd>    <a href="#EmptyEvent.GoID">func (ev *EmptyEvent) GoID() (gID GoID)</a></dd>
+				
+			
+				
+				<dd><a href="#EvThread">type EvThread</a></dd>
+				
+					
+					<dd>    <a href="#NewEvThread">func NewEvThread(name string) (ti *EvThread)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Event">type Event</a></dd>
+				
+					
+					<dd>    <a href="#NewDataEvent">func NewDataEvent(gID GoID, payload interface{}) (evt Event)</a></dd>
+				
+					
+					<dd>    <a href="#NewExitEvent">func NewExitEvent(e error, gID GoID) (evt Event)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#EventRx">type EventRx</a></dd>
+				
+				
+			
+				
+				<dd><a href="#ExitEvent">type ExitEvent</a></dd>
+				
+				
+			
+				
+				<dd><a href="#GoID">type GoID</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Manager">type Manager</a></dd>
+				
+					
+					<dd>    <a href="#NewManager">func NewManager(ctx0 context.Context) (mgr Manager)</a></dd>
+				
+				
+			
+				
+				<dd><a href="#ThreadManager">type ThreadManager</a></dd>
+				
+				
+					
+					<dd>    <a href="#ThreadManager.Action">func (mgr *ThreadManager) Action(threadResult error, action CancelAction) (isEnd bool)</a></dd>
+				
+					
+					<dd>    <a href="#ThreadManager.CalleeContext">func (mgr *ThreadManager) CalleeContext(ID ...string) (env Callee)</a></dd>
+				
+					
+					<dd>    <a href="#ThreadManager.Cancel">func (mgr *ThreadManager) Cancel() (isEnd bool)</a></dd>
+				
+					
+					<dd>    <a href="#ThreadManager.Count">func (mgr *ThreadManager) Count() (count int64)</a></dd>
+				
+					
+					<dd>    <a href="#ThreadManager.Events">func (mgr *ThreadManager) Events() (out EventRx)</a></dd>
+				
+					
+					<dd>    <a href="#ThreadManager.IsEnd">func (mgr *ThreadManager) IsEnd() (isEnd bool)</a></dd>
+				
+					
+					<dd>    <a href="#ThreadManager.ProcessEvent">func (mgr *ThreadManager) ProcessEvent(ev Event) (err error)</a></dd>
+				
+					
+					<dd>    <a href="#ThreadManager.Threads">func (mgr *ThreadManager) Threads() (names []string, IDs []GoID)</a></dd>
+				
+			
+			
+			</dl>
+			</div><!-- #manual-nav -->
+
+		
+
+		
+			<h3>Package files</h3>
+			<p>
+			<span style="font-size:90%">
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go">callee.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/dataevent.go">dataevent.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/emptyevent.go">emptyevent.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go">ev.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/exitevent.go">exitevent.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go">manager.go</a>
+			
+				<a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/thread.go">thread.go</a>
+			
+			</span>
+			</p>
+		
+		</div><!-- .expanded -->
+		</div><!-- #pkg-index -->
+
+		
+
+		
+		
+		
+		
+			
+			
+			<h2 id="Callee">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L37">Callee</a>
+				<a class="permalink" href="#Callee">¶</a>
+				
+				
+			</h2>
+			<p>
+Callee provides functions for a called goroutine
+</p>
+
+			<pre>type Callee interface {
+    <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>                                <span class="comment">// Deadline Done Err Value</span>
+    Success()                                      <span class="comment">// Success indicates this goruote terminated successfully</span>
+    Failure(err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)                             <span class="comment">// Failure indicates this goroutine failed with err</span>
+    Result(errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>)                            <span class="comment">// recovery for gorutines: usage: defer ctx.Result(&amp;err)</span>
+    ResultV(errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>, recoverValue interface{}) <span class="comment">// recovery for gorutines</span>
+    Thread() (name <a href="http://localhost:8080/pkg/builtin/#string">string</a>, ID <a href="#GoID">GoID</a>)                <span class="comment">// Thread provides information about the thread</span>
+    Send(payload interface{})                      <span class="comment">// Send allows a goroutine to send custom types</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewCallee">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L27">NewCallee</a>
+					<a class="permalink" href="#NewCallee">¶</a>
+					
+					
+				</h3>
+				<pre>func NewCallee(name <a href="http://localhost:8080/pkg/builtin/#string">string</a>, gID <a href="#GoID">GoID</a>, eventTx chan&lt;- <a href="#Event">Event</a>, ctx0 <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>) (ctx <a href="#Callee">Callee</a>)</pre>
+				<p>
+NewCallee provides a Calle implementation, data used by a managed goroutine
+</p>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="CalleeContext">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L17">CalleeContext</a>
+				<a class="permalink" href="#CalleeContext">¶</a>
+				
+				
+			</h2>
+			<p>
+CalleeContext provides for a goroutine to communicate with the caller
+</p>
+
+			<pre>type CalleeContext struct {
+    <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="CalleeContext.Failure">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L36">Failure</a>
+					<a class="permalink" href="#CalleeContext.Failure">¶</a>
+					
+					
+				</h3>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Failure(err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="CalleeContext.Result">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L51">Result</a>
+					<a class="permalink" href="#CalleeContext.Result">¶</a>
+					
+					
+				</h3>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Result(errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="CalleeContext.ResultV">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L55">ResultV</a>
+					<a class="permalink" href="#CalleeContext.ResultV">¶</a>
+					
+					
+				</h3>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) ResultV(errp *<a href="http://localhost:8080/pkg/builtin/#error">error</a>, recoverValue interface{})</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="CalleeContext.Send">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L88">Send</a>
+					<a class="permalink" href="#CalleeContext.Send">¶</a>
+					
+					
+				</h3>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Send(payload interface{})</pre>
+				<p>
+Send allows a groutine to send any event
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="CalleeContext.Success">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L32">Success</a>
+					<a class="permalink" href="#CalleeContext.Success">¶</a>
+					
+					
+				</h3>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Success()</pre>
+				
+				
+				
+				
+			
+				
+				<h3 id="CalleeContext.Thread">func (*CalleeContext) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/callee.go#L81">Thread</a>
+					<a class="permalink" href="#CalleeContext.Thread">¶</a>
+					
+					
+				</h3>
+				<pre>func (ctx *<a href="#CalleeContext">CalleeContext</a>) Thread() (name <a href="http://localhost:8080/pkg/builtin/#string">string</a>, gID <a href="#GoID">GoID</a>)</pre>
+				
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="CancelAction">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L57">CancelAction</a>
+				<a class="permalink" href="#CancelAction">¶</a>
+				
+				
+			</h2>
+			<p>
+CancelAction holds strategy for when a goruotine terminates
+</p>
+
+			<pre>type CancelAction <a href="http://localhost:8080/pkg/builtin/#uint8">uint8</a></pre>
+
+			
+				
+				<pre>const (
+    <span class="comment">// TerminateAll terminates other goroutines on first termination</span>
+    <span id="TerminateAll">TerminateAll</span> <a href="#CancelAction">CancelAction</a> = <a href="http://localhost:8080/pkg/builtin/#iota">iota</a>
+    <span class="comment">// KeepGoing waits for all goroutines to complete even on errors</span>
+    <span id="KeepGoing">KeepGoing</span>
+    <span class="comment">// WhileOk terminates if any goroutine errors</span>
+    <span id="WhileOk">WhileOk</span>
+)</pre>
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="DataEvent">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/dataevent.go#L11">DataEvent</a>
+				<a class="permalink" href="#DataEvent">¶</a>
+				
+				
+			</h2>
+			<p>
+DataEvent is an event with an empty interface data value.
+The goroutine defines an exported unique type that it sends using ctx.Send(payload).
+The main evvent loop checks the type of the pyload against the exported unique type
+</p>
+
+			<pre>type DataEvent struct {
+    <a href="#EmptyEvent">EmptyEvent</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="DataEvent.Payload">func (*DataEvent) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/dataevent.go#L24">Payload</a>
+					<a class="permalink" href="#DataEvent.Payload">¶</a>
+					
+					
+				</h3>
+				<pre>func (ev *<a href="#DataEvent">DataEvent</a>) Payload() (payload interface{})</pre>
+				<p>
+Payload returns the data value of a DataEvent
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="EmptyEvent">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/emptyevent.go#L9">EmptyEvent</a>
+				<a class="permalink" href="#EmptyEvent">¶</a>
+				
+				
+			</h2>
+			<p>
+EmptyEvent is an event with no data
+</p>
+
+			<pre>type EmptyEvent struct {
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewEmptyEvent">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/emptyevent.go#L15">NewEmptyEvent</a>
+					<a class="permalink" href="#NewEmptyEvent">¶</a>
+					
+					
+				</h3>
+				<pre>func NewEmptyEvent(gID <a href="#GoID">GoID</a>) *<a href="#EmptyEvent">EmptyEvent</a></pre>
+				
+				
+				
+			
+
+			
+				
+				<h3 id="EmptyEvent.GoID">func (*EmptyEvent) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/emptyevent.go#L20">GoID</a>
+					<a class="permalink" href="#EmptyEvent.GoID">¶</a>
+					
+					
+				</h3>
+				<pre>func (ev *<a href="#EmptyEvent">EmptyEvent</a>) GoID() (gID <a href="#GoID">GoID</a>)</pre>
+				<p>
+GoID returns the id of the sending goroutine
+</p>
+
+				
+				
+				
+			
+		
+			
+			
+			<h2 id="EvThread">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/thread.go#L11">EvThread</a>
+				<a class="permalink" href="#EvThread">¶</a>
+				
+				
+			</h2>
+			<p>
+EvThread holds manager information for a running goroutine
+</p>
+
+			<pre>type EvThread struct {
+<span id="EvThread.ID"></span>    ID   <a href="#GoID">GoID</a>
+<span id="EvThread.Name"></span>    Name <a href="http://localhost:8080/pkg/builtin/#string">string</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewEvThread">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/thread.go#L17">NewEvThread</a>
+					<a class="permalink" href="#NewEvThread">¶</a>
+					
+					
+				</h3>
+				<pre>func NewEvThread(name <a href="http://localhost:8080/pkg/builtin/#string">string</a>) (ti *<a href="#EvThread">EvThread</a>)</pre>
+				<p>
+NewEvThread holds manager information for a running goroutine
+</p>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="Event">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L60">Event</a>
+				<a class="permalink" href="#Event">¶</a>
+				
+				
+			</h2>
+			<p>
+Event is a message passed from goroutines
+</p>
+
+			<pre>type Event interface {
+    GoID() (gID <a href="#GoID">GoID</a>) <span class="comment">// [16]byte</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewDataEvent">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/dataevent.go#L19">NewDataEvent</a>
+					<a class="permalink" href="#NewDataEvent">¶</a>
+					
+					
+				</h3>
+				<pre>func NewDataEvent(gID <a href="#GoID">GoID</a>, payload interface{}) (evt <a href="#Event">Event</a>)</pre>
+				<p>
+NewDataEvent creates an event with payload of a single data value
+</p>
+
+				
+				
+			
+				
+				<h3 id="NewExitEvent">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/exitevent.go#L17">NewExitEvent</a>
+					<a class="permalink" href="#NewExitEvent">¶</a>
+					
+					
+				</h3>
+				<pre>func NewExitEvent(e <a href="http://localhost:8080/pkg/builtin/#error">error</a>, gID <a href="#GoID">GoID</a>) (evt <a href="#Event">Event</a>)</pre>
+				<p>
+NewExitEvent holds the outcome of a goruotine
+</p>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="EventRx">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L31">EventRx</a>
+				<a class="permalink" href="#EventRx">¶</a>
+				
+				
+			</h2>
+			<p>
+EventRx receives events from goroutines
+</p>
+
+			<pre>type EventRx &lt;-chan <a href="#Event">Event</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="ExitEvent">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/exitevent.go#L9">ExitEvent</a>
+				<a class="permalink" href="#ExitEvent">¶</a>
+				
+				
+			</h2>
+			<p>
+ExitEvent holds the outcome of a goruotine
+</p>
+
+			<pre>type ExitEvent struct {
+    <a href="#EmptyEvent">EmptyEvent</a>
+<span id="ExitEvent.Err"></span>    Err       <a href="http://localhost:8080/pkg/builtin/#error">error</a>
+<span id="ExitEvent.IsCancel"></span>    IsCancel  <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>
+<span id="ExitEvent.IsTimeout"></span>    IsTimeout <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="GoID">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L34">GoID</a>
+				<a class="permalink" href="#GoID">¶</a>
+				
+				
+			</h2>
+			<p>
+GoID is a unique value identifying a goroutine
+</p>
+
+			<pre>type GoID <a href="http://localhost:8080/pkg/github.com/google/uuid/">uuid</a>.<a href="http://localhost:8080/pkg/github.com/google/uuid/#UUID">UUID</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Manager">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/ev.go#L65">Manager</a>
+				<a class="permalink" href="#Manager">¶</a>
+				
+				
+			</h2>
+			<p>
+Manager provides management of goroutines
+</p>
+
+			<pre>type Manager interface {
+    Cancel() (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)                    <span class="comment">// Cancel signals to all goroutines to terminate</span>
+    Events() (ch <a href="#EventRx">EventRx</a>)                    <span class="comment">// Events provides the channel emitting events from goroutines</span>
+    CalleeContext(ID ...<a href="http://localhost:8080/pkg/builtin/#string">string</a>) (ctx <a href="#Callee">Callee</a>) <span class="comment">// CalleeContext context for a new goroutine, 0 or 1 argument</span>
+    ProcessEvent(event <a href="#Event">Event</a>) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)    <span class="comment">// ProcessEvent sanity checks an EventRx event</span>
+    Action(evResult <a href="http://localhost:8080/pkg/builtin/#error">error</a>, action <a href="#CancelAction">CancelAction</a>) (awaitThreads <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)
+    IsEnd() (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)                   <span class="comment">// IsEnd returns true if all goroutines have terminated</span>
+    Threads() (names []<a href="http://localhost:8080/pkg/builtin/#string">string</a>, IDs []<a href="#GoID">GoID</a>) <span class="comment">// Threads provide information on currently managed goroutines</span>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewManager">func <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L35">NewManager</a>
+					<a class="permalink" href="#NewManager">¶</a>
+					
+					
+				</h3>
+				<pre>func NewManager(ctx0 <a href="http://localhost:8080/pkg/context/">context</a>.<a href="http://localhost:8080/pkg/context/#Context">Context</a>) (mgr <a href="#Manager">Manager</a>)</pre>
+				<p>
+NewManager obtains instance for executing goroutines
+</p>
+
+				
+				
+			
+
+			
+		
+			
+			
+			<h2 id="ThreadManager">type <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L21">ThreadManager</a>
+				<a class="permalink" href="#ThreadManager">¶</a>
+				
+				
+			</h2>
+			<p>
+ThreadManager provides thread-safe management of go routines
+</p>
+
+			<pre>type ThreadManager struct {
+<span id="ThreadManager.Launch"></span>    Launch <a href="http://localhost:8080/pkg/time/">time</a>.<a href="http://localhost:8080/pkg/time/#Time">Time</a>
+    <span class="comment">// contains filtered or unexported fields</span>
+}
+</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+				
+				<h3 id="ThreadManager.Action">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L82">Action</a>
+					<a class="permalink" href="#ThreadManager.Action">¶</a>
+					
+					
+				</h3>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Action(threadResult <a href="http://localhost:8080/pkg/builtin/#error">error</a>, action <a href="#CancelAction">CancelAction</a>) (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<p>
+Action determines whether the executable should continue to wait for additional threads
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ThreadManager.CalleeContext">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L49">CalleeContext</a>
+					<a class="permalink" href="#ThreadManager.CalleeContext">¶</a>
+					
+					
+				</h3>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) CalleeContext(ID ...<a href="http://localhost:8080/pkg/builtin/#string">string</a>) (env <a href="#Callee">Callee</a>)</pre>
+				<p>
+CalleeContext produces an environment for calling a goroutine - thread safe
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ThreadManager.Cancel">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L131">Cancel</a>
+					<a class="permalink" href="#ThreadManager.Cancel">¶</a>
+					
+					
+				</h3>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Cancel() (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<p>
+Cancel shuts down all goroutines
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ThreadManager.Count">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L107">Count</a>
+					<a class="permalink" href="#ThreadManager.Count">¶</a>
+					
+					
+				</h3>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Count() (count <a href="http://localhost:8080/pkg/builtin/#int64">int64</a>)</pre>
+				<p>
+Count determines remaining goroutines
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ThreadManager.Events">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L44">Events</a>
+					<a class="permalink" href="#ThreadManager.Events">¶</a>
+					
+					
+				</h3>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Events() (out <a href="#EventRx">EventRx</a>)</pre>
+				<p>
+Events gets the channel emitting messages from goroutines
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ThreadManager.IsEnd">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L102">IsEnd</a>
+					<a class="permalink" href="#ThreadManager.IsEnd">¶</a>
+					
+					
+				</h3>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) IsEnd() (isEnd <a href="http://localhost:8080/pkg/builtin/#bool">bool</a>)</pre>
+				<p>
+IsEnd determines if all goroutines have terminated
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ThreadManager.ProcessEvent">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L66">ProcessEvent</a>
+					<a class="permalink" href="#ThreadManager.ProcessEvent">¶</a>
+					
+					
+				</h3>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) ProcessEvent(ev <a href="#Event">Event</a>) (err <a href="http://localhost:8080/pkg/builtin/#error">error</a>)</pre>
+				<p>
+ProcessExit indicates whether this event is the final event from a terminating goroutine
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="ThreadManager.Threads">func (*ThreadManager) <a href="./http://localhost:8080/src/github.com/haraldrudell/parl/ev/manager.go#L112">Threads</a>
+					<a class="permalink" href="#ThreadManager.Threads">¶</a>
+					
+					
+				</h3>
+				<pre>func (mgr *<a href="#ThreadManager">ThreadManager</a>) Threads() (names []<a href="http://localhost:8080/pkg/builtin/#string">string</a>, IDs []<a href="#GoID">GoID</a>)</pre>
+				
+				
+				
+				
+			
+		
+	
+
+	
+
+
+
+
+
+
+
+<div id="footer">
+Build version go1.17.8.<br/>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+
+</body></html>

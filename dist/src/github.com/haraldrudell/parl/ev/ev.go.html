@@ -1,0 +1,142 @@
+<!DOCTYPE html><html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#375EAB"/>
+
+  <title>src/github.com/haraldrudell/parl/ev/ev.go - GoPages</title>
+
+<link type="text/css" rel="stylesheet" href="http://localhost:8080/lib/godoc/style.css"/>
+
+<script>window.initFuncs = [];</script>
+<script src="http://localhost:8080/lib/godoc/jquery.js" defer=""></script>
+
+
+
+
+<script>var goVersion = "go1.17.8";</script>
+<script src="http://localhost:8080/lib/godoc/godocs.js" defer=""></script>
+
+</head>
+<body>
+
+<div id="lowframe" style="position: fixed; bottom: 0; left: 0; height: 0; width: 100%; border-top: thin solid grey; background-color: white; overflow: auto;">
+...
+</div><!-- #lowframe -->
+
+<div id="topbar" class="wide"><div class="container">
+<div class="top-heading" id="heading-wide"><a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/">GoPages | Auto-generated docs</a></div>
+<div class="top-heading" id="heading-narrow"><a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/">GoPages</a></div>
+<a href="#" id="menu-button"><span id="menu-button-arrow">▽</span></a>
+
+</div></div>
+
+
+
+<div id="page" class="wide">
+<div class="container">
+
+
+  <h1>
+    Source file
+    <a href="http:/localhost:8080/src">src</a>/<a href="http:/localhost:8080/src/github.com">github.com</a>/<a href="http:/localhost:8080/src/github.com/haraldrudell">haraldrudell</a>/<a href="http:/localhost:8080/src/github.com/haraldrudell/parl">parl</a>/<a href="http:/localhost:8080/src/github.com/haraldrudell/parl/ev">ev</a>/<span class="text-muted">ev.go</span>
+  </h1>
+
+
+
+
+
+  <h2>
+    Documentation: <a href="http:/localhost:8080/pkg/github.com/haraldrudell/parl/ev">github.com/haraldrudell/parl/ev</a>
+  </h2>
+
+
+
+<div id="nav"></div>
+
+
+<script type="text/javascript">document.ANALYSIS_DATA = null;</script>
+<pre><span id="L1" class="ln">     1  </span><span class="comment">/*
+<span id="L2" class="ln">     2  </span>© 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)
+<span id="L3" class="ln">     3  </span>ISC License
+<span id="L4" class="ln">     4  </span>*/</span>
+<span id="L5" class="ln">     5  </span>
+<span id="L6" class="ln">     6  </span><span class="comment">/*
+<span id="L7" class="ln">     7  </span>Package ev provides standardized goroutine management
+<span id="L8" class="ln">     8  </span>
+<span id="L9" class="ln">     9  </span>events contain thread completions, failures and any type of data items. A manager launches and controls a set of goroutines
+<span id="L10" class="ln">    10  </span>
+<span id="L11" class="ln">    11  </span>ctx.Result is defered by a gorutine, captures panics and sends the goroutine’s result using Success or Failure
+<span id="L12" class="ln">    12  </span>
+<span id="L13" class="ln">    13  </span>  func (ctx ev.Callee) {
+<span id="L14" class="ln">    14  </span>    var err error
+<span id="L15" class="ln">    15  </span>    defer func() {
+<span id="L16" class="ln">    16  </span>      ctx.Result(&amp;err, recover())
+<span id="L17" class="ln">    17  </span>    }()
+<span id="L18" class="ln">    18  </span>  …
+<span id="L19" class="ln">    19  </span>
+<span id="L20" class="ln">    20  </span>© 2020–present Harald Rudell &lt;harald.rudell@gmail.com&gt; (https://haraldrudell.github.io/haraldrudell/)
+<span id="L21" class="ln">    21  </span>*/</span>
+<span id="L22" class="ln">    22  </span>package ev
+<span id="L23" class="ln">    23  </span>
+<span id="L24" class="ln">    24  </span>import (
+<span id="L25" class="ln">    25  </span>	&#34;context&#34;
+<span id="L26" class="ln">    26  </span>
+<span id="L27" class="ln">    27  </span>	&#34;github.com/google/uuid&#34;
+<span id="L28" class="ln">    28  </span>)
+<span id="L29" class="ln">    29  </span>
+<span id="L30" class="ln">    30  </span><span class="comment">// EventRx receives events from goroutines</span>
+<span id="L31" class="ln">    31  </span>type EventRx &lt;-chan Event
+<span id="L32" class="ln">    32  </span>
+<span id="L33" class="ln">    33  </span><span class="comment">// GoID is a unique value identifying a goroutine</span>
+<span id="L34" class="ln">    34  </span>type GoID uuid.UUID
+<span id="L35" class="ln">    35  </span>
+<span id="L36" class="ln">    36  </span><span class="comment">// Callee provides functions for a called goroutine</span>
+<span id="L37" class="ln">    37  </span>type Callee interface {
+<span id="L38" class="ln">    38  </span>	context.Context                                <span class="comment">// Deadline Done Err Value</span>
+<span id="L39" class="ln">    39  </span>	Success()                                      <span class="comment">// Success indicates this goruote terminated successfully</span>
+<span id="L40" class="ln">    40  </span>	Failure(err error)                             <span class="comment">// Failure indicates this goroutine failed with err</span>
+<span id="L41" class="ln">    41  </span>	Result(errp *error)                            <span class="comment">// recovery for gorutines: usage: defer ctx.Result(&amp;err)</span>
+<span id="L42" class="ln">    42  </span>	ResultV(errp *error, recoverValue interface{}) <span class="comment">// recovery for gorutines</span>
+<span id="L43" class="ln">    43  </span>	Thread() (name string, ID GoID)                <span class="comment">// Thread provides information about the thread</span>
+<span id="L44" class="ln">    44  </span>	Send(payload interface{})                      <span class="comment">// Send allows a goroutine to send custom types</span>
+<span id="L45" class="ln">    45  </span>}
+<span id="L46" class="ln">    46  </span>
+<span id="L47" class="ln">    47  </span>const (
+<span id="L48" class="ln">    48  </span>	<span class="comment">// TerminateAll terminates other goroutines on first termination</span>
+<span id="L49" class="ln">    49  </span>	TerminateAll CancelAction = iota
+<span id="L50" class="ln">    50  </span>	<span class="comment">// KeepGoing waits for all goroutines to complete even on errors</span>
+<span id="L51" class="ln">    51  </span>	KeepGoing
+<span id="L52" class="ln">    52  </span>	<span class="comment">// WhileOk terminates if any goroutine errors</span>
+<span id="L53" class="ln">    53  </span>	WhileOk
+<span id="L54" class="ln">    54  </span>)
+<span id="L55" class="ln">    55  </span>
+<span id="L56" class="ln">    56  </span><span class="comment">// CancelAction holds strategy for when a goruotine terminates</span>
+<span id="L57" class="ln">    57  </span>type CancelAction uint8
+<span id="L58" class="ln">    58  </span>
+<span id="L59" class="ln">    59  </span><span class="comment">// Event is a message passed from goroutines</span>
+<span id="L60" class="ln">    60  </span>type Event interface {
+<span id="L61" class="ln">    61  </span>	GoID() (gID GoID) <span class="comment">// [16]byte</span>
+<span id="L62" class="ln">    62  </span>}
+<span id="L63" class="ln">    63  </span>
+<span id="L64" class="ln">    64  </span><span class="comment">// Manager provides management of goroutines</span>
+<span id="L65" class="ln">    65  </span>type Manager interface {
+<span id="L66" class="ln">    66  </span>	Cancel() (isEnd bool)                    <span class="comment">// Cancel signals to all goroutines to terminate</span>
+<span id="L67" class="ln">    67  </span>	Events() (ch EventRx)                    <span class="comment">// Events provides the channel emitting events from goroutines</span>
+<span id="L68" class="ln">    68  </span>	CalleeContext(ID ...string) (ctx Callee) <span class="comment">// CalleeContext context for a new goroutine, 0 or 1 argument</span>
+<span id="L69" class="ln">    69  </span>	ProcessEvent(event Event) (err error)    <span class="comment">// ProcessEvent sanity checks an EventRx event</span>
+<span id="L70" class="ln">    70  </span>	Action(evResult error, action CancelAction) (awaitThreads bool)
+<span id="L71" class="ln">    71  </span>	IsEnd() (isEnd bool)                   <span class="comment">// IsEnd returns true if all goroutines have terminated</span>
+<span id="L72" class="ln">    72  </span>	Threads() (names []string, IDs []GoID) <span class="comment">// Threads provide information on currently managed goroutines</span>
+<span id="L73" class="ln">    73  </span>}
+<span id="L74" class="ln">    74  </span>
+</pre><p></p>
+
+<div id="footer">
+Build version go1.17.8.<br/>
+</div>
+
+</div><!-- .container -->
+</div><!-- #page -->
+
+
+</body></html>

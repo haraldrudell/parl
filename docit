@@ -1,0 +1,15 @@
+#!/bin/bash -eu
+# © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+# docit
+# 220316 macOS 12.2.1
+CMD=(gopages
+  -base http://localhost:8080
+  -brand-description "© 2022 Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)"
+  -brand-title Parl
+  -out assets/doc
+)
+rm -r assets/doc/*
+echo "${CMD[*]}" && "${CMD[@]}"
+find assets/doc -type f -name "*.html" -exec sed -Ei "" 's!http:/localhost!http://localhost!g' {} \;
+# sed -Ei "" 's!http:/localhost!http://localhost!g' assets/doc/src/github.com/haraldrudell/parl/parl.go.html
+# grep "http:/localhost" assets/doc/src/github.com/haraldrudell/parl/parl.go.html
