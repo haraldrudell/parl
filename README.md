@@ -12,7 +12,7 @@ features: moderator, sqlite interface, package-selectable logging, debouncer, se
 <br />
 <br />
 <img src=./assets/theflag.png>
-“Great things are simple”
+“justice, peace and massive virtual parallelism”
 <br />
 <br />
 
@@ -22,7 +22,7 @@ import "github.com/haraldrudell/parl"
 ```
 ## Documentation
 
-<a href=./parl/main/assets/doc/pkg/github.com/haraldrudell/index.html>on github</a>
+<a href="https://pkg.go.dev/github.com/haraldrudell/parl"><img src="https://pkg.go.dev/badge/github.com/haraldrudell/parl.svg" alt="Go Reference">&emsp; Documentation in the Go Package Index</a>
 <br />
 <br />
 On 3/16/2022 Parl was open-sourced under an ISC License<br />
