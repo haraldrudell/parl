@@ -3,16 +3,21 @@
 ISC License
 */
 
-package error116
+package errorglue
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
-// CodeLocation is similar to runtime.Frame, but includes basic types
+const (
+	newCodeLocationStackFrames = 1
+)
+
+// CodeLocation is similar to runtime.Frame, but contains basic types
 // string and int only
 type CodeLocation struct { //
 	File string // /opt/foxyboy/sw/privates/parl/mains/executable.go
@@ -22,6 +27,8 @@ type CodeLocation struct { //
 	FuncName string
 }
 
+// NewCodeLocation gets data for a single stack frame.
+// if stackFramesToSkip it returns data for the caller of NewCodeLocation
 func NewCodeLocation(stackFramesToSkip int) (cl *CodeLocation) {
 	if stackFramesToSkip < 0 {
 		stackFramesToSkip = 0
@@ -33,8 +40,8 @@ func NewCodeLocation(stackFramesToSkip int) (cl *CodeLocation) {
 	// pc: opaque
 	// file: basename.go
 	// line: int 25
-	if pc, c.File, c.Line, ok = runtime.Caller(1 + stackFramesToSkip); !ok {
-		panic(New("runtime.Caller failed"))
+	if pc, c.File, c.Line, ok = runtime.Caller(newCodeLocationStackFrames + stackFramesToSkip); !ok {
+		panic(errors.New("runtime.Caller failed"))
 	}
 	// rFunc: runtime.Func is all opaque fields. methods:
 	// Entry() (uintptr)
@@ -46,6 +53,10 @@ func NewCodeLocation(stackFramesToSkip int) (cl *CodeLocation) {
 	return &c
 }
 
+// GetCodeLocation converts a runtime stack frame to a code location
+// stack frame.
+// runtime contains opaque types while code location consists of basic
+// types int and string only
 func GetCodeLocation(rFrame *runtime.Frame) (cl *CodeLocation) {
 	// runtime.Frame:
 	// PC uintptr, Func *Func, Function string, File string, Line int, Entry uintptr, funcInfo funcInfo
@@ -56,11 +67,8 @@ func GetCodeLocation(rFrame *runtime.Frame) (cl *CodeLocation) {
 	}
 }
 
-func PackFunc() (packageDotFunction string) {
-	return NewCodeLocation(1).PackFunc()
-}
-
-// FuncName returns function name, characters no space: "AddErr"
+// FuncName returns function name, characters no space:
+//   AddErr
 func (cl *CodeLocation) Name() (funcName string) {
 	packageAndFunc := filepath.Base(cl.FuncName)
 	if lastDotIndex := strings.LastIndex(packageAndFunc, "."); lastDotIndex >= 0 {
@@ -69,7 +77,8 @@ func (cl *CodeLocation) Name() (funcName string) {
 	return packageAndFunc
 }
 
-// Package return base package name, single word of characters no space: "mains"
+// Package return base package name, a single word of characters with no space:
+//   mains
 func (cl *CodeLocation) Package() (funcName string) {
 	packageAndFunc := filepath.Base(cl.FuncName)
 	if dotIndex := strings.Index(packageAndFunc, "."); dotIndex >= 0 {
@@ -78,21 +87,29 @@ func (cl *CodeLocation) Package() (funcName string) {
 	return packageAndFunc
 }
 
-// PackFunc return base package name and function: "mains.AddErr"
+// PackFunc return base package name and function:
+//   mains.AddErr
 func (cl *CodeLocation) PackFunc() (packageDotFunction string) {
 	return cl.Package() + "." + cl.Name()
 }
 
-// Base returns base package name, optional types and function name: "mains.(*Executable).AddErr"
+// Base returns base package name, an optional type name and the function name:
+//   mains.(*Executable).AddErr
 func (cl *CodeLocation) Base() (baseName string) {
 	return filepath.Base(cl.FuncName)
 }
 
-// Short returns base package name, optional types and function name and file: "mains.(*Executable).AddErr-executable.go:25"
+// Short returns base package name, an optional type name and
+// the function name, base filename and line number:
+//   mains.(*Executable).AddErr-executable.go:25
 func (cl *CodeLocation) Short() (funcName string) {
 	return fmt.Sprintf("%s-%s:%d", filepath.Base(cl.FuncName), filepath.Base(cl.File), cl.Line)
 }
 
+// String returns a two-line string representation suitable for a multi-line stack trace.
+// Typical output:
+//   github.com/haraldrudell/parl/error116.(*TypeName).FuncName\n
+//     /opt/sw/privates/parl/error116/codelocation_test.go:20
 func (cl CodeLocation) String() string {
 	return fmt.Sprintf("%s\n\x20\x20%s:%d", cl.FuncName, cl.File, cl.Line)
 }

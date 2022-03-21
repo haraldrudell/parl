@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/errorglue"
 )
 
 func TestLogLogI(t *testing.T) {
@@ -20,7 +20,7 @@ func TestLogLogI(t *testing.T) {
 	// parl.TestLogLogI-log-instance_test.go:22
 	// it has a line number that  mocksLogI removes
 	if false {
-		t.Logf("Short: %q", error116.NewCodeLocation(0).Short())
+		t.Logf("Short: %q", errorglue.NewCodeLocation(0).Short())
 		t.FailNow()
 	}
 
@@ -142,7 +142,7 @@ func TestRegexpLogI(t *testing.T) {
 	// github.com/haraldrudell/parl.TestRegexpLogI
 	// fully qualified package name and function name
 	if false {
-		t.Logf("FuncName: %q", error116.NewCodeLocation(0).FuncName)
+		t.Logf("FuncName: %q", errorglue.NewCodeLocation(0).FuncName)
 		t.FailNow()
 	}
 
@@ -232,7 +232,7 @@ func mocksLogI() (text1, textNewline, expectedLocation, regexpLocation string, w
 	textNewline = text1 + "\n"
 
 	// location text for this file
-	location := error116.NewCodeLocation(1)
+	location := errorglue.NewCodeLocation(1)
 	expectedLocation = location.Short()
 	// remove line number since this changes
 	if index := strings.Index(expectedLocation, ":"); index == -1 {

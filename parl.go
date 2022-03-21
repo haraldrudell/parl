@@ -44,6 +44,7 @@ package parl
 
 import (
 	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/errorglue"
 )
 
 const (
@@ -59,7 +60,7 @@ const (
 
 var Errorf = error116.Errorf
 var New = error116.New
-var NewCodeLocation = error116.NewCodeLocation
+var NewCodeLocation = errorglue.NewCodeLocation
 var PackFunc = error116.PackFunc
 
 type Password interface {

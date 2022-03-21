@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/errorglue"
 )
 
 const (
@@ -75,7 +76,7 @@ func invokeOnError(onError func(error), err error) {
 }
 
 func Annotation() (annotation string) {
-	return fmt.Sprintf("Recover from panic in %s:", error116.NewCodeLocation(recAnnStackFrames).PackFunc())
+	return fmt.Sprintf("Recover from panic in %s:", errorglue.NewCodeLocation(recAnnStackFrames).PackFunc())
 }
 
 // processRecover ensures non-nil result to be error with Stack

@@ -3,7 +3,7 @@
 ISC License
 */
 
-package error116
+package errorglue
 
 import (
 	"fmt"
@@ -12,8 +12,11 @@ import (
 )
 
 const (
-	maxStackFrameSize   = 32
-	callersFramesToSkip = 1
+	maxStackFrameSize = 32
+	// 0 is runtime.Callers
+	// 1 is NewStackSLice
+	// 2 is caller location
+	newStackSliceFramesToSkip = 2
 )
 
 // StackSlice represents a StackSlice of program counters.
@@ -24,7 +27,7 @@ func NewStackSlice(skip int) (slice StackSlice) {
 
 	// get the slice of runtime.Frames
 	pcs := make([]uintptr, maxStackFrameSize)
-	entries := runtime.Callers(callersFramesToSkip+skip, pcs)
+	entries := runtime.Callers(newStackSliceFramesToSkip+skip, pcs)
 	if entries == 0 {
 		return
 	}
@@ -43,7 +46,15 @@ func NewStackSlice(skip int) (slice StackSlice) {
 }
 
 func (st StackSlice) Short() (s string) {
-	s = " at " + st[0].Short()
+	if len(st) >= 1 {
+		s = " at " + st[0].Short()
+	}
+	return
+}
+
+func (st StackSlice) Clone() (s StackSlice) {
+	s = make([]CodeLocation, len(st))
+	copy(s, st)
 	return
 }
 

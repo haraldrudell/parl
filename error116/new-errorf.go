@@ -8,17 +8,26 @@ package error116
 import (
 	"errors"
 	"fmt"
+
+	"github.com/haraldrudell/parl/errorglue"
 )
 
-// New does errors.New and error116.Stack
+const (
+	stackFramesToSkip = 1
+	newFramesToSkip   = 1
+)
+
+// error116.New is similar to errors.New but ensures that the returned error
+// has at least one stack trace associated
 func New(s string) error {
-	if s == "" {
-		s = "StackNew from " + NewCodeLocation(1).Short()
+	if s == "" { // ensure there is an error message
+		s = "StackNew from " + errorglue.NewCodeLocation(1).Short()
 	}
-	return Stack(errors.New(s))
+	return Stackn(errors.New(s), newFramesToSkip)
 }
 
-// Errorf wraps error and ensure a stack exists
+// error116.Errorf is similar to fmt.Errorf but ensures that the returned err
+// has at least one stack trace associated
 func Errorf(format string, a ...interface{}) (err error) {
 	err = fmt.Errorf(format, a...)
 	if HasStack(err) {
@@ -27,17 +36,21 @@ func Errorf(format string, a ...interface{}) (err error) {
 	return Stackn(err, 1)
 }
 
-// Stack ensures the error chain has a stack trace
+// error116.Stack ensures the err has a stack trace
+// associated.
+// err can be nil in which nil is returned
 func Stack(err error) (err2 error) {
 	if err == nil || HasStack(err) {
 		err2 = err
 		return
 	}
-	err2 = &errorStack{ErrorChain{err}, NewStackSlice(stackFramesToSkip)}
+	err2 = errorglue.NewErrorStack(err, errorglue.NewStackSlice(stackFramesToSkip))
 	return
 }
 
-// Stackn is Stack but allows to skip caller stack frames and will always add a stack
+// error116.Stackn always attaches a new stack trace to err and
+// allows for skipping stack frames using framesToSkip.
+// if err is nil, no action is taken
 func Stackn(err error, framesToSkip int) (err2 error) {
 	if err == nil {
 		return
@@ -45,6 +58,6 @@ func Stackn(err error, framesToSkip int) (err2 error) {
 	if framesToSkip < 0 {
 		framesToSkip = 0
 	}
-	err2 = &errorStack{ErrorChain{err}, NewStackSlice(stackFramesToSkip + framesToSkip)}
+	err2 = errorglue.NewErrorStack(err, errorglue.NewStackSlice(stackFramesToSkip+framesToSkip))
 	return
 }

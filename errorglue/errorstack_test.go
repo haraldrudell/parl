@@ -3,7 +3,7 @@
 ISC License
 */
 
-package error116
+package errorglue
 
 import (
 	"errors"
@@ -29,24 +29,23 @@ func TestErrorWithStack(t *testing.T) {
 	shortStack := fmt.Sprintf("%s at %s-%s:", msg, filepath.Base(funcName), filepath.Base(filename))
 	longStack := fmt.Sprintf("%s\n%s\n  %s:", msg, funcName, filename)
 	quote := "\x22"
-	formats := []Format{DefaultFormat, LongFormat, LongSuffix, ShortFormat, ShortSuffix}
-	formatMap := map[Format]string{DefaultFormat: "default", LongFormat: "long",
+	formats := []ErrorFormat{DefaultFormat, LongFormat, LongSuffix, ShortFormat, ShortSuffix}
+	formatMap := map[ErrorFormat]string{DefaultFormat: "default", LongFormat: "long",
 		LongSuffix: "longS", ShortFormat: "short", ShortSuffix: "shortS"}
 	key := "key"
 	value := "value"
-	dataMap := DataMap{key: value}
 
 	_ = line
 	_ = shortStack
 	_ = longStack
 	_ = quote
 
-	err := New(msg)
+	err := errors.New(msg)
 	for _, format := range formats {
 		t.Logf("%s: %s\n", formatMap[format], ChainString(err, format))
 	}
 
-	err = Errorf("errors: '%w'", ErrorData(errors.New(msg), dataMap))
+	err = fmt.Errorf("errors: '%w'", NewErrorData(errors.New(msg), key, value))
 	for _, format := range formats {
 		t.Logf("%s: %s\n", formatMap[format], ChainString(err, format))
 	}

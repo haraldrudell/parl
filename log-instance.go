@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/errorglue"
 )
 
 const (
@@ -80,18 +80,18 @@ func (lg *LogInstance) Info(format string, a ...interface{}) {
 
 // Debug outputs only if debug is configured or the code location package matches regexp
 func (lg *LogInstance) Debug(format string, a ...interface{}) {
-	var cloc *error116.CodeLocation
+	var cloc *errorglue.CodeLocation
 	if !lg.isDebug.IsTrue() {
 		regExp := lg.getRegexp()
 		if regExp == nil {
 			return // debug: false regexp: nil
 		}
-		cloc = error116.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta)
+		cloc = errorglue.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta)
 		if !regExp.MatchString(cloc.FuncName) {
 			return // debug: false regexp: no match
 		}
 	} else {
-		cloc = error116.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta)
+		cloc = errorglue.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta)
 	}
 	if err := lg.output(0, appendLocation(sprintf(format, a...), cloc)); err != nil {
 		panic(Errorf("LogInstance output: %w", err))
@@ -101,7 +101,7 @@ func (lg *LogInstance) Debug(format string, a ...interface{}) {
 // D prints to stderr with code location
 // Thread safe. D is meant for temporary output intended to be removed before check-in
 func (lg *LogInstance) D(format string, a ...interface{}) {
-	if err := lg.output(0, appendLocation(sprintf(format, a...), error116.NewCodeLocation(lg.stackFramesToSkip+logInstDebugFrameDelta))); err != nil {
+	if err := lg.output(0, appendLocation(sprintf(format, a...), errorglue.NewCodeLocation(lg.stackFramesToSkip+logInstDebugFrameDelta))); err != nil {
 		panic(Errorf("LogInstance output: %w", err))
 	}
 }
@@ -146,7 +146,7 @@ func (lg *LogInstance) IsThisDebug() bool {
 	if regExp == nil {
 		return false
 	}
-	cloc := error116.NewCodeLocation(lg.stackFramesToSkip - isThisDebugDelta)
+	cloc := errorglue.NewCodeLocation(lg.stackFramesToSkip - isThisDebugDelta)
 	return regExp.MatchString(cloc.FuncName)
 }
 
@@ -164,14 +164,14 @@ func (lg *LogInstance) getRegexp() *regexp.Regexp {
 func (lg *LogInstance) doLog(format string, a ...interface{}) {
 	s := sprintf(format, a...)
 	if lg.isDebug.IsTrue() {
-		s = appendLocation(s, error116.NewCodeLocation(lg.stackFramesToSkip))
+		s = appendLocation(s, errorglue.NewCodeLocation(lg.stackFramesToSkip))
 	}
 	if err := lg.output(0, s); err != nil {
 		panic(Errorf("LogInstance output: %w", err))
 	}
 }
 
-func appendLocation(s string, location *error116.CodeLocation) string {
+func appendLocation(s string, location *errorglue.CodeLocation) string {
 	// insert code location before a possible ending newline
 	sNewline := ""
 	if strings.HasSuffix(s, "\n") {

@@ -4,126 +4,48 @@ ISC License
 */
 
 /*
-Package error116 adds stack traces and maps of values to error values.
+Package error116 enrichens error values with string data, stack traces, associated errors,
+less severe warnings, thread-safe containers and
+comprehensive error string representations.
 
-fmt.Printf("%+v", err) stack, long lines
+Creating errors with stack traces:
+  err := error116.New("error message") // adds a stacktrace contained inside of err
+  err = error116.Errorf("Some text: '%w'", err) // adds a stacktrace if err does not already have it
+  err = error116.Stackn(err, 0) // adds a stack trace even if err already has it
+Enriching errors:
+	err = error116.AddKeyValue(err, "record", "123") // adds a key-value string, last key wins
+	err = error116.AddKeyValue(err, "", "2022-03-19 11:10:00") // adds a string to a list, oldest first
+Encapsulating associated errors allowing for a single error value to contain multiple errors:
+  err = error116.AppendError(err, err2) // err2 is inside of err, can be printed and retrieved
+  fn := error116.Errp(&err) // fn(error) can be repeatedly invoked, aggregating errors in err
+  error116.ParlError.AddError(err) // thread-safe error encapsulation
+Marking errors as less severe:
+  warning := error116.Warning(err) // warning should not terminate the thread
+  error116.IsWarning(err) // Determine severity of an error value
+Printing rich errors:
+  error116.Long(err)
+  → error-message
+  → github.com/haraldrudell/parl/error116.(*csTypeName).FuncName
+  →   /opt/sw/privates/parl/error116/chainstring_test.go:26
+  → runtime.goexit
+  →   /opt/homebrew/Cellar/go/1.17.8/libexec/src/runtime/asm_arm64.s:1133
+  → record: 1234
+  → Other error: Close failed
+  error116.Short(err)
+  → error-message at error116.(*csTypeName).FuncName-chainstring_test.go:26
+  fmt.Println(err)
+  → error-message
 
-fmt.Printf("%-v", err) stack, short lines
-
-fmt.Printf("%s", err)
-
-fmt.Printf("%q", err)
+Can be used with Printf, but only works if last error in chain is from error116:
+  fmt.Printf("err: %+v", err) // same as Long()
+  fmt.Printf("err: %-v", err) // save as Short()
+Is compatible:
+  fmt.Println(err) // no change
+  fmt.Printf("err: %v", err) // no change
+  err.Error() // no change
+  fmt.Printf("err: %s", err) // no change
+  fmt.Printf("err: %q", err) // no change
 
 © 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 */
 package error116
-
-import (
-	"errors"
-	"fmt"
-	"strings"
-)
-
-// ErrorCallStacker indicates that this error is a call stack wrapping another error
-type ErrorCallStacker interface {
-	StackTrace() StackSlice
-}
-
-type Errors interface {
-	error // Error() string: the short error message
-	Long() string
-}
-
-// error116.Wrapper is an interface indicating error-chain capabilities.
-// It is not public in errors package
-type Wrapper interface {
-	Unwrap() error // Unwrap returns the next error in the chain or nil
-}
-
-// ErrorHasData is an interface providing the ErrorHasData map
-type ErrorHasData interface {
-	error
-	GetMap() (ed DataMap)
-}
-
-// ErrorHasCode allows an error to classify itself
-type ErrorHasCode interface {
-	error
-	ErrorCode(code string) (hasCode bool)
-	ErrorCodes(codes []string) (has []string)
-}
-
-type ErrorHasList interface {
-	error
-	ErrorList() (errors []error)
-	Append(extra error) (err error)
-	Count() int
-}
-
-// DataMap is a map of values associated with an error
-type DataMap map[string]string
-
-// HasStack detects if the error chain already contains a stack trace
-func HasStack(err error) (hasStack bool) {
-	var e ErrorCallStacker
-	return errors.As(err, &e)
-}
-
-// GetStackTrace gets the last stack trace
-func GetStackTrace(err error) (stack StackSlice) {
-	var e ErrorCallStacker
-	if errors.As(err, &e) {
-		stack = e.StackTrace()
-	}
-	return
-}
-
-// GetInnerMostStack gets the oldest stack trace in the error chain
-func GetInnerMostStack(err error) (stack StackSlice) {
-	var e ErrorCallStacker
-	for errors.As(err, &e) {
-	}
-	if e != nil {
-		stack = e.StackTrace()
-	}
-	return
-}
-
-// DumpChain gets a space-separated string of error implementation type names
-func DumpChain(err error) (s string) {
-	var strs []string
-	for err != nil {
-		strs = append(strs, fmt.Sprintf("%T", err))
-		err = errors.Unwrap(err)
-	}
-	s = strings.Join(strs, "\x20")
-	return
-}
-
-func Errp(errp *error) func(e error) {
-	if errp == nil {
-		panic("Errp with nil argument")
-	}
-	return func(e error) {
-		*errp = AppendError(*errp, e)
-	}
-}
-
-// GetAllMaps retrieves all maps in the error chain, last at index 0
-func GetAllMaps(err error) (maps []DataMap) {
-	var e ErrorHasData
-	for errors.As(err, &e) {
-		maps = append(maps, e.GetMap())
-	}
-	return
-}
-
-// GetLastMap retrieves the last map in the error chain
-func GetLastMap(err error) (m DataMap) {
-	var e ErrorHasData
-	errors.As(err, &e)
-	if e != nil {
-		m = e.GetMap()
-	}
-	return
-}

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/errorglue"
 )
 
 func TestLogLog(t *testing.T) {
@@ -237,7 +237,7 @@ func mocksLogStat() (text1, textNewline, expectedLocation, regexpLocation string
 	textNewline = text1 + "\n"
 
 	// location text for this file
-	location := error116.NewCodeLocation(1)
+	location := errorglue.NewCodeLocation(1)
 	expectedLocation = location.Short()
 	// remove line number since this changes
 	if index := strings.Index(expectedLocation, ":"); index == -1 {
