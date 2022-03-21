@@ -3,7 +3,7 @@
 ISC License
 */
 
-package parl
+package parlog
 
 import (
 	"fmt"
@@ -11,34 +11,42 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/haraldrudell/parl/parlog"
+	"github.com/haraldrudell/parl/error116"
 	"github.com/haraldrudell/parl/runt"
 )
 
-func TestLogLog(t *testing.T) {
-	// reset of static loggings logInstance object
-	defer func(stderrLogger0 *parlog.LogInstance) {
-		stderrLogger = stderrLogger0
-	}(stderrLogger)
-	defer SetDebug(false)
+func TestLogLogI(t *testing.T) {
 
-	text1, textNewline, expectedLocation, _, writer, _ := mocksLogStat()
-	stderrLogger = parlog.NewLogFrames(writer, 1)
+	// the code location in printouts is code location Short:
+	// parl.TestLogLogI-log-instance_test.go:22
+	// it has a line number that  mocksLogI removes
+	if false {
+		t.Logf("Short: %q", runt.NewCodeLocation(0).Short())
+		t.FailNow()
+	}
 
+	text1, textNewline, expectedLocation, _, writer, lg := mocksLogI()
+	// expectedLocation:
+	// parl.TestLogLogI-log-instance_test.go
+	if false {
+		t.Logf("mocksLogI Short: %q", expectedLocation)
+		t.FailNow()
+	}
 	var actualSlice []string
 	var actual string
 
 	// Log
-	Log(text1)
+	lg.Log(text1)
 	actualSlice = writer.getData()
 	if len(actualSlice) != 1 || actualSlice[0] != textNewline {
-		t.Logf(".Log failed: expected: %q actual: %s", textNewline, quoteSliceLogStat(actualSlice))
+		t.Logf("len actual: %d", len(actualSlice))
+		t.Logf(".Log failed: expected: %q actual: %s", textNewline, quoteSliceLogI(actualSlice))
 		t.Fail()
 	}
 
 	// Log with Location
-	SetDebug(true)
-	Log(text1 + "\n")
+	lg.SetDebug(true)
+	lg.Log(text1 + "\n")
 	actualSlice = writer.getData()
 	if len(actualSlice) != 1 {
 		t.Logf("Log SetDebug: invocations not 1: %d", len(actualSlice))
@@ -50,7 +58,7 @@ func TestLogLog(t *testing.T) {
 		t.Fail()
 	}
 	if !strings.Contains(actual, expectedLocation) {
-		t.Logf("Log SetDebug: no location: actual: %q expected: %q", actual, expectedLocation)
+		t.Logf("Log SetDebug: no location: actual:\n%q expected:\n%q", actual, expectedLocation)
 		t.Fail()
 	}
 	if strings.Index(actual, "\n") != len(actual)-1 {
@@ -59,36 +67,29 @@ func TestLogLog(t *testing.T) {
 	}
 }
 
-func TestInfoLog(t *testing.T) {
-	defer func(stderrLogger0 *parlog.LogInstance) {
-		stderrLogger = stderrLogger0
-	}(stderrLogger)
-	defer SetSilent(false)
-
-	text1, textNewline, _, _, writer, _ := mocksLogStat()
-	stderrLogger = parlog.NewLogFrames(writer, 1)
-
+func TestInfoLogI(t *testing.T) {
+	text1, textNewline, _, _, writer, lg := mocksLogI()
 	var actualSlice []string
 
 	// Info
-	Info(text1)
+	lg.Info(text1)
 	actualSlice = writer.getData()
 	if len(actualSlice) != 1 || actualSlice[0] != textNewline {
-		t.Logf(".Log failed: expected:\n%q actual:\n%+v", textNewline, quoteSliceLogStat(actualSlice))
+		t.Logf(".Log failed: expected: %q actual: %+v", textNewline, quoteSliceLogI(actualSlice))
 		t.Fail()
 	}
-	if IsSilent() {
+	if lg.IsSilent() {
 		t.Logf("SetSilent default true")
 		t.Fail()
 	}
 
 	// SetSilent
-	SetSilent(true)
-	if !IsSilent() {
+	lg.SetSilent(true)
+	if !lg.IsSilent() {
 		t.Logf("SetSilent ineffective")
 		t.Fail()
 	}
-	Info(text1)
+	lg.Info(text1)
 	actualSlice = writer.getData()
 	if len(actualSlice) != 0 {
 		t.Logf("SetSilent true: Info still prints")
@@ -96,24 +97,17 @@ func TestInfoLog(t *testing.T) {
 	}
 }
 
-func TestDebugLog(t *testing.T) {
-	defer func(stderrLogger0 *parlog.LogInstance) {
-		stderrLogger = stderrLogger0
-	}(stderrLogger)
-	defer SetDebug(false)
-
-	text1, textNewline, expectedLocation, _, writer, _ := mocksLogStat()
-	stderrLogger = parlog.NewLogFrames(writer, 1)
-
+func TestDebugLogI(t *testing.T) {
+	text1, textNewline, expectedLocation, _, writer, lg := mocksLogI()
 	var actualSlice []string
 	var actual string
 
 	// Debug off
-	if IsThisDebug() {
+	if lg.IsThisDebug() {
 		t.Logf("IsThisDebug default true")
 		t.Fail()
 	}
-	Debug(text1)
+	lg.Debug(text1)
 	actualSlice = writer.getData()
 	if len(actualSlice) != 0 {
 		t.Logf("Debug prints as default")
@@ -121,12 +115,12 @@ func TestDebugLog(t *testing.T) {
 	}
 
 	// Debug on
-	SetDebug(true)
-	if !IsThisDebug() {
+	lg.SetDebug(true)
+	if !lg.IsThisDebug() {
 		t.Logf("IsThisDebug ineffective")
 		t.Fail()
 	}
-	Debug(textNewline)
+	lg.Debug(textNewline)
 	actualSlice = writer.getData()
 	if len(actualSlice) != 1 {
 		t.Logf("Log SetDebug: invocations not 1: %d", len(actualSlice))
@@ -143,32 +137,38 @@ func TestDebugLog(t *testing.T) {
 	}
 }
 
-func TestRegexpLog(t *testing.T) {
-	defer func(stderrLogger0 *parlog.LogInstance) {
-		stderrLogger = stderrLogger0
-	}(stderrLogger)
-	defer SetRegexp("")
+func TestRegexpLogI(t *testing.T) {
 
-	text1, textNewline, expectedLocation, regexpLocation, writer, _ := mocksLogStat()
-	stderrLogger = parlog.NewLogFrames(writer, 1)
+	// What is matched against the regexp is FuncName:
+	// github.com/haraldrudell/parl.TestRegexpLogI
+	// fully qualified package name and function name
+	if false {
+		t.Logf("FuncName: %q", runt.NewCodeLocation(0).FuncName)
+		t.FailNow()
+	}
 
-	matchingRegexp := regexpLocation
-	nonMatchingRegexp := "aaa"
-
+	text1, textNewline, expectedLocation, regexpLocation, writer, lg := mocksLogI()
 	var actualSlice []string
 	var actual string
 
+	nonMatchingRegexp := "aaa"
+	matchingRegexp := regexpLocation
+
+	// string that regExp is matched against: "github.com/haraldrudell/parl.TestRegexpLogI"
+	//t.Logf("string that regExp is matched against: %q", error116.NewCodeLocation(0).FuncName)
+
 	// matching regexp
-	if err := SetRegexp(matchingRegexp); err != nil {
+	if err := lg.SetRegexp(matchingRegexp); err != nil {
 		t.Logf("SetRegexp failed: input: %q err: %+v", matchingRegexp, err)
 		t.Fail()
 	}
-	Debug(textNewline)
+	lg.Debug(textNewline)
 	actualSlice = writer.getData()
 	if len(actualSlice) != 1 {
-		t.Logf("matching regexp did not print 1: %d regexp input:\n%q",
+		t.Logf("matching regexp did not print 1: %d regexp input:\n%q compiled:\n%+v",
 			len(actualSlice),
-			matchingRegexp)
+			matchingRegexp,
+			lg.infoRegexp)
 		t.Fail()
 	}
 	actual = actualSlice[0]
@@ -183,15 +183,15 @@ func TestRegexpLog(t *testing.T) {
 		t.Fail()
 	}
 	if strings.Index(actual, "\n") != len(actual)-1 {
-		t.Logf("matching regexp: newline not at end: actual: %q expected: %q", actual, expectedLocation)
+		t.Logf("matching regexp: newline not at end: actual: %q expected: %q", actual, regexpLocation)
 		t.Fail()
 	}
 
 	// non-matching regexp
-	if err := SetRegexp(nonMatchingRegexp); err != nil {
+	if err := lg.SetRegexp(nonMatchingRegexp); err != nil {
 		panic(err)
 	}
-	Debug(text1)
+	lg.Debug(text1)
 	actualSlice = writer.getData()
 	if len(actualSlice) > 0 {
 		t.Logf("non-matching regexp did print: %d", len(actualSlice))
@@ -199,12 +199,12 @@ func TestRegexpLog(t *testing.T) {
 	}
 }
 
-type mockWriterLogStat struct {
+type mockWriterLogI struct {
 	lock sync.Mutex
 	buf  []string
 }
 
-func (w *mockWriterLogStat) Write(p []byte) (n int, err error) {
+func (w *mockWriterLogI) Write(p []byte) (n int, err error) {
 	n = len(p)
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -212,7 +212,7 @@ func (w *mockWriterLogStat) Write(p []byte) (n int, err error) {
 	return
 }
 
-func (w *mockWriterLogStat) getData() (sList []string) {
+func (w *mockWriterLogI) getData() (sList []string) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 	sList = w.buf
@@ -220,7 +220,7 @@ func (w *mockWriterLogStat) getData() (sList []string) {
 	return
 }
 
-func quoteSliceLogStat(sList []string) (s string) {
+func quoteSliceLogI(sList []string) (s string) {
 	var s2 []string
 	for _, sx := range sList {
 		s2 = append(s2, fmt.Sprintf("%q", sx))
@@ -228,7 +228,7 @@ func quoteSliceLogStat(sList []string) (s string) {
 	return strings.Join(s2, "\x20")
 }
 
-func mocksLogStat() (text1, textNewline, expectedLocation, regexpLocation string, writer *mockWriterLogStat, mockOutput func(n int, s string) (err error)) {
+func mocksLogI() (text1, textNewline, expectedLocation, regexpLocation string, writer *mockWriterLogI, lg *LogInstance) {
 	text1 = "abc"
 	textNewline = text1 + "\n"
 
@@ -237,18 +237,12 @@ func mocksLogStat() (text1, textNewline, expectedLocation, regexpLocation string
 	expectedLocation = location.Short()
 	// remove line number since this changes
 	if index := strings.Index(expectedLocation, ":"); index == -1 {
-		panic(Errorf("error116.NewCodeLocation failed: %q", expectedLocation))
+		panic(error116.Errorf("error116.NewCodeLocation failed: %q", expectedLocation))
 	} else {
 		expectedLocation = expectedLocation[0:index]
 	}
 	regexpLocation = location.FuncName
-	writer = &mockWriterLogStat{}
-	mockOutput = func(n int, s string) (err error) {
-		if !strings.HasSuffix(s, "\n") {
-			s += "\n"
-		}
-		_, err = writer.Write([]byte(s))
-		return
-	}
+	writer = &mockWriterLogI{}
+	lg = NewLog(writer)
 	return
 }

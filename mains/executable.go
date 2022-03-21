@@ -309,23 +309,21 @@ func (ex *Executable) AddErr(err error) (x *Executable) {
 		ex.err = err
 		return
 	}
-	if errorList, ok := ex.err.(error116.ErrorHasList); ok {
-		errorList.Append(err)
-		return
-	}
 	ex.err = error116.AppendError(ex.err, err)
 	return
 }
 
 // PrintErr prints an error
 func (ex *Executable) PrintErr(err error) {
-	format := error116.DefaultFormat // format := "%v\n"
+	var s string
 	if ex.IsLongErrors {
-		format = error116.LongFormat // format = "%+v\n"
+		s = error116.Long(err)
 	} else if ex.IsErrorLocation {
-		format = error116.ShortFormat
+		s = error116.Short(err)
+	} else if err != nil {
+		s = err.Error()
 	}
-	fmt.Fprintln(os.Stderr, error116.ChainString(err, format))
+	fmt.Fprintln(os.Stderr, s)
 }
 
 // Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
@@ -339,9 +337,10 @@ func (ex *Executable) Exit() {
 	if ex.err == nil {
 		parlos.Exit0()
 	}
-	errorList, isList := ex.err.(error116.ErrorHasList)
+	errorList := error116.ErrorList(ex.err)
+	isList := len(errorList) > 1
 	if isList {
-		for _, e := range errorList.ErrorList() {
+		for _, e := range errorList[1:] {
 			ex.PrintErr(e)
 		}
 	}

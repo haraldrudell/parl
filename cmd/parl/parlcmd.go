@@ -18,6 +18,7 @@ go run ./cmd/parl
 package main
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -67,7 +68,7 @@ func main() {
 		LongErrors(options.Debug, options.Verbosity != "").
 		ConfigureLog().
 		ApplyYaml(options.YamlFile, options.YamlKey, applyYaml, optionData)
-	ctx := parl.NewContext()
+	ctx := context.Background()
 
 	if options.error {
 		exe.AddErr(parl.Errorf("Single error")).Exit()

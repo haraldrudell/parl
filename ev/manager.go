@@ -88,8 +88,9 @@ func (mgr *ThreadManager) Action(threadResult error, action CancelAction) (isEnd
 	// state: KeepGoing or (WhileOk and no error)
 	if threadResult != nil { // ev.Keepgoing and errors
 		strs := []string{threadResult.Error()}
-		if errorList, ok := threadResult.(error116.ErrorHasList); ok {
-			for _, e := range errorList.ErrorList() {
+		errorList := error116.ErrorList(threadResult)
+		if len(errorList) > 1 {
+			for _, e := range errorList[1:] {
 				strs = append(strs, e.Error())
 			}
 		}

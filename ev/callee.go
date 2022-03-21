@@ -63,7 +63,7 @@ func (ctx *CalleeContext) ResultV(errp *error, recoverValue interface{}) {
 	// collect recoverValue, update *errp
 	if recoverValue != nil {
 		e := parl.EnsureError(recoverValue)
-		parl.Errorf("Recover in Result for goroutine: %s: %w", ctx.name, recoverValue)
+		parl.Errorf("Recover in Result for goroutine: %s: %v", ctx.name, recoverValue)
 		err = error116.AppendError(err, e)
 		if errp != nil && err != *errp {
 			*errp = err

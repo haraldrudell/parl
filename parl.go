@@ -44,6 +44,8 @@ package parl
 
 import (
 	"github.com/haraldrudell/parl/error116"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 const (
@@ -57,10 +59,19 @@ const (
 	Rfc3339nsz = "2006-01-02T15:04:05.999999999Z"
 )
 
-var Errorf = error116.Errorf
-var New = error116.New
-var NewCodeLocation = error116.NewCodeLocation
-var PackFunc = error116.PackFunc
+func Errorf(format string, a ...interface{}) (err error) {
+	return error116.Errorf(format, a...)
+}
+
+func New(s string) error {
+	return error116.New(s)
+}
+
+var parlSprintf = message.NewPrinter(language.English).Sprintf
+
+func Sprintf(format string, a ...interface{}) string {
+	return parlSprintf(format, a...)
+}
 
 type Password interface {
 	HasPassword() (hasPassword bool)
