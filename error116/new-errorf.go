@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/haraldrudell/parl/errorglue"
+	"github.com/haraldrudell/parl/runt"
 )
 
 const (
@@ -21,7 +22,7 @@ const (
 // has at least one stack trace associated
 func New(s string) error {
 	if s == "" { // ensure there is an error message
-		s = "StackNew from " + errorglue.NewCodeLocation(1).Short()
+		s = "StackNew from " + runt.NewCodeLocation(1).Short()
 	}
 	return Stackn(errors.New(s), newFramesToSkip)
 }

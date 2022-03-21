@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"github.com/haraldrudell/parl/error116"
-	"github.com/haraldrudell/parl/errorglue"
+	"github.com/haraldrudell/parl/runt"
 )
 
 const (
@@ -36,7 +36,7 @@ func recover2(annotation string, errp *error, onError func(error), multiple bool
 
 	// ensure non-empty annotation
 	if annotation == "" {
-		annotation = NewCodeLocation(recRecStackFrames).PackFunc() + ": panic:"
+		annotation = runt.NewCodeLocation(recRecStackFrames).PackFunc() + ": panic:"
 	}
 
 	// consume *errp
@@ -76,7 +76,7 @@ func invokeOnError(onError func(error), err error) {
 }
 
 func Annotation() (annotation string) {
-	return fmt.Sprintf("Recover from panic in %s:", errorglue.NewCodeLocation(recAnnStackFrames).PackFunc())
+	return fmt.Sprintf("Recover from panic in %s:", runt.NewCodeLocation(recAnnStackFrames).PackFunc())
 }
 
 // processRecover ensures non-nil result to be error with Stack

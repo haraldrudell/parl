@@ -158,7 +158,7 @@ func (wa *Watch) fsnotifyListener() {
 			now := time.Now()
 			if !ok {
 				if !wa.isShutdown.IsTrue() {
-					wa.errChan <- parl.Errorf("%s event channel closed", wa.ID)
+					wa.errChan <- parl.Errorf("%d event channel closed", wa.ID)
 				}
 				break
 			}

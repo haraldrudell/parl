@@ -9,6 +9,7 @@ import (
 	"errors"
 
 	"github.com/haraldrudell/parl/errorglue"
+	"github.com/haraldrudell/parl/runt"
 )
 
 // error116.ErrorData get possible string values associated with an error chain.
@@ -77,7 +78,7 @@ func IsWarning(err error) bool {
 // of the caller:
 //   error116.FuncName
 func PackFunc() (packageDotFunction string) {
-	return errorglue.NewCodeLocation(1).PackFunc()
+	return runt.NewCodeLocation(1).PackFunc()
 }
 
 // error116.Short gets a one-line location string similar to printf %-v and ShortFormat.

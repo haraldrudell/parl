@@ -43,7 +43,7 @@ func TestSocket(t *testing.T) {
 		return
 	}
 	if err := socket.Close(); err != nil {
-		t.Errorf("socket.Close: '%w'", err)
+		t.Errorf("socket.Close: '%v'", err)
 		return
 	}
 }
@@ -83,7 +83,7 @@ func TestRunHandler(t *testing.T) {
 	var tcpClient net.Dialer
 	conn, err := tcpClient.DialContext(ctx, addr.Network(), addr.String())
 	if err != nil {
-		t.Errorf("tcpClient.DialContext: '%w'", err)
+		t.Errorf("tcpClient.DialContext: '%v'", err)
 		return
 	}
 
@@ -95,7 +95,7 @@ func TestRunHandler(t *testing.T) {
 			if errors.Is(err, io.EOF) {
 				break
 			} else {
-				t.Errorf("conn.Read: '%w'", err)
+				t.Errorf("conn.Read: '%v'", err)
 				return
 			}
 		}
@@ -107,13 +107,13 @@ func TestRunHandler(t *testing.T) {
 
 	// close client
 	if err := conn.Close(); err != nil {
-		t.Errorf("client Close: '%w'", err)
+		t.Errorf("client Close: '%v'", err)
 		return
 	}
 
 	// close listener
 	if err := socket.Close(); err != nil {
-		t.Errorf("client Close: '%w'", err)
+		t.Errorf("client Close: '%v'", err)
 		return
 	}
 

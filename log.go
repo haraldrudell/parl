@@ -5,15 +5,22 @@ ISC License
 
 package parl
 
+import (
+	"os"
+
+	"github.com/haraldrudell/parl/parlay"
+)
+
 const (
 	logStackFramesToSkip = 1
 )
 
-var stderrLogger = newLog(nil, logStackFramesToSkip)
+var stderrLogger = parlay.NewLogFrames(nil, logStackFramesToSkip)
+var stdoutOutput = parlay.GetLog(os.Stdout).Output
 
 // Out prints extected output to stdout
 func Out(format string, a ...interface{}) {
-	stdoutOutput(0, sprintf(format, a))
+	stdoutOutput(0, Sprintf(format, a))
 }
 
 // Log invocations always print

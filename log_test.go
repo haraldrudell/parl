@@ -11,19 +11,19 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/haraldrudell/parl/errorglue"
+	"github.com/haraldrudell/parl/parlay"
+	"github.com/haraldrudell/parl/runt"
 )
 
 func TestLogLog(t *testing.T) {
 	// reset of static loggings logInstance object
-	output0 := stderrLogger.output
-	defer func() {
-		stderrLogger.output = output0
-		SetDebug(false)
-	}()
+	defer func(stderrLogger0 *parlay.LogInstance) {
+		stderrLogger = stderrLogger0
+	}(stderrLogger)
+	defer SetDebug(false)
 
-	text1, textNewline, expectedLocation, _, writer, mockOutput := mocksLogStat()
-	stderrLogger.output = mockOutput
+	text1, textNewline, expectedLocation, _, writer, _ := mocksLogStat()
+	stderrLogger = parlay.NewLogFrames(writer, 1)
 
 	var actualSlice []string
 	var actual string
@@ -60,14 +60,13 @@ func TestLogLog(t *testing.T) {
 }
 
 func TestInfoLog(t *testing.T) {
-	output0 := stderrLogger.output
-	defer func() {
-		stderrLogger.output = output0
-		SetSilent(false)
-	}()
+	defer func(stderrLogger0 *parlay.LogInstance) {
+		stderrLogger = stderrLogger0
+	}(stderrLogger)
+	defer SetSilent(false)
 
-	text1, textNewline, _, _, writer, mockOutput := mocksLogStat()
-	stderrLogger.output = mockOutput
+	text1, textNewline, _, _, writer, _ := mocksLogStat()
+	stderrLogger = parlay.NewLogFrames(writer, 1)
 
 	var actualSlice []string
 
@@ -98,14 +97,13 @@ func TestInfoLog(t *testing.T) {
 }
 
 func TestDebugLog(t *testing.T) {
-	output0 := stderrLogger.output
-	defer func() {
-		stderrLogger.output = output0
-		SetDebug(false)
-	}()
+	defer func(stderrLogger0 *parlay.LogInstance) {
+		stderrLogger = stderrLogger0
+	}(stderrLogger)
+	defer SetDebug(false)
 
-	text1, textNewline, expectedLocation, _, writer, mockOutput := mocksLogStat()
-	stderrLogger.output = mockOutput
+	text1, textNewline, expectedLocation, _, writer, _ := mocksLogStat()
+	stderrLogger = parlay.NewLogFrames(writer, 1)
 
 	var actualSlice []string
 	var actual string
@@ -146,14 +144,13 @@ func TestDebugLog(t *testing.T) {
 }
 
 func TestRegexpLog(t *testing.T) {
-	output0 := stderrLogger.output
-	defer func() {
-		stderrLogger.output = output0
-		SetRegexp("")
-	}()
+	defer func(stderrLogger0 *parlay.LogInstance) {
+		stderrLogger = stderrLogger0
+	}(stderrLogger)
+	defer SetRegexp("")
 
-	text1, textNewline, expectedLocation, regexpLocation, writer, mockOutput := mocksLogStat()
-	stderrLogger.output = mockOutput
+	text1, textNewline, expectedLocation, regexpLocation, writer, _ := mocksLogStat()
+	stderrLogger = parlay.NewLogFrames(writer, 1)
 
 	matchingRegexp := regexpLocation
 	nonMatchingRegexp := "aaa"
@@ -169,10 +166,9 @@ func TestRegexpLog(t *testing.T) {
 	Debug(textNewline)
 	actualSlice = writer.getData()
 	if len(actualSlice) != 1 {
-		t.Logf("matching regexp did not print 1: %d regexp input:\n%q compiled:\n%+v",
+		t.Logf("matching regexp did not print 1: %d regexp input:\n%q",
 			len(actualSlice),
-			matchingRegexp,
-			stderrLogger.infoRegexp)
+			matchingRegexp)
 		t.Fail()
 	}
 	actual = actualSlice[0]
@@ -237,7 +233,7 @@ func mocksLogStat() (text1, textNewline, expectedLocation, regexpLocation string
 	textNewline = text1 + "\n"
 
 	// location text for this file
-	location := errorglue.NewCodeLocation(1)
+	location := runt.NewCodeLocation(1)
 	expectedLocation = location.Short()
 	// remove line number since this changes
 	if index := strings.Index(expectedLocation, ":"); index == -1 {

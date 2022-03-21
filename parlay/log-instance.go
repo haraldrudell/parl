@@ -3,7 +3,7 @@
 ISC License
 */
 
-package parl
+package parlay
 
 import (
 	"fmt"
@@ -13,8 +13,12 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 
-	"github.com/haraldrudell/parl/errorglue"
+	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/runt"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 const (
@@ -25,13 +29,15 @@ const (
 
 // LogInstance provide logging delegating to log.Output
 type LogInstance struct {
-	isSilence         AtomicBool
-	isDebug           AtomicBool
+	isSilence         uint32 // atomic
+	isDebug           uint32 // atomic
 	infoLock          sync.RWMutex
 	infoRegexp        *regexp.Regexp // behing infoLock
 	output            func(calldepth int, s string) error
 	stackFramesToSkip int
 }
+
+var sprintf = message.NewPrinter(language.English).Sprintf
 
 // NewLog gets a logger for Fatal and Warning for specific output
 func NewLog(writers ...io.Writer) (lg *LogInstance) {
@@ -53,9 +59,9 @@ func NewLog(writers ...io.Writer) (lg *LogInstance) {
 }
 
 // NewLog gets a logger for Fatal and Warning for specific output
-func newLog(writer io.Writer, extraStackFramesToSkip int) (lg *LogInstance) {
+func NewLogFrames(writer io.Writer, extraStackFramesToSkip int) (lg *LogInstance) {
 	if extraStackFramesToSkip < 0 {
-		Errorf("newLog extraStackFramesToSkip < 0: %d", extraStackFramesToSkip)
+		panic(error116.Errorf("newLog extraStackFramesToSkip < 0: %d", extraStackFramesToSkip))
 	}
 	lg = NewLog(writer)
 	lg.stackFramesToSkip += extraStackFramesToSkip
@@ -72,7 +78,7 @@ func (lg *LogInstance) Log(format string, a ...interface{}) {
 // IsSilent deteremines the state of silence
 // if debug is enabled, code location is appended
 func (lg *LogInstance) Info(format string, a ...interface{}) {
-	if lg.isSilence.IsTrue() {
+	if atomic.LoadUint32(&lg.isSilence) != 0 {
 		return
 	}
 	lg.doLog(format, a...)
@@ -80,46 +86,46 @@ func (lg *LogInstance) Info(format string, a ...interface{}) {
 
 // Debug outputs only if debug is configured or the code location package matches regexp
 func (lg *LogInstance) Debug(format string, a ...interface{}) {
-	var cloc *errorglue.CodeLocation
-	if !lg.isDebug.IsTrue() {
+	var cloc *runt.CodeLocation
+	if atomic.LoadUint32(&lg.isDebug) == 0 {
 		regExp := lg.getRegexp()
 		if regExp == nil {
 			return // debug: false regexp: nil
 		}
-		cloc = errorglue.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta)
+		cloc = runt.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta)
 		if !regExp.MatchString(cloc.FuncName) {
 			return // debug: false regexp: no match
 		}
 	} else {
-		cloc = errorglue.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta)
+		cloc = runt.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta)
 	}
 	if err := lg.output(0, appendLocation(sprintf(format, a...), cloc)); err != nil {
-		panic(Errorf("LogInstance output: %w", err))
+		panic(error116.Errorf("LogInstance output: %w", err))
 	}
 }
 
 // D prints to stderr with code location
 // Thread safe. D is meant for temporary output intended to be removed before check-in
 func (lg *LogInstance) D(format string, a ...interface{}) {
-	if err := lg.output(0, appendLocation(sprintf(format, a...), errorglue.NewCodeLocation(lg.stackFramesToSkip+logInstDebugFrameDelta))); err != nil {
-		panic(Errorf("LogInstance output: %w", err))
+	if err := lg.output(0, appendLocation(sprintf(format, a...), runt.NewCodeLocation(lg.stackFramesToSkip+logInstDebugFrameDelta))); err != nil {
+		panic(error116.Errorf("LogInstance output: %w", err))
 	}
 }
 
 // SetDebug prints everything with code location: IsInfo
 func (lg *LogInstance) SetDebug(debug bool) {
+	var v uint32
 	if debug {
-		lg.isDebug.Set()
-	} else {
-		lg.isDebug.Clear()
+		v = 1
 	}
+	atomic.StoreUint32(&lg.isDebug, v)
 }
 
 func (lg *LogInstance) SetRegexp(regExp string) (err error) {
 	var regExpPt *regexp.Regexp
 	if regExp != "" {
 		if regExpPt, err = regexp.Compile(regExp); err != nil {
-			return Errorf("regexp.Compile: %w", err)
+			return error116.Errorf("regexp.Compile: %w", err)
 		}
 	}
 	lg.infoLock.Lock()
@@ -130,29 +136,29 @@ func (lg *LogInstance) SetRegexp(regExp string) (err error) {
 
 // SetSilent only prints Log
 func (lg *LogInstance) SetSilent(silent bool) {
+	var v uint32
 	if silent {
-		lg.isSilence.Set()
-	} else {
-		lg.isSilence.Clear()
+		v = 1
 	}
+	atomic.StoreUint32(&lg.isSilence, v)
 }
 
 // IsThisDebug returns whether debug logging is configured
 func (lg *LogInstance) IsThisDebug() bool {
-	if lg.isDebug.IsTrue() {
+	if atomic.LoadUint32(&lg.isDebug) != 0 {
 		return true
 	}
 	regExp := lg.getRegexp()
 	if regExp == nil {
 		return false
 	}
-	cloc := errorglue.NewCodeLocation(lg.stackFramesToSkip - isThisDebugDelta)
+	cloc := runt.NewCodeLocation(lg.stackFramesToSkip - isThisDebugDelta)
 	return regExp.MatchString(cloc.FuncName)
 }
 
 // IsSilent if true it means that Info does not print
 func (lg *LogInstance) IsSilent() (isSilent bool) {
-	return lg.isSilence.IsTrue()
+	return atomic.LoadUint32(&lg.isSilence) != 0
 }
 
 func (lg *LogInstance) getRegexp() *regexp.Regexp {
@@ -163,15 +169,15 @@ func (lg *LogInstance) getRegexp() *regexp.Regexp {
 
 func (lg *LogInstance) doLog(format string, a ...interface{}) {
 	s := sprintf(format, a...)
-	if lg.isDebug.IsTrue() {
-		s = appendLocation(s, errorglue.NewCodeLocation(lg.stackFramesToSkip))
+	if atomic.LoadUint32(&lg.isDebug) != 0 {
+		s = appendLocation(s, runt.NewCodeLocation(lg.stackFramesToSkip))
 	}
 	if err := lg.output(0, s); err != nil {
-		panic(Errorf("LogInstance output: %w", err))
+		panic(error116.Errorf("LogInstance output: %w", err))
 	}
 }
 
-func appendLocation(s string, location *errorglue.CodeLocation) string {
+func appendLocation(s string, location *runt.CodeLocation) string {
 	// insert code location before a possible ending newline
 	sNewline := ""
 	if strings.HasSuffix(s, "\n") {

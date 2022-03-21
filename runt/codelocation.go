@@ -3,7 +3,7 @@
 ISC License
 */
 
-package errorglue
+package runt
 
 import (
 	"errors"
