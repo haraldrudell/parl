@@ -3,7 +3,7 @@
 ISC License
 */
 
-package parlay
+package parlog
 
 import (
 	"fmt"

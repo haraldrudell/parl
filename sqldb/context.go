@@ -3,7 +3,7 @@
 ISC License
 */
 
-package parl
+package sqldb
 
 import (
 	"context"

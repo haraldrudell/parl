@@ -11,19 +11,19 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/haraldrudell/parl/parlay"
+	"github.com/haraldrudell/parl/parlog"
 	"github.com/haraldrudell/parl/runt"
 )
 
 func TestLogLog(t *testing.T) {
 	// reset of static loggings logInstance object
-	defer func(stderrLogger0 *parlay.LogInstance) {
+	defer func(stderrLogger0 *parlog.LogInstance) {
 		stderrLogger = stderrLogger0
 	}(stderrLogger)
 	defer SetDebug(false)
 
 	text1, textNewline, expectedLocation, _, writer, _ := mocksLogStat()
-	stderrLogger = parlay.NewLogFrames(writer, 1)
+	stderrLogger = parlog.NewLogFrames(writer, 1)
 
 	var actualSlice []string
 	var actual string
@@ -60,13 +60,13 @@ func TestLogLog(t *testing.T) {
 }
 
 func TestInfoLog(t *testing.T) {
-	defer func(stderrLogger0 *parlay.LogInstance) {
+	defer func(stderrLogger0 *parlog.LogInstance) {
 		stderrLogger = stderrLogger0
 	}(stderrLogger)
 	defer SetSilent(false)
 
 	text1, textNewline, _, _, writer, _ := mocksLogStat()
-	stderrLogger = parlay.NewLogFrames(writer, 1)
+	stderrLogger = parlog.NewLogFrames(writer, 1)
 
 	var actualSlice []string
 
@@ -97,13 +97,13 @@ func TestInfoLog(t *testing.T) {
 }
 
 func TestDebugLog(t *testing.T) {
-	defer func(stderrLogger0 *parlay.LogInstance) {
+	defer func(stderrLogger0 *parlog.LogInstance) {
 		stderrLogger = stderrLogger0
 	}(stderrLogger)
 	defer SetDebug(false)
 
 	text1, textNewline, expectedLocation, _, writer, _ := mocksLogStat()
-	stderrLogger = parlay.NewLogFrames(writer, 1)
+	stderrLogger = parlog.NewLogFrames(writer, 1)
 
 	var actualSlice []string
 	var actual string
@@ -144,13 +144,13 @@ func TestDebugLog(t *testing.T) {
 }
 
 func TestRegexpLog(t *testing.T) {
-	defer func(stderrLogger0 *parlay.LogInstance) {
+	defer func(stderrLogger0 *parlog.LogInstance) {
 		stderrLogger = stderrLogger0
 	}(stderrLogger)
 	defer SetRegexp("")
 
 	text1, textNewline, expectedLocation, regexpLocation, writer, _ := mocksLogStat()
-	stderrLogger = parlay.NewLogFrames(writer, 1)
+	stderrLogger = parlog.NewLogFrames(writer, 1)
 
 	matchingRegexp := regexpLocation
 	nonMatchingRegexp := "aaa"

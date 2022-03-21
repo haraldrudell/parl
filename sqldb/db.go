@@ -19,7 +19,7 @@ const (
 
 // StoreDB saves db handle in context
 func StoreDB(ctx context.Context, db *sql.DB) {
-	parl.StoreInContext(ctx, contextDBformat, db)
+	StoreInContext(ctx, contextDBformat, db)
 }
 
 // GetDB obtains db handle from context
@@ -33,5 +33,5 @@ func GetDB(ctx context.Context) (db *sql.DB) {
 
 // DiscardDB removes db handle from context
 func DiscardDB(ctx context.Context) {
-	parl.DelFromContext(ctx, contextDBformat)
+	DelFromContext(ctx, contextDBformat)
 }
