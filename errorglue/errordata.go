@@ -22,7 +22,7 @@ var _ fmt.Formatter = &errorData{} // errorData can be used with fmt.Printf %v
 var _ ChainStringer = &errorData{} // errorData can be used by error116.ChainStringer()
 
 func NewErrorData(err error, key, value string) (e2 error) {
-	return &errorData{*NewRichError(err), key, value}
+	return &errorData{*newRichError(err), key, value}
 }
 
 func (e *errorData) KeyValue() (key, value string) {
@@ -32,7 +32,7 @@ func (e *errorData) KeyValue() (key, value string) {
 	return e.key, e.value
 }
 
-func (e *errorData) ChainString(format ErrorFormat) (s string) {
+func (e *errorData) ChainString(format CSFormat) (s string) {
 	if e == nil || format == ShortSuffix {
 		return
 	}

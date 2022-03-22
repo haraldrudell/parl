@@ -16,7 +16,7 @@ var _ error = &WarningType{}   // WarningType behaves like an error
 var _ Wrapper = &WarningType{} // WarningType has an error chain
 
 func NewWarning(err error) error {
-	return &WarningType{*NewErrorChain(err)}
+	return &WarningType{*newErrorChain(err)}
 }
 
 // Error prepends “Warning: ” to the error message

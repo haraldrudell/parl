@@ -19,7 +19,7 @@ type ErrorChain struct {
 var _ error = &ErrorChain{}   // ErrorChain behaves like an error
 var _ Wrapper = &ErrorChain{} // ErrorChain has an error chain
 
-func NewErrorChain(err error) (e2 *ErrorChain) {
+func newErrorChain(err error) (e2 *ErrorChain) {
 	return &ErrorChain{err}
 }
 

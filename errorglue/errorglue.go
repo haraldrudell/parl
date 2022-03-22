@@ -15,7 +15,7 @@ type ChainStringer interface {
 	// If a ChainStringer pointer receiver gets a nil value, the empty string is returned.
 	// ChainString() obtains a string representation of the errors in its chain.
 	// Rich errors implement either ChainStringer or fmt.Formatter
-	ChainString(format ErrorFormat) string
+	ChainString(format CSFormat) string
 }
 
 // Wrapper is an interface indicating error-chain capabilities.
@@ -36,8 +36,11 @@ type RelatedError interface {
 
 // ErrorHasCode allows an error to classify itself
 type ErrorHasCode interface {
-	error
+	// Check if this error claims a particular Linux errno, an int
+	IsErrno(errno int) (hasErrno bool)
+	// ErrorCode determines if this error claims code, a string
 	ErrorCode(code string) (hasCode bool)
+	// ErrorCodes returns codes that this error claims, some are numeric strings mapping to an errno
 	ErrorCodes(codes []string) (has []string)
 }
 

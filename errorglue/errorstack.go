@@ -23,7 +23,7 @@ var _ fmt.Formatter = &errorStack{}    // errorStack has features for fmt.Printf
 var _ Wrapper = &errorStack{}          // errorStack has an error chain
 
 func NewErrorStack(err error, st StackSlice) (e2 error) {
-	return &errorStack{*NewRichError(err), st}
+	return &errorStack{*newRichError(err), st}
 }
 
 func (e *errorStack) StackTrace() (st StackSlice) {
@@ -33,7 +33,7 @@ func (e *errorStack) StackTrace() (st StackSlice) {
 	return e.s.Clone()
 }
 
-func (e *errorStack) ChainString(format ErrorFormat) (s string) {
+func (e *errorStack) ChainString(format CSFormat) (s string) {
 	if e == nil {
 		return
 	} else if format != ShortSuffix {
