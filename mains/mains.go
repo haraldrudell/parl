@@ -3,7 +3,5 @@
 ISC License
 */
 
-/*
-Package mains contains functions for executing a command-line utility
-*/
+// Package mains contains functions for implementing a service or command-line utility
 package mains

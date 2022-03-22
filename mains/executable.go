@@ -17,6 +17,7 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/error116"
 	"github.com/haraldrudell/parl/parlos"
+	"github.com/haraldrudell/parl/parlp"
 	"github.com/haraldrudell/parl/parls"
 	"github.com/haraldrudell/parl/runt"
 	"gopkg.in/yaml.v2"
@@ -43,7 +44,20 @@ const (
 // ArgumentSpec bitfield for 0, 1, many arguments following command-line switches
 type ArgumentSpec uint32
 
-// Executable constant strings that describes an executable
+/*
+Executable constant strings that describes an executable
+advisable static values include Program Version Comment Description Copyright License Arguments
+like:
+ var exe = mains.Executable{
+   Program:     "getip",
+   Version:     "0.0.1",
+   Comment:     "first version",
+   Description: "finds ip address for hostname",
+   Copyright:   "© 2020-present Harald Rudell <harald.rudell@gmail.com> (http://www.haraldrudell.com)",
+   License:     "All rights reserved",
+   Arguments:   mains.NoArguments | mains.OneArgument,
+ }
+*/
 type Executable struct {
 	Program        string // gonet
 	Version        string // 0.0.1
@@ -65,9 +79,18 @@ type Executable struct {
 	IsErrorLocation bool
 }
 
-// Init populate launch time — may throw
+/*
+Init populate launch time and sets silence if first argument is “-silent.”
+Init supports function chaining like:
+ exe.Init().
+   PrintBannerAndParseOptions(optionData).
+   LongErrors(options.Debug, options.Verbosity != "").
+   ConfigureLog().
+   ApplyYaml(options.YamlFile, options.YamlKey, applyYaml, optionData)
+   …
+*/
 func (ex *Executable) Init() *Executable {
-	now := time.Now()
+	now := parlp.ProcessStartTime()
 	ex.Launch = now
 	ex.LaunchString = now.Format(rfcTimeFormat)
 	ex.Host = parlos.ShortHostname()
@@ -77,7 +100,21 @@ func (ex *Executable) Init() *Executable {
 	return ex
 }
 
-// LongErrors sets if errors are printed with stack trace and values
+/*
+LongErrors sets if errors are printed with stack trace and values. LongErrors
+supports functional chaining:
+ exe.Init().
+   …
+   LongErrors(options.Debug, options.Verbosity != "").
+   ConfigureLog()…
+
+isLongErrors prints full stack traces, related errors and error data in string
+lists and string maps.
+
+isErrorLocation appends the innermost location to the error message when isLongErrors
+is not set:
+ error-message at error116.(*csTypeName).FuncName-chainstring_test.go:26
+*/
 func (ex *Executable) LongErrors(isLongErrors bool, isErrorLocation bool) *Executable {
 	parl.Debug("exe.LongErrors long: %t location: %t", isLongErrors, isErrorLocation)
 	ex.IsLongErrors = isLongErrors
@@ -93,7 +130,7 @@ func ParentDir() (dir string) {
 	return
 }
 
-// ExecDir gets directory where executable is located
+// ExecDir gets abolute path to directory where executable is located
 func ExecDir() (dir string) {
 	if len(os.Args) == 0 {
 		return
@@ -102,7 +139,8 @@ func ExecDir() (dir string) {
 	return
 }
 
-// Abs ensures a file system path is fully qualified
+// Abs ensures a file system path is fully qualified.
+// Abs is single-return-value and panics on troubles
 func Abs(dir string) (out string) {
 	var err error
 	if out, err = filepath.Abs(dir); err != nil {
@@ -120,7 +158,28 @@ func UserHomeDir() (dir string) {
 	return
 }
 
-// PrintBannerAndParseOptions prints greeting
+/*
+PrintBannerAndParseOptions prints greeting like:
+ parl 0.1.0 parlca https server/client udp server
+It then parses options described by []OptionData stroing the values at OptionData.P.
+If options fail to parse, a proper message is printed to stderr and the process exits
+with status code 2. PrintBannerAndParseOptions supports functional chaining like:
+ exe.Init().
+   PrintBannerAndParseOptions(…).
+   LongErrors(…
+Options and yaml is configured likeso:
+ var options = &struct {
+   noStdin bool
+   *mains.BaseOptionsType
+ }{BaseOptionsType: &mains.BaseOptions}
+ var optionData = append(mains.BaseOptionData(exe.Program, mains.YamlYes), []mains.OptionData{
+   {P: &options.noStdin, Name: "no-stdin", Value: false, Usage: "Service: do not use standard input", Y: mains.NewYamlValue(&y, &y.NoStdin)},
+ }...)
+ type YamlData struct {
+   NoStdin bool // nostdin: true
+ }
+ var y YamlData
+*/
 func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executable) {
 	ex1 = ex
 	// print program name and populated details
@@ -176,6 +235,15 @@ func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executab
 	return
 }
 
+// ConfigureLog configures the default log such as parl.Log parl.Out parl.D
+// for silent, debug and regExp.
+// Settings come from BaseOptions.Silent and BaseOptions.Debug.
+//
+// ConfigureLog supports functional chaining like:
+//  exe.Init().
+//    …
+//    ConfigureLog().
+//    ApplyYaml(…)
 func (ex *Executable) ConfigureLog() (ex1 *Executable) {
 	if BaseOptions.Silent {
 		parl.SetSilent(true)
@@ -193,7 +261,41 @@ func (ex *Executable) ConfigureLog() (ex1 *Executable) {
 	return ex
 }
 
+/*
+ApplyYaml adds options read from a yaml file.
+
+File: The filename searched comes from Executable.Program or the yamlFile argument.
+If yamlFile is set exactly this file is read. If yamlFile is not set, A search is executed in the
+directories ~/apps .. and /etc.
+The filename searched is [program]-[hostname].yaml and [program].yaml.
+
+Content: If the file does not eixst, no action is taken. If the file is empty,
+no action is taken.
+
+The top entry in the yaml file is expected to be a dictionary of dictionaries.
+The key searched for in the
+top level dictionary is the yamlKey argument or “options” if not set.
+
+thunk needs to in otuside of the library for typoing reasons and is
+implemented similar to the below. y is the variable receiving parsed yaml data. The om list
+is then svcaned for its Y pointers to copy yaml settings to options.
+ func applyYaml(bytes []byte, unmarshal mains.UnmarshalFunc, yamlDictionaryKey string) (hasData bool, err error) {
+   yamlContentObject := map[string]*YamlData{} // need map[string] because yaml top level is dictionary
+   if err = unmarshal(bytes, &yamlContentObject); err != nil {
+     return
+   }
+   yamlDataPointer := yamlContentObject[yamlDictionaryKey] // pick out the options dictionary value
+   if hasData = yamlDataPointer != nil; !hasData {
+     return
+   }
+   y = *yamlDataPointer
+   return
+ }
+*/
 func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, om []OptionData) {
+	if thunk == nil {
+		panic(parl.New("mains.Executable.ApplyYaml: thunk cannot be nil"))
+	}
 	parl.Debug("exe.ApplyYaml: file: %q", yamlFile)
 	filename, bytes := FindFile(yamlFile, ex.Program)
 	if filename == "" || len(bytes) == 0 {
@@ -204,7 +306,7 @@ func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, 
 
 	// try to obtain the list of defined keys in the options dictionary
 	var yamlVisitedKeys map[string]bool
-	yco := map[string]map[string]interface{}{}
+	yco := map[string]map[string]interface{}{} // a dictionary of dictionaries with unknown content
 	parl.Debug("ApplyYaml: first yaml.Unmarshal")
 	if yaml.Unmarshal(bytes, &yco) == nil {
 		yamlVisitedKeys = map[string]bool{}
@@ -233,7 +335,7 @@ func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, 
 			optionData.Y == nil { // does not have yaml value
 			continue
 		}
-		if yamlVisitedKeys != nil { // we hve a map of the yaml keys present
+		if yamlVisitedKeys != nil { // we have a map of the yaml keys present
 			if !yamlVisitedKeys[optionData.Y.Name] {
 				continue // this key was not present in yaml
 			}
@@ -267,7 +369,15 @@ func (ex *Executable) usage() {
 	fmt.Fprintln(writer, helpHelp)
 }
 
-// Recover function to be deferred in main()
+/*
+Recover function to be used in main.main:
+  func main() {
+    defer Recover()
+    …
+On panic, the function prints to stderr: "Unhandled panic invoked exe.Recover: stack:"
+followed by a stack trace. It then adds an error to mains.Executable and terminates
+the process with status code 1
+*/
 func (ex *Executable) Recover() {
 	if e := recover(); e != nil {
 		hasStack := false
@@ -323,7 +433,7 @@ func (ex *Executable) PrintErr(err error) {
 	} else if err != nil {
 		s = err.Error()
 	}
-	fmt.Fprintln(os.Stderr, s)
+	parl.Log(s)
 }
 
 // Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
