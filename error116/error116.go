@@ -49,3 +49,11 @@ Is compatible:
 © 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 */
 package error116
+
+// ErrorStore is a thread-safe store for any number of errors
+type ErrorStore interface {
+	AddError(err error) (e error)
+	AddErrorProc(err error)
+	GetError() (e error)
+	Error() (message string)
+}
