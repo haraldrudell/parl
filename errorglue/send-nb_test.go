@@ -18,7 +18,7 @@ func TestSendNB(t *testing.T) {
 	err1 := errors.New("err1")
 	err2 := errors.New("err2")
 	errCh := make(chan error)
-	sendNb := SendNb{SendChannel: *NewSendChannel(errCh, nil)}
+	sendNb := SendNb{SendChannel: *NewSendChannel(errCh)}
 	var wg sync.WaitGroup
 	wg.Add(1)
 	sendNb.Send(err1, &wg)

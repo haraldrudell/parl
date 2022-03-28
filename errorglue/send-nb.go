@@ -6,6 +6,8 @@ ISC License
 package errorglue
 
 import (
+	"fmt"
+	"os"
 	"sync"
 
 	"github.com/haraldrudell/parl/runt"
@@ -64,8 +66,8 @@ func (sc *SendNb) sendThread(wg *sync.WaitGroup) {
 		}
 
 		// no other panics should occur — we do not know what this is
-		// hand the error back to instance owner
-		sc.onError(err)
+		// This will never happen. This is the best we can do when it does
+		fmt.Fprintln(os.Stderr, err)
 	})
 
 	for {

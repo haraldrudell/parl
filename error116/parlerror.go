@@ -6,8 +6,6 @@ ISC License
 package error116
 
 import (
-	"fmt"
-	"os"
 	"sync"
 
 	"github.com/haraldrudell/parl/errorglue"
@@ -47,7 +45,7 @@ When using a channel, The error channel is closed by (*ParlError).Shutdown():
 func NewParlError(errCh chan<- error) (pe *ParlError) {
 	p := ParlError{}
 	if errCh != nil {
-		p.SendNb.SendChannel = *errorglue.NewSendChannel(errCh, p.panicFunc)
+		p.SendNb.SendChannel = *errorglue.NewSendChannel(errCh)
 	}
 	return &p
 }
@@ -112,10 +110,4 @@ func (pe *ParlError) addError(err error) (err1 error) {
 	pe.err = err1
 
 	return
-}
-
-func (pe *ParlError) panicFunc(err error) {
-	// This will never happen. This is the best we can do when it does
-	fmt.Fprintln(os.Stderr, err)
-	pe.addError(err)
 }
