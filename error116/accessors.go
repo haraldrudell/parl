@@ -74,9 +74,9 @@ func HasStack(err error) (hasStack bool) {
 
 // error116.IsWarning determines if an error has been flagged as a warning.
 // error116.Warning() flags an error to be of warning level
-func IsWarning(err error) (ok bool) {
+func IsWarning(err error) (isWarning bool) {
 	for err != nil {
-		if _, ok = err.(*errorglue.WarningType); ok {
+		if _, isWarning = err.(*errorglue.WarningType); isWarning {
 			break // found an error in the chain that is of warning type
 		}
 		err = errors.Unwrap(err)

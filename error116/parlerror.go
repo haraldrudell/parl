@@ -15,7 +15,8 @@ const (
 	peNil = "<nil>"
 )
 
-// ParlError is a thread-safe error container
+// ParlError is a thread-safe error container that can optionally
+// send errors non-blocking on a channel.
 type ParlError struct {
 	errLock          sync.RWMutex
 	err              error // inside lock
@@ -27,20 +28,22 @@ var _ errorglue.ErrorStore = &ParlError{} // ParlError is an error store
 
 /*
 NewParlError provides a thread-safe error container that can optionally
-send incoming errors on a channel.
+send incoming errors non-blocking on a channel.
 
 If a channel is not used, a zero-value works:
- var errs error116.ParlError
- errs = &error116.ParlError{}
+ var err error116.ParlError
  …
- return errs.GetError()
+ return err
 
-When using a channel, The error channel is closed by (*ParlError).Shutdown():
+When using a channel, The error channel is closed by Shutdown():
  errCh := make(chan error)
- errs := NewParlError(errCh)
+ err := NewParlError(errCh)
+ …
+ err.Shutdown()
  …
  if err, ok := <- errCh; !ok {
    // errs was shutdown
+A shutdown ParlError is still usable, but will no longer send errors
 */
 func NewParlError(errCh chan<- error) (pe *ParlError) {
 	p := ParlError{}
