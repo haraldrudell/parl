@@ -48,3 +48,10 @@ type ErrorHasCode interface {
 type ErrorCallStacker interface {
 	StackTrace() StackSlice
 }
+
+// ErrorStore is a thread-safe store for any number of errors
+type ErrorStore interface {
+	AddError(err error) (e error)
+	GetError() (e error)
+	Error() (message string)
+}
