@@ -23,3 +23,17 @@ func TestDumpChain(t *testing.T) {
 		t.Errorf("DumpChain: %q expected: %q", actual, expected)
 	}
 }
+
+func TestIsWarning(t *testing.T) {
+	err := errors.New("err")
+	w := Warning(err) // mark as warning
+
+	// outermost error is now the stack trace
+	// *errorglue.errorStack *errorglue.WarningType *errors.errorString
+	//t.Error(errorglue.DumpChain(w))
+
+	actual := IsWarning(w)
+	if !actual {
+		t.Error("IsWarning broken")
+	}
+}

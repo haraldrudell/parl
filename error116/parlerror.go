@@ -6,38 +6,41 @@ ISC License
 package error116
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"sync"
+
+	"github.com/haraldrudell/parl/errorglue"
 )
 
 const (
-	peNil                 = "<nil>"
-	peSendOnClosedChannel = "send on closed channel"
+	peNil = "<nil>"
 )
 
 // ParlError is a thread-safe error container
 type ParlError struct {
-	errLock   sync.RWMutex
-	err       error // inside lock
-	errChLock sync.Mutex
-	errCh     chan<- error // value and close inside lock
+	errLock          sync.RWMutex
+	err              error // inside lock
+	errorglue.SendNb       // non-blocking channel for sending errors
 }
 
-var _ error = &ParlError{}      // ParlError behaves like an error
-var _ ErrorStore = &ParlError{} // ParlError is an error store
+var _ error = &ParlError{}                // ParlError behaves like an error
+var _ errorglue.ErrorStore = &ParlError{} // ParlError is an error store
 
 /*
 NewParlError sends its errors on the provided error channel in addition to storing
 them in the error container. Thread safe. The error channel is closed by
 (*ParlError).Shutdown().
-For ParlError instances without error channel, use a composite initializer or
-or provide nil value
+
+For ParlError instances without error channel, it is possible to instead use a
+composite initializer or to provide nil errCh value
 */
 func NewParlError(errCh chan<- error) (pe *ParlError) {
-	return &ParlError{errCh: errCh}
+	p := ParlError{}
+	if errCh != nil {
+		p.SendNb.SendChannel = *errorglue.NewSendChannel(errCh, p.panicFunc)
+	}
+	return &p
 }
 
 // AddError stores additional errors in the container.
@@ -54,14 +57,7 @@ func (pe *ParlError) AddError(err error) (err1 error) {
 	err1 = pe.addError(err)
 
 	// send if we have a channel, never block
-	errCh := pe.getErrCh()
-	if errCh == nil {
-		return
-	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go pe.send(errCh, err1, &wg) // non-blocking send
-	wg.Wait()                    // wait for thread send to get ready
+	pe.Send(err)
 
 	return
 }
@@ -92,17 +88,6 @@ func (pe *ParlError) Error() string {
 	return peNil
 }
 
-// Shutdown is only required if this ParlError has an error channel
-func (pe *ParlError) Shutdown() {
-	defer pe.recover("ParlError panic on closing errCh", func(err error) {
-		// This will never happen. This is the best we can do when it does
-		fmt.Fprintln(os.Stderr, err)
-		pe.AddError(err)
-	})
-
-	pe.closeAction() // thread-safe, closes exactly once
-}
-
 func (pe *ParlError) addError(err error) (err1 error) {
 	pe.errLock.Lock()
 	defer pe.errLock.Unlock()
@@ -120,63 +105,8 @@ func (pe *ParlError) addError(err error) (err1 error) {
 	return
 }
 
-func (pe *ParlError) getErrCh() (errCh chan<- error) {
-	pe.errChLock.Lock()
-	defer pe.errChLock.Unlock()
-	return pe.errCh
-}
-
-func (pe *ParlError) closeAction() {
-	pe.errChLock.Lock()
-	defer pe.errChLock.Unlock()
-	errCh := pe.errCh
-	if errCh == nil {
-		return
-	}
-	pe.errCh = nil // prevent further send or close
-	close(errCh)
-}
-
-func (pe *ParlError) recover(label string, onError func(err error)) {
-	if v := recover(); v != nil {
-		err, ok := v.(error)
-		if !ok {
-			err = Errorf("ParlError panic on closing errCh: %+v", v)
-		} else {
-			err = Errorf("%s: %w", label, err)
-		}
-		onError(err)
-	}
-}
-
-func (pe *ParlError) send(errCh chan<- error, err error, wg *sync.WaitGroup) {
-	defer pe.recover("send on error channel", func(err error) {
-		if isSendOnClosedChannel(err) {
-			return // ignore if the channel was or became closed
-		}
-		pe.addError(err) // add to the lot
-	})
-
-	wg.Done()    // signal read-to-send
-	errCh <- err // may block and panic
-}
-
-func isSendOnClosedChannel(err error) (is bool) {
-
-	// errors.As cannot handle nil
-	if err == nil {
-		return false // not an error
-	}
-
-	// is it a runtime error?
-	// Go1.18: err value is a private custom type string
-	// the value is effectively inaccessible
-	// runtime defines an interface for its errors
-	var runtimeError runtime.Error
-	if !errors.As(err, &runtimeError) {
-		return false // not a runtime error
-	}
-
-	// is it the right runtime error?
-	return runtimeError.Error() == peSendOnClosedChannel
+func (pe *ParlError) panicFunc(err error) {
+	// This will never happen. This is the best we can do when it does
+	fmt.Fprintln(os.Stderr, err)
+	pe.addError(err)
 }
