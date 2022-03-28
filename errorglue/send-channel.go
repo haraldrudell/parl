@@ -30,7 +30,7 @@ func (sc *SendChannel) Send(err error) {
 
 // Shutdown closes the channel exactly once. Thread-safe
 func (sc *SendChannel) Shutdown() {
-	defer RecoverThread("ParlError panic on closing errCh", sc.panicFunc)
+	defer RecoverThread("ParlError panic on closing errCh", sc.getPanicFunc())
 
 	sc.errChLock.Lock()
 	defer sc.errChLock.Unlock()
@@ -46,6 +46,13 @@ func (sc *SendChannel) getErrCh() (errCh chan<- error) {
 	sc.errChLock.Lock()
 	defer sc.errChLock.Unlock()
 	return sc.errCh
+}
+
+func (sc *SendChannel) getPanicFunc() func(err error) {
+	if sc.panicFunc != nil {
+		return sc.panicFunc
+	}
+	return defaultPanic
 }
 
 func defaultPanic(err error) {
