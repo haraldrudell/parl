@@ -3,6 +3,8 @@
 ISC License
 */
 
+// Package runt provides an interface to the Go standard library’s runtime package using
+// only serializable simple types
 package runt
 
 import (
