@@ -29,8 +29,8 @@ func TestErrorWithStack(t *testing.T) {
 	shortStack := fmt.Sprintf("%s at %s-%s:", msg, filepath.Base(funcName), filepath.Base(filename))
 	longStack := fmt.Sprintf("%s\n%s\n  %s:", msg, funcName, filename)
 	quote := "\x22"
-	formats := []ErrorFormat{DefaultFormat, LongFormat, LongSuffix, ShortFormat, ShortSuffix}
-	formatMap := map[ErrorFormat]string{DefaultFormat: "default", LongFormat: "long",
+	formats := []CSFormat{DefaultFormat, LongFormat, LongSuffix, ShortFormat, ShortSuffix}
+	formatMap := map[CSFormat]string{DefaultFormat: "default", LongFormat: "long",
 		LongSuffix: "longS", ShortFormat: "short", ShortSuffix: "shortS"}
 	key := "key"
 	value := "value"

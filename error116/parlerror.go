@@ -6,44 +6,74 @@ ISC License
 package error116
 
 import (
+	"fmt"
+	"os"
 	"sync"
+
+	"github.com/haraldrudell/parl/errorglue"
 )
 
-const peNil = "<nil>"
+const (
+	peNil = "<nil>"
+)
 
 // ParlError is a thread-safe error container
 type ParlError struct {
-	e error
-	sync.RWMutex
+	errLock          sync.RWMutex
+	err              error // inside lock
+	errorglue.SendNb       // non-blocking channel for sending errors
 }
 
-var _ error = &ParlError{} // ParlError behaves like an error
+var _ error = &ParlError{}                // ParlError behaves like an error
+var _ errorglue.ErrorStore = &ParlError{} // ParlError is an error store
 
-// AddError stores additional errors in the comtainer. Thread-safe.
-// for a non-thread-safe version, use error116.Errp
-func (pe *ParlError) AddError(err error) (e error) {
+/*
+NewParlError sends its errors on the provided error channel in addition to storing
+them in the error container. Thread safe. The error channel is closed by
+(*ParlError).Shutdown().
+
+For ParlError instances without error channel, it is possible to instead use a
+composite initializer or to provide nil errCh value
+*/
+func NewParlError(errCh chan<- error) (pe *ParlError) {
+	p := ParlError{}
+	if errCh != nil {
+		p.SendNb.SendChannel = *errorglue.NewSendChannel(errCh, p.panicFunc)
+	}
+	return &p
+}
+
+// AddError stores additional errors in the container.
+// Thread-safe. Returns the current state.
+// For a non-thread-safe version, use error116.Errp
+func (pe *ParlError) AddError(err error) (err1 error) {
+
+	// if there is no error, no change
 	if err == nil {
 		return pe.GetError()
 	}
-	pe.RWMutex.Lock()
-	defer pe.RWMutex.Unlock()
-	if pe.e == nil {
-		pe.e = err
-	} else {
-		pe.e = AppendError(pe.e, err)
-	}
-	return pe.e
+
+	// update the container
+	err1 = pe.addError(err)
+
+	// send if we have a channel, never block
+	pe.Send(err)
+
+	return
 }
 
+// AddErrorProc stores additional errors in the container
+// It is thread-safe and has a no-return-value signature.
+// For a non-thread-safe version, use error116.Errp
 func (pe *ParlError) AddErrorProc(err error) {
 	pe.AddError(err)
 }
 
 // GetError returns the error value enclosed in ParlError. Thread-safe
-func (pe *ParlError) GetError() (e error) {
-	pe.RWMutex.RLock()
-	defer pe.RWMutex.RUnlock()
-	return pe.e
+func (pe *ParlError) GetError() (err error) {
+	pe.errLock.RLock()
+	defer pe.errLock.RUnlock()
+	return pe.err
 }
 
 // Error() makes ParlError behave like an error.
@@ -56,4 +86,27 @@ func (pe *ParlError) Error() string {
 		return err.Error()
 	}
 	return peNil
+}
+
+func (pe *ParlError) addError(err error) (err1 error) {
+	pe.errLock.Lock()
+	defer pe.errLock.Unlock()
+
+	// determine the new value
+	if pe.err == nil {
+		err1 = err
+	} else {
+		err1 = AppendError(pe.err, err)
+	}
+
+	// store the new value
+	pe.err = err1
+
+	return
+}
+
+func (pe *ParlError) panicFunc(err error) {
+	// This will never happen. This is the best we can do when it does
+	fmt.Fprintln(os.Stderr, err)
+	pe.addError(err)
 }

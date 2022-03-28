@@ -15,7 +15,7 @@ const (
 	// For an error with data, stack trace and associated errors,
 	// DefaultFormat only prints the error message:
 	//   error-message
-	DefaultFormat ErrorFormat = iota + 1
+	DefaultFormat CSFormat = iota + 1
 	// ShortFormat has one-line location similar to printf %-v.
 	// ShortFormat does not print stack traces, data and associated errors.
 	// ShortFormat does print a one-liner of the error message and a brief code location:
@@ -37,12 +37,12 @@ const (
 
 const csNilString = "<nil>"
 
-// ErrorFormat describes string conversion of an error chain
-type ErrorFormat byte
+// CSFormat describes string conversion of an error chain
+type CSFormat byte
 
 // ChainString() gets a string representation of a single error chain
 // TODO 220319 finish comment
-func ChainString(err error, format ErrorFormat) (s string) {
+func ChainString(err error, format CSFormat) (s string) {
 	if err == nil {
 		return csNilString
 	}
@@ -127,7 +127,7 @@ func ChainString(err error, format ErrorFormat) (s string) {
 
 // PrintfFormat gets the ErrorFormat to use when executing
 // the Printf value verb 'v'
-func PrintfFormat(s fmt.State) ErrorFormat {
+func PrintfFormat(s fmt.State) CSFormat {
 	if IsPlusFlag(s) {
 		return LongFormat
 	} else if IsMinusFlag(s) {

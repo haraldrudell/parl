@@ -12,6 +12,8 @@ import (
 	"github.com/haraldrudell/parl/runt"
 )
 
+const e116PackFuncStackFrames = 1
+
 // error116.ErrorData get possible string values associated with an error chain.
 // list is a list of string values that were stored with an empty key, oldest first.
 // keyValues are string values associated with a key string, newest key wins.
@@ -63,22 +65,30 @@ func ErrorList(err error) (errs []error) {
 
 // error116.HasStack detects if the error chain already contains a stack trace
 func HasStack(err error) (hasStack bool) {
+	if err == nil {
+		return
+	}
 	var e errorglue.ErrorCallStacker
 	return errors.As(err, &e)
 }
 
 // error116.IsWarning determines if an error has been flagged as a warning.
 // error116.Warning() flags an error to be of warning level
-func IsWarning(err error) bool {
-	var warning *errorglue.WarningType
-	return errors.Is(err, warning)
+func IsWarning(err error) (ok bool) {
+	for err != nil {
+		if _, ok = err.(*errorglue.WarningType); ok {
+			break // found an error in the chain that is of warning type
+		}
+		err = errors.Unwrap(err)
+	}
+	return
 }
 
 // error116.PackFunc returns the package name and function name
 // of the caller:
 //   error116.FuncName
 func PackFunc() (packageDotFunction string) {
-	return runt.NewCodeLocation(1).PackFunc()
+	return runt.NewCodeLocation(e116PackFuncStackFrames).PackFunc()
 }
 
 // error116.Short gets a one-line location string similar to printf %-v and ShortFormat.

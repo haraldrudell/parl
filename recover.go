@@ -115,10 +115,27 @@ func AddToPanic(panicValue interface{}, additionalErr error) (err error) {
 	return error116.AppendError(err, additionalErr)
 }
 
-// HandlePanic executes a function wrapped in panic recovery.
-// If the function panics, HandlePanic returns an error value
+// HandlePanic recovers from panics when executing fn.
+// A panic is returned in err
 func HandlePanic(fn func()) (err error) {
 	defer Recover(Annotation(), &err, nil)
 	fn()
 	return
 }
+
+// HandleErrp recovers from panics when executing fn.
+// A panic is stored at errp using error116.AppendError()
+func HandleErrp(fn func(), errp *error) {
+	defer Recover(Annotation(), errp, nil)
+	fn()
+}
+
+// HandleErrp recovers from panics when executing fn.
+// A panic is provided to the storeError function.
+// storeError can be the thread-safe error116.ParlError.AddErrorProc()
+func HandleParlError(fn func(), storeError func(error)) {
+	defer Recover(Annotation(), nil, storeError)
+	fn()
+}
+
+var _ = (&error116.ParlError{}).AddErrorProc

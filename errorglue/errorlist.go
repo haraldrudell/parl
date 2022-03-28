@@ -19,7 +19,7 @@ var _ Wrapper = &relatedError{}      // relatedError is an error chain
 var _ RelatedError = &relatedError{} // relatedError has an associated error
 
 func NewRelatedError(err, err2 error) (e2 error) {
-	return &relatedError{*NewErrorChain(err), err2}
+	return &relatedError{*newErrorChain(err), err2}
 }
 
 func (et *relatedError) AssociatedError() (err error) {

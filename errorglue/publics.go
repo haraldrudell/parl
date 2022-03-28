@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/haraldrudell/parl/runt"
 )
 
 /*
@@ -121,4 +123,22 @@ func DumpChain(err error) (typeNames string) {
 	}
 	typeNames = strings.Join(strs, "\x20")
 	return
+}
+
+/*
+RecoverThread is a defer function for threads.
+On panic, the onError function is invoked with an error
+message that contains location information
+*/
+func RecoverThread(label string, onError func(err error)) {
+	if onError == nil {
+		panic(fmt.Errorf("%s: onError func nil", runt.NewCodeLocation(1).PackFunc()))
+	}
+	if v := recover(); v != nil {
+		err, ok := v.(error)
+		if !ok {
+			err = fmt.Errorf("Non-error value: %v", v)
+		}
+		onError(fmt.Errorf("%s: %w", label, err))
+	}
 }

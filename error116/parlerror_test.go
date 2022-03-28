@@ -7,8 +7,50 @@ package error116
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
+
+func TestParlErrorErrCh(t *testing.T) {
+	chErr := make(chan error)
+	closePanics := func() (didPanic bool) {
+		defer func() {
+			if v := recover(); v != nil {
+				didPanic = true
+			}
+		}()
+
+		close(chErr)
+		return false
+	}
+
+	// does Shutdown close errCh?
+	pe := NewParlError(chErr)
+	pe.Shutdown()
+	if !closePanics() {
+		t.Error("pe.Shutdown did not close errCh")
+	}
+
+	expected := 1
+	chErr = make(chan error)
+	err := errors.New("message")
+
+	// what happens on shutdown with blocking thread?
+	pe = NewParlError(chErr)
+	pe.AddError(err) // a thread is now blocked sending err on errCh
+	pe.Shutdown()    // closes errCh
+	list := ErrorList(pe.GetError())
+	actualInt := len(list)
+
+	if actualInt != expected {
+		sList := make([]string, len(list))
+		for i, e := range list {
+			sList[i] = e.Error()
+		}
+		t.Errorf("Error count: %d expected: %d: [%s]", actualInt, expected, strings.Join(sList, ",\x20"))
+	}
+
+}
 
 func TestParlError(t *testing.T) {
 	e1 := errors.New("error1")

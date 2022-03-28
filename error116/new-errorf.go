@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	stackFramesToSkip = 1
-	newFramesToSkip   = 1
+	e116StacknFramesToSkip = 1
+	e116StackFrames        = 1
 )
 
 // error116.New is similar to errors.New but ensures that the returned error
@@ -24,7 +24,7 @@ func New(s string) error {
 	if s == "" { // ensure there is an error message
 		s = "StackNew from " + runt.NewCodeLocation(1).Short()
 	}
-	return Stackn(errors.New(s), newFramesToSkip)
+	return Stackn(errors.New(s), e116StackFrames)
 }
 
 // error116.Errorf is similar to fmt.Errorf but ensures that the returned err
@@ -34,19 +34,17 @@ func Errorf(format string, a ...interface{}) (err error) {
 	if HasStack(err) {
 		return
 	}
-	return Stackn(err, 1)
+	return Stackn(err, e116StackFrames)
 }
 
 // error116.Stack ensures the err has a stack trace
 // associated.
 // err can be nil in which nil is returned
 func Stack(err error) (err2 error) {
-	if err == nil || HasStack(err) {
-		err2 = err
-		return
+	if HasStack(err) {
+		return err
 	}
-	err2 = errorglue.NewErrorStack(err, errorglue.NewStackSlice(stackFramesToSkip))
-	return
+	return Stackn(err, e116StackFrames)
 }
 
 // error116.Stackn always attaches a new stack trace to err and
@@ -59,6 +57,6 @@ func Stackn(err error, framesToSkip int) (err2 error) {
 	if framesToSkip < 0 {
 		framesToSkip = 0
 	}
-	err2 = errorglue.NewErrorStack(err, errorglue.NewStackSlice(stackFramesToSkip+framesToSkip))
+	err2 = errorglue.NewErrorStack(err, errorglue.NewStackSlice(e116StacknFramesToSkip+framesToSkip))
 	return
 }
