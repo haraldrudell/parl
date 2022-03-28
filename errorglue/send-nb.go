@@ -15,20 +15,23 @@ import (
 type SendNb struct {
 	SendChannel
 	sqLock    sync.Mutex
-	errQueue  []error // inside lock
+	sendQueue []error // inside lock
 	hasThread bool    // inside lock
 }
 
-// Send sends an error on the error channel. non-blocking. Thread-safe
+// Send sends an error on the error channel. Non-blocking. Thread-safe.
+// wg can be used to wait until the thread is near-send
 func (sc *SendNb) Send(err error, wgs ...*sync.WaitGroup) {
 	if err == nil {
 		return // nothing to send
 	}
+
+	// get possible WaitGroup
 	var wg *sync.WaitGroup
 	if len(wgs) > 0 {
 		wg = wgs[0]
 	}
-	if sc.getErrCh() == nil { // thread-safe determination
+	if sc.errCh == nil {
 		if wg != nil {
 			wg.Done()
 		}
@@ -41,15 +44,17 @@ func (sc *SendNb) Send(err error, wgs ...*sync.WaitGroup) {
 func (sc *SendNb) saveOrLaunch(err error, wg *sync.WaitGroup) {
 	sc.sqLock.Lock()
 	defer sc.sqLock.Unlock()
-	sc.errQueue = append(sc.errQueue, err)
-	if sc.hasThread {
+	sc.sendQueue = append(sc.sendQueue, err) // put err in send queue
+	if sc.hasThread {                        // the thread is already blocked
 		if wg != nil {
 			wg.Done()
 		}
-		return
+		return // err put in queue
 	}
+
+	// launch thread
 	sc.hasThread = true
-	go sc.sendThread(wg)
+	go sc.sendThread(wg) // send err in new thread
 }
 
 func (sc *SendNb) sendThread(wg *sync.WaitGroup) {
@@ -57,31 +62,34 @@ func (sc *SendNb) sendThread(wg *sync.WaitGroup) {
 		if runt.IsSendOnClosedChannel(err) {
 			return // ignore if the channel was or became closed
 		}
-		sc.panicFunc(err) // add to the lot
+
+		// no other panics should occur — we do not know what this is
+		// hand the error back to instance owner
+		sc.onError(err)
 	})
 
 	for {
-		err := sc.getErr()
+		err := sc.getErrFromSendQueue()
 		if err == nil {
-			break
+			break // end of queue: shutdown thread
 		}
 		if wg != nil {
-			wg.Done() // signal read-to-send
+			wg.Done() // signal near-send
 			wg = nil
 		}
 		sc.SendChannel.Send(err) // may block and panic
 	}
 }
 
-func (sc *SendNb) getErr() (err error) {
+func (sc *SendNb) getErrFromSendQueue() (err error) {
 	sc.sqLock.Lock()
 	defer sc.sqLock.Unlock()
-	if len(sc.errQueue) == 0 {
+	if len(sc.sendQueue) == 0 {
 		sc.hasThread = false
 		return nil
 	}
-	err = sc.errQueue[0]
-	copy(sc.errQueue[0:], sc.errQueue[1:])
-	sc.errQueue = sc.errQueue[:len(sc.errQueue)-1]
+	err = sc.sendQueue[0]
+	copy(sc.sendQueue[0:], sc.sendQueue[1:])
+	sc.sendQueue = sc.sendQueue[:len(sc.sendQueue)-1]
 	return
 }

@@ -28,12 +28,21 @@ var _ error = &ParlError{}                // ParlError behaves like an error
 var _ errorglue.ErrorStore = &ParlError{} // ParlError is an error store
 
 /*
-NewParlError sends its errors on the provided error channel in addition to storing
-them in the error container. Thread safe. The error channel is closed by
-(*ParlError).Shutdown().
+NewParlError provides a thread-safe error container that can optionally
+send incoming errors on a channel.
 
-For ParlError instances without error channel, it is possible to instead use a
-composite initializer or to provide nil errCh value
+If a channel is not used, a zero-value works:
+ var errs error116.ParlError
+ errs = &error116.ParlError{}
+ …
+ return errs.GetError()
+
+When using a channel, The error channel is closed by (*ParlError).Shutdown():
+ errCh := make(chan error)
+ errs := NewParlError(errCh)
+ …
+ if err, ok := <- errCh; !ok {
+   // errs was shutdown
 */
 func NewParlError(errCh chan<- error) (pe *ParlError) {
 	p := ParlError{}

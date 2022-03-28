@@ -5,52 +5,42 @@ ISC License
 
 package errorglue
 
-import (
-	"sync"
-)
+import "sync"
 
 // ParlError is a thread-safe error container
 type SendChannel struct {
-	errChLock sync.Mutex
-	errCh     chan<- error // value and close inside lock
-	panicFunc func(err error)
+	errCh        chan<- error // value and close inside lock
+	onError      func(err error)
+	shutdownOnce sync.Once
 }
 
-func NewSendChannel(errCh chan<- error, panicFunc func(err error)) (sc *SendChannel) {
-	if panicFunc == nil {
-		panicFunc = defaultPanic
+func NewSendChannel(errCh chan<- error, onError func(err error)) (sc *SendChannel) {
+	if onError == nil {
+		onError = defaultPanic
 	}
-	return &SendChannel{errCh: errCh, panicFunc: panicFunc}
+	return &SendChannel{errCh: errCh, onError: onError}
 }
 
 // Send sends an error on the error channel. Thread-safe
 func (sc *SendChannel) Send(err error) {
-	sc.getErrCh() <- err // may block and panic
+	sc.errCh <- err // may block and panic
 }
 
 // Shutdown closes the channel exactly once. Thread-safe
 func (sc *SendChannel) Shutdown() {
-	defer RecoverThread("ParlError panic on closing errCh", sc.getPanicFunc())
+	sc.shutdownOnce.Do(func() {
+		defer RecoverThread("ParlError panic on closing errCh", sc.getPanicFunc())
 
-	sc.errChLock.Lock()
-	defer sc.errChLock.Unlock()
-	errCh := sc.errCh
-	if errCh == nil {
-		return
-	}
-	sc.errCh = nil // prevent further send or close
-	close(errCh)
-}
-
-func (sc *SendChannel) getErrCh() (errCh chan<- error) {
-	sc.errChLock.Lock()
-	defer sc.errChLock.Unlock()
-	return sc.errCh
+		if sc.errCh == nil {
+			return
+		}
+		close(sc.errCh)
+	})
 }
 
 func (sc *SendChannel) getPanicFunc() func(err error) {
-	if sc.panicFunc != nil {
-		return sc.panicFunc
+	if sc.onError != nil {
+		return sc.onError
 	}
 	return defaultPanic
 }

@@ -27,7 +27,7 @@ func TestSendNB(t *testing.T) {
 	wg.Wait() // wait until thread is about to send
 	sendNb.sqLock.Lock()
 	hasThread := sendNb.hasThread
-	queueLen := len(sendNb.errQueue)
+	queueLen := len(sendNb.sendQueue)
 	sendNb.sqLock.Unlock()
 	if !hasThread {
 		t.Error("sendNB no thread")
