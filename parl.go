@@ -43,7 +43,7 @@ On 3/16/2022 Parl was open-sourced under an ISC License
 package parl
 
 import (
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
@@ -60,11 +60,11 @@ const (
 )
 
 func Errorf(format string, a ...interface{}) (err error) {
-	return error116.Errorf(format, a...)
+	return perrors.Errorf(format, a...)
 }
 
 func New(s string) error {
-	return error116.New(s)
+	return perrors.New(s)
 }
 
 var parlSprintf = message.NewPrinter(language.English).Sprintf

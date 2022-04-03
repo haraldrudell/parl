@@ -10,7 +10,8 @@ import (
 	"path"
 
 	// Database driver
-	"github.com/haraldrudell/parl/parlos"
+
+	"github.com/haraldrudell/parl/pos"
 	_ "modernc.org/sqlite"
 )
 
@@ -25,7 +26,7 @@ const (
 // DsnSqlite builds a dsn identifying a database
 func DsnSqlite(appName string, dir string) (dataSourceName string) {
 	if dir == "" {
-		dir = parlos.HomeDir(path.Join(dotLocalDir, shareDir, appName))
+		dir = pos.HomeDir(path.Join(dotLocalDir, shareDir, appName))
 	}
 	dataSourceName = path.Join(dir, appName+dbExt)
 	return

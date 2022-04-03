@@ -10,7 +10,7 @@ import (
 	"io"
 	"runtime"
 
-	"github.com/haraldrudell/parl/runt"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 )
 
 // StackSlice represents a StackSlice of program counters.
-type StackSlice []runt.CodeLocation
+type StackSlice []pruntime.CodeLocation
 
 // NewStackSlice gets a slice of stack frames
 func NewStackSlice(skip int) (slice StackSlice) {
@@ -38,7 +38,7 @@ func NewStackSlice(skip int) (slice StackSlice) {
 	// convert to slice of CodeLocation
 	for {
 		frame, more := frames.Next()
-		slice = append(slice, *runt.GetCodeLocation(&frame))
+		slice = append(slice, *pruntime.GetCodeLocation(&frame))
 		if !more {
 			break
 		}
@@ -55,7 +55,7 @@ func (st StackSlice) Short() (s string) {
 }
 
 func (st StackSlice) Clone() (s StackSlice) {
-	s = make([]runt.CodeLocation, len(st))
+	s = make([]pruntime.CodeLocation, len(st))
 	copy(s, st)
 	return
 }

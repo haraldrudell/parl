@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/haraldrudell/parl/runt"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 /*
@@ -125,6 +125,19 @@ func DumpChain(err error) (typeNames string) {
 	return
 }
 
+// DumpGo produces a newline-separated string of
+// type-names and Go-syntax found in the error
+// chain of err.
+// err can be nil
+func DumpGo(err error) (typeNames string) {
+	var strs []string
+	for ; err != nil; err = errors.Unwrap(err) {
+		strs = append(strs, fmt.Sprintf("%T %[1]v", err))
+	}
+	typeNames = strings.Join(strs, "\n")
+	return
+}
+
 /*
 RecoverThread is a defer function for threads.
 On panic, the onError function is invoked with an error
@@ -132,7 +145,7 @@ message that contains location information
 */
 func RecoverThread(label string, onError func(err error)) {
 	if onError == nil {
-		panic(fmt.Errorf("%s: onError func nil", runt.NewCodeLocation(1).PackFunc()))
+		panic(fmt.Errorf("%s: onError func nil", pruntime.NewCodeLocation(1).PackFunc()))
 	}
 	if v := recover(); v != nil {
 		err, ok := v.(error)

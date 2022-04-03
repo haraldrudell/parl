@@ -12,7 +12,7 @@ import (
 	"crypto/x509"
 	"testing"
 
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 func TestNewEd25519(t *testing.T) {
@@ -56,7 +56,7 @@ func TestNewEd25519(t *testing.T) {
 		return
 	}
 	if !keyPair.HasKey() {
-		t.Error(error116.New("keyPair empty"))
+		t.Error(perrors.New("keyPair empty"))
 		return
 	}
 	algo := keyPair.Algo()

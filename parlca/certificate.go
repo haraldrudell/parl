@@ -9,7 +9,7 @@ import (
 	"crypto/ed25519"
 	"crypto/x509"
 
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // x509Certificate extends x509.Certificate with utility methods
@@ -53,7 +53,7 @@ func (c *x509Certificate) PublicKeyBytes() (bytes []byte) {
 	}
 	ed25519PublicKey, ok := cert.PublicKey.(ed25519.PublicKey)
 	if !ok {
-		panic(error116.Errorf("Bad PublicKey type: %T", cert.PublicKey))
+		panic(perrors.Errorf("Bad PublicKey type: %T", cert.PublicKey))
 	}
 	bytes = ed25519PublicKey
 	return

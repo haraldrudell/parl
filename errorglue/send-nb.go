@@ -10,7 +10,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/haraldrudell/parl/runt"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 // SendNb implements non-blocking send using a thread and buffer up to size of int
@@ -61,7 +61,7 @@ func (sc *SendNb) saveOrLaunch(err error, wg *sync.WaitGroup) {
 
 func (sc *SendNb) sendThread(wg *sync.WaitGroup) {
 	defer RecoverThread("send on error channel", func(err error) {
-		if runt.IsSendOnClosedChannel(err) {
+		if pruntime.IsSendOnClosedChannel(err) {
 			return // ignore if the channel was or became closed
 		}
 
