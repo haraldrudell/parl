@@ -6,128 +6,104 @@ ISC License
 package parl
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 )
 
 const (
 	defaultParallelism = 20
-	uint64MinusOne     = ^uint64(0)
 )
 
 // Moderator invokes functions at a limited level of parallelism
 type Moderator struct {
-	parallelism  uint64
-	shutdownLock sync.Once
-	isShutdown   AtomicBool
-	dataLock     sync.Mutex
-	available    uint64 // behind dataLock
-	waitCount    uint64 // atomic
-	waitLock     sync.Mutex
+	parallelism uint64
+	cond        *sync.Cond
+	ctx         context.Context
+	active      uint64 // behind lock
+	waiting     uint64 // behind lock
 }
 
-var ErrModeratorShutdown = errors.New("Moderator shut down")
-
 // NewModerator creates a new Moderator used to limit parallelism
-func NewModerator(parallelism uint64) (mo *Moderator) {
+func NewModerator(parallelism uint64, ctx context.Context) (mo *Moderator) {
 	if parallelism == 0 {
 		parallelism = defaultParallelism
 	}
-	return &Moderator{parallelism: parallelism, available: parallelism}
+	m := Moderator{parallelism: parallelism, ctx: ctx}
+	m.cond = sync.NewCond(&sync.Mutex{})
+	go m.shutdownThread()
+	return &m
 }
 
 // Do calls fn limited by the moderator’s parallelism.
 // If the moderator is shut down, ErrModeratorShutdown is returned
 func (mo *Moderator) Do(fn func() error) (err error) {
 	if fn == nil {
-		panic(New("Moderator.Do with nil function"))
+		return New("Moderator.Do with nil function")
 	}
-	if mo.isShutdown.IsTrue() {
-		return ErrModeratorShutdown
+	if err = mo.getTicket(); err != nil {
+		return
 	}
 	defer mo.returnTicket() // we will always get a ticket, and it should be returned
-	if err = mo.getTicket(); err != nil {
-		return // shutdown
-	}
 	return fn()
 }
 
 func (mo *Moderator) getTicket() (err error) {
-	if mo.getAvailableTicket() {
-		return // a ticket was available
-	}
-
-	// wait for ticket
-	mo.waitLock.Lock()
-
-	// we now have a ticket!
-	if mo.isShutdown.IsTrue() {
-		return ErrModeratorShutdown
-	}
-	return
-}
-
-func (mo *Moderator) getAvailableTicket() (hasTicket bool) {
-	mo.dataLock.Lock()
-	defer mo.dataLock.Unlock()
-	if mo.available > 0 {
-		mo.available--
-		if mo.available == 0 {
-			mo.waitLock.Lock() // the next thread will wait
+	mo.cond.L.Lock()
+	defer mo.cond.L.Unlock()
+	isWaiting := false
+	for {
+		if mo.ctx.Err() != nil {
+			err = mo.ctx.Err()
+			break
 		}
-		return true
+		if mo.active < mo.parallelism {
+			mo.active++
+			break
+		}
+		if !isWaiting {
+			isWaiting = true
+			mo.waiting++
+		}
+		mo.cond.Wait()
 	}
-	mo.waitCount++
+	if isWaiting {
+		mo.waiting--
+	}
 	return
 }
 
 func (mo *Moderator) returnTicket() {
-	mo.dataLock.Lock()
-	defer mo.dataLock.Unlock()
-
-	// hand ticket to the queue
-	if mo.waitCount > 0 {
-		mo.waitCount--
-		mo.waitLock.Unlock()
-		return
-	}
-	if mo.available == 0 {
-		mo.waitLock.Unlock()
-	}
-
-	// note an additional ticket available
-	mo.available++
+	mo.cond.L.Lock()
+	mo.cond.Signal()
+	defer mo.cond.L.Unlock()
+	mo.active--
 }
 
-func (mo *Moderator) Status() (parallelism uint64, available uint64, waiting uint64, isShutdown bool) {
+func (mo *Moderator) shutdownThread() {
+	<-mo.ctx.Done()
+	mo.cond.Broadcast()
+}
+
+func (mo *Moderator) Status() (parallelism uint64, active uint64, waiting uint64, isShutdown bool) {
 	parallelism = mo.parallelism
-	mo.dataLock.Lock()
-	available = mo.available
-	mo.dataLock.Unlock()
-	waiting = atomic.LoadUint64(&mo.waitCount)
-	isShutdown = mo.isShutdown.IsTrue()
+	mo.cond.L.Lock()
+	active = mo.active
+	waiting = mo.waiting
+	mo.cond.L.Unlock()
+	isShutdown = mo.ctx.Err() != nil
 	return
 }
 
 func (mo *Moderator) String() (s string) {
-	p, a, w, sd := mo.Status()
-	if a > 0 {
-		s = fmt.Sprintf("available: %d(%d)", a, p)
+	parallelism, active, waiting, sd := mo.Status()
+	if active < parallelism {
+		s = fmt.Sprintf("available: %d(%d)", parallelism-active, parallelism)
 	} else {
-		s = fmt.Sprintf("waiting: %d(%d)", w, p)
+		s = fmt.Sprintf("waiting: %d(%d)", waiting, parallelism)
 	}
 	if sd {
 		s += " shutdown"
 	}
 	return
-}
-
-func (mo *Moderator) shutdown() {
-	mo.isShutdown.Set()
-}
-
-func (mo *Moderator) Shutdown() {
-	mo.shutdownLock.Do(mo.shutdown)
 }

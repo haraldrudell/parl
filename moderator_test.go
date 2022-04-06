@@ -6,23 +6,28 @@ ISC License
 package parl
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
+const (
+	mttShortTime = 10 * time.Millisecond
+)
+
 func TestModerator(t *testing.T) {
-	doA := "a"
-	exitA := "A"
+	taskALaunched := "a"
+	taskAExited := "A"
 	goB := "d"
 	doB := "b"
 	doC := "c"
 	goC := "¢"
-	exitB := "B"
-	exitC := "C"
+	taskBExited := "B"
+	taskCExited := "C"
 	expectedSequence := "a¢dAcCbB"
-	exitAIndex := strings.Index(expectedSequence, exitA)
+	exitAIndex := strings.Index(expectedSequence, taskAExited)
 
 	Append := func() func(string) string {
 		sequence := ""
@@ -35,26 +40,39 @@ func TestModerator(t *testing.T) {
 		}
 	}()
 
-	// new state
-	expectedStatusNew := "available: 1(1)"
-	mo := NewModerator(1)
-	actual := mo.String()
-	if actual != expectedStatusNew {
-		t.Logf("New status: expected: %s actual: %s", expectedStatusNew, actual)
-		t.Fail()
+	// instantiate
+	count := 1
+	ctx, cancel := context.WithCancel(context.Background())
+	mo := NewModerator(1, ctx)
+
+	// initial Status
+	parallelism, active, waiting, shutdown := mo.Status()
+	if parallelism != uint64(count) {
+		t.Errorf("Parallelism %d expected %d", parallelism, count)
+	}
+	if active != 0 {
+		t.Errorf("Parallelism %d expected %d", active, 0)
+	}
+	if waiting != 0 {
+		t.Errorf("Waiting %d expected %d", waiting, 0)
+	}
+	if shutdown {
+		t.Errorf("shutdown %t expected %t", shutdown, false)
 	}
 
-	// state one: one thread running, no tickets left
-	expectedStatusOne := "waiting: 0(1)"
+	// StateOne: status: one thread running, ni available tickets, no threads waiting
+	extecpedA := 1
+	extecpedW := 0
 	wgADo := sync.WaitGroup{}
 	wgADo.Add(1)
 	wgAWait := sync.WaitGroup{}
 	wgAWait.Add(1)
 	wgAExit := sync.WaitGroup{}
 	wgAExit.Add(1)
+	// thread A goes into its Do function
 	go func() {
 		if err := mo.Do(func() (err error) {
-			Append(doA)
+			Append(taskALaunched)
 			wgADo.Done()
 			wgAWait.Wait()
 			return
@@ -62,18 +80,20 @@ func TestModerator(t *testing.T) {
 			t.Logf("A err: %v", err)
 			t.Fail()
 		}
-		Append(exitA)
+		Append(taskAExited)
 		wgAExit.Done()
 	}()
 	wgADo.Wait()
-	actual = mo.String()
-	if actual != expectedStatusOne {
-		t.Logf("State One: expected: %s actual: %s", expectedStatusOne, actual)
-		t.Fail()
+	_, active, waiting, _ = mo.Status()
+	if active != uint64(extecpedA) {
+		t.Errorf("State One: active expected: %d actual: %d", active, extecpedA)
+	}
+	if waiting != uint64(extecpedW) {
+		t.Errorf("State One: waiting expected: %d actual: %d", waiting, extecpedW)
 	}
 
 	// state two: 2 threads in queue
-	expectedStatusTwo := "waiting: 2(1)"
+	extecpedW = 2
 	wgBCWait := sync.WaitGroup{}
 	wgBCWait.Add(1)
 	wgBCExit := sync.WaitGroup{}
@@ -90,37 +110,48 @@ func TestModerator(t *testing.T) {
 		Append(exit)
 		wgBCExit.Done()
 	}
-	go BC(goB, doB, exitB)
-	go BC(goC, doC, exitC)
-	for {
-		actual = mo.String() // will hang if something wrong
-		if expectedStatusTwo == actual {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
+	// thread B waiting
+	go BC(goB, doB, taskBExited)
+	// thread C waiting
+	go BC(goC, doC, taskCExited)
+	// wait for threads to enter cond.Wait()
+	time.Sleep(mttShortTime)
+	_, active, waiting, _ = mo.Status()
+	if active != uint64(extecpedA) {
+		t.Errorf("State One: active expected: %d actual: %d", active, extecpedA)
+	}
+	if waiting != uint64(extecpedW) {
+		t.Errorf("State One: waiting expected: %d actual: %d", waiting, extecpedW)
 	}
 
 	// state three: 1 thread in queue
-	expectedStatusThree := "waiting: 1(1)"
+	extecpedW = 1
 	wgAWait.Done()
 	wgAExit.Wait()
-	actual = mo.String()
-	if actual != expectedStatusThree {
-		t.Logf("Status Three: expected: %s actual: %s", expectedStatusThree, actual)
-		t.Fail()
+	// wait for a thread to exit cond.Wait()
+	time.Sleep(mttShortTime)
+	_, active, waiting, _ = mo.Status()
+	if active != uint64(extecpedA) {
+		t.Errorf("State One: active expected: %d actual: %d", active, extecpedA)
+	}
+	if waiting != uint64(extecpedW) {
+		t.Errorf("State One: waiting expected: %d actual: %d", waiting, extecpedW)
 	}
 
 	// state 4: 1 ticket available
-	expectedStatusFour := "available: 1(1)"
+	extecpedA = 0
+	extecpedW = 0
 	wgBCWait.Done()
 	wgBCExit.Wait()
-	actual = mo.String()
-	if actual != expectedStatusFour {
-		t.Logf("Status Four: expected: %s actual: %s", expectedStatusFour, actual)
-		t.Fail()
+	_, active, waiting, _ = mo.Status()
+	if active != uint64(extecpedA) {
+		t.Errorf("State One: active expected: %d actual: %d", active, extecpedA)
+	}
+	if waiting != uint64(extecpedW) {
+		t.Errorf("State One: waiting expected: %d actual: %d", waiting, extecpedW)
 	}
 
-	seq := Append("")
+	seq := Append("") // get result
 	// expected sequence: a¢dAcCbB
 	// ¢d and cCbB may flip
 	if len(seq) != len(expectedSequence) ||
@@ -129,4 +160,11 @@ func TestModerator(t *testing.T) {
 		t.Logf("Bad sequence: expected: %s actual: %s", expectedSequence, seq)
 		t.Fail()
 	}
+
+	cancel()
+	_, _, _, shutdown = mo.Status()
+	if !shutdown {
+		t.Errorf("shutdown %t expected %t", shutdown, true)
+	}
+
 }
