@@ -16,6 +16,12 @@ func IsENOENT(err error) (isENOENT bool) {
 	return Errno(err) == syscall.ENOENT
 }
 
+// IsConnectionRefused searches the error chsin of err for syscall.ECONNREFUSED
+// net.Dialer errors for closed socket
+func IsConnectionRefused(err error) (isConnectionRefused bool) {
+	return Errno(err) == syscall.ECONNREFUSED
+}
+
 // Errno scans an error chain for a syscall.Errno type, returning nil if none exists.
 // int(errno) provides the numeric value.
 // errno can be compared:
