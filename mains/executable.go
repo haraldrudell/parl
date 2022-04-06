@@ -296,19 +296,20 @@ func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, 
 	if thunk == nil {
 		panic(parl.New("mains.Executable.ApplyYaml: thunk cannot be nil"))
 	}
-	parl.Debug("exe.ApplyYaml: file: %q", yamlFile)
-	filename, bytes := FindFile(yamlFile, ex.Program)
-	if filename == "" || len(bytes) == 0 {
-		parl.Debug("ApplyYaml: no yaml file")
+	parl.Debug("Arguments: yamlFile: %q yamlKey: %q", yamlFile, yamlKey)
+	filename, byts := FindFile(yamlFile, ex.Program)
+	if filename == "" || len(byts) == 0 {
+		parl.Debug("ex.ApplyYaml: no yaml file")
 		return
 	}
 	yamlDictionaryKey := GetTopLevelKey(yamlKey) // key name from option or a default
+	parl.Debug("filename: %q top-level key: %q bytes: %q", filename, yamlDictionaryKey, string(byts))
 
 	// try to obtain the list of defined keys in the options dictionary
 	var yamlVisitedKeys map[string]bool
 	yco := map[string]map[string]interface{}{} // a dictionary of dictionaries with unknown content
-	parl.Debug("ApplyYaml: first yaml.Unmarshal")
-	if yaml.Unmarshal(bytes, &yco) == nil {
+	parl.Debug("ex.ApplyYaml: first yaml.Unmarshal")
+	if yaml.Unmarshal(byts, &yco) == nil {
 		yamlVisitedKeys = map[string]bool{}
 		if optionsMap := yco[yamlDictionaryKey]; optionsMap != nil {
 			for key := range optionsMap {
@@ -316,11 +317,11 @@ func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, 
 			}
 		}
 	}
-	parl.Debug("ApplyYaml: yamlVisitedKeys: %v\n", yamlVisitedKeys)
+	parl.Debug("ex.ApplyYaml: yamlVisitedKeys: %v\n", yamlVisitedKeys)
 
-	hasData, err := thunk(bytes, yaml.Unmarshal, yamlDictionaryKey)
+	hasData, err := thunk(byts, yaml.Unmarshal, yamlDictionaryKey)
 	if err != nil {
-		ex.AddErr(parl.Errorf("ApplyYaml thunk: filename: %q: %w", filename, err)).Exit()
+		ex.AddErr(parl.Errorf("ex.ApplyYaml thunk: filename: %q: %w", filename, err)).Exit()
 	} else if !hasData {
 		return
 	}
