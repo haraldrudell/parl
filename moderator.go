@@ -15,7 +15,16 @@ const (
 	defaultParallelism = 20
 )
 
-// Moderator invokes functions at a limited level of parallelism
+/*
+Moderator invokes functions at a limited level of parallelism.
+It is a ticketing system
+ m := NewModerator(20, ctx)
+ m.Do(func() (err error) { // waiting here for a ticket
+   // got a ticket!
+   …
+   return or panic // ticket automatically returned
+ println(m) →waiting: 2(20)
+*/
 type Moderator struct {
 	parallelism uint64
 	cond        *sync.Cond
