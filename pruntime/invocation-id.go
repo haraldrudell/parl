@@ -6,7 +6,6 @@ ISC License
 package pruntime
 
 import (
-	"errors"
 	"runtime/debug"
 	"strings"
 )
@@ -22,8 +21,6 @@ const (
 	linesPerStackFrame = 2
 	// skip debug.Stack, that includes itself, and the Invocation stack frames
 	skipFrames = 2
-	// debug.Stack uses this prefix in the first line of the result
-	runtGoroutinePrefix = "goroutine "
 )
 
 // Invocation returns an invocation stack trace for debug printing, empty string on troubles.
@@ -49,19 +46,10 @@ func Invocation(stackFramesToSkip int) (stackTrace string) {
 // GoRoutineID obtains a numeric string that as of Go1.18 is
 // assigned to each goroutine. This number is an increasing
 // unsigned integer beginning at 1 for the main invocation
-func GoRoutineID() (ID string) {
-	return getID(string(debug.Stack()))
-}
-
-// getID obtains gorutine ID, as of go1.18 a numeric string "1"…
-func getID(stackTrace string) (ID string) {
-	if !strings.HasPrefix(stackTrace, runtGoroutinePrefix) {
-		panic(errors.New("runt.getID: stack trace not starting with: " + runtGoroutinePrefix))
+func GoRoutineID() (threadID string) {
+	var err error
+	if threadID, _, err = ParseFirstStackLine(string(debug.Stack()), true); err != nil {
+		panic(err)
 	}
-	IDIndex := len(runtGoroutinePrefix)
-	spaceIndex := strings.Index(stackTrace[IDIndex:], "\x20")
-	if spaceIndex == -1 {
-		panic(errors.New("runt.getID: bad stack trace string"))
-	}
-	return stackTrace[IDIndex : spaceIndex+IDIndex]
+	return
 }

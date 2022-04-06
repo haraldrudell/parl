@@ -3,8 +3,6 @@
 ISC License
 */
 
-// Package runt provides an interface to the Go standard library’s runtime package using
-// only serializable simple types
 package pruntime
 
 import (
@@ -21,11 +19,17 @@ const (
 
 // CodeLocation is similar to runtime.Frame, but contains basic types
 // string and int only
-type CodeLocation struct { //
-	File string // /opt/foxyboy/sw/privates/parl/mains/executable.go
+type CodeLocation struct {
+	// File is the absolute path to the go source file
+	//  /opt/foxyboy/sw/privates/parl/mains/executable.go
+	File string
+	// Line is the line number in the source file
+	//  35
 	Line int
-	// package path ending in package name, optional type information, function name
-	// github.com/haraldrudell/parl/mains.(*Executable).AddErr
+	// FuncName is the fully qualified Go package path,
+	// a possible value or pointer receiver struct name,
+	// and the function name
+	//  github.com/haraldrudell/parl/mains.(*Executable).AddErr
 	FuncName string
 }
 
@@ -106,6 +110,20 @@ func (cl *CodeLocation) Base() (baseName string) {
 //   mains.(*Executable).AddErr-executable.go:25
 func (cl *CodeLocation) Short() (funcName string) {
 	return fmt.Sprintf("%s-%s:%d", filepath.Base(cl.FuncName), filepath.Base(cl.File), cl.Line)
+}
+
+// Short returns base package name, an optional type name and
+// the function name, base filename and line number:
+//   mains.(*Executable).AddErr-executable.go:25
+func (cl *CodeLocation) Long() (funcName string) {
+	return fmt.Sprintf("%s-%s:%d", cl.FuncName, filepath.Base(cl.File), cl.Line)
+}
+
+// Full returns all available information on one line
+// the function name, base filename and line number:
+//   mains.(*Executable).AddErr-executable.go:25
+func (cl *CodeLocation) Full() (funcName string) {
+	return fmt.Sprintf("%s-%s:%d", cl.FuncName, cl.File, cl.Line)
 }
 
 // String returns a two-line string representation suitable for a multi-line stack trace.
