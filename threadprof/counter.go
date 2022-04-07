@@ -6,7 +6,11 @@ ISC License
 // Package ghandi interfaces Android devices
 package threadprof
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+
+	"github.com/haraldrudell/parl"
+)
 
 type CounterOn struct {
 	value   uint64 // atomic
@@ -16,7 +20,7 @@ type CounterOn struct {
 	decRate uint64 // atomic
 }
 
-func newCounter() (counter Counter) {
+func newCounter() (counter parl.Counter) {
 	return &CounterOn{}
 }
 
@@ -39,7 +43,7 @@ func (cn *CounterOn) Dec() (value uint64) {
 	return
 }
 
-func (cn *CounterOn) CounterValue(reset bool) (values Values) {
+func (cn *CounterOn) CounterValue(reset bool) (values parl.CounterValues) {
 	values = &CounterValue{
 		value:   atomic.LoadUint64(&cn.value),
 		ops:     atomic.LoadUint64(&cn.ops),

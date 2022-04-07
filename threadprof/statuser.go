@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/haraldrudell/parl"
 )
 
 const (
@@ -37,7 +39,7 @@ func newStatuser(d time.Duration) (st *StatuserOn) {
 	return &s
 }
 
-func (st *StatuserOn) Set(status string) (statuser Statuser) {
+func (st *StatuserOn) Set(status string) (statuser parl.Statuser) {
 	st.lock.Lock()
 	defer st.lock.Unlock()
 	st.status = status

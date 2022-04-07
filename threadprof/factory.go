@@ -5,17 +5,22 @@ ISC License
 
 package threadprof
 
-import "time"
+import (
+	"time"
 
-var HFactory HistoryFactory = &historyFactory{}
+	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/goid"
+)
 
-var CFactory CountersFactory = &countersFactory{}
+var HFactory parl.HistoryFactory = &historyFactory{}
 
-var SFactory StatuserFactory = &statuserFactory{}
+var CFactory parl.CountersFactory = &countersFactory{}
+
+var SFactory parl.StatuserFactory = &statuserFactory{}
 
 type historyFactory struct{}
 
-func (ff *historyFactory) NewThreadHistory(useEvents bool, useHistory bool) (threadHistory History) {
+func (ff *historyFactory) NewThreadHistory(useEvents bool, useHistory bool) (threadHistory parl.History) {
 	if !useEvents {
 		return &threadNil{}
 	}
@@ -24,7 +29,7 @@ func (ff *historyFactory) NewThreadHistory(useEvents bool, useHistory bool) (thr
 
 type countersFactory struct{}
 
-func (ff *countersFactory) NewCounters(useCounters bool) (counters Counters) {
+func (ff *countersFactory) NewCounters(useCounters bool) (counters parl.Counters) {
 	if !useCounters {
 		return &countersNil{}
 	}
@@ -33,7 +38,7 @@ func (ff *countersFactory) NewCounters(useCounters bool) (counters Counters) {
 
 type statuserFactory struct{}
 
-func (ff *statuserFactory) NewStatuser(useStatuser bool, d time.Duration) (statuser Statuser) {
+func (ff *statuserFactory) NewStatuser(useStatuser bool, d time.Duration) (statuser parl.Statuser) {
 	if !useStatuser {
 		return &statuserNil{}
 	}
@@ -42,28 +47,28 @@ func (ff *statuserFactory) NewStatuser(useStatuser bool, d time.Duration) (statu
 
 type threadNil struct{}
 
-func (tn *threadNil) Event(event string, ID0 ...string) {}
+func (tn *threadNil) Event(event string, ID0 ...goid.ThreadID) {}
 
-func (tn *threadNil) GetEvents() (events map[string][]string) { return }
+func (tn *threadNil) GetEvents() (events map[goid.ThreadID][]string) { return }
 
 type countersNil struct{}
 
-func (tn *countersNil) GetCounters() (list []string, m map[string]Counter) { return }
-func (tn *countersNil) GetOrCreate(name string) (counter Counter)          { return &counterNil{} }
-func (tn *countersNil) Reset()                                             {}
+func (tn *countersNil) GetCounters() (list []string, m map[string]parl.Counter) { return }
+func (tn *countersNil) GetOrCreate(name string) (counter parl.Counter)          { return &counterNil{} }
+func (tn *countersNil) Reset()                                                  {}
 
 type counterNil struct{}
 
-func (tn *counterNil) CounterValue(reset bool) (values Values) { return }
-func (tn *counterNil) Dec() (value uint64)                     { return }
-func (tn *counterNil) Inc() (value uint64)                     { return }
-func (tn *counterNil) Value() (value uint64)                   { return }
-func (tn *counterNil) Ops() (ops uint64)                       { return }
-func (tn *counterNil) Max() (max uint64)                       { return }
-func (tn *counterNil) IncRate() (incRate uint64)               { return }
-func (tn *counterNil) DecRate() (decRate uint64)               { return }
+func (tn *counterNil) CounterValue(reset bool) (values parl.CounterValues) { return }
+func (tn *counterNil) Dec() (value uint64)                                 { return }
+func (tn *counterNil) Inc() (value uint64)                                 { return }
+func (tn *counterNil) Value() (value uint64)                               { return }
+func (tn *counterNil) Ops() (ops uint64)                                   { return }
+func (tn *counterNil) Max() (max uint64)                                   { return }
+func (tn *counterNil) IncRate() (incRate uint64)                           { return }
+func (tn *counterNil) DecRate() (decRate uint64)                           { return }
 
 type statuserNil struct{}
 
-func (tn *statuserNil) Set(status string) (statuser Statuser) { return tn }
-func (tn *statuserNil) Shutdown()                             {}
+func (tn *statuserNil) Set(status string) (statuser parl.Statuser) { return tn }
+func (tn *statuserNil) Shutdown()                                  {}

@@ -12,10 +12,12 @@ import (
 )
 
 /*
-OnceChan is similar to a context.
+OnceChan is a semaphore implementing the Context with Cancel interface.
+Whenever a context is required for cancellation, a OnceChan can be used
+in its place.
 Unlike context, OnceChan requires no initialization.
 Similar to Context, OnceChan can be waited on like a channel using Done().
-OnceChan can be inspected using IsDone().
+OnceChan can be inspected using IsDone() or Err().
 OnceChan is cancelled using .Cancel()
 
  var semaphore OnceChan

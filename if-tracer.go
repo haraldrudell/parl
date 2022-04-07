@@ -5,13 +5,19 @@ ISC License
 
 package parl
 
-import "time"
+import (
+	"time"
+
+	"github.com/haraldrudell/parl/goid"
+)
 
 type Tracer interface {
-	Assign(threadID, task string) (tracer Tracer)
-	Record(threadID, text string) (tracer Tracer)
-	Records(clear bool) (records map[string][]TracerRecord)
+	Assign(threadID goid.ThreadID, task TracerTaskID) (tracer Tracer)
+	Record(threadID goid.ThreadID, text string) (tracer Tracer)
+	Records(clear bool) (records map[TracerTaskID][]TracerRecord)
 }
+
+type TracerTaskID string
 
 type TracerRecord interface {
 	Values() (at time.Time, text string)

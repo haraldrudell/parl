@@ -35,7 +35,7 @@ type Device interface {
 	List(remoteDir string) (dFileInfo []Dent, err error)
 	/*
 		NIMP 220405:
-		shell: remount: dev: tcp: local:localreserved: localabstract: localfilesystem:
+		remount: dev: tcp: local:localreserved: localabstract: localfilesystem:
 		framebuffer: jdwp: track-jdwp reverse:
 		sync STAT SEND
 	*/

@@ -16,15 +16,15 @@ import (
 type CountersOn struct {
 	isRunning parl.AtomicBool
 	lock      sync.Mutex
-	ordered   []string           // behind lock
-	m         map[string]Counter // behind lock
+	ordered   []string                // behind lock
+	m         map[string]parl.Counter // behind lock
 }
 
-func newCounters() (counters Counters) {
-	return &CountersOn{m: map[string]Counter{}}
+func newCounters() (counters parl.Counters) {
+	return &CountersOn{m: map[string]parl.Counter{}}
 }
 
-func (cs *CountersOn) GetOrCreate(name string) (counter Counter) {
+func (cs *CountersOn) GetOrCreate(name string) (counter parl.Counter) {
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
 	var ok bool
@@ -37,7 +37,7 @@ func (cs *CountersOn) GetOrCreate(name string) (counter Counter) {
 	return
 }
 
-func (cs *CountersOn) Add(name string) (counter Counter) {
+func (cs *CountersOn) Add(name string) (counter parl.Counter) {
 	if cs.isRunning.IsTrue() {
 		panic(perrors.Errorf("Add while Counter running: %s", name))
 	}
@@ -52,11 +52,11 @@ func (cs *CountersOn) Add(name string) (counter Counter) {
 	return
 }
 
-func (cs *CountersOn) GetCounters() (list []string, m map[string]Counter) {
+func (cs *CountersOn) GetCounters() (list []string, m map[string]parl.Counter) {
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
 	list = append([]string{}, cs.ordered...)
-	m = map[string]Counter{}
+	m = map[string]parl.Counter{}
 	for key, value := range cs.m {
 		m[key] = value
 	}

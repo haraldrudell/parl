@@ -14,14 +14,14 @@ import (
 
 const CounterKey = "progressorCounters"
 
-func CountersInContext(ctx context.Context, counters Counters) (ctx2 context.Context) {
+func CountersInContext(ctx context.Context, counters parl.Counters) (ctx2 context.Context) {
 	if cs := contextCounters(ctx); cs != nil {
 		return ctx // counters already present
 	}
 	return context.WithValue(ctx, CounterKey, counters)
 }
 
-func CountersFromContext(ctx context.Context) (counters Counters) {
+func CountersFromContext(ctx context.Context) (counters parl.Counters) {
 	if counters = contextCounters(ctx); counters == nil {
 		parl.Log("CONTEXTNOCOUNTERS")
 		panic("NO OCUNTERS")

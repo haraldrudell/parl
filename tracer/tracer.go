@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/goid"
 )
 
 const (
@@ -19,86 +20,88 @@ const (
 
 type Tracer struct {
 	lock    sync.Mutex
-	threads map[string]string
-	tasks   map[string][]parl.TracerRecord
+	threads map[goid.ThreadID]parl.TracerTaskID
+	tasks   map[parl.TracerTaskID][]parl.TracerRecord
 }
 
 func NewTracer() (tracer parl.Tracer) {
-	return &Tracer{threads: map[string]string{}, tasks: map[string][]parl.TracerRecord{}}
+	return &Tracer{
+		threads: map[goid.ThreadID]parl.TracerTaskID{},
+		tasks:   map[parl.TracerTaskID][]parl.TracerRecord{}}
 }
 
-func (tr *Tracer) Assign(threadID, task string) (tr2 parl.Tracer) {
+func (tr *Tracer) Assign(threadID goid.ThreadID, task parl.TracerTaskID) (tr2 parl.Tracer) {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 	tr2 = tr
 
 	// find out thread’s current assignment
-	var task0 string
-	var record0 []parl.TracerRecord
+	var taskBefore parl.TracerTaskID
+	var recordListBefore []parl.TracerRecord
 	var ok0 bool
-	if task0, ok0 = tr.threads[threadID]; ok0 {
-		record0 = tr.tasks[task0]
+	if taskBefore, ok0 = tr.threads[threadID]; ok0 {
+		recordListBefore = tr.tasks[taskBefore]
 		// unassign from previous task as appropriate
-		if task == "" || task != task0 {
-			record0 = append(record0, NewRecordDo(trUnassigned+threadID))
-			tr.tasks[task0] = record0
+		if task == "" || task != taskBefore {
+			recordListBefore = append(recordListBefore, NewRecordDo(trUnassigned+string(threadID)))
+			tr.tasks[taskBefore] = recordListBefore
 		}
 	}
 
 	// unassignment
 	if task == "" {
-		delete(tr.tasks, threadID)
+		delete(tr.threads, threadID)
 		return
 	}
 
 	// new assignment
 	tr.threads[threadID] = task
-	record1 := tr.tasks[task]
-	if len(record1) == 0 {
-		record1 = []parl.TracerRecord{NewRecordDo(task)} // first record is task name
+	recordListNow := tr.tasks[task]
+	if len(recordListNow) == 0 {
+		recordListNow = []parl.TracerRecord{NewRecordDo(string(task))} // first record is task name
 	}
-	record1 = append(record1, NewRecordDo(trAssigned+threadID))
-	tr.tasks[task] = record1
+	recordListNow = append(recordListNow, NewRecordDo(trAssigned+string(threadID)))
+	tr.tasks[task] = recordListNow
 	return
 }
 
-func (tr *Tracer) Record(threadID, text string) (tr2 parl.Tracer) {
+func (tr *Tracer) Record(threadID goid.ThreadID, text string) (tr2 parl.Tracer) {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 	tr2 = tr
 
 	// if thread is unassigned, use thread task
-	var task0 string
+	var assignedTask parl.TracerTaskID
 	var ok0 bool
-	var record []parl.TracerRecord
-	if task0, ok0 = tr.threads[threadID]; !ok0 {
-		task0 = trDefaultTask + threadID
-		record = tr.tasks[task0]
-		if len(record) == 0 {
-			record = []parl.TracerRecord{NewRecordDo(task0)} // first record is task name
+	var recordList []parl.TracerRecord
+	if assignedTask, ok0 = tr.threads[threadID]; !ok0 {
+		assignedTask = parl.TracerTaskID(trDefaultTask + string(threadID))
+		recordList = tr.tasks[assignedTask]
+		if len(recordList) == 0 {
+			recordList = []parl.TracerRecord{NewRecordDo(string(assignedTask))} // first record is task name
 		}
 	} else {
-		record = tr.tasks[task0]
+		recordList = tr.tasks[assignedTask]
 	}
 
-	record = append(record, NewRecordDo(text))
-	tr.tasks[task0] = record
+	recordList = append(recordList, NewRecordDo(text))
+	tr.tasks[assignedTask] = recordList
 	return
 }
 
-func (tr *Tracer) Records(clear bool) (records map[string][]parl.TracerRecord) {
+func (tr *Tracer) Records(clear bool) (records map[parl.TracerTaskID][]parl.TracerRecord) {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 
-	records = map[string][]parl.TracerRecord{}
+	records = map[parl.TracerTaskID][]parl.TracerRecord{}
 	for key, recordSlice := range tr.tasks {
 		slice2 := make([]parl.TracerRecord, len(recordSlice))
 		copy(slice2, recordSlice)
 		records[key] = slice2
 	}
 	if clear {
-		tr.threads = map[string]string{}
-		tr.tasks = map[string][]parl.TracerRecord{}
+		tr.threads = map[goid.ThreadID]parl.TracerTaskID{}
+		tr.tasks = map[parl.TracerTaskID][]parl.TracerRecord{}
 	}
 	return
 }
