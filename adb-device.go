@@ -3,17 +3,22 @@
 ISC License
 */
 
-// Package adb defines ageneric interface do Android Debug Bridge
 package parl
 
 import (
+	"io"
 	"io/fs"
 	"time"
 )
 
 // Device is a generic representation of an Android Device accessible via an AdbServer
 type Device interface {
-	Devicette // Shell() Serial()
+	Devicette // Serial()
+	// Shell executes a shell command on the device.
+	// The resulting socket can be obtained either using the reader callback,
+	// which is a socket connection to the device,
+	// or by collecting the out string.
+	Shell(command string, reader func(conn io.ReadWriteCloser) (err error)) (out string, err error)
 	// Pull copies a remote file or directory on the Android device to a local file system location.
 	// the local file must not exist.
 	Pull(remotePath, nearPath string) (err error)

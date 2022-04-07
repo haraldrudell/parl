@@ -3,12 +3,10 @@
 ISC License
 */
 
-// Package adb defines ageneric interface do Android Debug Bridge
 package parl
 
 import (
 	"context"
-	"io"
 )
 
 /*
@@ -56,13 +54,10 @@ type Tracker interface {
 /*
 Devicette respresents a minimal adb protocol level connection to an Android device
 via an adb server.
+A Devicette may also be an AddressProvider.
+// An address and an AndroidSerial is all required to make an Adbette connection
 */
 type Devicette interface {
-	// Shell executes a shell command on the device.
-	// The resulting socket can be obtained either using the reader callback,
-	// which is a socket connection to the device,
-	// or by collecting the out string.
-	Shell(command string, reader func(conn io.ReadWriteCloser) (err error)) (out string, err error)
 	// Serial returns the device serial number
 	Serial() (serial AndroidSerial)
 }
@@ -88,6 +83,15 @@ type ServerFactory interface {
 // It is typically a string of a dozen or so 8-bit chanacters consisting of
 // lower and upper case a-zA-Z0-9
 type AndroidSerial string
+
+// AndroidStatus indicates the current status of a device
+// known to a Server or Serverette
+// it is a short word of ANSII-set characters
+type AndroidStatus string
+
+// AndroidOnline is the Android device status
+// that indicates an online device
+const AndroidOnline AndroidStatus = "device"
 
 // AdressProvider retrieves the address from an adb server or device so that
 // custom devices can be created

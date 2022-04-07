@@ -10,9 +10,13 @@ import "time"
 type Tracer interface {
 	Assign(threadID, task string) (tracer Tracer)
 	Record(threadID, text string) (tracer Tracer)
-	Records(clear bool) (records map[string][]Record)
+	Records(clear bool) (records map[string][]TracerRecord)
 }
 
-type Record interface {
+type TracerRecord interface {
 	Values() (at time.Time, text string)
+}
+
+type TracerFactory interface {
+	NewTracer() (tracer Tracer)
 }

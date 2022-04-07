@@ -15,6 +15,6 @@ func NewTracerNil() (tracer parl.Tracer) {
 
 func (tn *tracerNil) Assign(threadID, task string) (tracer parl.Tracer) { return tn }
 func (tn *tracerNil) Record(threadID, text string) (tracer parl.Tracer) { return tn }
-func (tn *tracerNil) Records(clear bool) (records map[string][]parl.Record) {
-	return map[string][]parl.Record{}
+func (tn *tracerNil) Records(clear bool) (records map[string][]parl.TracerRecord) {
+	return map[string][]parl.TracerRecord{}
 }

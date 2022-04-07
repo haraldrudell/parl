@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package adb defines ageneric interface do Android Debug Bridge
 package parl
 
 import (
@@ -27,15 +26,16 @@ type Adbette interface {
 	ReadString() (s string, err error)
 	// ConnectToDevice sends a forwarding request to an adb
 	// server to connect to one of its devices
-	ConnectToDevice(serial string) (err error)
+	ConnectToDevice(serial AndroidSerial) (err error)
 	// Shell executes a shell command on a device connected to the adb server
 	Shell(command string, reader func(conn io.ReadWriteCloser) (err error)) (out string, err error)
 	// TrackDevices orders a server to emit serial number as they become available
 	TrackDevices() (err error)
 	// Devices lists the currently online serials
-	Devices() (serials []string, err error)
+	Devices() (serials []AndroidSerial, err error)
 	// DeviceStati returns all available serials and their status
-	DeviceStati() (serials []string, stati []string, err error)
+	// The two slices correspond and are of the same length
+	DeviceStati() (serials []AndroidSerial, stati []AndroidStatus, err error)
 	// Closer closes an adb connection, meant to be a deferred function
 	Closer(errp *error)
 	// SetSync chnages the protocol mode of an adb connection to sync

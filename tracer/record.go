@@ -16,7 +16,7 @@ type RecordDo struct {
 	Text string
 }
 
-func NewRecordDo(text string) (record parl.Record) {
+func NewRecordDo(text string) (record parl.TracerRecord) {
 	return &RecordDo{At: time.Now(), Text: text}
 }
 
