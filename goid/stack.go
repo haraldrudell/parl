@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pruntime
+package goid
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/haraldrudell/parl/pruntime"
 	"github.com/pkg/errors"
 )
 
@@ -30,20 +31,20 @@ const (
 type Stack struct {
 	// ThreadID is unqique for this thread.
 	// typically numeric string “1”…
-	ThreadID string
+	ID ThreadID
 	// Status is typically word “running”
-	Status string
+	Status ThreadStatus
 	// IsMainThread indicates if this is the thread that laucnhed main.main
 	IsMainThread bool
 	// Frame.Args like "(0x14000113040)".
 	Frames []Frame
 	// Creator.FuncName is "main.main()" for main thread
-	Creator    CodeLocation
-	DebugStack CodeLocation
+	Creator    pruntime.CodeLocation
+	DebugStack pruntime.CodeLocation
 }
 
 type Frame struct {
-	CodeLocation
+	pruntime.CodeLocation
 	// args like "(1, 2, 3)"
 	Args string
 }
@@ -74,7 +75,7 @@ func NewStack(skipFrames int) (stack *Stack) {
 	}
 
 	// first line
-	if s.ThreadID, s.Status, err = ParseFirstStackLine(trace[0], false); err != nil {
+	if s.ID, s.Status, err = ParseFirstStackLine(trace[0], false); err != nil {
 		panic(err)
 	}
 
@@ -106,7 +107,7 @@ func NewStack(skipFrames int) (stack *Stack) {
 }
 
 // getID obtains gorutine ID, as of go1.18 a numeric string "1"…
-func ParseFirstStackLine(stackTrace string, onlyID bool) (ID string, status string, err error) {
+func ParseFirstStackLine(stackTrace string, onlyID bool) (ID ThreadID, status ThreadStatus, err error) {
 
 	// get ID
 	if !strings.HasPrefix(stackTrace, runtGoroutinePrefix) {
@@ -119,7 +120,7 @@ func ParseFirstStackLine(stackTrace string, onlyID bool) (ID string, status stri
 		err = errors.New("runt.getID: bad stack trace string")
 		return
 	}
-	ID = stackTrace[IDIndex : spaceIndex+IDIndex]
+	ID = ThreadID(stackTrace[IDIndex : spaceIndex+IDIndex])
 	if onlyID {
 		return
 	}
@@ -136,7 +137,7 @@ func ParseFirstStackLine(stackTrace string, onlyID bool) (ID string, status stri
 		err = fmt.Errorf("runt.getID: unparseable first line: %q", line0)
 		return
 	}
-	status = line[left:right]
+	status = ThreadStatus(line[left:right])
 	return
 }
 

@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pruntime
+package goid
 
 import "testing"
 

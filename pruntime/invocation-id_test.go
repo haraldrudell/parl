@@ -93,17 +93,3 @@ func TestDebugStack(t *testing.T) {
 		the stack trace ends with a newline
 	*/
 }
-
-func TestGoROutineID(t *testing.T) {
-	stackIndex := 10
-	expectedID := string(debug.Stack())[stackIndex:]
-	if index := strings.Index(expectedID, "\x20"); index == -1 {
-		t.Error("debug.Stack failed")
-	} else {
-		expectedID = expectedID[:index]
-	}
-	actual := GoRoutineID()
-	if actual != expectedID {
-		t.Errorf("GoRoutineID bad: %q expected %q", actual, expectedID)
-	}
-}
