@@ -1,6 +1,6 @@
 /*
 © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved.
+ISC License
 */
 
 package threadprof
@@ -50,6 +50,7 @@ type countersNil struct{}
 
 func (tn *countersNil) GetCounters() (list []string, m map[string]Counter) { return }
 func (tn *countersNil) GetOrCreate(name string) (counter Counter)          { return &counterNil{} }
+func (tn *countersNil) Reset()                                             {}
 
 type counterNil struct{}
 

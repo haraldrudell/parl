@@ -1,6 +1,6 @@
 /*
 © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved.
+ISC License
 */
 
 // Package ghandi interfaces Android devices
@@ -61,4 +61,11 @@ func (cs *CountersOn) GetCounters() (list []string, m map[string]Counter) {
 		m[key] = value
 	}
 	return
+}
+
+func (cs *CountersOn) Reset() {
+	_, m := cs.GetCounters()
+	for _, counter := range m {
+		counter.CounterValue(true)
+	}
 }

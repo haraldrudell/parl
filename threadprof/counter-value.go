@@ -1,6 +1,6 @@
 /*
 © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved.
+ISC License
 */
 
 // Package ghandi interfaces Android devices

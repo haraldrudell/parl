@@ -1,6 +1,6 @@
 /*
 © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved.
+ISC License
 */
 
 // Package threadprof provide profiling of threading
@@ -16,6 +16,7 @@ type History interface {
 type Counters interface {
 	GetOrCreate(name string) (counter Counter)
 	GetCounters() (orderedKeys []string, m map[string]Counter)
+	Reset()
 }
 
 type Counter interface {
