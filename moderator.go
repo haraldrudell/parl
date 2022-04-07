@@ -23,7 +23,7 @@ It is a ticketing system
    // got a ticket!
    …
    return or panic // ticket automatically returned
- println(m) →waiting: 2(20)
+ m.String() → waiting: 2(20)
 */
 type Moderator struct {
 	parallelism uint64
