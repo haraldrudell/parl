@@ -9,6 +9,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/haraldrudell/parl/perrors"
 )
 
 const (
@@ -37,6 +39,9 @@ type Moderator struct {
 func NewModerator(parallelism uint64, ctx context.Context) (mo *Moderator) {
 	if parallelism == 0 {
 		parallelism = defaultParallelism
+	}
+	if ctx == nil {
+		panic(perrors.New("NewModerator with nil context"))
 	}
 	m := Moderator{parallelism: parallelism, ctx: ctx}
 	m.cond = sync.NewCond(&sync.Mutex{})
