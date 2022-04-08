@@ -17,6 +17,7 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/parlp"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/plog"
 	"github.com/haraldrudell/parl/pos"
 	"github.com/haraldrudell/parl/pruntime"
 	"github.com/haraldrudell/parl/pstrings"
@@ -409,7 +410,8 @@ func (ex *Executable) AddErr(err error) (x *Executable) {
 		} else {
 			errS = "nil"
 		}
-		parl.Debug("%s(error: %s)\n%[1]s invocation: %[3]s", packFunc, errS, pruntime.Invocation(0))
+		parl.Debug("\n%s(error: %s)\n%[1]s invocation:\n%[3]s", packFunc, errS, pruntime.Invocation(0))
+		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}
 	x = ex
 	if err == nil {
@@ -428,7 +430,7 @@ func (ex *Executable) AddErr(err error) (x *Executable) {
 func (ex *Executable) PrintErr(err error) {
 	var s string
 	if ex.IsLongErrors {
-		s = perrors.Long(err)
+		s = perrors.Long(err) + "\n"
 	} else if ex.IsErrorLocation {
 		s = perrors.Short(err)
 	} else if err != nil {
@@ -440,11 +442,14 @@ func (ex *Executable) PrintErr(err error) {
 // Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
 func (ex *Executable) Exit() {
 	if ex.err == nil {
-		parl.Debug("exe.Exit: no error")
+		parl.Debug("\nexe.Exit: no error")
 	} else {
-		parl.Debug("exe.Exit: err: %T '%[1]v'", ex.err)
+		parl.Debug("\nexe.Exit: err: %T '%[1]v'", ex.err)
 	}
-	parl.Debug("%s", debug.Stack())
+	parl.Debug("\nexe.Exit invocation:\n%s\n", debug.Stack())
+	if parl.IsThisDebug() { // add newline during debug without location
+		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
+	}
 	if ex.err == nil {
 		pos.Exit0()
 	}
