@@ -1,20 +1,19 @@
 /*
-© 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+© 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 ISC License
 */
 
 package goid
 
-/*
-ThreadID is an opaque type that uniquley identifies a thread,
-ie. a goroutine.
-pruntime.GoRoutineID obtains the ThreadID for the executing
-thread.
-ThreadID is comparable, ie. can be used as a map key.
-ThreadID can be cast to string
-*/
-type ThreadID string
+import "runtime/debug"
 
-// ThreadStatus indicates the current stat of a thread
-// most often it is "running"
-type ThreadStatus string
+// GoID obtains a numeric string that as of Go1.18 is
+// assigned to each goroutine. This number is an increasing
+// unsigned integer beginning at 1 for the main invocation
+func GoID() (threadID ThreadID) {
+	var err error
+	if threadID, _, err = ParseFirstStackLine(string(debug.Stack()), true); err != nil {
+		panic(err)
+	}
+	return
+}

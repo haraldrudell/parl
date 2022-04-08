@@ -20,7 +20,7 @@ type Counter interface {
 }
 
 type CounterValues interface {
-	Get() (value uint64, ops uint64, max uint64, incRate uint64, decRate uint64)
+	Get() (value uint64, running uint64, max uint64, incRate uint64, decRate uint64)
 	Value() (value uint64)
 	Running() (running uint64)
 	Max() (max uint64)
