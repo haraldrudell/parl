@@ -20,7 +20,7 @@ func TestGoRoutineID(t *testing.T) {
 	} else {
 		expectedID = ThreadID(s[:index])
 	}
-	actual := GoRoutineID()
+	actual := GoID()
 	if actual != expectedID {
 		t.Errorf("GoRoutineID bad: %q expected %q", actual, expectedID)
 	}
