@@ -7,6 +7,14 @@ package parl
 
 import "sync/atomic"
 
+/*
+AtomicBool is a thread-safe flag.
+AtomicBool requires no initialization
+ var isDone parl.AtomicBool
+ if isDone.Set() // isDone was not set, but is set now
+ …
+ if !isDone.IsTrue() // isDone is not set
+*/
 type AtomicBool struct {
 	value int32 // atomic
 }

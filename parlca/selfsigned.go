@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 type SelfSigned struct {
@@ -44,7 +44,7 @@ func NewSelfSigned(canonicalName string) (ca CertificateAuthority) {
 	EnsureSelfSigned(cert)
 	signer := c.Private()
 	if c.CaDER, err = x509.CreateCertificate(rand.Reader, cert, cert, signer.Public(), signer); err != nil {
-		panic(error116.Errorf("x509.CreateCertificate ca: '%w'", err))
+		panic(perrors.Errorf("x509.CreateCertificate ca: '%w'", err))
 	}
 	ca = &c
 	return
@@ -71,14 +71,14 @@ func (ca *SelfSigned) Sign(template *x509.Certificate, publicKey crypto.PublicKe
 	if isValid, caCert, err = ca.Check(); err != nil {
 		return
 	} else if !isValid {
-		err = error116.New("Self-Signed Certiicate Auhtority not valid")
+		err = perrors.New("Self-Signed Certiicate Auhtority not valid")
 		return
 	}
 	caSigner := ca.KeyPair.Private()
 
 	// sign template
 	if certDER, err = x509.CreateCertificate(ca.Reader, template, caCert, publicKey, caSigner); err != nil {
-		err = error116.Errorf("x509.CreateCertificate: '%w'", err)
+		err = perrors.Errorf("x509.CreateCertificate: '%w'", err)
 		return
 	}
 	return
@@ -90,7 +90,7 @@ func (ca *SelfSigned) Check() (isValid bool, cert *x509.Certificate, err error) 
 	}
 	var c x509Certificate
 	if c.Certificate, err = x509.ParseCertificate(ca.CaDER); err != nil {
-		err = error116.Errorf("x509.ParseCertificate: '%w'", err)
+		err = perrors.Errorf("x509.ParseCertificate: '%w'", err)
 		return
 	}
 	isValid = c.HasPublic()
@@ -107,7 +107,7 @@ func EnsureTemplate(cert *x509.Certificate) {
 	}
 	if cert.Subject.CommonName == "" {
 		if host, err := os.Hostname(); err != nil {
-			panic(error116.Errorf("os.Hostname: '%w'", err))
+			panic(perrors.Errorf("os.Hostname: '%w'", err))
 		} else {
 			if index := strings.Index(host, "."); index != -1 {
 				host = host[:index]
@@ -131,7 +131,7 @@ func EnsureTemplate(cert *x509.Certificate) {
 func EnsureSelfSigned(cert *x509.Certificate) {
 	if cert.Issuer.CommonName == "" {
 		if host, err := os.Hostname(); err != nil {
-			panic(error116.Errorf("os.Hostname: '%w'", err))
+			panic(perrors.Errorf("os.Hostname: '%w'", err))
 		} else {
 			if index := strings.Index(host, "."); index != -1 {
 				host = host[:index]

@@ -12,7 +12,7 @@ import (
 	"crypto/x509"
 	"io"
 
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 type Ed25519KeyPair struct {
@@ -31,7 +31,7 @@ func NewEd25519() (keyPair KeyPair, err error) {
 func GenerateEd25519(reader io.Reader) (keyPair KeyPair, err error) {
 	k := Ed25519KeyPair{}
 	if _, k.PrivateKey, err = ed25519.GenerateKey(reader); err != nil {
-		err = error116.Errorf("ed25519.GenerateKey: '%w'", err)
+		err = perrors.Errorf("ed25519.GenerateKey: '%w'", err)
 		return
 	}
 	keyPair = &k
@@ -44,7 +44,7 @@ func (key *Ed25519KeyPair) Algo() (algo x509.PublicKeyAlgorithm) {
 
 func (key *Ed25519KeyPair) Bytes() (bytes KeyDER, err error) {
 	if bytes, err = x509.MarshalPKCS8PrivateKey(key.PrivateKey); err != nil {
-		err = error116.Errorf("x509.MarshalPKCS8PrivateKey: '%w'", err)
+		err = perrors.Errorf("x509.MarshalPKCS8PrivateKey: '%w'", err)
 	}
 	return
 }
@@ -60,7 +60,7 @@ func (key *Ed25519KeyPair) PublicBytes() (bytes []byte) {
 	// ed25519.PublicKey: []byte
 	var ok bool
 	if bytes, ok = public.(ed25519.PublicKey); !ok {
-		panic(error116.Errorf("ed25519.PrivateKey.Public not []byte: %T %#[1]v", public))
+		panic(perrors.Errorf("ed25519.PrivateKey.Public not []byte: %T %#[1]v", public))
 	}
 	return
 }

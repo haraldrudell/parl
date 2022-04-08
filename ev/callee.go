@@ -10,7 +10,7 @@ import (
 	"errors"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // CalleeContext provides for a goroutine to communicate with the caller
@@ -35,7 +35,9 @@ func (ctx *CalleeContext) Success() {
 
 func (ctx *CalleeContext) Failure(err error) {
 	if err == nil {
-		err = error116.New("Failure without errors")
+		err = perrors.New("Failure without errors")
+	} else {
+		err = perrors.Stack(err) // ensure error has a stack trace
 	}
 	evt := NewExitEvent(err, ctx.gID)
 	exitEvent := evt.(*ExitEvent)
@@ -64,7 +66,7 @@ func (ctx *CalleeContext) ResultV(errp *error, recoverValue interface{}) {
 	if recoverValue != nil {
 		e := parl.EnsureError(recoverValue)
 		parl.Errorf("Recover in Result for goroutine: %s: %v", ctx.name, recoverValue)
-		err = error116.AppendError(err, e)
+		err = perrors.AppendError(err, e)
 		if errp != nil && err != *errp {
 			*errp = err
 		}

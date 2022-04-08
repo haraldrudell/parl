@@ -10,8 +10,8 @@ import (
 	"os"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/error116"
 	"github.com/haraldrudell/parl/ev"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 type scannerResult struct {
@@ -40,7 +40,7 @@ func Keystrokes(ctx ev.Callee) {
 				}
 				err = line.err
 			} else {
-				err = error116.New("Unexpected close of lines channel")
+				err = perrors.New("Unexpected close of lines channel")
 			}
 		case <-ctx.Done():
 		}

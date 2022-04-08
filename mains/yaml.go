@@ -17,7 +17,7 @@ import (
 	"path"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/parlos"
+	"github.com/haraldrudell/parl/pos"
 )
 
 const (
@@ -47,8 +47,8 @@ func FindFile(filename0, program string) (out string, bytes []byte) {
 		bytes, _ = readFile(out)
 		return
 	}
-	dirs := []string{path.Join(parlos.UserHomeDir(), appsName), ParentDir(), Abs(etcName)}
-	filenames := []string{fmt.Sprintf("%s-%s%s", program, parlos.ShortHostname(), yamlExt),
+	dirs := []string{path.Join(pos.UserHomeDir(), appsName), ParentDir(), Abs(etcName)}
+	filenames := []string{fmt.Sprintf("%s-%s%s", program, pos.ShortHostname(), yamlExt),
 		program + yamlExt}
 	for _, dir := range dirs {
 		for _, f := range filenames {

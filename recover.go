@@ -8,8 +8,8 @@ package parl
 import (
 	"fmt"
 
-	"github.com/haraldrudell/parl/error116"
-	"github.com/haraldrudell/parl/runt"
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
@@ -36,7 +36,7 @@ func recover2(annotation string, errp *error, onError func(error), multiple bool
 
 	// ensure non-empty annotation
 	if annotation == "" {
-		annotation = runt.NewCodeLocation(recRecStackFrames).PackFunc() + ": panic:"
+		annotation = pruntime.NewCodeLocation(recRecStackFrames).PackFunc() + ": panic:"
 	}
 
 	// consume *errp
@@ -52,7 +52,7 @@ func recover2(annotation string, errp *error, onError func(error), multiple bool
 		if multiple {
 			invokeOnError(onError, e)
 		} else {
-			err = error116.AppendError(err, e)
+			err = perrors.AppendError(err, e)
 		}
 	}
 
@@ -76,7 +76,7 @@ func invokeOnError(onError func(error), err error) {
 }
 
 func Annotation() (annotation string) {
-	return fmt.Sprintf("Recover from panic in %s:", runt.NewCodeLocation(recAnnStackFrames).PackFunc())
+	return fmt.Sprintf("Recover from panic in %s:", pruntime.NewCodeLocation(recAnnStackFrames).PackFunc())
 }
 
 // processRecover ensures non-nil result to be error with Stack
@@ -112,7 +112,7 @@ func AddToPanic(panicValue interface{}, additionalErr error) (err error) {
 	if additionalErr == nil {
 		return
 	}
-	return error116.AppendError(err, additionalErr)
+	return perrors.AppendError(err, additionalErr)
 }
 
 // HandlePanic recovers from panics when executing fn.
@@ -138,4 +138,4 @@ func HandleParlError(fn func(), storeError func(error)) {
 	fn()
 }
 
-var _ = (&error116.ParlError{}).AddErrorProc
+var _ = (&perrors.ParlError{}).AddErrorProc

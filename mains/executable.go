@@ -15,11 +15,12 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/error116"
-	"github.com/haraldrudell/parl/parlos"
 	"github.com/haraldrudell/parl/parlp"
-	"github.com/haraldrudell/parl/parls"
-	"github.com/haraldrudell/parl/runt"
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/plog"
+	"github.com/haraldrudell/parl/pos"
+	"github.com/haraldrudell/parl/pruntime"
+	"github.com/haraldrudell/parl/pstrings"
 	"gopkg.in/yaml.v2"
 )
 
@@ -93,7 +94,7 @@ func (ex *Executable) Init() *Executable {
 	now := parlp.ProcessStartTime()
 	ex.Launch = now
 	ex.LaunchString = now.Format(rfcTimeFormat)
-	ex.Host = parlos.ShortHostname()
+	ex.Host = pos.ShortHostname()
 	if len(os.Args) > 1 && os.Args[1] == SilentString {
 		parl.SetSilent(true)
 	}
@@ -183,8 +184,8 @@ Options and yaml is configured likeso:
 func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executable) {
 	ex1 = ex
 	// print program name and populated details
-	banner := parls.FilteredJoin([]string{
-		parls.FilteredJoin([]string{ex.Program, ex.Version, ex.Comment}, "\x20"),
+	banner := pstrings.FilteredJoin([]string{
+		pstrings.FilteredJoin([]string{ex.Program, ex.Version, ex.Comment}, "\x20"),
 		ex.Copyright,
 		ex.License,
 		fmt.Sprintf(timeHeader, ex.LaunchString),
@@ -223,7 +224,7 @@ func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executab
 			parl.Log("Unknown parameters: %s\n", strings.Join(args, "\x20"))
 		}
 		ex.usage()
-		parlos.Exit(parlos.StatusCodeUsage, nil)
+		pos.Exit(pos.StatusCodeUsage, nil)
 	}
 	ex.ArgCount = count
 	if count == 1 && (ex.Arguments&OneArgument != 0) {
@@ -253,7 +254,7 @@ func (ex *Executable) ConfigureLog() (ex1 *Executable) {
 	}
 	if BaseOptions.Verbosity != "" {
 		if err := parl.SetRegexp(BaseOptions.Verbosity); err != nil {
-			parlos.Exit(parlos.StatusCodeUsage, err)
+			pos.Exit(pos.StatusCodeUsage, err)
 		}
 	}
 	parl.Debug("exe.ConfigureLog silent: %t debug: %t verbosity: %q\n",
@@ -296,19 +297,20 @@ func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, 
 	if thunk == nil {
 		panic(parl.New("mains.Executable.ApplyYaml: thunk cannot be nil"))
 	}
-	parl.Debug("exe.ApplyYaml: file: %q", yamlFile)
-	filename, bytes := FindFile(yamlFile, ex.Program)
-	if filename == "" || len(bytes) == 0 {
-		parl.Debug("ApplyYaml: no yaml file")
+	parl.Debug("Arguments: yamlFile: %q yamlKey: %q", yamlFile, yamlKey)
+	filename, byts := FindFile(yamlFile, ex.Program)
+	if filename == "" || len(byts) == 0 {
+		parl.Debug("ex.ApplyYaml: no yaml file")
 		return
 	}
 	yamlDictionaryKey := GetTopLevelKey(yamlKey) // key name from option or a default
+	parl.Debug("filename: %q top-level key: %q bytes: %q", filename, yamlDictionaryKey, string(byts))
 
 	// try to obtain the list of defined keys in the options dictionary
 	var yamlVisitedKeys map[string]bool
 	yco := map[string]map[string]interface{}{} // a dictionary of dictionaries with unknown content
-	parl.Debug("ApplyYaml: first yaml.Unmarshal")
-	if yaml.Unmarshal(bytes, &yco) == nil {
+	parl.Debug("ex.ApplyYaml: first yaml.Unmarshal")
+	if yaml.Unmarshal(byts, &yco) == nil {
 		yamlVisitedKeys = map[string]bool{}
 		if optionsMap := yco[yamlDictionaryKey]; optionsMap != nil {
 			for key := range optionsMap {
@@ -316,11 +318,11 @@ func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, 
 			}
 		}
 	}
-	parl.Debug("ApplyYaml: yamlVisitedKeys: %v\n", yamlVisitedKeys)
+	parl.Debug("ex.ApplyYaml: yamlVisitedKeys: %v\n", yamlVisitedKeys)
 
-	hasData, err := thunk(bytes, yaml.Unmarshal, yamlDictionaryKey)
+	hasData, err := thunk(byts, yaml.Unmarshal, yamlDictionaryKey)
 	if err != nil {
-		ex.AddErr(parl.Errorf("ApplyYaml thunk: filename: %q: %w", filename, err)).Exit()
+		ex.AddErr(parl.Errorf("ex.ApplyYaml thunk: filename: %q: %w", filename, err)).Exit()
 	} else if !hasData {
 		return
 	}
@@ -339,7 +341,7 @@ func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, 
 			if !yamlVisitedKeys[optionData.Y.Name] {
 				continue // this key was not present in yaml
 			}
-		} else if parls.IsDefaultValue(optionData.Y.Pointer) {
+		} else if pstrings.IsDefaultValue(optionData.Y.Pointer) {
 			continue // no visited information,, so ignore default values
 		}
 		if err := optionData.ApplyYaml(); err != nil {
@@ -353,13 +355,13 @@ func (ex *Executable) usage() {
 	writer := flag.CommandLine.Output()
 	fmt.Fprintln(
 		writer,
-		parls.FilteredJoin([]string{
-			parls.FilteredJoin([]string{
+		pstrings.FilteredJoin([]string{
+			pstrings.FilteredJoin([]string{
 				ex.Program,
 				ex.Description,
 			}, "\x20"),
 			usageHeader,
-			parls.FilteredJoin([]string{
+			pstrings.FilteredJoin([]string{
 				ex.Program,
 				optionsSyntax,
 				ex.ArgumentsUsage,
@@ -382,7 +384,7 @@ func (ex *Executable) Recover() {
 	if e := recover(); e != nil {
 		hasStack := false
 		if err, ok := e.(error); ok {
-			hasStack = error116.HasStack(err)
+			hasStack = perrors.HasStack(err)
 		}
 		parl.Debug("exe.Recover: executable %s panic: %T hasStack: %t '%+[2]v'", ex.Program, e, hasStack)
 		fmt.Println("Unhandled panic invoked exe.Recover: stack:")
@@ -401,14 +403,15 @@ func (ex *Executable) Recover() {
 // AddErr extended with immediate printing of first error
 func (ex *Executable) AddErr(err error) (x *Executable) {
 	if parl.IsThisDebug() {
-		packFunc := error116.PackFunc()
+		packFunc := perrors.PackFunc()
 		var errS string
 		if err != nil {
 			errS = "\x27" + err.Error() + "\x27"
 		} else {
 			errS = "nil"
 		}
-		parl.Debug("%s(error: %s)\n%[1]s invocation: %[3]s", packFunc, errS, runt.Invocation(0))
+		parl.Debug("\n%s(error: %s)\n%[1]s invocation:\n%[3]s", packFunc, errS, pruntime.Invocation(0))
+		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}
 	x = ex
 	if err == nil {
@@ -419,7 +422,7 @@ func (ex *Executable) AddErr(err error) (x *Executable) {
 		ex.err = err
 		return
 	}
-	ex.err = error116.AppendError(ex.err, err)
+	ex.err = perrors.AppendError(ex.err, err)
 	return
 }
 
@@ -427,9 +430,9 @@ func (ex *Executable) AddErr(err error) (x *Executable) {
 func (ex *Executable) PrintErr(err error) {
 	var s string
 	if ex.IsLongErrors {
-		s = error116.Long(err)
+		s = perrors.Long(err) + "\n"
 	} else if ex.IsErrorLocation {
-		s = error116.Short(err)
+		s = perrors.Short(err)
 	} else if err != nil {
 		s = err.Error()
 	}
@@ -439,15 +442,18 @@ func (ex *Executable) PrintErr(err error) {
 // Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
 func (ex *Executable) Exit() {
 	if ex.err == nil {
-		parl.Debug("exe.Exit: no error")
+		parl.Debug("\nexe.Exit: no error")
 	} else {
-		parl.Debug("exe.Exit: err: %T '%[1]v'", ex.err)
+		parl.Debug("\nexe.Exit: err: %T '%[1]v'", ex.err)
 	}
-	parl.Debug("%s", debug.Stack())
+	parl.Debug("\nexe.Exit invocation:\n%s\n", debug.Stack())
+	if parl.IsThisDebug() { // add newline during debug without location
+		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
+	}
 	if ex.err == nil {
-		parlos.Exit0()
+		pos.Exit0()
 	}
-	errorList := error116.ErrorList(ex.err)
+	errorList := perrors.ErrorList(ex.err)
 	isList := len(errorList) > 1
 	if isList {
 		for _, e := range errorList[1:] {
@@ -457,5 +463,5 @@ func (ex *Executable) Exit() {
 	if ex.IsLongErrors || isList {
 		fmt.Fprintln(os.Stderr, ex.err)
 	}
-	parlos.Exit1(nil)
+	pos.Exit1(nil)
 }

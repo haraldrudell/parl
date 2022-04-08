@@ -15,4 +15,6 @@ type PrintLine string
 type StatusText string
 
 // Warning provides errors that should not terminate the ev thread
-type Warning error
+type Warning struct {
+	Err error
+}

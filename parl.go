@@ -42,12 +42,6 @@ On 3/16/2022 Parl was open-sourced under an ISC License
 */
 package parl
 
-import (
-	"github.com/haraldrudell/parl/error116"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
-)
-
 const (
 	Rfc3339s   = "2006-01-02 15:04:05-07:00"
 	Rfc3339ms  = "2006-01-02 15:04:05.999-07:00"
@@ -58,20 +52,6 @@ const (
 	Rfc3339usz = "2006-01-02T15:04:05.999999Z"
 	Rfc3339nsz = "2006-01-02T15:04:05.999999999Z"
 )
-
-func Errorf(format string, a ...interface{}) (err error) {
-	return error116.Errorf(format, a...)
-}
-
-func New(s string) error {
-	return error116.New(s)
-}
-
-var parlSprintf = message.NewPrinter(language.English).Sprintf
-
-func Sprintf(format string, a ...interface{}) string {
-	return parlSprintf(format, a...)
-}
 
 type Password interface {
 	HasPassword() (hasPassword bool)

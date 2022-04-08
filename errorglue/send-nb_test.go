@@ -18,7 +18,7 @@ func TestSendNB(t *testing.T) {
 	err1 := errors.New("err1")
 	err2 := errors.New("err2")
 	errCh := make(chan error)
-	sendNb := SendNb{SendChannel: *NewSendChannel(errCh, nil)}
+	sendNb := SendNb{SendChannel: *NewSendChannel(errCh)}
 	var wg sync.WaitGroup
 	wg.Add(1)
 	sendNb.Send(err1, &wg)
@@ -27,7 +27,7 @@ func TestSendNB(t *testing.T) {
 	wg.Wait() // wait until thread is about to send
 	sendNb.sqLock.Lock()
 	hasThread := sendNb.hasThread
-	queueLen := len(sendNb.errQueue)
+	queueLen := len(sendNb.sendQueue)
 	sendNb.sqLock.Unlock()
 	if !hasThread {
 		t.Error("sendNB no thread")

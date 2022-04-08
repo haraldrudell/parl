@@ -8,15 +8,15 @@ package parl
 import (
 	"os"
 
-	"github.com/haraldrudell/parl/parlog"
+	"github.com/haraldrudell/parl/plog"
 )
 
 const (
 	logStackFramesToSkip = 1
 )
 
-var stderrLogger = parlog.NewLogFrames(nil, logStackFramesToSkip)
-var stdoutOutput = parlog.GetLog(os.Stdout).Output
+var stderrLogger = plog.NewLogFrames(nil, logStackFramesToSkip)
+var stdoutOutput = plog.GetLog(os.Stdout).Output
 
 // Out prints extected output to stdout
 func Out(format string, a ...interface{}) {

@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/error116"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // ThreadManager provides thread-safe management of go routines
@@ -65,11 +65,11 @@ func (mgr *ThreadManager) CalleeContext(ID ...string) (env Callee) {
 // ProcessExit indicates whether this event is the final event from a terminating goroutine
 func (mgr *ThreadManager) ProcessEvent(ev Event) (err error) {
 	if ev == nil {
-		return error116.New("goroutine channel closed or goroutine sent nil")
+		return perrors.New("goroutine channel closed or goroutine sent nil")
 	}
 	gID := ev.GoID()
 	if _, ok := mgr.goIDMap.Load(gID); !ok {
-		return error116.New("event from unknown goroutine")
+		return perrors.New("event from unknown goroutine")
 	}
 	if _, ok := ev.(*ExitEvent); ok {
 		mgr.goIDMap.Delete(gID)
@@ -88,7 +88,7 @@ func (mgr *ThreadManager) Action(threadResult error, action CancelAction) (isEnd
 	// state: KeepGoing or (WhileOk and no error)
 	if threadResult != nil { // ev.Keepgoing and errors
 		strs := []string{threadResult.Error()}
-		errorList := error116.ErrorList(threadResult)
+		errorList := perrors.ErrorList(threadResult)
 		if len(errorList) > 1 {
 			for _, e := range errorList[1:] {
 				strs = append(strs, e.Error())

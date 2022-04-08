@@ -8,7 +8,7 @@ package mains
 import (
 	"fmt"
 
-	"github.com/haraldrudell/parl/parlos"
+	"github.com/haraldrudell/parl/pos"
 )
 
 const (
@@ -36,7 +36,7 @@ func BaseOptionData(program string, yaml YamlOption) (od []OptionData) {
 	}
 	if yaml == YamlYes {
 		od = append(od, []OptionData{
-			{P: &BaseOptions.YamlFile, Name: "yamlFile", Value: "", Usage: fmt.Sprintf("Use specific file other than %s.yaml %[1]s-%s.yaml in ~/apps .. /etc", program, parlos.ShortHostname())},
+			{P: &BaseOptions.YamlFile, Name: "yamlFile", Value: "", Usage: fmt.Sprintf("Use specific file other than %s.yaml %[1]s-%s.yaml in ~/apps .. /etc", program, pos.ShortHostname())},
 			{P: &BaseOptions.YamlKey, Name: "yamlKey", Value: "", Usage: "Other dictionary key than 'options:'"},
 		}...)
 	}

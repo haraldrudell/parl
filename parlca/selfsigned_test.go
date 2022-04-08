@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/haraldrudell/parl/error116"
-	"github.com/haraldrudell/parl/parlos"
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pos"
 )
 
 // /usr/local/opt/openssl/bin/openssl x509 -in cert.der -inform der -noout -text
@@ -46,7 +46,7 @@ func TestNewSelfSigned(t *testing.T) {
 		t.Errorf("SelfSigned not valid")
 		return
 	}
-	filename := filepath.Join(parlos.UserHomeDir(), "cert.der")
+	filename := filepath.Join(pos.UserHomeDir(), "cert.der")
 	bytes := ca.DER()
 	t.Logf("writing: %s bytes: %d", filename, len(bytes))
 	if err := writeBytes(filename, bytes); err != nil {
@@ -60,12 +60,12 @@ func TestNewSelfSigned(t *testing.T) {
 func writeBytes(filename string, bytes []byte) (err error) {
 	var file *os.File
 	if file, err = os.OpenFile(filename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600); err != nil {
-		err = error116.Errorf("os.OpenFile %q: '%w'", filename, err)
+		err = perrors.Errorf("os.OpenFile %q: '%w'", filename, err)
 		return
 	}
 	defer func() {
 		if e := file.Close(); e != nil {
-			err = error116.AppendError(err, e)
+			err = perrors.AppendError(err, e)
 		}
 	}()
 	_, err = file.Write(bytes)
