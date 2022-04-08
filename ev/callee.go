@@ -36,6 +36,8 @@ func (ctx *CalleeContext) Success() {
 func (ctx *CalleeContext) Failure(err error) {
 	if err == nil {
 		err = perrors.New("Failure without errors")
+	} else {
+		err = perrors.Stack(err) // ensure error has a stack trace
 	}
 	evt := NewExitEvent(err, ctx.gID)
 	exitEvent := evt.(*ExitEvent)
