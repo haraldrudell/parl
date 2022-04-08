@@ -15,14 +15,16 @@ type Adbetter interface {
 	NewConnection(address string, ctx context.Context) (conn Adbette, err error)
 }
 
+type AdbRequest string
+
 // Adbette is a minimal implementation of the adb Android debug bridge protocol
 // Adbette include both adb server and Android device functions
 type Adbette interface {
-	// SendReadOkay sends a command to a the adb server.
+	// SendReadOkay sends a request to a remote adb endpoint.
 	// if anything else than OKAY is received back from the
-	// server, err is non-nil.
-	SendReadOkay(s string) (err error)
-	// ReadString reads utf-8 text from an adb server or device up to 64 KiB-1 in length
+	// remote endpoint, err is non-nil.
+	SendReadOkay(request AdbRequest) (err error)
+	// ReadString reads utf-8 text up to 64 KiB-1 in length
 	ReadString() (s string, err error)
 	// ConnectToDevice sends a forwarding request to an adb
 	// server to connect to one of its devices
@@ -44,7 +46,7 @@ type Adbette interface {
 	LIST(remoteDir string, dentReceiver func(mode uint32, size uint32, time uint32, byts []byte) (err error)) (err error)
 	// RECV fetches the contents of a file located on an adb device
 	RECV(remotePath string, blobReceiver func(data []byte) (err error)) (err error)
-	// CancelError is a value that a LIST or RECV callback routine can return to
+	// CancelError is a value that a LIST or RECV callback routines can return to
 	// cancel further invocations
 	CancelError() (cancelError error)
 }

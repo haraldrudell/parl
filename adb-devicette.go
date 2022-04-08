@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-// Device is a generic representation of an Android Device accessible via an AdbServer
-type Device interface {
-	Devicette // Serial()
+// Devicette is a generic representation of an Android Devicette accessible via an AdbServer
+type Devicette interface {
+	SkeletonDevice // Serial()
 	// Shell executes a shell command on the device.
 	// The resulting socket can be obtained either using the reader callback,
 	// which is a socket connection to the device,
