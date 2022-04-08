@@ -27,7 +27,7 @@ func (te *Events) Event(event string, ID0 ...goid.ThreadID) {
 		ID = ID0[0]
 	}
 	if ID == "" {
-		ID = goid.GoRoutineID()
+		ID = goid.GoID()
 	}
 	te.event(ID, event)
 }

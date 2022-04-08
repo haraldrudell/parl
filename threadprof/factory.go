@@ -12,11 +12,11 @@ import (
 	"github.com/haraldrudell/parl/goid"
 )
 
-var HFactory parl.HistoryFactory = &historyFactory{}
+var HistoryFactory parl.HistoryFactory = &historyFactory{}
 
-var CFactory parl.CountersFactory = &countersFactory{}
+var CountersFactory parl.CountersFactory = &countersFactory{}
 
-var SFactory parl.StatuserFactory = &statuserFactory{}
+var StatuserFactory parl.StatuserFactory = &statuserFactory{}
 
 type historyFactory struct{}
 
@@ -53,15 +53,19 @@ func (tn *threadNil) GetEvents() (events map[goid.ThreadID][]string) { return }
 
 type countersNil struct{}
 
-func (tn *countersNil) GetCounters() (list []string, m map[string]parl.Counter) { return }
-func (tn *countersNil) GetOrCreate(name string) (counter parl.Counter)          { return &counterNil{} }
-func (tn *countersNil) Reset()                                                  {}
+func (tn *countersNil) GetCounters() (list []parl.CounterID, m map[parl.CounterID]parl.Counter) {
+	return
+}
+func (tn *countersNil) GetOrCreateCounter(name parl.CounterID) (counter parl.Counter) {
+	return &counterNil{}
+}
+func (tn *countersNil) ResetCounters() {}
 
 type counterNil struct{}
 
 func (tn *counterNil) CounterValue(reset bool) (values parl.CounterValues) { return }
-func (tn *counterNil) Dec() (value uint64)                                 { return }
-func (tn *counterNil) Inc() (value uint64)                                 { return }
+func (tn *counterNil) Dec() (counters parl.Counter)                        { return tn }
+func (tn *counterNil) Inc() (counters parl.Counter)                        { return tn }
 func (tn *counterNil) Value() (value uint64)                               { return }
 func (tn *counterNil) Ops() (ops uint64)                                   { return }
 func (tn *counterNil) Max() (max uint64)                                   { return }

@@ -13,18 +13,18 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-type CountersOn struct {
+type Counters struct {
 	isRunning parl.AtomicBool
 	lock      sync.Mutex
-	ordered   []string                // behind lock
-	m         map[string]parl.Counter // behind lock
+	ordered   []parl.CounterID                // behind lock
+	m         map[parl.CounterID]parl.Counter // behind lock
 }
 
 func newCounters() (counters parl.Counters) {
-	return &CountersOn{m: map[string]parl.Counter{}}
+	return &Counters{m: map[parl.CounterID]parl.Counter{}}
 }
 
-func (cs *CountersOn) GetOrCreate(name string) (counter parl.Counter) {
+func (cs *Counters) GetOrCreateCounter(name parl.CounterID) (counter parl.Counter) {
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
 	var ok bool
@@ -37,7 +37,7 @@ func (cs *CountersOn) GetOrCreate(name string) (counter parl.Counter) {
 	return
 }
 
-func (cs *CountersOn) Add(name string) (counter parl.Counter) {
+func (cs *Counters) Add(name parl.CounterID) (counter parl.Counter) {
 	if cs.isRunning.IsTrue() {
 		panic(perrors.Errorf("Add while Counter running: %s", name))
 	}
@@ -52,18 +52,18 @@ func (cs *CountersOn) Add(name string) (counter parl.Counter) {
 	return
 }
 
-func (cs *CountersOn) GetCounters() (list []string, m map[string]parl.Counter) {
+func (cs *Counters) GetCounters() (list []parl.CounterID, m map[parl.CounterID]parl.Counter) {
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
-	list = append([]string{}, cs.ordered...)
-	m = map[string]parl.Counter{}
+	list = append([]parl.CounterID{}, cs.ordered...)
+	m = map[parl.CounterID]parl.Counter{}
 	for key, value := range cs.m {
 		m[key] = value
 	}
 	return
 }
 
-func (cs *CountersOn) Reset() {
+func (cs *Counters) ResetCounters() {
 	_, m := cs.GetCounters()
 	for _, counter := range m {
 		counter.CounterValue(true)

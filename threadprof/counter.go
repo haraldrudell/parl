@@ -12,21 +12,21 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-type CounterOn struct {
+type Counter struct {
 	value   uint64 // atomic
-	ops     uint64 // atomic
+	running uint64 // atomic
 	max     uint64 // atomic
 	incRate uint64 // atomic
 	decRate uint64 // atomic
 }
 
 func newCounter() (counter parl.Counter) {
-	return &CounterOn{}
+	return &Counter{}
 }
 
-func (cn *CounterOn) Inc() (value uint64) {
-	value = atomic.AddUint64(&cn.value, 1)
-	atomic.AddUint64(&cn.ops, 1)
+func (cn *Counter) Inc() (counter parl.Counter) {
+	value := atomic.AddUint64(&cn.value, 1)
+	atomic.AddUint64(&cn.running, 1)
 	for {
 		max := atomic.LoadUint64(&cn.max)
 		if value <= max || // no update is required
@@ -34,27 +34,28 @@ func (cn *CounterOn) Inc() (value uint64) {
 			break
 		}
 	}
-	return
+	return cn
 }
 
-func (cn *CounterOn) Dec() (value uint64) {
-	value = atomic.AddUint64(&cn.value, ^uint64(0))
-	atomic.AddUint64(&cn.ops, 1)
-	return
+func (cn *Counter) Dec() (cunter parl.Counter) {
+	atomic.AddUint64(&cn.running, ^uint64(0))
+	return cn
 }
 
-func (cn *CounterOn) CounterValue(reset bool) (values parl.CounterValues) {
+func (cn *Counter) CounterValue(reset bool) (values parl.CounterValues) {
 	values = &CounterValue{
 		value:   atomic.LoadUint64(&cn.value),
-		ops:     atomic.LoadUint64(&cn.ops),
+		running: atomic.LoadUint64(&cn.running),
 		max:     atomic.LoadUint64(&cn.max),
 		incRate: atomic.LoadUint64(&cn.incRate),
 		decRate: atomic.LoadUint64(&cn.decRate),
 	}
 	if reset {
 		atomic.StoreUint64(&cn.value, 0)
-		atomic.StoreUint64(&cn.ops, 0)
+		atomic.StoreUint64(&cn.running, 0)
 		atomic.StoreUint64(&cn.max, 0)
+		atomic.StoreUint64(&cn.incRate, 0)
+		atomic.StoreUint64(&cn.decRate, 0)
 	}
 	return
 }
