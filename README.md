@@ -25,7 +25,7 @@ import "github.com/haraldrudell/parl"
 <a href="https://pkg.go.dev/github.com/haraldrudell/parl"><img src="https://pkg.go.dev/badge/github.com/haraldrudell/parl.svg" alt="Go Reference">&emsp; Documentation in the Go Package Index</a>
 <br />
 <br />
-On 3/16/2022 Parl was open-sourced under an ISC License<br />
+On March 16th, 2022, parl was open-sourced under an ISC License<br />
 Parl is about 9,000 lines of Go code with first line written on November 21, 2018<br />
 <br />
 © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)

@@ -6,39 +6,84 @@ ISC License
 /*
 Package parl handles inter-thread communication and controls parallelism
 
-Logging of extected output is via Out(string, ...interface{}).
-Parl logging uses comma separator for numbers and is thread safe
+parl has sub-packages augmenting the Go standard library:
+ perrors pfs plog pnet pos pruntime psql pstrings
+ psyscall pterm ptime
 
-Log(string, ...interface{}) always outputs to stderr.
-Console is the same intended to be used for command-line interactivity.
-SetDebug(true) appends code location
+parl has feature packages:
+ ev — handling of goroutine-based functions
+ goid — unique goroutine IDs
+ mains — functions for writing command-line utilities and services
+ parlca — self-signed certificate authority
+ progress — monitor work progress for a large number of threads
+ sqlite — local SQL database
+ threadprof — profiling and counters for what threads are doing
+ // statuser: thread hang detector
+ tracer — event lists by task rather than by time or thread
 
-Info is active by default and outputs to stderr.
-SetSilent(true) removes this output.
-SetDebug(true) appends code location
-IsSilent deteremines if Info printing applies
+parl features per-writer thread-safe logging with topic and per-package
+output control:
 
-Debug only prints if SetDebug(true) or the code location matches SetInfoRegexp().
-The string matched for regular expression looks like: “github.com/haraldrudell/parl.FuncName”
-IsThisDebug determines if debug is active for the executing function
+Logging is to stderr except for the Out function.
+parl logging uses comma separator for numbers.
+One argument is output as string, two or more arguments is Printf.
+The location matched against the  regular expression is
+full package path, optional type receiver and the funtion name:
+“github.com/haraldrudell/mypackage.(*MyType).MyFunc”
+ Out(string, ...interface{}) — Standard output
+ Log(string, ...interface{}) — Always outputs to stderr
+ parl.D(string, ...interface{}) — Same as Log, intended for temporary use
 
-parl.D is intended for temporary printouts to be removed before check-in
+ Info(string, ...interface{}) — Informational progress messages
+ SetSilent(true) — removes Info output
+ IsSilent() — deteremines if Info printing applies
 
-parl provides generic recovery for goroutines and functions:
-capturing panics, annotating and storing errors and invoking an error handling function on errors:
+ Debug(string, ...interface{}) — only prints for locations where SetDebug(true)
+ SetDebug(true) — Control Debug() globally, code location for all prints, long stack traces
+ SetRegexp(regExp string) (err error) — Regular expression controlling local Debug() printing
+ IsThisDebug() — Determines if debug is active for the executing function
 
-  func f() (err error) {
-		defer parl.Recover(parl.Annotation(), &err, onError func(e error) { … })
-	…
-Default error string: “Recover from panic in somePackage.someFunction: 'File not found'.
-For multiple errors, Recover uses error116 error lists,
-while Recover2 instead invokes onError multiple times
+ Console(string, ...interface{}) — terminal interactivity output
+
+parl provides panic recovery for process and goroutines:
+capturing panics, annotating, retrieving and storing errors and
+invoking error handling functions:
+ func myThread(errCh chan<- error) {
+   var err error
+   defer close(errCh)
+   defer parl.Recover2(parl.Annotation(), &err, func (err error) { errCh <- err})
+
+   if err = someFunc(); err != nil {
+     err = perrors.Errorf("someFunc: %w", err)
+     return
+   …
+
+ func myThreadSafeThread(wg *sync.WaitGroup, errs *perrors.ParlError) { // ParlError: thread-safe error store
+   defer wg.Done()
+   defer parl.Recover(parl.Annotation(), nil, errs.AddErrorProc)
+
+   if err = someFunc(); err != nil {
+     errs.AddError(perrors.Errorf("someFunc: %w", err))
+     return
+   …
+
+parl package features:
+ AtomicBool — Thread-safe boolean
+ Closer — Deferable, panic free channel close
+ ClosableChan — Initialization-free channel with inspectable close that does not panic
+ Moderator — A ticketing system for limited parallelism
+ NBChan — A non-blocking unbuffered channel with trillion-size buffer
+ OnceChan — Initialization-free inspectable shutdown semaphore implementing Context
+ SerialDo — Serialization of invocations
+ WaitGroup —Inspectable WaitGroup
+ Debouncer — Invocation debouncer, pre-generics
+ Sprintf — Supporting thousands separator
 
 Parl is about 9,000 lines of Go code with first line written on November 21, 2018
 
-On 3/16/2022 Parl was open-sourced under an ISC License
+On March 16th, 2022, parl was open-sourced under an ISC License
 
-© 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+© 2018–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 */
 package parl
 

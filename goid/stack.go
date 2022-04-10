@@ -29,18 +29,23 @@ const (
 )
 
 type Stack struct {
-	// ThreadID is unqique for this thread.
+	// ThreadID is a unqique ID associated with this thread.
 	// typically numeric string “1”…
+	// it can be used as a map key or converted to string
 	ID ThreadID
 	// Status is typically word “running”
 	Status ThreadStatus
-	// IsMainThread indicates if this is the thread that laucnhed main.main
+	// IsMainThread indicates if this is the thread that launched main.main
 	IsMainThread bool
-	// Frame.Args like "(0x14000113040)".
+	// Frames is a list of code locations for this thread.
+	// [0] is the invoker of goid.NewStack().
+	// last is the function starting this thread.
+	// Frame.Args is invocation values like "(0x14000113040)".
 	Frames []Frame
-	// Creator.FuncName is "main.main()" for main thread
-	Creator    pruntime.CodeLocation
-	DebugStack pruntime.CodeLocation
+	// Creator is the code location of the go statement launching
+	// this thread.
+	// FuncName is "main.main()" for main thread
+	Creator pruntime.CodeLocation
 }
 
 type Frame struct {
@@ -50,7 +55,7 @@ type Frame struct {
 }
 
 // NewStack populates a Stack object with the current thread
-// and its stack
+// and its stack using debug.Stack
 func NewStack(skipFrames int) (stack *Stack) {
 	var err error
 	if skipFrames < 0 {
