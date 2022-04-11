@@ -34,7 +34,7 @@ tidyDirectory() {
   if $Update; then
     S+=" && ${GoUpdate[*]}"
   fi
-  S+="&&  ${GoModTidy[*]})"
+  S+=" && ${GoModTidy[*]})"
   echo -e "\n$S"
   ("${CMD[@]}" && if $Update; then ${GoUpdate[*]}; fi && "${GoModTidy[@]}") || return
 }
