@@ -4,7 +4,7 @@ ISC License
 */
 
 // Package sqlite wraps modernc.org/sqlite
-package sqlite
+package sqliter
 
 import (
 	"path"

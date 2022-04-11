@@ -6,13 +6,13 @@ ISC License
 package goid
 
 import (
+	"errors"
 	"fmt"
 	"runtime/debug"
 	"strconv"
 	"strings"
 
 	"github.com/haraldrudell/parl/pruntime"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -150,7 +150,7 @@ func ParseStackFrame(twoLines []string, noArgs bool) (frame *Frame, err error) {
 	f := Frame{}
 	length := len(twoLines)
 	if length != 2 {
-		err = errors.Errorf("pruntime.Stack: input length not 2: %d", length)
+		err = fmt.Errorf("pruntime.Stack: input length not 2: %d", length)
 		return
 	}
 	fn := twoLines[0]
@@ -169,7 +169,7 @@ func ParseStackFrame(twoLines []string, noArgs bool) (frame *Frame, err error) {
 		restLeft = 0
 	}
 	if restLeft == -1 {
-		err = errors.Errorf("pruntime.Stack: bad function line: %q", fn)
+		err = fmt.Errorf("pruntime.Stack: bad function line: %q", fn)
 		return
 	}
 	f.CodeLocation.FuncName = fn[:left]

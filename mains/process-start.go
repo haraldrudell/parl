@@ -3,8 +3,7 @@
 ISC License
 */
 
-// Package parlp provides portable computer process information
-package parlp
+package mains
 
 import (
 	"time"

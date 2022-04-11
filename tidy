@@ -1,0 +1,31 @@
+#!/bin/bash -eu
+# © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+# tidy
+# 220331 macOS 12.3, Linux 5.13
+GoModTidy=(go mod tidy)
+GoWorkSync=(go work sync)
+
+tidyAll() {
+  tidyDirectory mains
+  tidyDirectory pfs
+  tidyDirectory pterm
+  tidyDirectory sqliter
+
+  # go mod tidy
+  echo -e "\n${GoModTidy[*]}"
+  "${GoModTidy[@]}" || return
+
+  # go work sync
+  echo -e "\n${GoWorkSync[*]}"
+  "${GoWorkSync[@]}" || return
+}
+
+tidyDirectory() {
+  local DIR="$1"
+  local CMD=(cd "$DIR")
+  echo -e "\n(${CMD[*]} && ${GoModTidy[*]})"
+  ("${CMD[@]}" && "${GoModTidy[@]}") || return
+}
+
+tidyAll || { X=$?; echo >&2 "status code: $X"; exit $X; }
+echo -e "\ntidy completed successfully"
