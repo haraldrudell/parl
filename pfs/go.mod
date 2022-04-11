@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/google/uuid v1.3.0
-	github.com/haraldrudell/parl v0.4.1
+	github.com/haraldrudell/parl v0.4.2
 )
 
 require (

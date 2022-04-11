@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/elastic/go-sysinfo v1.7.1
-	github.com/haraldrudell/parl v0.4.1
+	github.com/haraldrudell/parl v0.4.2
 	gopkg.in/yaml.v2 v2.4.0
 )
 
