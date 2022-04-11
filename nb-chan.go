@@ -13,50 +13,78 @@ import (
 )
 
 /*
-NBChan is a non-blocking thread-safe channel.
-NBChan does not need initialization.
-NBChan can be used for error channels.
+NBChan is a non-blocking send channel with trillion-size buffer.
+NBChan can be used as an error channel where the thread does not
+block from a delayed or missing reader.
+NBChan is initialization-free, thread-safe, idempotent, deferrable and observable.
+Ch(), Send(), Close() CloseNow() IsClosed() Count() are not blocked by channel send
+and are panic-free.
+Close() CloseNow() are deferrable
+WaitForClose() waits until the underlying channel has been closed.
+NBChan implements a thread-safe error store perrors.ParlError
+NBChan.GetError() returns thread panics and close errors.
+No errors are added to the error store after the channel has closed.
+ var errCh parl.NBChan[error]
+ go thread(&errCh)
+ err, ok := <-errCh.Ch()
+ errCh.WaitForClose()
+ errCh.GetError()
+ …
+ func thread(errCh *parl.NBChan[error]) {
+   defer errCh.Close() // non-blocking close effective on send complete
+   var err error
+   parl.Recover(parl.Annotation(), &err, errCh.AddErrorProc)
+   errCh.Ch() <- err // non-blocking
+   if err = someFunc(); err != nil {
+     err = perrors.Errorf("someFunc: %w", err)
+     return
 */
 type NBChan[T any] struct {
-	closerLock sync.RWMutex
-	closer     ClosableChan[T] // inside lock
+	closableChan ClosableChan[T]
 
-	// GetError()
-	perrors.ParlError // possible thread panic
+	stateLock               sync.Mutex
+	unsentCount             int  // inside lock
+	sendQueue               []T  // inside lock
+	waitForCloseInitialized bool // inside lock
+	nbChanCloseInvoked      bool // inside lock
 
-	sqLock      sync.Mutex
-	unsentCount int  // inside lock
-	sendQueue   []T  // inside lock
-	hasThread   bool // inside lock
+	waitForClose sync.WaitGroup // initialization inside lock
+
+	waitForThread WaitGroup // observable waitgroup
+
+	perrors.ParlError // thread panics
 }
 
-// NewNBChan instantiates a non-blocking channel based on existing channel.
-// NewNBChan otherwise does not need initialization and can be used like:
+// NewNBChan instantiates a non-blocking trillion-size buffer channel.
+// NewNBChan allows initialization based on an existing channel.
+// NewNBChan does not need initialization and can be used like:
 //  var nbChan NBChan[error]
-//  go wherever(nbChan.Ch())
-// A non-blocking channel is a trillion-buffer channel that does not block if a reader
-// is not present
-func NewNBChan[T any](ch chan T) (nbChan *NBChan[T]) {
-	var nb NBChan[T] // somewhere to store ch
-	nb.getCh(ch)     // initialize nb based on ch
+//  go thread(&nbChan)
+func NewNBChan[T any](ch ...chan T) (nbChan *NBChan[T]) {
+	nb := NBChan[T]{}
+	nb.closableChan = *NewClosableChan(ch...) // store ch if present
 	return &nb
 }
 
 // Ch obtains the channel
 func (nb *NBChan[T]) Ch() (ch chan T) {
-	return nb.getCh(nil)
+	return nb.closableChan.Ch()
 }
 
 // Send sends non-blocking on the channel
 func (nb *NBChan[T]) Send(value T) {
-	nb.sqLock.Lock()
-	defer nb.sqLock.Unlock()
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
+
+	if nb.nbChanCloseInvoked {
+		return // no send after Close()
+	}
 
 	nb.unsentCount++
 
-	// launch thread
-	if !nb.hasThread {
-		nb.hasThread = true
+	// if no thread, send using new thread
+	if nb.waitForThread.IsZero() {
+		nb.waitForThread.Add(1)
 		go nb.sendThread(value) // send err in new thread
 		return
 	}
@@ -67,47 +95,71 @@ func (nb *NBChan[T]) Send(value T) {
 
 // Count returns number of unsent values
 func (nb *NBChan[T]) Count() (unsentCount int) {
-	nb.sqLock.Lock()
-	defer nb.sqLock.Unlock()
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
 
 	return nb.unsentCount
 }
 
-// IsClosed indicates whether the Close method has been invoked
-func (nb *NBChan[T]) IsClosed() (isClosed bool) {
-	nb.getCh(nil)
-	return nb.closer.IsClosed()
+// Close orders the channel to close once pending sends complete.
+// Close is thread-safe, non-blocking and panic-free.
+func (nb *NBChan[T]) Close() (didClose bool) {
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
+
+	if nb.nbChanCloseInvoked {
+		return // Close was already invoked
+	}
+	nb.nbChanCloseInvoked = true
+
+	if !nb.waitForThread.IsZero() {
+		return // there is a pending thread that will execute close on exit
+	}
+	var err error
+	if err, didClose = nb.closableChan.Close(); didClose && err != nil { // execute the close now
+		nb.AddError(err) // store posible close error
+	}
+	return
 }
 
-// Close ensures the channel is closed.
+// IsClosed indicates whether the channel has actually closed
+func (nb *NBChan[T]) IsClosed() (isClosed bool) {
+	return nb.closableChan.IsClosed()
+}
+
+func (nb *NBChan[T]) WaitForClose() {
+	nb.initWaitForClose() // ensure waitForClose state is valid
+	nb.waitForClose.Wait()
+}
+
+// CloseNow closes without waiting for sends to complete.
 // Close does not panic.
 // Close is thread-safe.
 // Close does not return until the channel is closed.
 // Upon return, all invocations have a possible close error in err.
 // if errp is non-nil, it is updated with error status
-func (nb *NBChan[T]) Close(errp ...*error) (err error, didClose bool) {
-	nb.getCh(nil)
-	return nb.closer.Close(errp...)
-}
+func (nb *NBChan[T]) CloseNow(errp ...*error) (err error, didClose bool) {
+	if nb.closableChan.IsClosed() {
+		return // channel is already closed
+	}
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
 
-func (nb *NBChan[T]) getCh(ch0 chan T) (ch chan T) {
-	nb.closerLock.Lock()
-	defer nb.closerLock.Unlock()
+	// discard pending data
+	if len(nb.sendQueue) > 0 {
+		nb.sendQueue = nil
+		nb.unsentCount = 0
+	}
 
-	if nb.closer.ch == nil { // instantiate closer
-		if ch0 != nil {
-			ch = ch0 // base on ch0
-		} else {
-			ch = make(chan T) // base on new unbuffered channel
-		}
-		nb.closer = ClosableChan[T]{ch: ch}
-	} else {
-		ch = nb.closer.Ch() // get ch from Closer
+	// close the channel now
+	if err, didClose = nb.closableChan.Close(); didClose && err != nil { // execute the close now
+		nb.AddError(err) // store posible close error
 	}
 	return
 }
 
 func (nb *NBChan[T]) sendThread(value T) {
+	defer nb.sendThreadDefer()
 	defer Recover(Annotation(), nil, func(err error) {
 		if pruntime.IsSendOnClosedChannel(err) {
 			return // ignore if the channel was or became closed
@@ -115,33 +167,56 @@ func (nb *NBChan[T]) sendThread(value T) {
 		nb.AddError(err)
 	})
 
-	ch := nb.getCh(nil)
+	ch := nb.closableChan.Ch()
 	for {
-		ch <- value // may block and panic
+		ch <- value // may block or panic
 
 		var ok bool
-		if value, ok = nb.getValue(); !ok {
+		if value, ok = nb.valueToSend(); !ok {
 			break
 		}
 	}
 }
 
-func (nb *NBChan[T]) getValue() (value T, ok bool) {
-	nb.sqLock.Lock()
-	defer nb.sqLock.Unlock()
-
-	nb.unsentCount--
+func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
 
 	// no more values: end thread
 	if len(nb.sendQueue) == 0 {
-		nb.hasThread = false
 		return
 	}
 
 	// send next value in queue
 	value = nb.sendQueue[0]
 	ok = true
+	nb.unsentCount--
 	copy(nb.sendQueue[0:], nb.sendQueue[1:])
 	nb.sendQueue = nb.sendQueue[:len(nb.sendQueue)-1]
 	return
+}
+
+func (nb *NBChan[T]) sendThreadDefer() {
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
+
+	if nb.nbChanCloseInvoked { // Close() was invoked after thrad started
+		nb.closableChan.Close() // close if Close was invoked. Idempotent
+	}
+
+	nb.waitForThread.Done() // thread has exit
+}
+
+func (nb *NBChan[T]) initWaitForClose() {
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
+
+	if nb.waitForCloseInitialized {
+		return // state is valid
+	}
+	nb.waitForCloseInitialized = true
+
+	if !nb.closableChan.IsClosed() {
+		nb.waitForClose.Add(1) // has to wait for close to occur
+	}
 }

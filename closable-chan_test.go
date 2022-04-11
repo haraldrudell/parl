@@ -13,7 +13,7 @@ func TestCloser(t *testing.T) {
 
 	// Closer can be invoked multiple times
 	ch := make(chan struct{})
-	cl := NewCloser(ch)
+	cl := NewClosableChan(ch)
 	ch2 := cl.Ch()
 	if ch2 != ch {
 		t.Errorf("NewCloser Ch bad")
@@ -45,7 +45,7 @@ func TestCloser(t *testing.T) {
 	{
 		ch := make(chan struct{})
 		close(ch)
-		cl := NewCloser(ch)
+		cl := NewClosableChan(ch)
 		var err2 error
 		err, didClose := cl.Close(&err2)
 		if err == nil {

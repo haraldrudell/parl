@@ -24,7 +24,7 @@ func TestOnceChan(t *testing.T) {
 	}()
 	time.Sleep(ocShort)
 	expWaiting := 1
-	actual := wg.Waiting()
+	actual := wg.Counter()
 	if actual != expWaiting {
 		t.Errorf("Bad waiting: %d expected %d", actual, expWaiting)
 	}
