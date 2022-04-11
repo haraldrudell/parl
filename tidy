@@ -2,8 +2,15 @@
 # © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 # tidy
 # 220331 macOS 12.3, Linux 5.13
+GoUpdate=(go get -u)
 GoModTidy=(go mod tidy)
 GoWorkSync=(go work sync)
+
+if [ $# -gt 0 ]; then
+  Update=true
+else
+  Update=false
+fi
 
 tidyAll() {
   tidyDirectory mains
@@ -23,8 +30,13 @@ tidyAll() {
 tidyDirectory() {
   local DIR="$1"
   local CMD=(cd "$DIR")
-  echo -e "\n(${CMD[*]} && ${GoModTidy[*]})"
-  ("${CMD[@]}" && "${GoModTidy[@]}") || return
+  local S="(${CMD[*]}"
+  if $Update; then
+    S+=" && ${GoUpdate[*]}"
+  fi
+  S+="&&  ${GoModTidy[*]})"
+  echo -e "\n$S"
+  ("${CMD[@]}" && if $Update; then ${GoUpdate[*]}; fi && "${GoModTidy[@]}") || return
 }
 
 tidyAll || { X=$?; echo >&2 "status code: $X"; exit $X; }
