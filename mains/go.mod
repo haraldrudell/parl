@@ -1,4 +1,4 @@
-module github.com/haraldrudell/parl/parlp
+module github.com/haraldrudell/parl/mains
 
 go 1.18
 
