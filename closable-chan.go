@@ -8,26 +8,39 @@ package parl
 import "sync"
 
 /*
-ClosableChan holds a channel.
-ClosableChan has a thread-safe re-entrant Close method
-closing the channel exactly once without panics.
-IsClosed indicates wether the channel has been closed
+ClosableChan wraps channel close.
+ClosableChan is an initialization-free channel with a deferable, thread-safe,
+idempotent and observable Close method.
+Close closes the channel exactly once, recovering panics.
+IsClosed provides wether the Close method did execute close.
+ var errCh parl.ClosableChan[error]
+ go thread(&errCh)
+ err, ok := <-errCh.Ch()
+ if errCh.isClosed() { // can be inspected
+ …
+ func thread(errCh *parl.ClosableChan[error]) {
+   defer errCh.Close(nil) // will not terminate the process
+   errCh.Ch() <- err
 */
 type ClosableChan[T any] struct {
-	ch       chan T
-	err      error
+	lock          sync.Mutex
+	ch            chan T // behind lock
+	closeSelector AtomicBool
+	err           error
+
 	isClosed AtomicBool
-	once     sync.Once
 }
 
-// NewCloser ensures a chan does not throw
-func NewCloser[T any](ch chan T) (cl *ClosableChan[T]) {
-	return &ClosableChan[T]{ch: ch}
+// NewClosableChan ensures a chan does not throw
+func NewClosableChan[T any](ch ...chan T) (cl *ClosableChan[T]) {
+	c := ClosableChan[T]{}
+	c.getCh(ch...) // ch... or make provides the channel
+	return &c
 }
 
 // Ch retrieves the channel
 func (cl *ClosableChan[T]) Ch() (ch chan T) {
-	return cl.ch
+	return cl.getCh()
 }
 
 // Close ensures the channel is closed.
@@ -35,22 +48,19 @@ func (cl *ClosableChan[T]) Ch() (ch chan T) {
 // Close is thread-safe.
 // Close does not return until the channel is closed.
 // Upon return, all invocations have a possible close error in err.
-// if errp is non-nil, it is updated with error status
+// if errp is non-nil, it is updated with a possible error
+// didClose indicates whether this invocation closed the channel
 func (cl *ClosableChan[T]) Close(errp ...*error) (err error, didClose bool) {
 
 	// first thread closes the channel
-	cl.once.Do(func() {
-		defer Recover(Annotation(), &cl.err, nil)
-
-		didClose = true
-		cl.isClosed.Set()
-		close(cl.ch)
-	})
+	didClose = cl.close()
 
 	// all threads provide the result
 	err = cl.err
 	if len(errp) > 0 {
-		*errp[0] = err
+		if errp0 := errp[0]; errp0 != nil {
+			*errp0 = err
+		}
 	}
 	return
 }
@@ -60,10 +70,31 @@ func (cl *ClosableChan[T]) IsClosed() (isClosed bool) {
 	return cl.isClosed.IsTrue()
 }
 
-// Closer closes a channels and can be deferred
-// and does not panic
-func Closer[T any](ch chan T, errp *error) {
-	defer Recover(Annotation(), errp, nil)
+func (cl *ClosableChan[T]) getCh(ch0 ...chan T) (ch chan T) {
+	cl.lock.Lock()
+	defer cl.lock.Unlock()
 
-	close(ch)
+	if ch = cl.ch; ch == nil {
+		if len(ch0) > 0 {
+			ch = ch0[0]
+		} else {
+			ch = make(chan T)
+		}
+		cl.ch = ch
+	}
+	return
+}
+
+func (cl *ClosableChan[T]) close() (didClose bool) {
+	ch := cl.getCh()
+	cl.lock.Lock()
+	defer cl.lock.Unlock()
+
+	// first thread closes the channel
+	if cl.closeSelector.Set() { // this one must be before close
+		Closer(ch, &cl.err)
+		cl.isClosed.Set() // that one is set after close
+		didClose = true
+	}
+	return
 }

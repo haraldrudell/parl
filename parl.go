@@ -48,24 +48,6 @@ full package path, optional type receiver and the funtion name:
 parl provides panic recovery for process and goroutines:
 capturing panics, annotating, retrieving and storing errors and
 invoking error handling functions:
- func myThread(errCh chan<- error) {
-   var err error
-   defer close(errCh)
-   defer parl.Recover2(parl.Annotation(), &err, func (err error) { errCh <- err})
-
-   if err = someFunc(); err != nil {
-     err = perrors.Errorf("someFunc: %w", err)
-     return
-   …
-
- func myThreadSafeThread(wg *sync.WaitGroup, errs *perrors.ParlError) { // ParlError: thread-safe error store
-   defer wg.Done()
-   defer parl.Recover(parl.Annotation(), nil, errs.AddErrorProc)
-
-   if err = someFunc(); err != nil {
-     errs.AddError(perrors.Errorf("someFunc: %w", err))
-     return
-   …
 
 parl package features:
  AtomicBool — Thread-safe boolean
