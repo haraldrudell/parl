@@ -2,10 +2,8 @@ module github.com/haraldrudell/parl/sqliter
 
 go 1.18
 
-replace github.com/haraldrudell/parl => ../../parl
-
 require (
-	github.com/haraldrudell/parl v0.0.0-00010101000000-000000000000
+	github.com/haraldrudell/parl v0.4.0
 	modernc.org/sqlite v1.16.0
 )
 
