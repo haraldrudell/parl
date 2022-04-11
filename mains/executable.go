@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/parlp"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/plog"
 	"github.com/haraldrudell/parl/pos"
@@ -91,7 +90,7 @@ Init supports function chaining like:
    …
 */
 func (ex *Executable) Init() *Executable {
-	now := parlp.ProcessStartTime()
+	now := ProcessStartTime()
 	ex.Launch = now
 	ex.LaunchString = now.Format(rfcTimeFormat)
 	ex.Host = pos.ShortHostname()

@@ -6,14 +6,17 @@ ISC License
 package parl
 
 import (
+	"context"
 	"io"
 	"io/fs"
 	"time"
 )
 
-// Devicette is a generic representation of an Android Devicette accessible via an AdbServer
+// Devicette is a generic implementation of the capabilities
+// of a device implementing the adb Android debug bridge protocol
 type Devicette interface {
-	SkeletonDevice // Serial()
+	// Serial returns the serial number for this device
+	Serial() (serial AndroidSerial)
 	// Shell executes a shell command on the device.
 	// The resulting socket can be obtained either using the reader callback,
 	// which is a socket connection to the device,
@@ -43,10 +46,27 @@ type Devicette interface {
 
 // Dent is the information returned by adb ls or LIST
 type Dent interface {
-	Name() (name string)            // utf-8
-	Modified() (modified time.Time) // second precision, local time zone
+	// Name is utf-8 base path in device file system
+	Name() (name string)
+	// Modified is in second precision, local time zone
+	Modified() (modified time.Time)
+	// IsDir indicates directory.
+	// LIST only support symbolic link, directory and regular file types
 	IsDir() (isDir bool)
+	// IsRegular indicates regular file, ie. not a directory or symbolic link.
+	// LIST only support symbolic link, directory and regular file types
 	IsRegular() (isRegular bool) // ie.not directory or symlink
-	Perm() (perm fs.FileMode)    // 9 bits Unix permissions, directory and symlink
-	Size() (size uint32)         // limited to 4 GiB-1
+	// Perm returns os.FileMode data.
+	// 9-bit Unix permissions per os.FilePerm.
+	// directory and symlink bits
+	Perm() (perm fs.FileMode)
+	// Size is limited to 4 GiB-1
+	Size() (size uint32)
+}
+
+// DevicetteFactory describes how Devicette objects are obtained.
+type DevicetteFactory interface {
+	// NewDevicette creates a Devicette interacting with remote adb Android Debug Bridge
+	// devices via an adb server available at the socket address address
+	NewDevicette(address AdbSocketAddress, serial AndroidSerial, ctx context.Context) (devicette Devicette)
 }

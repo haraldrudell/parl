@@ -12,6 +12,7 @@ import (
 /*
 Serverette is a generic representation of an adb server running on a host.
 
+command-line adb:
 As of Android 12, Android Debug Bridge version 1.0.41 Version 32.0.0-8006631 has the following commands are supported:
 devices connect disconnect pair forward ppp reverse mdns push pull sync shell emu
 install install-multiple install-multiple-package uninstall bugreport jdwp logcat disable-verity enable-verity keygen
@@ -19,13 +20,13 @@ wait-for* get-state get-serialno get-devpath remount reboot sideload
 root unroot usb tcpip start-server kill-server reconnect attach detach
 */
 type Serverette interface {
+	AdbAdressProvider // AdbSocketAddress()
 	// DeviceSerialList lists serials for the currently online Android devices
 	DeviceSerialList() (serials []AndroidSerial, err error)
-	// DeviceForSerial obtains AdbDevice for a serial.
-	// The device instance can execute additional device functions.
-	// Devicette can connect to the device similarly to how the server implementation
-	// connects to trhe adb Android Debug Bridge server
-	DeviceForSerial(serial AndroidSerial) (android SkeletonDevice, err error)
+	// DeviceStati lists all serials currently known to the server along with
+	// their current status.
+	// The two slices correspond and are of the same length
+	DeviceStati() (serials []AndroidSerial, stati []AndroidStatus, err error)
 	// TrackDevices emits serial numbers for devices that come online.
 	// serials are sent on the serials channel.
 	// if err is non-nil, set-up of failed.
@@ -51,50 +52,28 @@ type Trackerette interface {
 	Cancel()
 }
 
-/*
-SkeletonDevice respresents a minimal adb protocol level connection to an Android device
-via an adb server.
-A SkeletonDevice may also be an AddressProvider.
-// An address and an AndroidSerial is all required to make an Adbette connection
-*/
-type SkeletonDevice interface {
-	// Serial returns the device serial number
-	Serial() (serial AndroidSerial)
-}
-
 // ServeretteFactory is a Server connection factory for Adbette implementations
 type ServeretteFactory interface {
 	// Adb connects to an adb adb Android Debug Bridge server on a specified tcp socket.
 	// address is a string default "localhost:5037" and default port ":5037".
 	// adbetter is a factory for Adbette connections.
-	Adb(address string, adbetter Adbetter, ctx context.Context) (server Serverette)
+	NewServerette(address AdbSocketAddress, adbetter Adbetter, ctx context.Context) (server Serverette)
 }
 
 // ServerFactory describes how AdbServer objects are obtained.
 // Such servers may use duifferent protocol implementations from Adbette
 type ServerFactory interface {
 	// Adb connects to an adb adb Android Debug Bridge server on a specified tcp socket
-	Adb(address string, ctx context.Context) (server Serverette)
+	Adb(address AdbSocketAddress, ctx context.Context) (server Serverette)
 	// AdbLocalhost connects to an adb Android Debug Bridge server on the local computer
 	AdbLocalhost(ctx context.Context) (server Serverette)
 }
 
-// AndroidSerial uniquely identities an Anroid device.
-// It is typically a string of a dozen or so 8-bit chanacters consisting of
-// lower and upper case a-zA-Z0-9
-type AndroidSerial string
-
 // AndroidStatus indicates the current status of a device
 // known to a Server or Serverette
-// it is a short word of ANSII-set characters
+// it is a single word of ANSII-set characters
 type AndroidStatus string
 
 // AndroidOnline is the Android device status
 // that indicates an online device
 const AndroidOnline AndroidStatus = "device"
-
-// AdressProvider retrieves the address from an adb server or device so that
-// custom devices can be created
-type AdressProvider interface {
-	DialAddress() (address string)
-}
