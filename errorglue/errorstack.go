@@ -7,13 +7,15 @@ package errorglue
 
 import (
 	"fmt"
+
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 // errorStack provides a stack trace to an error chain.
 // errorStack has publics Error() Unwrap() Format() ChainString() StackTrace()
 type errorStack struct {
 	RichError
-	s StackSlice // slice
+	s pruntime.StackSlice // slice
 }
 
 var _ error = &errorStack{}            // errorStack behaves like an error
@@ -22,11 +24,11 @@ var _ ChainStringer = &errorStack{}    // errorStack can be used by ChainString
 var _ fmt.Formatter = &errorStack{}    // errorStack has features for fmt.Printf
 var _ Wrapper = &errorStack{}          // errorStack has an error chain
 
-func NewErrorStack(err error, st StackSlice) (e2 error) {
+func NewErrorStack(err error, st pruntime.StackSlice) (e2 error) {
 	return &errorStack{*newRichError(err), st}
 }
 
-func (e *errorStack) StackTrace() (st StackSlice) {
+func (e *errorStack) StackTrace() (st pruntime.StackSlice) {
 	if e == nil {
 		return
 	}

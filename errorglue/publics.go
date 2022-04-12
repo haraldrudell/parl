@@ -78,7 +78,7 @@ func ErrorsWithStack(err error) (errs []error) {
 }
 
 // GetInnerMostStack gets the oldest stack trace in the error chain
-func GetInnerMostStack(err error) (stack StackSlice) {
+func GetInnerMostStack(err error) (stack pruntime.StackSlice) {
 	var e ErrorCallStacker
 	for errors.As(err, &e) {
 	}
@@ -89,7 +89,7 @@ func GetInnerMostStack(err error) (stack StackSlice) {
 }
 
 // GetStackTrace gets the last stack trace
-func GetStackTrace(err error) (stack StackSlice) {
+func GetStackTrace(err error) (stack pruntime.StackSlice) {
 	var e ErrorCallStacker
 	if errors.As(err, &e) {
 		stack = e.StackTrace()
@@ -98,11 +98,11 @@ func GetStackTrace(err error) (stack StackSlice) {
 }
 
 // GetStacks gets a slice of all stack traces, oldest first
-func GetStacks(err error) (stacks []StackSlice) {
+func GetStacks(err error) (stacks []pruntime.StackSlice) {
 	for err != nil {
 		if e, ok := err.(ErrorCallStacker); ok {
 			stack := e.StackTrace()
-			stacks = append([]StackSlice{stack}, stacks...)
+			stacks = append([]pruntime.StackSlice{stack}, stacks...)
 		}
 		err = errors.Unwrap(err)
 	}

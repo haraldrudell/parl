@@ -3,14 +3,12 @@
 ISC License
 */
 
-package errorglue
+package pruntime
 
 import (
 	"fmt"
 	"io"
 	"runtime"
-
-	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
@@ -22,7 +20,7 @@ const (
 )
 
 // StackSlice represents a StackSlice of program counters.
-type StackSlice []pruntime.CodeLocation
+type StackSlice []CodeLocation
 
 // NewStackSlice gets a slice of stack frames
 func NewStackSlice(skip int) (slice StackSlice) {
@@ -38,7 +36,7 @@ func NewStackSlice(skip int) (slice StackSlice) {
 	// convert to slice of CodeLocation
 	for {
 		frame, more := frames.Next()
-		slice = append(slice, *pruntime.GetCodeLocation(&frame))
+		slice = append(slice, *GetCodeLocation(&frame))
 		if !more {
 			break
 		}
@@ -55,7 +53,7 @@ func (st StackSlice) Short() (s string) {
 }
 
 func (st StackSlice) Clone() (s StackSlice) {
-	s = make([]pruntime.CodeLocation, len(st))
+	s = make([]CodeLocation, len(st))
 	copy(s, st)
 	return
 }

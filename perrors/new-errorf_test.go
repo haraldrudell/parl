@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/haraldrudell/parl/errorglue"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 func TestStack(t *testing.T) {
@@ -38,7 +39,7 @@ func TestStack(t *testing.T) {
 	var actualString string
 	var actualInt int
 
-	getStack := func(name string, fn func(wg *sync.WaitGroup, errp *error)) (stack errorglue.StackSlice, err error) {
+	getStack := func(name string, fn func(wg *sync.WaitGroup, errp *error)) (stack pruntime.StackSlice, err error) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go fn(&wg, &err)

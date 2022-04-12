@@ -57,6 +57,6 @@ func Stackn(err error, framesToSkip int) (err2 error) {
 	if framesToSkip < 0 {
 		framesToSkip = 0
 	}
-	err2 = errorglue.NewErrorStack(err, errorglue.NewStackSlice(e116StacknFramesToSkip+framesToSkip))
+	err2 = errorglue.NewErrorStack(err, pruntime.NewStackSlice(e116StacknFramesToSkip+framesToSkip))
 	return
 }
