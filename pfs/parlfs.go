@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 )
 
+var E = 17
+
 // AbsEval makes path absolute and resolves symlinks
 func AbsEval(path string) (p string, err error) {
 	if p, err = filepath.Abs(path); err == nil {
