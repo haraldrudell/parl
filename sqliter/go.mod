@@ -3,7 +3,7 @@ module github.com/haraldrudell/parl/sqliter
 go 1.18
 
 require (
-	github.com/haraldrudell/parl v0.4.6
+	github.com/haraldrudell/parl v0.4.7
 	modernc.org/sqlite v1.16.0
 )
 
