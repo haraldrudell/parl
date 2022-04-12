@@ -5,8 +5,6 @@ ISC License
 
 /*
 Package pfs provides file-system related functions
-
-© 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 */
 package pfs
 

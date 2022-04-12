@@ -1,16 +1,25 @@
 #!/bin/bash -eu
 # © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 # tidy
-# 220331 macOS 12.3, Linux 5.13
+# macOS 12.3.1, Linux 5.13
+VERSION="tidy"\
+"\n  version: 220412 parl: fix go work sync issues"\
+"\nu do “go get -u”"
 GoUpdate=(go get -u)
 GoModTidy=(go mod tidy)
 GoWorkSync=(go work sync)
 
-if [ $# -gt 0 ]; then
-  Update=true
-else
-  Update=false
-fi
+echo -e "\n$VERSION"
+
+Update=false
+if [ $# -gt 0 ]; then for OPTION in "$@"; do
+  if [ "$OPTION" = u ]; then
+    Update=true
+  else
+    echo >&2 "Bad option: '$OPTION'"
+    exit 1
+  fi
+done; fi
 
 tidyAll() {
   tidyDirectory mains
