@@ -22,8 +22,11 @@ type Devicette interface {
 	// which is a socket connection to the device,
 	// or by collecting the out string.
 	Shell(command string, reader func(conn io.ReadWriteCloser) (err error)) (out string, err error)
-	// Pull copies a remote file or directory on the Android device to a local file system location.
-	// the local file must not exist.
+	/*
+		Pull copies a remote file or directory on the Android device to a local file system location.
+		the local file must not exist.
+		Pull refuses certain files like product apks. shell cat works
+	*/
 	Pull(remotePath, nearPath string) (err error)
 	/*
 		List has some peculiarities:
@@ -46,9 +49,10 @@ type Devicette interface {
 
 // Dent is the information returned by adb ls or LIST
 type Dent interface {
-	// Name is utf-8 base path in device file system
+	// Name is utf-8 base path in device file system.
+	// Name is base name, ie. file name and extension.
 	Name() (name string)
-	// Modified is in second precision, local time zone
+	// Modified time, the time file contents was changed, second precision, continuous time
 	Modified() (modified time.Time)
 	// IsDir indicates directory.
 	// LIST only support symbolic link, directory and regular file types
@@ -58,7 +62,7 @@ type Dent interface {
 	IsRegular() (isRegular bool) // ie.not directory or symlink
 	// Perm returns os.FileMode data.
 	// 9-bit Unix permissions per os.FilePerm.
-	// directory and symlink bits
+	// LIST also supports directory and symlink bits
 	Perm() (perm fs.FileMode)
 	// Size is limited to 4 GiB-1
 	Size() (size uint32)

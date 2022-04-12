@@ -3,18 +3,16 @@
 ISC License
 */
 
-package errorglue
+package pruntime
 
 import (
 	"fmt"
 	"io"
 	"runtime"
-
-	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
-	maxStackFrameSize = 32
+	maxStackFrameSize = 1024
 	// 0 is runtime.Callers
 	// 1 is NewStackSLice
 	// 2 is caller location
@@ -22,23 +20,24 @@ const (
 )
 
 // StackSlice represents a StackSlice of program counters.
-type StackSlice []pruntime.CodeLocation
+type StackSlice []CodeLocation
 
 // NewStackSlice gets a slice of stack frames
 func NewStackSlice(skip int) (slice StackSlice) {
 
 	// get the slice of runtime.Frames
-	pcs := make([]uintptr, maxStackFrameSize)
-	entries := runtime.Callers(newStackSliceFramesToSkip+skip, pcs)
-	if entries == 0 {
-		return
+	var frames *runtime.Frames
+	for pcs := make([]uintptr, maxStackFrameSize); ; pcs = make([]uintptr, 2*len(pcs)) {
+		if entries := runtime.Callers(newStackSliceFramesToSkip+skip, pcs); entries < len(pcs) {
+			frames = runtime.CallersFrames(pcs[:entries])
+			break // the stack fit into pcs slice
+		}
 	}
-	frames := runtime.CallersFrames(pcs[:entries])
 
 	// convert to slice of CodeLocation
 	for {
 		frame, more := frames.Next()
-		slice = append(slice, *pruntime.GetCodeLocation(&frame))
+		slice = append(slice, *GetCodeLocation(&frame))
 		if !more {
 			break
 		}
@@ -55,7 +54,7 @@ func (st StackSlice) Short() (s string) {
 }
 
 func (st StackSlice) Clone() (s StackSlice) {
-	s = make([]pruntime.CodeLocation, len(st))
+	s = make([]CodeLocation, len(st))
 	copy(s, st)
 	return
 }

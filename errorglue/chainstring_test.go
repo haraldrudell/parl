@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 // we must have a package-wide type beacuse receivers can
@@ -44,7 +46,7 @@ func (tn *csTypeName) Do(t *testing.T) {
 	//   /opt/sw/privates/parl/error116/chainstring_test.go:18
 	// runtime.goexit
 	//   /opt/homebrew/Cellar/go/1.17.8/libexec/src/runtime/asm_arm64.s:1133
-	var stack StackSlice
+	var stack pruntime.StackSlice
 
 	t.Logf("LongFormat:\n%s", ChainString(stackErrs[0], LongFormat))
 
@@ -68,12 +70,12 @@ func (tn *csTypeName) FuncName() {
 				NewRelatedError(
 					NewErrorData(
 						NewErrorData(
-							NewErrorStack(errors.New(tn.errorMessage), NewStackSlice(0)),
+							NewErrorStack(errors.New(tn.errorMessage), pruntime.NewStackSlice(0)),
 							tn.key1, tn.value1),
 						tn.key2, tn.value2),
-					NewErrorStack(errors.New(tn.errorMsg2), NewStackSlice(0)),
+					NewErrorStack(errors.New(tn.errorMsg2), pruntime.NewStackSlice(0)),
 				)),
-			NewStackSlice(0))
+			pruntime.NewStackSlice(0))
 	tn.wg.Done()
 }
 

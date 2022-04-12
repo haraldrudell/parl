@@ -19,11 +19,12 @@ block from a delayed or missing reader.
 NBChan is initialization-free, thread-safe, idempotent, deferrable and observable.
 Ch(), Send(), Close() CloseNow() IsClosed() Count() are not blocked by channel send
 and are panic-free.
-Close() CloseNow() are deferrable
+Close() CloseNow() are deferrable.
 WaitForClose() waits until the underlying channel has been closed.
-NBChan implements a thread-safe error store perrors.ParlError
+NBChan implements a thread-safe error store perrors.ParlError.
 NBChan.GetError() returns thread panics and close errors.
 No errors are added to the error store after the channel has closed.
+NBChan does not generate errors. When it does, errors are thread panics and close errors.
  var errCh parl.NBChan[error]
  go thread(&errCh)
  err, ok := <-errCh.Ch()
@@ -33,7 +34,7 @@ No errors are added to the error store after the channel has closed.
  func thread(errCh *parl.NBChan[error]) {
    defer errCh.Close() // non-blocking close effective on send complete
    var err error
-   parl.Recover(parl.Annotation(), &err, errCh.AddErrorProc)
+   defer parl.Recover(parl.Annotation(), &err, errCh.AddErrorProc)
    errCh.Ch() <- err // non-blocking
    if err = someFunc(); err != nil {
      err = perrors.Errorf("someFunc: %w", err)

@@ -45,19 +45,39 @@ full package path, optional type receiver and the funtion name:
 
  Console(string, ...interface{}) — terminal interactivity output
 
-parl provides panic recovery for process and goroutines:
-capturing panics, annotating, retrieving and storing errors and
-invoking error handling functions:
+parl.Recover() and parl.Recover2() thread recovery and mains.Executable.Recover()
+process recovery:
+
+Threads can provide their errors via the perrors.ParlError thread-safe error store,
+plain error channels, parl.NBChan[error] or parl.ClosableChan[error].
+parl.Recover and parl.Recover2 convert thread panic to error along with regular errors,
+annotating, retrieving and storing those errors and invoking error handling functions for them.
+mains.Recover is similar for the process.
+ func thread(errCh *parl.NBChan[error]) { // real-time non-blocking error channel
+   defer errCh.Close() // non-blocking close effective on send complete
+   var err error
+   defer parl.Recover2(parl.Annotation(), &err, errCh.Send)
+   errCh.Ch() <- err // non-blocking
+   if err = someFunc(); err != nil {
+     err = perrors.Errorf("someFunc: %w", err) // labels and attaches a stack
+     return
+ …
+ func myThreadSafeThread(wg *sync.WaitGroup, errs *perrors.ParlError) { // ParlError: thread-safe error store
+   defer wg.Done()
+   var err error
+   defer parl.Recover(parl.Annotation(), &err, errs.AddErrorProc)
+ …
+
 
 parl package features:
  AtomicBool — Thread-safe boolean
- Closer — Deferable, panic free channel close
- ClosableChan — Initialization-free channel with inspectable close that does not panic
+ Closer — Deferrable, panic-free channel close
+ ClosableChan — Initialization-free channel with observable deferrable panic-free close
  Moderator — A ticketing system for limited parallelism
- NBChan — A non-blocking unbuffered channel with trillion-size buffer
- OnceChan — Initialization-free inspectable shutdown semaphore implementing Context
+ NBChan — A non-blocking channel with trillion-size dynamic buffer
+ OnceChan — Initialization-free observable shutdown semaphore implementing Context
  SerialDo — Serialization of invocations
- WaitGroup —Inspectable WaitGroup
+ WaitGroup —Observable WaitGroup
  Debouncer — Invocation debouncer, pre-generics
  Sprintf — Supporting thousands separator
 

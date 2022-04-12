@@ -6,6 +6,8 @@ ISC License
 // Package errorglue contains helful declarations that are not important
 package errorglue
 
+import "github.com/haraldrudell/parl/pruntime"
+
 // ChainStringer obntain s a comprehensive string representation of an error chain.
 // formats used are DefaultFormat ShortFormat LongFormat ShortSuffix LongSuffix
 type ChainStringer interface {
@@ -46,7 +48,7 @@ type ErrorHasCode interface {
 
 // ErrorCallStacker enrichens an error with a stack trace of code locations
 type ErrorCallStacker interface {
-	StackTrace() StackSlice
+	StackTrace() pruntime.StackSlice
 }
 
 // ErrorStore is a thread-safe store for any number of errors
