@@ -11,16 +11,16 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-type RecordDo struct {
+type TracerRecord struct {
 	At   time.Time
 	Text string
 }
 
-func NewRecordDo(text string) (record parl.TracerRecord) {
-	return &RecordDo{At: time.Now(), Text: text}
+func NewTracerRecord(text string) (record parl.TracerRecord) {
+	return &TracerRecord{At: time.Now(), Text: text}
 }
 
-func (rd *RecordDo) Values() (at time.Time, text string) {
+func (rd *TracerRecord) Values() (at time.Time, text string) {
 	at = rd.At
 	text = rd.Text
 	return

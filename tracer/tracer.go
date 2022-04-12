@@ -30,7 +30,7 @@ func NewTracer() (tracer parl.Tracer) {
 		tasks:   map[parl.TracerTaskID][]parl.TracerRecord{}}
 }
 
-func (tr *Tracer) Assign(threadID goid.ThreadID, task parl.TracerTaskID) (tr2 parl.Tracer) {
+func (tr *Tracer) AssignTaskToThread(threadID goid.ThreadID, task parl.TracerTaskID) (tr2 parl.Tracer) {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 	tr2 = tr
@@ -43,7 +43,7 @@ func (tr *Tracer) Assign(threadID goid.ThreadID, task parl.TracerTaskID) (tr2 pa
 		recordListBefore = tr.tasks[taskBefore]
 		// unassign from previous task as appropriate
 		if task == "" || task != taskBefore {
-			recordListBefore = append(recordListBefore, NewRecordDo(trUnassigned+string(threadID)))
+			recordListBefore = append(recordListBefore, NewTracerRecord(trUnassigned+string(threadID)))
 			tr.tasks[taskBefore] = recordListBefore
 		}
 	}
@@ -58,14 +58,14 @@ func (tr *Tracer) Assign(threadID goid.ThreadID, task parl.TracerTaskID) (tr2 pa
 	tr.threads[threadID] = task
 	recordListNow := tr.tasks[task]
 	if len(recordListNow) == 0 {
-		recordListNow = []parl.TracerRecord{NewRecordDo(string(task))} // first record is task name
+		recordListNow = []parl.TracerRecord{NewTracerRecord(string(task))} // first record is task name
 	}
-	recordListNow = append(recordListNow, NewRecordDo(trAssigned+string(threadID)))
+	recordListNow = append(recordListNow, NewTracerRecord(trAssigned+string(threadID)))
 	tr.tasks[task] = recordListNow
 	return
 }
 
-func (tr *Tracer) Record(threadID goid.ThreadID, text string) (tr2 parl.Tracer) {
+func (tr *Tracer) RecordTaskEvent(threadID goid.ThreadID, text string) (tr2 parl.Tracer) {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 	tr2 = tr
@@ -78,13 +78,13 @@ func (tr *Tracer) Record(threadID goid.ThreadID, text string) (tr2 parl.Tracer) 
 		assignedTask = parl.TracerTaskID(trDefaultTask + string(threadID))
 		recordList = tr.tasks[assignedTask]
 		if len(recordList) == 0 {
-			recordList = []parl.TracerRecord{NewRecordDo(string(assignedTask))} // first record is task name
+			recordList = []parl.TracerRecord{NewTracerRecord(string(assignedTask))} // first record is task name
 		}
 	} else {
 		recordList = tr.tasks[assignedTask]
 	}
 
-	recordList = append(recordList, NewRecordDo(text))
+	recordList = append(recordList, NewTracerRecord(text))
 	tr.tasks[assignedTask] = recordList
 	return
 }

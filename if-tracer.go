@@ -11,9 +11,22 @@ import (
 	"github.com/haraldrudell/parl/goid"
 )
 
+// Tracer lists events in terms of tasks rather than per time or thread.
+// A task is executed by threads assigned to it.
+// Threads are uniquely identified by threadID.
+// A task can have zero or one threads assigned at any one time.
+// A thread can be assigned to zero or one tasks.
+// Each task has an ID, a name and a list of events and thread assignments
+// Tracer can record branching in the code and return that for a particular
+// item being processed. For an item processed incorrectly, or when
+// threads hang, Tracer will find unfavorable branching and last known locations.
 type Tracer interface {
-	Assign(threadID goid.ThreadID, task TracerTaskID) (tracer Tracer)
-	Record(threadID goid.ThreadID, text string) (tracer Tracer)
+	// AssignTaskToThread assigns a Thread to a task
+	AssignTaskToThread(threadID goid.ThreadID, task TracerTaskID) (tracer Tracer)
+	// RecordTaskEvent adds an event to the task threadID is currently assigned to.
+	// If threadID is not assigned, a new task is created.
+	RecordTaskEvent(threadID goid.ThreadID, text string) (tracer Tracer)
+	// Records returns the current map of tasks and their events
 	Records(clear bool) (records map[TracerTaskID][]TracerRecord)
 }
 
@@ -24,5 +37,7 @@ type TracerRecord interface {
 }
 
 type TracerFactory interface {
-	NewTracer() (tracer Tracer)
+	// NewTracer creates tracer storage.
+	// use false indicates a nil Tracer whose output will not be used
+	NewTracer(use bool) (tracer Tracer)
 }

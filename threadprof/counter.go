@@ -25,12 +25,12 @@ func newCounter() (counter parl.Counter) {
 }
 
 func (cn *Counter) Inc() (counter parl.Counter) {
-	value := atomic.AddUint64(&cn.value, 1)
-	atomic.AddUint64(&cn.running, 1)
+	atomic.AddUint64(&cn.value, 1)
+	running := atomic.AddUint64(&cn.running, 1)
 	for {
 		max := atomic.LoadUint64(&cn.max)
-		if value <= max || // no update is required
-			atomic.CompareAndSwapUint64(&cn.max, max, value) { // update was successful
+		if running <= max || // no update is required
+			atomic.CompareAndSwapUint64(&cn.max, max, running) { // update was successful
 			break
 		}
 	}
