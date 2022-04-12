@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	maxStackFrameSize = 32
+	maxStackFrameSize = 1024
 	// 0 is runtime.Callers
 	// 1 is NewStackSLice
 	// 2 is caller location
@@ -26,12 +26,13 @@ type StackSlice []CodeLocation
 func NewStackSlice(skip int) (slice StackSlice) {
 
 	// get the slice of runtime.Frames
-	pcs := make([]uintptr, maxStackFrameSize)
-	entries := runtime.Callers(newStackSliceFramesToSkip+skip, pcs)
-	if entries == 0 {
-		return
+	var frames *runtime.Frames
+	for pcs := make([]uintptr, maxStackFrameSize); ; pcs = make([]uintptr, 2*len(pcs)) {
+		if entries := runtime.Callers(newStackSliceFramesToSkip+skip, pcs); entries < len(pcs) {
+			frames = runtime.CallersFrames(pcs[:entries])
+			break // the stack fit into pcs slice
+		}
 	}
-	frames := runtime.CallersFrames(pcs[:entries])
 
 	// convert to slice of CodeLocation
 	for {
