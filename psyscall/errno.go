@@ -22,17 +22,22 @@ func IsConnectionRefused(err error) (isConnectionRefused bool) {
 	return Errno(err) == syscall.ECONNREFUSED
 }
 
-// Errno scans an error chain for a syscall.Errno type, returning nil if none exists.
-// int(errno) provides the numeric value.
-// errno can be compared:
-//  if errno == syscall.ENOENT…
-// The errno numeric value can be printed:
-//  fmt.Printf("0x%x", int(errno))
-func Errno(err error) (errno syscall.Errno) {
+// Errno scans an error chain for a syscall.Errno type.
+// Errno returns syscall.Errno 0x0 if none exists.
+// Note: syscall.Errno.Error has value receiver.
+// Errno checks:
+//  Errno(nil) == 0 → true.
+//  if errno != 0 {…
+//  int(errno) provides the numeric value.
+//   if errno == syscall.ENOENT…
+//   fmt.Printf("%v", errno) → state not recoverable
+//   fmt.Printf("0x%x", int(errno)) → 0x68
+func Errno(err error) (errnoValue syscall.Errno) {
 	for ; err != nil; err = errors.Unwrap(err) {
-		if errno1, ok := err.(syscall.Errno); ok {
-			return errno1
+		var ok bool
+		if errnoValue, ok = err.(syscall.Errno); ok {
+			return // match return
 		}
 	}
-	return
+	return // no match return
 }

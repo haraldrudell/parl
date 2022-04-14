@@ -11,7 +11,7 @@ features: moderator, sqlite interface, package-selectable logging, debouncer, se
 <a href=./LICENSE>ISC License</a>
 <br />
 <br />
-<img src=./assets/theflag.png>
+<img src=./zassets/theflag.png>
 “justice, peace and massive virtual parallelism”
 <br />
 <br />

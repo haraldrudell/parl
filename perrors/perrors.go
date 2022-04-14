@@ -49,3 +49,10 @@ Is compatible:
 © 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 */
 package perrors
+
+// IsError is used for type assertions determining if an error value
+// implements the Is() method, therefore supports errors.Is()
+type IsError interface {
+	error
+	Is(target error) (isThisType bool)
+}
