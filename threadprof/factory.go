@@ -61,6 +61,7 @@ func (tn *counterNil) Ops() (ops uint64)                                   { ret
 func (tn *counterNil) Max() (max uint64)                                   { return }
 func (tn *counterNil) IncRate() (incRate uint64)                           { return }
 func (tn *counterNil) DecRate() (decRate uint64)                           { return }
+func (tn *counterNil) SetValue(value uint64)                               {}
 
 type statuserNil struct{}
 

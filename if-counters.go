@@ -26,6 +26,7 @@ type Counters interface {
 type Counter interface {
 	Inc() (counter Counter)
 	Dec() (counter Counter)
+	SetValue(value uint64)
 	CounterValue(reset bool) (values CounterValues)
 }
 

@@ -42,6 +42,10 @@ func (cn *Counter) Dec() (cunter parl.Counter) {
 	return cn
 }
 
+func (cn *Counter) SetValue(value uint64) {
+	cn.value = value
+}
+
 func (cn *Counter) CounterValue(reset bool) (values parl.CounterValues) {
 	values = &CounterValue{
 		value:   atomic.LoadUint64(&cn.value),
