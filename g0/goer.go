@@ -55,6 +55,7 @@ func NewGoer(
 		addLocation: *addLocation,
 		gr:          &GoerRuntime{},
 	}
+	gd.gr.wg.Add(1)
 	gd.gr.g0 = NewGo(
 		gd.errorReceiver,
 		gd.add,
@@ -162,7 +163,6 @@ func (gr *GoerDo) getGoerRuntime(checkThread bool) (goerRuntime *GoerRuntime) {
 	var stack *goid.Stack
 	if checkThread {
 		stack = goid.NewStack(grCheckThreadFrames)
-		parl.D("getGoerRuntime: stack: %s", stack)
 	}
 	gr.lock.Lock()
 	defer gr.lock.Unlock()
@@ -182,21 +182,25 @@ func (gr *GoerDo) getGoerRuntime(checkThread bool) (goerRuntime *GoerRuntime) {
 	return gr.gr
 }
 
+/*
+#[index] [waitcount] ([adds]) [thread-ID or parent-thread-ID] add: add-location
+# go-creator index
+*/
 func (gr *GoerDo) String() (s string) {
 	sList := []string{fmt.Sprintf("#%d", gr.index)}
 	if goerRuntime := gr.getGoerRuntime(false); goerRuntime != nil {
 		adds, dones := goerRuntime.wg.Counters()
-		sList = append(sList, fmt.Sprintf("%d(%d", adds-dones, adds))
+		sList = append(sList, fmt.Sprintf("%d(%d)", adds-dones, adds))
 	}
 	if gr.threadID != "" {
-		sList = append(sList, "ID: %d", string(gr.threadID))
+		sList = append(sList, "ID: "+gr.threadID.String())
 	} else {
-		sList = append(sList, "pID: %d", string(gr.parentID))
+		sList = append(sList, "pID: "+gr.parentID.String())
 	}
 	if gr.funcLocation.FuncName != "" {
 		sList = append(sList, gr.funcLocation.PackFunc())
 	} else {
-		sList = append(sList, "add: %s", gr.addLocation.Short())
+		sList = append(sList, "add: "+gr.addLocation.Short())
 	}
 
 	return strings.Join(sList, "\x20")
