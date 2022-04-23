@@ -29,6 +29,7 @@ type GoCreator interface {
 	// that have yet to exit
 	WaitPeriod(duration ...time.Duration)
 	IsExit() (isExit bool)
+	List() (s string)
 }
 
 // GoError is an error or a thread exit associated with a goroutine

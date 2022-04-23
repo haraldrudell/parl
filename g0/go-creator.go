@@ -92,7 +92,7 @@ func (gc *GoCreatorDo) WaitPeriod(duration ...time.Duration) {
 	ticker := time.NewTicker(d)
 	defer ticker.Stop()
 
-	parl.Console(gc.list())
+	parl.Console(gc.List())
 	for keepGoing := true; keepGoing; {
 		select {
 		case <-waitCh:
@@ -100,7 +100,7 @@ func (gc *GoCreatorDo) WaitPeriod(duration ...time.Duration) {
 		case <-ticker.C:
 		}
 
-		parl.Console(gc.list())
+		parl.Console(gc.List())
 	}
 }
 
@@ -108,7 +108,7 @@ func (gc *GoCreatorDo) IsExit() (isExit bool) {
 	return gc.wg.IsZero()
 }
 
-func (gc *GoCreatorDo) list() (s string) {
+func (gc *GoCreatorDo) List() (s string) {
 	timeStamp := ptime.Short()
 	goIndex := gc.getGoerList()
 
@@ -120,14 +120,17 @@ func (gc *GoCreatorDo) list() (s string) {
 	}
 	sort.Slice(goList, func(i, j int) bool { return goList[i] < goList[j] })
 
+	adds, dones := gc.wg.Counters()
+	s = parl.Sprintf("%s %d(%d)", timeStamp, adds-dones, adds)
+
 	if len(goIndex) == 0 {
-		return timeStamp + "\x20None"
+		return s + "\x20None"
 	}
 	if len(goIndex) == 1 {
-		return timeStamp + (goIndex[goList[0]]).String()
+		return s + "\x20" + (goIndex[goList[0]]).String()
 	}
 
-	sList := []string{"\n" + timeStamp + ":"}
+	sList := []string{"\n" + s + ":"}
 	for _, index := range goList {
 		sList = append(sList, goIndex[index].String())
 	}
