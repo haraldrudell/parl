@@ -7,6 +7,7 @@ package sqliter
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,11 @@ const (
 )
 
 type DBUtil struct{}
+
+type ErrorCode interface {
+	error
+	Code() (code int)
+}
 
 func (du *DBUtil) BoolToDB(b bool) (dbValue int) {
 	if b {
@@ -77,6 +83,13 @@ func (du *DBUtil) Int(sqlRow *sql.Row, e error) (value int, err error) {
 		return
 	}
 
+	return
+}
+
+func (du *DBUtil) GetErrorCode(err error) (code int, ec ErrorCode) {
+	if errors.As(err, &ec) {
+		code = ec.Code()
+	}
 	return
 }
 
