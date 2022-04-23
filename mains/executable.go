@@ -386,7 +386,7 @@ func (ex *Executable) Recover() {
 			hasStack = perrors.HasStack(err)
 		}
 		parl.Debug("exe.Recover: executable %s panic: %T hasStack: %t '%+[2]v'", ex.Program, e, hasStack)
-		fmt.Println("Unhandled panic invoked exe.Recover: stack:")
+		parl.Log("Unhandled panic invoked exe.Recover: stack:")
 		debug.PrintStack()
 		var err error
 		var ok bool
