@@ -24,7 +24,7 @@ type CancelContextDo struct {
 func NewCancelContext(ctx context.Context) (cancelCtx CancelContext) {
 	c := CancelContextDo{}
 	c.Context, c.cancel = context.WithCancel(ctx)
-	return
+	return &c
 }
 
 // Cancel cancels this context
