@@ -14,8 +14,8 @@ const (
 	rfc3339msz        = "2006-01-02T15:04:05.000Z"
 	rfc3339usz        = "2006-01-02T15:04:05.000000Z"
 	rfc3339nsz        = "2006-01-02T15:04:05.000000000Z"
-	shortHour         = "060102_150405Z07"
-	shortMinute       = "060102_150405Z0700"
+	shortHour         = "060102_15:04:05Z07"
+	shortMinute       = "060102_15:04:05Z0700"
 	offsetHourDivisor = int(time.Hour / time.Second)
 )
 
