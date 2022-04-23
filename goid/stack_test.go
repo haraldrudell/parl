@@ -8,6 +8,7 @@ package goid
 import (
 	"testing"
 
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
@@ -35,5 +36,22 @@ func TestNewStack(t *testing.T) {
 	cl := pruntime.NewCodeLocation(0)
 	if stack.Frames[0].File != cl.File {
 		t.Errorf("Bad file: %s expected %s", stack.Frames[0].File, cl.File)
+	}
+}
+
+func TestParseFirstStackLine(t *testing.T) {
+	input := "goroutine 19 [running]:\ngarbage"
+	expID := parl.ThreadID("19")
+	expStatus := parl.ThreadStatus("running")
+
+	ID, status, err := ParseFirstLine(input)
+	if err != nil {
+		t.Errorf("ParseFirstStackLine err: %v", err)
+	}
+	if ID != expID {
+		t.Errorf("ID: %q exp: %q", ID, expID)
+	}
+	if status != expStatus {
+		t.Errorf("status: %q exp: %q", status, expStatus)
 	}
 }

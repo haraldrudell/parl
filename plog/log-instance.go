@@ -33,6 +33,8 @@ type LogInstance struct {
 	isDebug           uint32 // atomic
 	infoLock          sync.RWMutex
 	infoRegexp        *regexp.Regexp // behing infoLock
+	outLock           sync.Mutex
+	writer            io.Writer
 	output            func(calldepth int, s string) error
 	stackFramesToSkip int
 }
@@ -53,6 +55,7 @@ func NewLog(writers ...io.Writer) (lg *LogInstance) {
 		logger = log.New(writer, "", 0)
 	}
 	return &LogInstance{
+		writer:            writer,
 		output:            logger.Output,
 		stackFramesToSkip: logInstDefFrames,
 	}
@@ -72,6 +75,12 @@ func NewLogFrames(writer io.Writer, extraStackFramesToSkip int) (lg *LogInstance
 // if debug is enabled, code location is appended
 func (lg *LogInstance) Log(format string, a ...interface{}) {
 	lg.doLog(format, a...)
+}
+
+// Logw invocations always print.
+// Logw outputs withoput appending newline
+func (lg *LogInstance) Logw(format string, a ...interface{}) {
+	lg.invokeWriter(sprintf(format, a...))
 }
 
 // Info prints unless silence has been configured with SetSilence(true)
@@ -99,17 +108,13 @@ func (lg *LogInstance) Debug(format string, a ...interface{}) {
 	} else {
 		cloc = pruntime.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta)
 	}
-	if err := lg.output(0, appendLocation(sprintf(format, a...), cloc)); err != nil {
-		panic(perrors.Errorf("LogInstance output: %w", err))
-	}
+	lg.invokeOutput(appendLocation(sprintf(format, a...), cloc))
 }
 
 // D prints to stderr with code location
 // Thread safe. D is meant for temporary output intended to be removed before check-in
 func (lg *LogInstance) D(format string, a ...interface{}) {
-	if err := lg.output(0, appendLocation(sprintf(format, a...), pruntime.NewCodeLocation(lg.stackFramesToSkip+logInstDebugFrameDelta))); err != nil {
-		panic(perrors.Errorf("LogInstance output: %w", err))
-	}
+	lg.invokeOutput(appendLocation(sprintf(format, a...), pruntime.NewCodeLocation(lg.stackFramesToSkip+logInstDebugFrameDelta)))
 }
 
 // SetDebug prints everything with code location: IsInfo
@@ -161,6 +166,24 @@ func (lg *LogInstance) IsSilent() (isSilent bool) {
 	return atomic.LoadUint32(&lg.isSilence) != 0
 }
 
+func (lg *LogInstance) invokeOutput(s string) {
+	lg.outLock.Lock()
+	defer lg.outLock.Unlock()
+
+	if err := lg.output(0, s); err != nil {
+		panic(perrors.Errorf("LogInstance output: %w", err))
+	}
+}
+
+func (lg *LogInstance) invokeWriter(s string) {
+	lg.outLock.Lock()
+	defer lg.outLock.Unlock()
+
+	if _, err := lg.writer.Write([]byte(s)); err != nil {
+		panic(perrors.Errorf("LogInstance writer: %w", err))
+	}
+}
+
 func (lg *LogInstance) getRegexp() *regexp.Regexp {
 	lg.infoLock.RLock()
 	defer lg.infoLock.RUnlock()
@@ -172,9 +195,7 @@ func (lg *LogInstance) doLog(format string, a ...interface{}) {
 	if atomic.LoadUint32(&lg.isDebug) != 0 {
 		s = appendLocation(s, pruntime.NewCodeLocation(lg.stackFramesToSkip))
 	}
-	if err := lg.output(0, s); err != nil {
-		panic(perrors.Errorf("LogInstance output: %w", err))
-	}
+	lg.invokeOutput(s)
 }
 
 func appendLocation(s string, location *pruntime.CodeLocation) string {

@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/goid"
 )
 
 const (
@@ -20,17 +19,17 @@ const (
 
 type Tracer struct {
 	lock    sync.Mutex
-	threads map[goid.ThreadID]parl.TracerTaskID
+	threads map[parl.ThreadID]parl.TracerTaskID
 	tasks   map[parl.TracerTaskID][]parl.TracerRecord
 }
 
 func NewTracer() (tracer parl.Tracer) {
 	return &Tracer{
-		threads: map[goid.ThreadID]parl.TracerTaskID{},
+		threads: map[parl.ThreadID]parl.TracerTaskID{},
 		tasks:   map[parl.TracerTaskID][]parl.TracerRecord{}}
 }
 
-func (tr *Tracer) AssignTaskToThread(threadID goid.ThreadID, task parl.TracerTaskID) (tr2 parl.Tracer) {
+func (tr *Tracer) AssignTaskToThread(threadID parl.ThreadID, task parl.TracerTaskID) (tr2 parl.Tracer) {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 	tr2 = tr
@@ -65,7 +64,7 @@ func (tr *Tracer) AssignTaskToThread(threadID goid.ThreadID, task parl.TracerTas
 	return
 }
 
-func (tr *Tracer) RecordTaskEvent(threadID goid.ThreadID, text string) (tr2 parl.Tracer) {
+func (tr *Tracer) RecordTaskEvent(threadID parl.ThreadID, text string) (tr2 parl.Tracer) {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 	tr2 = tr
@@ -100,7 +99,7 @@ func (tr *Tracer) Records(clear bool) (records map[parl.TracerTaskID][]parl.Trac
 		records[key] = slice2
 	}
 	if clear {
-		tr.threads = map[goid.ThreadID]parl.TracerTaskID{}
+		tr.threads = map[parl.ThreadID]parl.TracerTaskID{}
 		tr.tasks = map[parl.TracerTaskID][]parl.TracerRecord{}
 	}
 	return

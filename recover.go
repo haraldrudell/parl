@@ -75,6 +75,8 @@ func invokeOnError(onError func(error), err error) {
 	}
 }
 
+func NoOnError(err error) {}
+
 func Annotation() (annotation string) {
 	return fmt.Sprintf("Recover from panic in %s:", pruntime.NewCodeLocation(recAnnStackFrames).PackFunc())
 }

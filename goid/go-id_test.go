@@ -12,16 +12,18 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/haraldrudell/parl"
 )
 
 func TestGoID(t *testing.T) {
 	runtGoroutinePrefix := "goroutine "
 
 	// get expected ThreadID
-	var expectedID ThreadID
+	var expectedID parl.ThreadID
 	s := strings.TrimPrefix(string(debug.Stack()), runtGoroutinePrefix)
 	if index := strings.Index(s, "\x20"); index != -1 {
-		expectedID = ThreadID(s[:index])
+		expectedID = parl.ThreadID(s[:index])
 	} else {
 		t.Error("debug.Stack failed")
 	}

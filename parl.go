@@ -90,14 +90,10 @@ On March 16th, 2022, parl was open-sourced under an ISC License
 package parl
 
 const (
-	Rfc3339s   = "2006-01-02 15:04:05-07:00"
-	Rfc3339ms  = "2006-01-02 15:04:05.999-07:00"
-	Rfc3339us  = "2006-01-02 15:04:05.999999-07:00"
-	Rfc3339ns  = "2006-01-02 15:04:05.999999999-07:00"
-	Rfc3339sz  = "2006-01-02T15:04:05Z"
-	Rfc3339msz = "2006-01-02T15:04:05.999Z"
-	Rfc3339usz = "2006-01-02T15:04:05.999999Z"
-	Rfc3339nsz = "2006-01-02T15:04:05.999999999Z"
+	Rfc3339s  = "2006-01-02 15:04:05Z07:00"
+	Rfc3339ms = "2006-01-02 15:04:05.000Z07:00"
+	Rfc3339us = "2006-01-02 15:04:05.000000Z07:00"
+	Rfc3339ns = "2006-01-02 15:04:05.000000000Z07:00"
 )
 
 type Password interface {
@@ -108,3 +104,18 @@ type Password interface {
 type FSLocation interface {
 	Directory() (directory string)
 }
+
+/*
+ThreadID is an opaque type that uniquley identifies a thread,
+ie. a goroutine.
+goid.GoID obtains ThreadID for the executing
+thread.
+ThreadID is comparable, ie. can be used as a map key.
+ThreadID can be cast to string using .String()
+func (threadID ThreadID) String() (s string)
+*/
+type ThreadID string
+
+// ThreadStatus indicates the current stat of a thread
+// most often it is "running"
+type ThreadStatus string

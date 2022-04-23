@@ -7,8 +7,6 @@ package parl
 
 import (
 	"time"
-
-	"github.com/haraldrudell/parl/goid"
 )
 
 // Tracer lists events in terms of tasks rather than per time or thread.
@@ -22,10 +20,10 @@ import (
 // threads hang, Tracer will find unfavorable branching and last known locations.
 type Tracer interface {
 	// AssignTaskToThread assigns a Thread to a task
-	AssignTaskToThread(threadID goid.ThreadID, task TracerTaskID) (tracer Tracer)
+	AssignTaskToThread(threadID ThreadID, task TracerTaskID) (tracer Tracer)
 	// RecordTaskEvent adds an event to the task threadID is currently assigned to.
 	// If threadID is not assigned, a new task is created.
-	RecordTaskEvent(threadID goid.ThreadID, text string) (tracer Tracer)
+	RecordTaskEvent(threadID ThreadID, text string) (tracer Tracer)
 	// Records returns the current map of tasks and their events
 	Records(clear bool) (records map[TracerTaskID][]TracerRecord)
 }

@@ -9,23 +9,13 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/goid"
 )
-
-var HistoryFactory parl.HistoryFactory = &historyFactory{}
 
 var CountersFactory parl.CountersFactory = &countersFactory{}
 
 var StatuserFactory parl.StatuserFactory = &statuserFactory{}
 
 type historyFactory struct{}
-
-func (ff *historyFactory) NewThreadHistory(useEvents bool, useHistory bool) (threadHistory parl.History) {
-	if !useEvents {
-		return &threadNil{}
-	}
-	return newEvents(useHistory)
-}
 
 type countersFactory struct{}
 
@@ -47,9 +37,9 @@ func (ff *statuserFactory) NewStatuser(useStatuser bool, d time.Duration) (statu
 
 type threadNil struct{}
 
-func (tn *threadNil) Event(event string, ID0 ...goid.ThreadID) {}
+func (tn *threadNil) Event(event string, ID0 ...parl.ThreadID) {}
 
-func (tn *threadNil) GetEvents() (events map[goid.ThreadID][]string) { return }
+func (tn *threadNil) GetEvents() (events map[parl.ThreadID][]string) { return }
 
 type countersNil struct{}
 

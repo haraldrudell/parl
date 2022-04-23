@@ -6,8 +6,6 @@ ISC License
 package parl
 
 import (
-	"os"
-
 	"github.com/haraldrudell/parl/plog"
 )
 
@@ -16,11 +14,15 @@ const (
 )
 
 var stderrLogger = plog.NewLogFrames(nil, logStackFramesToSkip)
-var stdoutOutput = plog.GetLog(os.Stdout).Output
+var stdoutLogger = plog.NewLogFrames(nil, logStackFramesToSkip)
 
 // Out prints extected output to stdout
 func Out(format string, a ...interface{}) {
-	stdoutOutput(0, Sprintf(format, a...))
+	stdoutLogger.Log(format, a...)
+}
+
+func Outw(format string, a ...interface{}) {
+	stderrLogger.Logw(format, a...)
 }
 
 // Log invocations always print
@@ -29,10 +31,22 @@ func Log(format string, a ...interface{}) {
 	stderrLogger.Log(format, a...)
 }
 
+// Logw invocations always print.
+// Logw outputs withoput appending newline
+func Logw(format string, a ...interface{}) {
+	stderrLogger.Logw(format, a...)
+}
+
 // Console always print intended for command-line interactivity
 // if debug is enabled, code location is appended
 func Console(format string, a ...interface{}) {
 	stderrLogger.Log(format, a...)
+}
+
+// Consolew always print intended for command-line interactivity
+// Consolew does not append a newline
+func Consolew(format string, a ...interface{}) {
+	stderrLogger.Logw(format, a...)
 }
 
 // Info prints unless silence has been configured with SetSilence(true)

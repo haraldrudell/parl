@@ -20,30 +20,37 @@ parl.WaitGroup requires no initialization.
 */
 type WaitGroup struct {
 	sync.WaitGroup
-	lock    sync.Mutex
-	counter int
+	lock  sync.Mutex
+	adds  int
+	dones int
 }
 
 func (wg *WaitGroup) Add(delta int) {
 	wg.lock.Lock()
 	defer wg.lock.Unlock()
-	wg.counter += delta
+
+	wg.adds += delta
 	wg.WaitGroup.Add(delta)
 }
 
 func (wg *WaitGroup) Done() {
 	wg.lock.Lock()
 	defer wg.lock.Unlock()
-	wg.counter--
+
+	wg.dones++
 	wg.WaitGroup.Done()
 }
 
-func (wg *WaitGroup) Counter() (counter int) {
+func (wg *WaitGroup) Counters() (adds int, dones int) {
 	wg.lock.Lock()
 	defer wg.lock.Unlock()
-	return wg.counter
+
+	adds = wg.adds
+	dones = wg.dones
+	return
 }
 
 func (wg *WaitGroup) IsZero() (isZero bool) {
-	return wg.Counter() == 0
+	adds, dones := wg.Counters()
+	return adds == dones
 }
