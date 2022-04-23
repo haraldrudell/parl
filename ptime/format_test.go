@@ -78,7 +78,7 @@ func TestRfc3339sz(t *testing.T) {
 }
 
 func TestShort(t *testing.T) {
-	exp := "220101_000000-08"
+	exp := "220101_00:00:00-08"
 	input := timeFixture
 	actual := Short(input)
 
