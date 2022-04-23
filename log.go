@@ -6,6 +6,8 @@ ISC License
 package parl
 
 import (
+	"os"
+
 	"github.com/haraldrudell/parl/plog"
 )
 
@@ -14,7 +16,7 @@ const (
 )
 
 var stderrLogger = plog.NewLogFrames(nil, logStackFramesToSkip)
-var stdoutLogger = plog.NewLogFrames(nil, logStackFramesToSkip)
+var stdoutLogger = plog.NewLogFrames(os.Stdout, logStackFramesToSkip)
 
 // Out prints extected output to stdout
 func Out(format string, a ...interface{}) {
