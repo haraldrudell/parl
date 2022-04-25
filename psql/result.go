@@ -7,37 +7,59 @@ package psql
 
 import (
 	"database/sql"
-	"strconv"
+	"fmt"
+
+	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
-// Result makes sql.Result printable
-type Result struct {
-	sql.Result
+// ExecResult makes sql.Result printable.
+// sql.Result are obtained by invoking Exec* methods of sql.DB sql.Stmt sql.Conn sql.Tx.
+// sql.Result is an interface with methods LastInsertId and RowsAffected.
+// each driver provides an sql.Result implementation.
+type ExecResult struct {
+	ID   int64
+	rows int64
 }
 
-// Get obtains last id and number of affected rows
-func (r *Result) Get() (id int64, count int64, sErr string, err error) {
-	id, err = r.LastInsertId()
-	if err == nil {
-		count, err = r.RowsAffected()
-		if err != nil {
-			sErr = "sql.Result.RowsAffected error: " + err.Error()
-		}
-	} else {
-		sErr = "sql.Result.LastInsertId error: " + err.Error()
+func NewExecResult(execResult sql.Result, e error) (result parl.ExecResult, err error) {
+	r := ExecResult{}
+	if err = e; err != nil {
+		return
 	}
+
+	if r.ID, err = execResult.LastInsertId(); err != nil {
+		err = perrors.Errorf("LastInsertId err: %w", err)
+		return
+	}
+	if r.rows, err = execResult.RowsAffected(); err != nil {
+		err = perrors.Errorf("RowsAffected err: %w", err)
+		return
+	}
+	result = &r
+
 	return
 }
 
-func (r Result) String() (s string) {
-	id, count, sErr, _ := r.Get()
+// ExecValues parses the result from an Exec* method into its values.
+// if LastInsertId or RowsAffected fails, the error is added to err.
+func ExecValues(execResult sql.Result, e error) (ID, rows int64, err error) {
+	var result parl.ExecResult
+	result, err = NewExecResult(execResult, e)
+	r := result.(*ExecResult)
+	ID = r.ID
+	rows = r.rows
 
-	s = "sql.Result: "
-	if sErr != "" {
-		s += sErr
-	} else {
-		s += "last inserted id: " + strconv.FormatInt(id, 10) +
-			"rows affected: " + strconv.FormatInt(count, 10)
-	}
 	return
+}
+
+// Get obtains last id and number of affected rows with errors separately
+func (r *ExecResult) Get() (ID int64, rows int64) {
+	ID = r.ID
+	rows = r.rows
+	return
+}
+
+func (r ExecResult) String() (s string) {
+	return fmt.Sprintf("sql.Result: ID %d rows: %d", r.ID, r.rows)
 }

@@ -15,7 +15,9 @@ import (
 )
 
 const (
-	urwx os.FileMode = 0700
+	urwx      os.FileMode = 0700
+	extension             = ".db"
+	hyphen                = "-"
 )
 
 type DataSourceNamer struct {
@@ -39,18 +41,18 @@ func NewDataSourceNamer(appName string) (dns parl.DataSourceNamer) {
 	return &d
 }
 
-func (dn *DataSourceNamer) DSN(year ...string) (dsn string) {
+func (dn *DataSourceNamer) DSN(year ...parl.DBPartition) (dsn string) {
 
 	// get database file name
 	var filename string
-	var year0 string
+	var year0 parl.DBPartition
 	if len(year) > 0 {
 		year0 = year[0]
 	}
 	if year0 != "" {
-		filename = dn.appName + "-" + year0 + ".db"
+		filename = dn.appName + hyphen + string(year0) + extension
 	} else {
-		filename = dn.appName + ".db"
+		filename = dn.appName + extension
 	}
 
 	return filepath.Join(dn.dir, filename)

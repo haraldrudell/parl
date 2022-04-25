@@ -11,15 +11,15 @@ import (
 )
 
 type DataSourceNamer interface {
-	DSN(year ...string) (dataSourceName string)
+	DSN(partition ...DBPartition) (dataSourceName string)
 	DataSource(dsn string) (dataSource DataSource, err error)
 }
 
 type DataSource interface {
-	ExecContext(ctx context.Context, query string, args ...any) (id int64, rows int64, err error)
-	QueryContext(ctx context.Context,
-		cb func(sqlRows *sql.Rows) (err error),
-		query string, args ...any) (err error)
-	QueryRowContext(ctx context.Context, query string, args ...any) (sqlRow *sql.Row, err error)
+	PrepareContext(ctx context.Context, query string) (stmt *sql.Stmt, err error)
 	Close() (err error)
+}
+
+type DSNrFactory interface {
+	NewDSNr(appName string) (dsnr DataSourceNamer)
 }
