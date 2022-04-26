@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/haraldrudell/parl v0.4.7
+	github.com/haraldrudell/parl v0.4.14
 	modernc.org/sqlite v1.16.0
 )
 

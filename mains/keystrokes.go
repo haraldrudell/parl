@@ -10,55 +10,24 @@ import (
 	"os"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/ev"
-	"github.com/haraldrudell/parl/perrors"
 )
 
-type scannerResult struct {
-	hasText bool
-	text    string
-	err     error
-	panic   bool
-}
-
-type InputLine string
-
 // Keystrokes emits keystroke events
-func Keystrokes(ctx ev.Callee) {
-	defer parl.Recover(parl.Annotation(), nil, func(err error) { ctx.Failure(err) })
-
-	lines := make(chan *scannerResult)
-	go readLines(lines)
+func Keystrokes(lines chan<- string, g0 parl.Go) {
 	var err error
-	for {
-		select {
-		case line := <-lines:
-			if line != nil {
-				if line.hasText {
-					ctx.Send((*InputLine)(&line.text))
-					continue
-				}
-				err = line.err
-			} else {
-				err = perrors.New("Unexpected close of lines channel")
-			}
-		case <-ctx.Done():
-		}
-		break
-	}
-	if err == nil {
-		ctx.Success()
-	} else {
-		ctx.Failure(parl.Errorf("stdio Scanner: '%w'", err))
-	}
-}
+	defer g0.Done(err)
+	defer parl.Recover(parl.Annotation(), &err, parl.NoOnError)
+	defer parl.CloserSend(lines, &err)
 
-func readLines(lines chan<- *scannerResult) {
-	parl.Recover(parl.Annotation(), nil, func(e error) { lines <- &scannerResult{err: e, panic: true}; close(lines) })
+	// we don’t need two threads because os.Stdin read cannot be aborted
 	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		lines <- &scannerResult{hasText: true, text: scanner.Text()}
+	for scanner.Scan() { // scanner is typically stuck here
+		if g0.Context().Err() != nil {
+			return // terminated via context
+		}
+		lines <- scanner.Text()
 	}
-	lines <- &scannerResult{err: scanner.Err()}
-	close(lines)
+
+	// scanner had error
+	err = scanner.Err()
 }

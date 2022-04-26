@@ -55,5 +55,6 @@ type ErrorCallStacker interface {
 type ErrorStore interface {
 	AddError(err error) (e error)
 	GetError() (e error)
+	InvokeIfError(fn func(err error))
 	Error() (message string)
 }

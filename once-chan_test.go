@@ -50,3 +50,13 @@ func TestOnceChan(t *testing.T) {
 		t.Error("onceChan channel not closed")
 	}
 }
+
+func TestOnceChanByValue(t *testing.T) {
+	var oc OnceChan
+
+	// former lock implementation:
+	// func passes lock by value: github.com/haraldrudell/parl.OnceChan contains sync.Mutex
+
+	f := func(o OnceChan) {}
+	f(oc)
+}

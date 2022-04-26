@@ -15,10 +15,11 @@ import (
 )
 
 type DBMap struct {
-	dsnr   parl.DataSourceNamer
-	lock   sync.Mutex
-	m      map[string]*DBCache // behind lock
-	schema func(dataSource parl.DataSource, ctx context.Context) (err error)
+	dsnr     parl.DataSourceNamer
+	lock     sync.Mutex
+	m        map[string]*DBCache // behind lock
+	closeErr error               // behind lock
+	schema   func(dataSource parl.DataSource, ctx context.Context) (err error)
 }
 
 func NewDBMap(dsnr parl.DataSourceNamer,
@@ -131,16 +132,24 @@ func (dm *DBMap) Close() (err error) {
 	defer dm.lock.Unlock()
 
 	if dm.dsnr == nil {
-		return
+		return dm.closeErr // already closed exit
 	}
+
+	// flag object closed
 	dm.dsnr = nil
 
-	for _, dbCache := range dm.m {
+	// close dbCache objects
+	m := dm.m
+	dm.m = nil // drop dbCache references
+	for _, dbCache := range m {
 		if e := dbCache.Close(); e != nil {
 			err = perrors.AppendError(err, e)
 		}
 	}
-	dm.m = nil
+
+	if err != nil {
+		dm.closeErr = err // store close status
+	}
 
 	return
 }
@@ -150,23 +159,24 @@ func (dm *DBMap) getOrCreateDBCache(dataSourceName string,
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
+	// status check
 	if dm.dsnr == nil {
 		err = perrors.New("Invocation after parl.DB close")
-		return
+		return // bad status exit
 	}
 
 	if dbCache = dm.m[dataSourceName]; dbCache != nil {
-		return
+		return // cached DB object exit
 	}
 
 	// create dataSource for new dbCache instance
 	var dataSource parl.DataSource
 	if dataSource, err = dm.dsnr.DataSource(dataSourceName); err != nil {
-		return
+		return // datasource create failure exit
 	}
 	defer func() {
 		if err == nil {
-			dm.m[dataSourceName] = dbCache
+			dm.m[dataSourceName] = dbCache // success: store new object
 		} else if e := dataSource.Close(); e != nil {
 			err = perrors.AppendError(err, perrors.Errorf("dataSource.Close: %w", err))
 		}
@@ -174,9 +184,9 @@ func (dm *DBMap) getOrCreateDBCache(dataSourceName string,
 
 	// initialize schema
 	if err = dm.schema(dataSource, ctx); err != nil {
-		return
+		return // schema failure exit
 	}
 	dbCache = NewDBCache(dataSource)
 
-	return
+	return // good exit
 }

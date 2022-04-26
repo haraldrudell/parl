@@ -86,6 +86,13 @@ func (pe *ParlError) GetError() (err error) {
 	return pe.err
 }
 
+// InvokeIfError invokes fn if the error store contains an error
+func (pe *ParlError) InvokeIfError(fn func(err error)) {
+	if err := pe.GetError(); err != nil {
+		fn(err)
+	}
+}
+
 // Error() makes ParlError behave like an error.
 // Error is thread-safe unlike in most other Error implementations.
 // Because code will check if ParlError is nil, which it mostly isn’t, and then

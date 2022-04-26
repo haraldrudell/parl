@@ -15,9 +15,10 @@ import (
 )
 
 type DBCache struct {
-	ds   parl.DataSource
-	lock sync.Mutex
-	m    map[string]*sql.Stmt // behind lock
+	ds       parl.DataSource
+	lock     sync.Mutex
+	m        map[string]*sql.Stmt // behind lock
+	closeErr error                // behind lock
 }
 
 func NewDBCache(dataSource parl.DataSource) (dc *DBCache) {
@@ -30,74 +31,51 @@ func NewDBCache(dataSource parl.DataSource) (dc *DBCache) {
 func (dc *DBCache) Stmt(query string, ctx context.Context) (stmt *sql.Stmt, err error) {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
+
 	if dc.ds == nil {
 		err = perrors.New("Stmt after Close")
-		return
+		return // state error exit
 	}
 
 	if stmt = dc.m[query]; stmt != nil {
-		return
+		return // found cached statement exit
 	}
+
 	if stmt, err = dc.ds.PrepareContext(ctx, query); err != nil {
 		err = perrors.Errorf("Prepare: %w", err)
-		return
+		return // statement prepare failed exit
 	}
 	dc.m[query] = stmt
 
-	return
+	return // new cached statement exit
 }
 
 func (dc *DBCache) Close() (err error) {
-	ds, stmts := dc.getCloses()
-	if ds != nil {
-		if err = ds.Close(); err != nil {
-			err = perrors.Errorf("dataSource.Close: %w", err)
-		}
-	}
-	err = perrors.AppendError(err, dc.closeStmts(stmts))
-
-	return
-}
-
-func (dc *DBCache) getStmts() (stmts []*sql.Stmt) {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
 
-	return dc.getStmts2()
-}
-
-func (dc *DBCache) getStmts2() (stmts []*sql.Stmt) {
-	stmts = make([]*sql.Stmt, len(dc.m))
-	i := 0
-	for _, stmt := range dc.m {
-		stmts[i] = stmt
-		i++
+	ds := dc.ds
+	if ds == nil {
+		return dc.closeErr // already closed exit
 	}
-	dc.m = map[string]*sql.Stmt{}
 
-	return
-}
+	// close data source
+	dc.ds = nil // flag object closed
+	if err = ds.Close(); err != nil {
+		err = perrors.Errorf("dataSource.Close: %w", err)
+	}
 
-func (dc *DBCache) closeStmts(stmts []*sql.Stmt) (err error) {
-	for _, stmt := range stmts {
+	// close cached statements
+	m := dc.m
+	dc.m = nil // drop stmt references
+	for _, stmt := range m {
 		if e := stmt.Close(); e != nil {
 			err = perrors.AppendError(err, perrors.Errorf("stmt.Close: %w", err))
 		}
 	}
-
-	return
-}
-
-func (dc *DBCache) getCloses() (ds parl.DataSource, stmts []*sql.Stmt) {
-	dc.lock.Lock()
-	defer dc.lock.Unlock()
-	if dc.ds == nil {
-		return
+	if err != nil {
+		dc.closeErr = err // indicate close error status
 	}
-
-	ds = dc.ds
-	dc.ds = nil
-	stmts = dc.getStmts2()
 
 	return
 }

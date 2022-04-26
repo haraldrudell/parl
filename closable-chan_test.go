@@ -6,6 +6,7 @@ ISC License
 package parl
 
 import (
+	"sync"
 	"testing"
 )
 
@@ -58,4 +59,36 @@ func TestCloser(t *testing.T) {
 			t.Errorf("cl.Close didClose false")
 		}
 	}
+}
+
+func TestByValue(t *testing.T) {
+	var ch ClosableChan[int]
+	_ = &ch
+
+	// A sync.Mutex field cannot be passed by value
+	// func passes lock by value: github.com/haraldrudell/parl.ClosableChan[int] contains sync.Mutex
+	/*
+		f := func(c ClosableChan[int]) {}
+		f(ch)
+	*/
+
+	// instead, pass by reference
+	g := func(c *ClosableChan[int]) {}
+	g(&ch)
+
+	// sync.Once can be passed by value
+	var o sync.Once
+	fo := func(p sync.Once) {}
+	fo(o)
+
+	// sync.WaitGroup can be passed by value
+	var wg sync.WaitGroup
+	fw := func(g sync.WaitGroup) {}
+	fw(wg)
+
+	// *sync.Cond can be pased by value
+	c := sync.NewCond(&sync.Mutex{})
+	fc := func(d *sync.Cond) {}
+	fc(c)
+
 }

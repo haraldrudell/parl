@@ -50,3 +50,7 @@ func (g0 *GoDo) Done(err error) {
 func (g0 *GoDo) Context() (ctx context.Context) {
 	return g0.ctx
 }
+
+func (g0 *GoDo) SubGo() (goCancel parl.SubGo) {
+	return NewGoSub(g0)
+}

@@ -116,6 +116,21 @@ type Go interface {
 	// Context will cancel when work done on behalf of this context
 	// should be canceled
 	Context() (ctx context.Context)
+	// SubGo allows a sub-group of threads to be cancelled and waited for separately.
+	// Subgo still has access to AddError error sink.
+	SubGo() (subGo SubGo)
+}
+
+// SubGo is a Go with its own CancelContext and WaitGroup.
+// Wait is used by the thread invoking SubGo waiting for its sub-threads to exit.
+// Cancel is used by any of the SubGo invoker and its sub-threads to cancel the group.
+type SubGo interface {
+	// Go: SubGo behaves like a Go
+	Go
+	// Wait allows a thread to wait for all sub-threads: many-to-many
+	Wait()
+	// Cancel allows for any thread to cancel all sub-threads: many-to-many
+	Cancel()
 }
 
 type GoCreatorFactory interface {
