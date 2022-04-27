@@ -1,0 +1,67 @@
+/*
+© 2021–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
+*/
+
+package psync
+
+import (
+	"strings"
+	"sync"
+
+	"github.com/haraldrudell/parl"
+)
+
+const (
+	maxList    = 100
+	skipFrames = 2
+)
+
+/*
+parl.GoGroup is an observable sync.Waitgroup.
+*/
+type TraceGroup struct {
+	parl.WaitGroup
+	lock sync.Mutex
+	list []WaitAction // behind lock
+}
+
+func (wg *TraceGroup) Add(delta int) {
+	wg.WaitGroup.Add(delta)
+	wg.action(delta, false)
+}
+
+func (wg *TraceGroup) Done() {
+	wg.WaitGroup.Done()
+	wg.action(0, true)
+}
+
+func (wg *TraceGroup) action(delta int, isDone bool) {
+	wg.lock.Lock()
+	defer wg.lock.Unlock()
+
+	if len(wg.list) == maxList {
+		copy(wg.list, wg.list[1:])
+	}
+	wg.list = append(wg.list, *NewWaitAction(skipFrames, delta, isDone))
+}
+
+func (wg *TraceGroup) String() (s string) {
+	adds, dones := wg.WaitGroup.Counters()
+	s = parl.Sprintf("%d(%d)", dones, adds)
+
+	wg.lock.Lock()
+	defer wg.lock.Unlock()
+
+	if len(wg.list) == 0 {
+		return
+	}
+	if len(wg.list) == 1 {
+		return s + "\x20" + wg.list[0].String()
+	}
+	sL := make([]string, len(wg.list))
+	for i, action := range wg.list {
+		sL[i] = action.String()
+	}
+	return s + ":\n" + strings.Join(sL, "\n")
+}

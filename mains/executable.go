@@ -351,10 +351,14 @@ func (ex *Executable) ApplyYaml(yamlFile, yamlKey string, thunk UnmarshalThunk, 
 
 func (ex *Executable) usage() {
 	writer := flag.CommandLine.Output()
+	var license string
+	if ex.License != "" {
+		license = "License: " + ex.License
+	}
 	fmt.Fprintln(
 		writer,
 		pstrings.FilteredJoin([]string{
-			"License: " + ex.License,
+			license,
 			pstrings.FilteredJoin([]string{
 				ex.Program,
 				ex.Description,
@@ -379,7 +383,18 @@ On panic, the function prints to stderr: "Unhandled panic invoked exe.Recover: s
 followed by a stack trace. It then adds an error to mains.Executable and terminates
 the process with status code 1
 */
-func (ex *Executable) Recover() {
+func (ex *Executable) Recover(errp ...*error) {
+
+	// get error from *errp
+	if len(errp) > 0 {
+		if errp0 := errp[0]; errp0 != nil {
+			if err := *errp0; err != nil {
+				ex.AddErr(err)
+			}
+		}
+	}
+
+	// check for panic
 	if e := recover(); e != nil {
 		hasStack := false
 		if err, ok := e.(error); ok {
@@ -395,8 +410,9 @@ func (ex *Executable) Recover() {
 		}
 		err = parl.Errorf("Unhandled panic to exe.Recover: '%w'", err)
 		ex.AddErr(err)
-		ex.Exit()
 	}
+
+	ex.Exit()
 }
 
 // AddErr extended with immediate printing of first error

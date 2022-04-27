@@ -100,6 +100,21 @@ func Short(err error) string {
 	return errorglue.ChainString(err, errorglue.ShortFormat)
 }
 
+func Deferr(label string, errp *error, fn func(format string, a ...interface{})) string {
+	if errp == nil {
+		return "perrors.Deferr: errp nil"
+	}
+	if label != "" {
+		label += ":\x20"
+	}
+	s := label + errorglue.ChainString(*errp, errorglue.ShortFormat)
+	if fn != nil {
+		fn(s)
+	}
+
+	return s
+}
+
 // error116.Long() gets a comprehensive string representation similar to printf %+v and LongFormat.
 // ShortFormat does not print stack traces, data and associated errors.
 // Long() prints full stack traces, string key-value and list values for both the error chain

@@ -201,7 +201,7 @@ func (nb *NBChan[T]) sendThreadDefer() {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	if nb.nbChanCloseInvoked { // Close() was invoked after thrad started
+	if nb.nbChanCloseInvoked { // Close() was invoked after thread started
 		nb.closableChan.Close() // close if Close was invoked. Idempotent
 	}
 

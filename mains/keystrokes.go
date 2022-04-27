@@ -18,7 +18,7 @@ import (
 // the lines channel is never closed
 func Keystrokes(lines chan<- string, g0 parl.Go) {
 	var err error
-	defer g0.Done(err)
+	defer g0.Done(&err)
 	defer parl.Recover(parl.Annotation(), &err, parl.NoOnError)
 
 	// stdio.Scan cannot be terminated, so let that thread terminate whenever

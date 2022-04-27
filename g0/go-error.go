@@ -5,7 +5,10 @@ ISC License
 
 package g0
 
-import "github.com/haraldrudell/parl"
+import (
+	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
+)
 
 type GoErrorDo struct {
 	error
@@ -31,4 +34,10 @@ func (ge *GoErrorDo) GetError() (err error) {
 
 func (ge *GoErrorDo) Goer() (goer parl.Goer) {
 	return ge.goer
+}
+
+func (ge *GoErrorDo) String() (s string) {
+	return ge.source.String() +
+		"\x20" + perrors.Short(ge.error) +
+		"\x20" + ge.goer.String()
 }

@@ -145,7 +145,9 @@ func (gc *GoCreatorDo) errorReceiver(err parl.GoError) {
 
 func (gc *GoCreatorDo) exitAction(err error, exitAction parl.ExitAction, index parl.GoIndex) {
 	gc.wg.Done()
-	gc.deleteGoer(index)
+	if gc.deleteGoer(index) == 0 {
+		gc.sharedChan.Close()
+	}
 
 	if exitAction == parl.ExIgnoreExit ||
 		err == nil && exitAction == parl.ExCancelOnFailure {
@@ -162,11 +164,12 @@ func (gc *GoCreatorDo) addGoer(goer *GoerDo, index parl.GoIndex) {
 	gc.m[index] = goer
 }
 
-func (gc *GoCreatorDo) deleteGoer(index parl.GoIndex) {
+func (gc *GoCreatorDo) deleteGoer(index parl.GoIndex) (remaining int) {
 	gc.lock.Lock()
 	defer gc.lock.Unlock()
 
 	delete(gc.m, index)
+	return len(gc.m)
 }
 
 func (gc *GoCreatorDo) getGoerList() (goIndex map[parl.GoIndex]*GoerDo) {

@@ -6,14 +6,13 @@ ISC License
 package g0
 
 import (
-	"sync"
-
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/psync"
 )
 
 type GoSub struct {
 	parl.Go
-	wg  sync.WaitGroup
+	wg  psync.TraceGroup
 	ctx parl.CancelContext
 }
 
@@ -26,9 +25,9 @@ func (gc *GoSub) Add(delta int) {
 	gc.Go.Add(delta)
 }
 
-func (gc *GoSub) Done(err error) {
+func (gc *GoSub) Done(errp *error) {
 	gc.wg.Done()
-	gc.Go.Done(err)
+	gc.Go.Done(errp)
 }
 
 func (gc *GoSub) Wait() {
@@ -41,4 +40,8 @@ func (gc *GoSub) Cancel() {
 
 func (gc *GoSub) SubGo() (goCancel parl.SubGo) {
 	return NewGoSub(gc)
+}
+
+func (gc *GoSub) String() (s string) {
+	return gc.wg.String()
 }

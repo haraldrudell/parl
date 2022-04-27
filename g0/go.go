@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 type GoDo struct {
@@ -43,7 +44,13 @@ func (g0 *GoDo) AddError(err error) {
 	g0.errorReceiver(err)
 }
 
-func (g0 *GoDo) Done(err error) {
+func (g0 *GoDo) Done(errp *error) {
+	var err error
+	if errp != nil {
+		err = *errp
+	} else {
+		err = perrors.New("g0.Done with errp nil")
+	}
 	g0.done(err)
 }
 

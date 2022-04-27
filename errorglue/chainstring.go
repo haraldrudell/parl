@@ -35,7 +35,7 @@ const (
 	LongSuffix
 )
 
-const csNilString = "<nil>"
+const csNilString = "OK"
 
 // CSFormat describes string conversion of an error chain
 type CSFormat byte

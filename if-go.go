@@ -43,6 +43,7 @@ type GoError interface {
 	// Goer provides the Goer object associated with the goroutine
 	// causing the error
 	Goer() (goer Goer)
+	String() (s string)
 }
 
 const (
@@ -55,7 +56,7 @@ const (
 	// GeExit indicates exit of the main goroutine
 	// err may be nil
 	GeExit
-	// GeInternal indictaes an error occuring inside the Goer object
+	// GeInternal indicates an error occuring inside the Goer object
 	GeInternal
 )
 
@@ -97,6 +98,7 @@ type Goer interface {
 	Chan() (ch <-chan error)
 	// Wait allows to wait for this exact goroutine
 	Wait()
+	String() (s string)
 }
 
 // parl.Go is a value provided to a goroutine allowing it
@@ -112,7 +114,7 @@ type Go interface {
 	AddError(err error)
 	// Done indicates that a goroutine has finished.
 	// err nil typically means successful exit.
-	Done(err error)
+	Done(errp *error)
 	// Context will cancel when work done on behalf of this context
 	// should be canceled
 	Context() (ctx context.Context)
@@ -131,6 +133,7 @@ type SubGo interface {
 	Wait()
 	// Cancel allows for any thread to cancel all sub-threads: many-to-many
 	Cancel()
+	String() (s string)
 }
 
 type GoCreatorFactory interface {
