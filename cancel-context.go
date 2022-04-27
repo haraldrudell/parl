@@ -29,14 +29,12 @@ func NewCancelContext(ctx context.Context) (cancelCtx CancelContext) {
 
 // Cancel cancels this context
 func (cc *CancelContextDo) Cancel() {
-	if cc == nil || cc.cancel == nil {
-		var s string
-		if cc == nil {
-			s = "context"
-		} else {
-			s = "context.cancel"
-		}
-		panic(perrors.Errorf("CancelContextDo.Cancel with %s nil", s))
+	if cc == nil {
+		panic(perrors.Errorf("CancelContext nil"))
 	}
-	cc.cancel()
+	cancel := cc.cancel
+	if cancel == nil {
+		panic(perrors.Errorf("CancelContext.Cancel nil"))
+	}
+	cancel()
 }

@@ -186,7 +186,6 @@ func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executab
 	banner := pstrings.FilteredJoin([]string{
 		pstrings.FilteredJoin([]string{ex.Program, ex.Version, ex.Comment}, "\x20"),
 		ex.Copyright,
-		ex.License,
 		fmt.Sprintf(timeHeader, ex.LaunchString),
 		fmt.Sprintf(hostHeader, ex.Host),
 	}, "\n")
@@ -355,6 +354,7 @@ func (ex *Executable) usage() {
 	fmt.Fprintln(
 		writer,
 		pstrings.FilteredJoin([]string{
+			"License: " + ex.License,
 			pstrings.FilteredJoin([]string{
 				ex.Program,
 				ex.Description,
