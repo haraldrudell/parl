@@ -4,6 +4,8 @@ ISC License
 */
 
 /*
+Package evx is deprecated by the github.com/haraldrudell/parl/g0 package 220429
+
 Package evx contains declarations not essential to event handling
 */
 package evx

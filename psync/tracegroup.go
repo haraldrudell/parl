@@ -17,9 +17,9 @@ const (
 	skipFrames = 2
 )
 
-/*
-parl.GoGroup is an observable sync.Waitgroup.
-*/
+// parl.TraceGroup is an observable sync.Waitgroup.
+//
+// TraceGroup cannot be in parl because WaitAction imports goid
 type TraceGroup struct {
 	parl.WaitGroup
 	lock sync.Mutex
@@ -34,6 +34,12 @@ func (wg *TraceGroup) Add(delta int) {
 func (wg *TraceGroup) Done() {
 	wg.WaitGroup.Done()
 	wg.action(0, true)
+}
+
+func (wg *TraceGroup) DoneBool() (isZero bool) {
+	wg.WaitGroup.Done()
+	wg.action(0, true)
+	return wg.IsZero()
 }
 
 func (wg *TraceGroup) action(delta int, isDone bool) {

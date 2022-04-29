@@ -23,12 +23,12 @@ IsClosed provides wether the Close method did execute close.
    errCh.Ch() <- err
 */
 type ClosableChan[T any] struct {
-	lock          sync.Mutex
-	ch            chan T // behind lock
-	closeSelector AtomicBool
-	err           error
+	lock sync.Mutex
+	ch   chan T // behind lock
+	err  error  // behind lock
 
-	isClosed AtomicBool
+	closeSelector AtomicBool
+	isClosed      AtomicBool
 }
 
 // NewClosableChan ensures a chan does not throw
@@ -50,18 +50,18 @@ func (cl *ClosableChan[T]) Ch() (ch chan T) {
 // Upon return, all invocations have a possible close error in err.
 // if errp is non-nil, it is updated with a possible error
 // didClose indicates whether this invocation closed the channel
-func (cl *ClosableChan[T]) Close(errp ...*error) (err error, didClose bool) {
+func (cl *ClosableChan[T]) Close(errp ...*error) (didClose bool, err error) {
 
 	// first thread closes the channel
-	didClose = cl.close()
-
 	// all threads provide the result
-	err = cl.err
+	didClose, err = cl.close()
+
 	if len(errp) > 0 {
 		if errp0 := errp[0]; errp0 != nil {
 			*errp0 = err
 		}
 	}
+
 	return
 }
 
@@ -85,7 +85,7 @@ func (cl *ClosableChan[T]) getCh(ch0 ...chan T) (ch chan T) {
 	return
 }
 
-func (cl *ClosableChan[T]) close() (didClose bool) {
+func (cl *ClosableChan[T]) close() (didClose bool, err error) {
 	ch := cl.getCh()
 	cl.lock.Lock()
 	defer cl.lock.Unlock()
@@ -96,5 +96,6 @@ func (cl *ClosableChan[T]) close() (didClose bool) {
 		cl.isClosed.Set() // that one is set after close
 		didClose = true
 	}
+	err = cl.err
 	return
 }

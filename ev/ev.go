@@ -4,6 +4,8 @@ ISC License
 */
 
 /*
+Package ev is deprecated by the github.com/haraldrudell/parl/g0 package 220429
+
 Package ev provides standardized goroutine management
 
 events contain thread completions, failures and any type of data items. A manager launches and controls a set of goroutines

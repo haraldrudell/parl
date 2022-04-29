@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// GoCreator manages the life cycle of one or more goroutines
-type GoCreator interface {
+// GoGroup manages many go statements
+type GoGroup interface {
 	// Add indicates a new goroutine about to be launched.
 	// conduit indicates how errors will be propagated from
 	// the goroutine.
@@ -33,7 +33,7 @@ type GoCreator interface {
 }
 
 // GoError is an error or a thread exit associated with a goroutine
-// Goer returns the Goer object handling the goroutine that sent the error
+// Goer returns the Goer object handling the goroutine that originated the error
 type GoError interface {
 	error // Error() string
 	// GetError retrieves the original error value
@@ -47,8 +47,8 @@ type GoError interface {
 }
 
 const (
-	// GeNonFatal indictaes a non-fatal error ocurring during processing
-	GeNonFatal = iota + 1
+	// GeNonFatal indicates a non-fatal error ocurring during processing
+	GeNonFatal GoErrorSource = iota + 1
 	// GePreDoneExit indicates an exit value of a subordinate goroutine,
 	// other than the main goroutine associated with the GoCreator object
 	// err may be nil
@@ -88,21 +88,48 @@ const (
 
 type ExitAction uint8
 
-// Goer is the managing object for a goroutine
+// Goer manages a single go statement
 type Goer interface {
-	// Go gets the Go object, that is handed to its goroutine on launch.
+	// Go gets the Go object, that is provided to its goroutine in a go statement
 	Go() (g0 Go)
-	// Chan is a channel that will close on thread exit.
-	// Chan will emit errors as they occur if the thread was launched with ECErrChan
-	// Chan will emit an Exit result if the thread was launched with ECErrChan
-	Chan() (ch <-chan error)
+	// Ch is a channel that will close on thread exit.
+	// Ch will emit errors as they occur if the thread was launched with ECErrChan
+	// Ch emitting
+	// Ch will emit an Exit result if the thread was launched with ECErrChan
+	Ch() (ch <-chan GoError)
+	// Context will cancel when work done on behalf of this context
+	// should be canceled
+	Context() (ctx context.Context)
+	Cancel()
 	// Wait allows to wait for this exact goroutine
 	Wait()
 	String() (s string)
 }
 
-// parl.Go is a value provided to a goroutine allowing it
-// to provide that it has finished and its result.
+// SubGoer manages a group of goroutines
+type SubGoer interface {
+	// Go gets a Go object, that is used in a go statement.
+	Go() (g0 Go)
+	// Ch is a channel that sends errors as they occur amd will close after GeExit
+	// Ch send GeNonFatal for non-fatal errors, err is non-nil
+	// Ch sends GePreDoneExit for sub-thread exits, err may be nil
+	// Ch sends a final GeExit for the final exit, err may be nil
+	Ch() (ch <-chan GoError)
+	// Cancel cancels all goroutines managed by the Subgoer
+	// AddError allows a goroutine to send non-fatal errors
+	AddError(err error)
+	Cancel()
+	// Wait allows to wait for all goroutines to exit
+	// Context will cancel when work done on behalf of this context
+	// should be canceled
+	Context() (ctx context.Context)
+	Wait()
+	IsExit() (isExit bool)
+	String() (s string)
+}
+
+// parl.Go allows a goroutine to implement cancel, submit errors, communicate exit,
+// be waited upon and to have sub-threads.
 type Go interface {
 	// Register performs no function but allows the Go object to collect
 	// information on the new thread
@@ -114,6 +141,7 @@ type Go interface {
 	AddError(err error)
 	// Done indicates that a goroutine has finished.
 	// err nil typically means successful exit.
+	// Done is deferrable.
 	Done(errp *error)
 	// Context will cancel when work done on behalf of this context
 	// should be canceled
@@ -123,19 +151,24 @@ type Go interface {
 	SubGo() (subGo SubGo)
 }
 
-// SubGo is a Go with its own CancelContext and WaitGroup.
+// SubGo allows a goroutine to have sub-threads.
+// SubGo is a Go with its own CancelContext and TraceGroup.
 // Wait is used by the thread invoking SubGo waiting for its sub-threads to exit.
 // Cancel is used by any of the SubGo invoker and its sub-threads to cancel the group.
 type SubGo interface {
 	// Go: SubGo behaves like a Go
 	Go
-	// Wait allows a thread to wait for all sub-threads: many-to-many
+	// Wait allows a thread to wait for (many) sub-threads
 	Wait()
-	// Cancel allows for any thread to cancel all sub-threads: many-to-many
+	// Cancel allows for any thread to cancel all sub-threads
 	Cancel()
 	String() (s string)
 }
 
 type GoCreatorFactory interface {
-	NewGoCreator(ctx context.Context) (goCreator GoCreator)
+	NewGoCreator(ctx context.Context) (goGroup GoGroup)
+}
+
+type GoerFactory interface {
+	NewGoer(ctx context.Context) (goer SubGoer)
 }

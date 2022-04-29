@@ -6,6 +6,7 @@ ISC License
 package g0
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -23,18 +24,19 @@ const (
 
 type GoerDo struct {
 	conduit        parl.ErrorConduit
-	index          parl.GoIndex
 	exitAction     parl.ExitAction
+	index          parl.GoIndex
 	gc             *GoCreatorDo
-	errCh          chan error
+	errCh          parl.NBChan[parl.GoError]
 	lock           sync.Mutex
-	parentID       parl.ThreadID // behind lock
-	threadID       parl.ThreadID // behind lock
-	otherIDs       map[parl.ThreadID]struct{}
-	addLocation    pruntime.CodeLocation // behind lock
-	createLocation pruntime.CodeLocation // behind lock
-	funcLocation   pruntime.CodeLocation // behind lock
-	gr             *GoerRuntime          // behind lock
+	parentID       parl.ThreadID              // behind lock
+	threadID       parl.ThreadID              // behind lock
+	otherIDs       map[parl.ThreadID]struct{} // behind lock
+	addLocation    pruntime.CodeLocation      // behind lock
+	createLocation pruntime.CodeLocation      // behind lock
+	funcLocation   pruntime.CodeLocation      // behind lock
+	gr             *GoerRuntime               // behind lock
+	ctx            parl.CancelContext
 }
 
 func NewGoer(
@@ -44,25 +46,27 @@ func NewGoer(
 	gc *GoCreatorDo,
 	parentID parl.ThreadID,
 	addLocation *pruntime.CodeLocation) (goer parl.Goer) {
-	gd := GoerDo{
+	goer0 := GoerDo{
 		conduit:     conduit,
 		exitAction:  exitAction,
 		index:       index,
 		gc:          gc,
-		errCh:       make(chan error),
 		parentID:    parentID,
 		otherIDs:    map[parl.ThreadID]struct{}{},
 		addLocation: *addLocation,
-		gr:          &GoerRuntime{},
+		ctx:         parl.NewCancelContext(gc.ctx),
 	}
-	gd.gr.wg.Add(1)
-	gd.gr.g0 = NewGo(
-		gd.errorReceiver,
-		gd.add,
-		gd.done,
-		gc.ctx,
-	)
-	return &gd
+	gruntime := GoerRuntime{
+		g0: NewGo(
+			goer0.errorReceiver,
+			goer0.add,
+			goer0.done,
+			goer0.Context,
+		),
+	}
+	gruntime.wg.Add(1)
+	goer0.gr = &gruntime
+	return &goer0
 }
 
 func (gr *GoerDo) Go() (g0 parl.Go) {
@@ -73,8 +77,16 @@ func (gr *GoerDo) Go() (g0 parl.Go) {
 	return goerRuntime.g0
 }
 
-func (gr *GoerDo) Chan() (ch <-chan error) {
-	return gr.errCh
+func (gr *GoerDo) Ch() (ch <-chan parl.GoError) {
+	return gr.errCh.Ch()
+}
+
+func (gr *GoerDo) Context() (ctx context.Context) {
+	return gr.ctx
+}
+
+func (gr *GoerDo) Cancel() {
+	gr.ctx.Cancel()
 }
 
 func (gr *GoerDo) Wait() {
@@ -111,16 +123,17 @@ func (gr *GoerDo) done(err error) {
 	}
 
 	// send GoError
+	goError := NewGoError(
+		err,
+		source,
+		gr,
+	)
 	if gr.conduit == parl.EcSharedChan {
-		gr.gc.errorReceiver(NewGoError(
-			err,
-			source,
-			gr,
-		))
+		gr.gc.errorReceiver(goError)
 	} else {
 
 		// send ThreadResult on dedicated error channel
-		gr.errCh <- parl.NewThreadResult(err)
+		gr.errCh.Send(goError)
 	}
 
 	if !isDone {
@@ -134,9 +147,7 @@ func (gr *GoerDo) done(err error) {
 	defer gr.lock.Unlock()
 
 	gr.gr = nil
-	if parl.Closer(gr.errCh, &err); err != nil {
-		gr.gc.errorReceiver(NewGoError(err, parl.GeInternal, gr))
-	}
+	gr.errCh.Close()
 }
 
 func (gr *GoerDo) errorReceiver(err error) {
@@ -146,17 +157,18 @@ func (gr *GoerDo) errorReceiver(err error) {
 	}
 
 	// send GoError
+	goError := NewGoError(
+		err,
+		parl.GeNonFatal,
+		gr,
+	)
 	if gr.conduit == parl.EcSharedChan {
-		gr.gc.errorReceiver(NewGoError(
-			err,
-			parl.GeNonFatal,
-			gr,
-		))
+		gr.gc.errorReceiver(goError)
 		return
 	}
 
 	// send err on dedicated error channel
-	gr.errCh <- err
+	gr.errCh.Send(goError)
 }
 
 func (gr *GoerDo) getGoerRuntime(checkThread bool) (goerRuntime *GoerRuntime) {

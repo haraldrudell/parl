@@ -1,7 +1,7 @@
-github.com/haraldrudell/parl v0.4.16 h1:ga1VAEADnJBQq4prW5/pcGbgxZYKLQDbqR4aD0KXzlc=
-github.com/haraldrudell/parl v0.4.16/go.mod h1:fZUG8raQfJ/PRMsHBtwKhmlaKfLgvIuMyHpTm7fsePU=
-golang.org/x/sys v0.0.0-20220422013727-9388b58f7150 h1:xHms4gcpe1YE7A3yIllJXP16CMAGuqwO2lX1mTyyRRc=
-golang.org/x/sys v0.0.0-20220422013727-9388b58f7150/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+github.com/haraldrudell/parl v0.4.17 h1:69Xve2j/C/r0YimtVnERewVADcgq2BnDSijQXl8DPa8=
+github.com/haraldrudell/parl v0.4.17/go.mod h1:fZUG8raQfJ/PRMsHBtwKhmlaKfLgvIuMyHpTm7fsePU=
+golang.org/x/sys v0.0.0-20220429121018-84afa8d3f7b3 h1:kBsBifDikLCf5sUMbcD8p73OinDtAQWQp8+n7FiyzlA=
+golang.org/x/sys v0.0.0-20220429121018-84afa8d3f7b3/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20220411215600-e5f449aeb171 h1:EH1Deb8WZJ0xc0WK//leUHXcX9aLE5SymusoTmMZye8=
 golang.org/x/term v0.0.0-20220411215600-e5f449aeb171/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
 golang.org/x/text v0.3.7 h1:olpwvP2KacW1ZWvsR7uQhoyTYvKAupfQrRGBFM352Gk=

@@ -32,7 +32,7 @@ type GoCreatorDo struct {
 	ctx        parl.CancelContext
 }
 
-func NewGoCreator(ctx context.Context) (goCreator parl.GoCreator) {
+func NewGoCreator(ctx context.Context) (goCreator parl.GoGroup) {
 	return &GoCreatorDo{
 		m:   map[parl.GoIndex]*GoerDo{},
 		ctx: parl.NewCancelContext(ctx),

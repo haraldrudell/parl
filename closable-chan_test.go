@@ -23,7 +23,7 @@ func TestCloser(t *testing.T) {
 		t.Errorf("NewCloser isClosed true")
 	}
 	// first close
-	err, didClose := cl.Close()
+	didClose, err := cl.Close()
 	if err != nil {
 		t.Errorf("cl.Close err %T %[1]v", err)
 	}
@@ -31,7 +31,7 @@ func TestCloser(t *testing.T) {
 		t.Errorf("cl.Close didClose false")
 	}
 	// second close
-	err, didClose = cl.Close()
+	didClose, err = cl.Close()
 	if err != nil {
 		t.Errorf("cl.Close err %T %[1]v", err)
 	}
@@ -48,7 +48,7 @@ func TestCloser(t *testing.T) {
 		close(ch)
 		cl := NewClosableChan(ch)
 		var err2 error
-		err, didClose := cl.Close(&err2)
+		didClose, err := cl.Close(&err2)
 		if err == nil {
 			t.Errorf("cl.Close no err")
 		}

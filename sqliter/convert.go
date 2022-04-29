@@ -90,6 +90,25 @@ func ToTime(timeString string) (t time.Time, err error) {
 	return
 }
 
+func TimeToDBNullable(t time.Time) (dbValue any) {
+	if t.IsZero() {
+		return nil // empty string
+	}
+	return ptime.Rfc3339nsz(t)
+}
+
+func NullableToTime(dbValue any) (t time.Time, err error) {
+	if dbValue == nil {
+		return // NULL: t.IsZero()
+	}
+	var s string
+	var ok bool
+	if s, ok = dbValue.(string); !ok {
+		err = perrors.Errorf("NullableToTime: not string: %T", dbValue)
+	}
+	return ToTime(s)
+}
+
 // GetErrorCode traverses an error chain looking for an SQLite error.
 // If an SQLite error is found, it is returned in ec.
 // code is the int error code.

@@ -117,13 +117,14 @@ func (nb *NBChan[T]) Close() (didClose bool) {
 		return // there is a pending thread that will execute close on exit
 	}
 	var err error
-	if err, didClose = nb.closableChan.Close(); didClose && err != nil { // execute the close now
+	if didClose, err = nb.closableChan.Close(); didClose && err != nil { // execute the close now
 		nb.AddError(err) // store posible close error
 	}
 	return
 }
 
-// IsClosed indicates whether the channel has actually closed
+// IsClosed indicates whether the channel has actually closed.
+
 func (nb *NBChan[T]) IsClosed() (isClosed bool) {
 	return nb.closableChan.IsClosed()
 }
@@ -153,7 +154,7 @@ func (nb *NBChan[T]) CloseNow(errp ...*error) (err error, didClose bool) {
 	}
 
 	// close the channel now
-	if err, didClose = nb.closableChan.Close(); didClose && err != nil { // execute the close now
+	if didClose, err = nb.closableChan.Close(); didClose && err != nil { // execute the close now
 		nb.AddError(err) // store posible close error
 	}
 	return
@@ -183,6 +184,9 @@ func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
+	// count the item ust sent
+	nb.unsentCount--
+
 	// no more values: end thread
 	if len(nb.sendQueue) == 0 {
 		return
@@ -191,7 +195,6 @@ func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
 	// send next value in queue
 	value = nb.sendQueue[0]
 	ok = true
-	nb.unsentCount--
 	copy(nb.sendQueue[0:], nb.sendQueue[1:])
 	nb.sendQueue = nb.sendQueue[:len(nb.sendQueue)-1]
 	return

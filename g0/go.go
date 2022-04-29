@@ -16,19 +16,19 @@ type GoDo struct {
 	errorReceiver func(err error)
 	add           func(delta int)
 	done          func(err error)
-	ctx           context.Context
+	ctxFn         func() (ctx context.Context)
 }
 
 func NewGo(
 	errorReceiver func(err error),
 	add func(delta int),
 	done func(err error),
-	ctx context.Context) (g0 parl.Go) {
+	ctxFn func() (ctx context.Context)) (g0 parl.Go) {
 	return &GoDo{
 		errorReceiver: errorReceiver,
 		add:           add,
 		done:          done,
-		ctx:           ctx,
+		ctxFn:         ctxFn,
 	}
 }
 
@@ -55,7 +55,7 @@ func (g0 *GoDo) Done(errp *error) {
 }
 
 func (g0 *GoDo) Context() (ctx context.Context) {
-	return g0.ctx
+	return g0.ctxFn()
 }
 
 func (g0 *GoDo) SubGo() (goCancel parl.SubGo) {
