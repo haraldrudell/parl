@@ -26,7 +26,7 @@ type GoerDo struct {
 	conduit        parl.ErrorConduit
 	exitAction     parl.ExitAction
 	index          parl.GoIndex
-	gc             *GoCreatorDo
+	gc             *GoGroup
 	errCh          parl.NBChan[parl.GoError]
 	lock           sync.Mutex
 	parentID       parl.ThreadID              // behind lock
@@ -43,7 +43,7 @@ func NewGoer(
 	conduit parl.ErrorConduit,
 	exitAction parl.ExitAction,
 	index parl.GoIndex,
-	gc *GoCreatorDo,
+	gc *GoGroup,
 	parentID parl.ThreadID,
 	addLocation *pruntime.CodeLocation) (goer parl.Goer) {
 	goer0 := GoerDo{

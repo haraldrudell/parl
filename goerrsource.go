@@ -9,7 +9,6 @@ var goErrorMap = map[GoErrorSource]string{
 	GeNonFatal:    "GeNonFatal",
 	GePreDoneExit: "GePreDoneExit",
 	GeExit:        "GeExit",
-	GeInternal:    "GeInternal",
 }
 
 func (ge GoErrorSource) String() (s string) {

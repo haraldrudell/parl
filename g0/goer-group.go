@@ -12,17 +12,17 @@ import (
 	"github.com/haraldrudell/parl/psync"
 )
 
-type Goer1 struct {
+type GoerGroup struct {
 	errCh parl.NBChan[parl.GoError]
 	wg    psync.TraceGroup
 	ctx   parl.CancelContext
 }
 
-func NewGoer1(ctx context.Context) (goer parl.SubGoer) {
-	return &Goer1{ctx: parl.NewCancelContext(ctx)}
+func NewGoerGroup(ctx context.Context) (goer parl.GoerGroup) {
+	return &GoerGroup{ctx: parl.NewCancelContext(ctx)}
 }
 
-func (gr *Goer1) Go() (g0 parl.Go) {
+func (gr *GoerGroup) Go() (g0 parl.Go) {
 	gr.wg.Add(1)
 	return NewGo(
 		gr.errorReceiver,
@@ -32,11 +32,11 @@ func (gr *Goer1) Go() (g0 parl.Go) {
 	)
 }
 
-func (gr *Goer1) Ch() (ch <-chan parl.GoError) {
+func (gr *GoerGroup) Ch() (ch <-chan parl.GoError) {
 	return gr.errCh.Ch()
 }
 
-func (gr *Goer1) AddError(err error) {
+func (gr *GoerGroup) AddError(err error) {
 	gr.errCh.Send(NewGoError(
 		err,
 		parl.GeNonFatal,
@@ -44,38 +44,38 @@ func (gr *Goer1) AddError(err error) {
 	))
 }
 
-func (gr *Goer1) Context() (ctx context.Context) {
+func (gr *GoerGroup) Context() (ctx context.Context) {
 	return gr.ctx
 }
 
-func (gr *Goer1) Cancel() {
+func (gr *GoerGroup) Cancel() {
 	gr.ctx.Cancel()
 }
 
-func (gr *Goer1) Wait() {
+func (gr *GoerGroup) Wait() {
 	gr.wg.Wait()
 }
 
-func (gr *Goer1) IsExit() (isExit bool) {
+func (gr *GoerGroup) IsExit() (isExit bool) {
 	return gr.wg.IsZero()
 }
 
-func (gr *Goer1) String() (s string) {
+func (gr *GoerGroup) String() (s string) {
 	return gr.wg.String()
 }
 
-func (gr *Goer1) errorReceiver(err error) {
+func (gr *GoerGroup) errorReceiver(err error) {
 	if err == nil {
 		return
 	}
 	gr.errCh.Send(NewGoError(err, parl.GeNonFatal, gr))
 }
 
-func (gr *Goer1) ctxFn() (ctx context.Context) {
+func (gr *GoerGroup) ctxFn() (ctx context.Context) {
 	return gr.ctx
 }
 
-func (gr *Goer1) done(err error) {
+func (gr *GoerGroup) done(err error) {
 	isZero := gr.wg.DoneBool()
 
 	var source parl.GoErrorSource

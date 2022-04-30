@@ -16,7 +16,7 @@ import (
 func TestGoCreatorDo_Add(t *testing.T) {
 	ctx := context.Background()
 
-	gc := NewGoCreator(ctx)
+	gc := NewGoGroup(ctx)
 	goer := gc.Add(parl.EcSharedChan, parl.ExCancelOnExit)
 
 	var waitForRegister sync.WaitGroup

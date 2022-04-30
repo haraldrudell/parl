@@ -23,7 +23,7 @@ const (
 	gcAddFrames = 1
 )
 
-type GoCreatorDo struct {
+type GoGroup struct {
 	sharedChan parl.NBChan[parl.GoError]
 	wg         parl.WaitGroup
 	lock       sync.Mutex
@@ -32,14 +32,14 @@ type GoCreatorDo struct {
 	ctx        parl.CancelContext
 }
 
-func NewGoCreator(ctx context.Context) (goCreator parl.GoGroup) {
-	return &GoCreatorDo{
+func NewGoGroup(ctx context.Context) (goCreator parl.GoGroup) {
+	return &GoGroup{
 		m:   map[parl.GoIndex]*GoerDo{},
 		ctx: parl.NewCancelContext(ctx),
 	}
 }
 
-func (gc *GoCreatorDo) Add(conduit parl.ErrorConduit, exitAction parl.ExitAction) (goer parl.Goer) {
+func (gc *GoGroup) Add(conduit parl.ErrorConduit, exitAction parl.ExitAction) (goer parl.Goer) {
 	gc.wg.Add(1)
 	index := gc.goIndex()
 	goer = NewGoer(
@@ -56,15 +56,15 @@ func (gc *GoCreatorDo) Add(conduit parl.ErrorConduit, exitAction parl.ExitAction
 	return
 }
 
-func (gc *GoCreatorDo) Warnings() (ch <-chan parl.GoError) {
+func (gc *GoGroup) Warnings() (ch <-chan parl.GoError) {
 	return gc.sharedChan.Ch()
 }
 
-func (gc *GoCreatorDo) Wait() {
+func (gc *GoGroup) Wait() {
 	gc.wg.Wait()
 }
 
-func (gc *GoCreatorDo) WaitPeriod(duration ...time.Duration) {
+func (gc *GoGroup) WaitPeriod(duration ...time.Duration) {
 
 	// is GoCreator already done?
 	if gc.wg.IsZero() {
@@ -104,11 +104,11 @@ func (gc *GoCreatorDo) WaitPeriod(duration ...time.Duration) {
 	}
 }
 
-func (gc *GoCreatorDo) IsExit() (isExit bool) {
+func (gc *GoGroup) IsExit() (isExit bool) {
 	return gc.wg.IsZero()
 }
 
-func (gc *GoCreatorDo) List() (s string) {
+func (gc *GoGroup) List() (s string) {
 	timeStamp := ptime.Short()
 	goIndex := gc.getGoerList()
 
@@ -137,13 +137,13 @@ func (gc *GoCreatorDo) List() (s string) {
 	return strings.Join(sList, "\n")
 }
 
-func (gc *GoCreatorDo) errorReceiver(err parl.GoError) {
+func (gc *GoGroup) errorReceiver(err parl.GoError) {
 
 	// emit the error
 	gc.sharedChan.Send(err)
 }
 
-func (gc *GoCreatorDo) exitAction(err error, exitAction parl.ExitAction, index parl.GoIndex) {
+func (gc *GoGroup) exitAction(err error, exitAction parl.ExitAction, index parl.GoIndex) {
 	gc.wg.Done()
 	if gc.deleteGoer(index) == 0 {
 		gc.sharedChan.Close()
@@ -157,14 +157,14 @@ func (gc *GoCreatorDo) exitAction(err error, exitAction parl.ExitAction, index p
 	gc.ctx.Cancel()
 }
 
-func (gc *GoCreatorDo) addGoer(goer *GoerDo, index parl.GoIndex) {
+func (gc *GoGroup) addGoer(goer *GoerDo, index parl.GoIndex) {
 	gc.lock.Lock()
 	defer gc.lock.Unlock()
 
 	gc.m[index] = goer
 }
 
-func (gc *GoCreatorDo) deleteGoer(index parl.GoIndex) (remaining int) {
+func (gc *GoGroup) deleteGoer(index parl.GoIndex) (remaining int) {
 	gc.lock.Lock()
 	defer gc.lock.Unlock()
 
@@ -172,7 +172,7 @@ func (gc *GoCreatorDo) deleteGoer(index parl.GoIndex) (remaining int) {
 	return len(gc.m)
 }
 
-func (gc *GoCreatorDo) getGoerList() (goIndex map[parl.GoIndex]*GoerDo) {
+func (gc *GoGroup) getGoerList() (goIndex map[parl.GoIndex]*GoerDo) {
 	gc.lock.Lock()
 	defer gc.lock.Unlock()
 
@@ -184,6 +184,6 @@ func (gc *GoCreatorDo) getGoerList() (goIndex map[parl.GoIndex]*GoerDo) {
 	return
 }
 
-func (gc *GoCreatorDo) goIndex() (goIndex parl.GoIndex) {
+func (gc *GoGroup) goIndex() (goIndex parl.GoIndex) {
 	return parl.GoIndex(atomic.AddUint64(&gc.index, 1))
 }
