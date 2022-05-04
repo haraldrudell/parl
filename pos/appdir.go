@@ -3,12 +3,10 @@
 ISC License
 */
 
-package pfs
+package pos
 
 import (
 	"path"
-
-	"github.com/haraldrudell/parl/pos"
 )
 
 type AppDirectory struct {
@@ -32,6 +30,6 @@ const (
 )
 
 func (appd *AppDirectory) Directory() (directory string) {
-	directory = pos.HomeDir(path.Join(dotLocalDir, shareDir, appd.App))
+	directory = HomeDir(path.Join(dotLocalDir, shareDir, appd.App))
 	return
 }

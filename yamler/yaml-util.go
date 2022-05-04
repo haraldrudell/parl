@@ -3,7 +3,7 @@
 ISC License
 */
 
-package yaml
+package yamler
 
 /*
 filename: program-host.yaml program.yaml
@@ -45,7 +45,7 @@ func FindFile(filename0, program string) (out string, bytes []byte) {
 		bytes, _ = readFile(out)
 		return
 	}
-	dirs := []string{path.Join(pos.UserHomeDir(), appsName), ParentDir(), pfs.Abs(etcName)}
+	dirs := []string{path.Join(pos.UserHomeDir(), appsName), pos.ParentDir(), pfs.Abs(etcName)}
 	filenames := []string{fmt.Sprintf("%s-%s%s", program, pos.ShortHostname(), yamlExt),
 		program + yamlExt}
 	for _, dir := range dirs {

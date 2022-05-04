@@ -3,7 +3,7 @@
 ISC License
 */
 
-package yaml
+package yamler
 
 import (
 	"flag"
@@ -12,7 +12,7 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/mains"
 	"github.com/haraldrudell/parl/pstrings"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type UnmarshalFunc func(in []byte, out interface{}) (err error) // yaml.Unmarshal
@@ -49,7 +49,7 @@ is then svcaned for its Y pointers to copy yaml settings to options.
    return
  }
 */
-func ApplyYaml(ex mains.Executable, yamlFile, yamlKey string, thunk UnmarshalThunk, om []OptionData) {
+func ApplyYaml(ex mains.Executable, yamlFile, yamlKey string, thunk UnmarshalThunk, om []mains.OptionData) {
 	if thunk == nil {
 		panic(parl.New("yaml.ApplyYaml: thunk cannot be nil"))
 	}

@@ -1,10 +1,11 @@
-module github.com/haraldrudell/parl/yaml
+module github.com/haraldrudell/parl/yamler
 
 go 1.18
 
 require (
-	github.com/haraldrudell/parl v0.4.22
-	gopkg.in/yaml.v2 v2.4.0
+	github.com/haraldrudell/parl v0.4.23
+	github.com/haraldrudell/parl/mains v0.4.23
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
 require (

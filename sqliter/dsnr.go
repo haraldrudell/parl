@@ -11,7 +11,7 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pfs"
+	"github.com/haraldrudell/parl/pos"
 )
 
 const (
@@ -28,7 +28,7 @@ type DataSourceNamer struct {
 
 func NewDataSourceNamer(appName string) (dns parl.DataSourceNamer) {
 	d := DataSourceNamer{
-		dir:     pfs.AppDir(appName),
+		dir:     pos.AppDir(appName),
 		appName: appName,
 	}
 
