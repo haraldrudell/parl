@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/haraldrudell/parl v0.4.20
-	github.com/haraldrudell/parl/pfs v0.4.20
+	github.com/haraldrudell/parl v0.4.21
+	github.com/haraldrudell/parl/pfs v0.4.21
 	modernc.org/sqlite v1.17.1
 )
 

@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pfs
+package watchfs
 
 import (
 	"fmt"

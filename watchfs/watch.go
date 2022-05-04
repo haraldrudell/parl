@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pfs
+package watchfs
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pfs"
 	"github.com/haraldrudell/parl/pstrings"
 	"github.com/haraldrudell/parl/ptime"
 )
@@ -118,7 +119,7 @@ func (wa *Watch) scan() (err error) {
 	// neither Linux and macOS can watch a directory tree so
 	// each watched directory needs to be referenced
 	var dirs []string
-	if dirs, err = Dirs(wa.dir0); err != nil {
+	if dirs, err = pfs.Dirs(wa.dir0); err != nil {
 		return
 	}
 	parl.Info("watching: %s\n", pstrings.QuoteList(dirs))

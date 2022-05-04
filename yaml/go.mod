@@ -1,14 +1,15 @@
-module github.com/haraldrudell/parl/mains
+module github.com/haraldrudell/parl/yaml
 
 go 1.18
 
 require (
-	github.com/elastic/go-sysinfo v1.7.1
-	github.com/haraldrudell/parl v0.4.20
+	github.com/haraldrudell/parl v0.4.21
+	github.com/haraldrudell/parl/mains v0.4.21
 	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
+	github.com/elastic/go-sysinfo v1.7.1 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect

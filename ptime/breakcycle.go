@@ -3,11 +3,11 @@
 ISC License
 */
 
-package goid
+package ptime
 
 import "github.com/haraldrudell/parl/breakcycle"
 
 var _ = func() (i int) {
-	breakcycle.GoidExport(NewStack)
+	breakcycle.PtimeExport(Short)
 	return
 }()

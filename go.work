@@ -2,8 +2,8 @@ go 1.18
 
 use (
 	.
-	./mains
-	./pfs
+	./process
 	./pterm
 	./sqliter
+	./watchfs
 )

@@ -26,32 +26,32 @@ In the time between parl and sub-package initialization,
 */
 package breakcycle
 
-var v interface{}
-var vFunc func(v interface{})
-var done bool
+var newStack interface{}
+var newStackReceiver func(v interface{})
+var goidParlDone bool
 
-// SetVFunc receives a function value from parl to receive the symbol value
-func SetVFunc(fn func(v interface{})) {
-	if done {
+// ParlImport receives a function value from parl to receive the symbol value
+func ParlImport(receiver func(v interface{})) {
+	if goidParlDone {
 		return
 	}
-	done = v != nil
-	if done {
-		fn(v)
+	goidParlDone = newStack != nil
+	if goidParlDone {
+		receiver(newStack)
 	} else {
-		vFunc = fn
+		newStackReceiver = receiver
 	}
 }
 
-// SetV receives a symbol value from a parl sub-package
-func SetV(value interface{}) {
-	if done {
+// GoidExport receives a symbol value from a parl sub-package
+func GoidExport(newStackValue interface{}) {
+	if goidParlDone {
 		return
 	}
-	done = vFunc != nil
-	if done {
-		vFunc(value)
+	goidParlDone = newStackReceiver != nil
+	if goidParlDone {
+		newStackReceiver(newStackValue)
 	} else {
-		v = value
+		newStack = newStackValue
 	}
 }

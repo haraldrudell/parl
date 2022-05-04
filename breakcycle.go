@@ -17,7 +17,7 @@ import (
 var newStack func(skipFrames int) (stack Stack)
 
 var _ = func() (i int) {
-	breakcycle.SetVFunc(setNewStack)
+	breakcycle.ParlImport(setNewStack)
 	return
 }()
 

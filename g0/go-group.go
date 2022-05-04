@@ -15,7 +15,6 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/goid"
 	"github.com/haraldrudell/parl/pruntime"
-	"github.com/haraldrudell/parl/ptime"
 )
 
 const (
@@ -95,7 +94,7 @@ func (gc *GoGroup) WaitPeriod(duration ...time.Duration) {
 }
 
 func (gc *GoGroup) String() (s string) {
-	timeStamp := ptime.Short()
+	timeStamp := short()
 	goIndex := gc.getGoerList()
 
 	goList := make([]parl.GoIndex, len(goIndex))

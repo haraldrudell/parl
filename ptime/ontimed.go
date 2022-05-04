@@ -6,72 +6,42 @@ ISC License
 package ptime
 
 import (
-	"context"
 	"time"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/g0"
 )
 
-// OnTimed provides events to perform on the hour
-type OnTimed struct {
-	nowChannel chan time.Time
-	sdChan     chan struct{}
-	isClose    parl.AtomicBool
-	ctx        context.Context
-}
+// OnTimedThread returns an OnTimed object that send time values by calendar period.
+// period is the calendar operiod such as time.Hour.
+// timeZone is time zone such as time.Local or time.UTC.
+func OnTimedThread(send func(time.Time), period time.Duration, loc *time.Location, g0 g0.Go) {
+	var err error
+	g0.Done(&err)
+	parl.Recover(parl.Annotation(), &err, parl.NoOnError)
 
-func GetTimer(period time.Duration, timeZone Tz, ctx context.Context) (ot *OnTimed) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	ot = &OnTimed{nowChannel: make(chan time.Time), sdChan: make(chan struct{}), ctx: ctx}
-	if period == 0 {
-		return
-	}
-	go ot.run(period, timeZone)
-	return
-}
+	timer := OnTimer(period, time.Now().In(loc))
+	defer timer.Stop()
 
-// NewOnTimedLocal provides events to perform on the hour
-func NewOnTimedLocal(period time.Duration) (ot *OnTimed) {
-	return GetTimer(period, LOCAL, nil)
-}
-
-// NewOnTimed provides events to perform on the hour
-func NewOnTimed(period time.Duration) (ot *OnTimed) {
-	return GetTimer(period, UTC, nil)
-}
-
-// NewOnTimed initializes OnTimed
-func (ot *OnTimed) run(period time.Duration, timeZone Tz) {
-	defer parl.Recover("OnTimed.run", nil, func(err error) { parl.Info("%+v\n", err) })
-	var timer *time.Timer
+	var ticker *time.Ticker
 	defer func() {
-		if timer != nil {
-			timer.Stop()
+		if ticker != nil {
+			ticker.Stop()
 		}
 	}()
+
+	done := g0.Context().Done()
+	C := timer.C
 	for {
-		timer = OnTimer(period, timeZone)
 		select {
-		case <-ot.ctx.Done():
-		case <-ot.sdChan:
-		case now := <-timer.C:
-			ot.nowChannel <- now
-			continue
+		case <-done:
+			return
+		case t := <-C:
+			if ticker == nil {
+				ticker = time.NewTicker(period)
+				C = ticker.C
+			}
+			send(t)
 		}
-		break
-	}
-}
-
-// Chan gets a channel to wait for
-func (ot *OnTimed) Chan() (ch <-chan time.Time) {
-	return ot.nowChannel
-}
-
-// Close stop the durations
-func (ot *OnTimed) Close() {
-	if ot.isClose.Set() {
-		close(ot.sdChan)
 	}
 }

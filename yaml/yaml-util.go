@@ -3,7 +3,7 @@
 ISC License
 */
 
-package mains
+package yaml
 
 /*
 filename: program-host.yaml program.yaml
@@ -36,9 +36,6 @@ func GetTopLevelKey(topKey string) (key string) {
 	}
 	return
 }
-
-type UnmarshalFunc func(in []byte, out interface{}) (err error) // yaml.Unmarshal
-type UnmarshalThunk func(bytes []byte, unmarshal UnmarshalFunc, yamlKey string) (hasDate bool, err error)
 
 // FindFile locates and read the yaml file
 func FindFile(filename0, program string) (out string, bytes []byte) {
