@@ -35,9 +35,9 @@ func (wg *TraceGroup) Done() {
 }
 
 func (wg *TraceGroup) DoneBool() (isZero bool) {
-	wg.WaitGroup.Done()
+	isZero = wg.WaitGroup.DoneBool()
 	wg.action(0, true)
-	return wg.IsZero()
+	return
 }
 
 func (wg *TraceGroup) action(delta int, isDone bool) {

@@ -18,24 +18,22 @@ import (
 )
 
 const (
-	grCheckThreadFrames = 3
+	// grCheckThreadFrames is how many gframes to skip: Goer.checkState + Goer.add/done/AddError/Go
+	grCheckThreadFrames = 2
 )
 
-type GoerDo struct {
-	GoerGroup
-	conduit          parl.ErrorConduit
-	exitAction       parl.ExitAction
-	index            parl.GoIndex
-	gc               *GoGroup
-	waiterr          // Ch() IsExit() Wait()
-	lock             sync.Mutex
-	parentID         parl.ThreadID              // behind lock
-	threadID         parl.ThreadID              // behind lock
-	otherIDs         map[parl.ThreadID]struct{} // behind lock
-	addLocation      pruntime.CodeLocation      // behind lock
-	createLocation   pruntime.CodeLocation      // behind lock
-	funcLocation     pruntime.CodeLocation      // behind lock
-	cancelAndContext                            // Cancel() Context()
+type Goer struct {
+	GoerGroup      // Ch() IsExit() Wait() Cancel() Context()
+	conduit        parl.ErrorConduit
+	exitAction     parl.ExitAction
+	gc             *GoGroup
+	lock           sync.Mutex
+	parentID       parl.ThreadID              // behind lock
+	threadID       parl.ThreadID              // behind lock
+	otherIDs       map[parl.ThreadID]struct{} // behind lock
+	addLocation    pruntime.CodeLocation      // behind lock
+	createLocation pruntime.CodeLocation      // behind lock
+	funcLocation   pruntime.CodeLocation      // behind lock
 }
 
 func NewGoer(
@@ -46,14 +44,13 @@ func NewGoer(
 	parentID parl.ThreadID,
 	addLocation *pruntime.CodeLocation) (goer parl.Goer) {
 
-	return &GoerDo{
+	return &Goer{
 		GoerGroup: GoerGroup{
-			waiterr:          waiterr{wg: &parl.WaitGroup{}},
+			waiterr:          waiterr{wg: &parl.WaitGroup{}, index: index},
 			cancelAndContext: *newCancelAndContext(gc.Context()),
 		},
 		conduit:     conduit,
 		exitAction:  exitAction,
-		index:       index,
 		gc:          gc,
 		parentID:    parentID,
 		otherIDs:    map[parl.ThreadID]struct{}{},
@@ -61,8 +58,20 @@ func NewGoer(
 	}
 }
 
-func (gr *GoerDo) AddError(err error) {
-	gr.getGoerRuntime("Go.AddError")
+func (gr *Goer) Go() (g0 parl.Go) {
+	gr.checkState("Go")
+	gr.add(1)
+	return NewGo(
+		gr.AddError,
+		gr.add,
+		gr.done,
+		gr.Context,
+		gr.Cancel,
+	)
+}
+
+func (gr *Goer) AddError(err error) {
+	gr.checkState("Go.AddError")
 
 	// package error
 	if err == nil {
@@ -80,40 +89,18 @@ func (gr *GoerDo) AddError(err error) {
 	gr.send(goError)
 }
 
-func (gr *GoerDo) add(delta int) {
-	gr.getGoerRuntime("Go.AddError")
+func (gr *Goer) add(delta int) {
+	gr.checkState("Go.AddError")
 	gr.waiterr.add(delta)
 }
 
-func (gr *GoerDo) done(errp *error) {
-	gr.getGoerRuntime("Go.Done")
+func (gr *Goer) done(errp *error) {
+	parl.Debug("Goer.done" + gr.string(errp))
+	gr.checkState("Go.Done")
 
-	// execute Done
-	isDone := gr.doneBool()
-
-	// get error value
-	var err error
-	if errp != nil {
-		err = *errp
-	} else {
-		err = perrors.New("g0.Done with errp nil")
-	}
-
-	// isDone indicates that this thread exited
-	// it ir otherwise a sub-thread exit
-	var source parl.GoErrorSource
-	if isDone {
-		source = parl.GeExit
-	} else {
-		source = parl.GePreDoneExit
-	}
-
-	// send GoError
-	goError := NewGoError(
-		err,
-		source,
-		gr,
-	)
+	// send error
+	isDone, goError := gr.doneAndErrp(errp)
+	err := goError.GetError()
 	if gr.conduit == parl.EcSharedChan {
 		gr.gc.send(goError)
 	} else {
@@ -131,19 +118,16 @@ func (gr *GoerDo) done(errp *error) {
 	gr.gc.exitAction(err, gr.exitAction, gr.index)
 }
 
-func (gr *GoerDo) getGoerRuntime(action string) (didClose bool) {
-	didClose = gr.didClose()
-	defer func() {
-		if didClose {
-			panic(perrors.New(action + " after close"))
-		}
-	}()
+func (gr *Goer) checkState(action string) (didClose bool) {
+	if didClose = gr.didClose(); didClose {
+		panic(perrors.Errorf(action+" after close\nSTACK: %s\n", pruntime.DebugStack(0)))
+	}
 
 	stack := goid.NewStack(grCheckThreadFrames)
 	gr.lock.Lock()
 	defer gr.lock.Unlock()
 
-	// unitialize thread data
+	// ensure we have a threadID
 	if gr.threadID == "" {
 		gr.threadID = stack.ID()
 		gr.createLocation = *stack.Creator()
@@ -151,7 +135,7 @@ func (gr *GoerDo) getGoerRuntime(action string) (didClose bool) {
 		return
 	}
 
-	// collect thread IDs
+	// collect additional thread IDs
 	if stack.ID() == gr.threadID {
 		return
 	}
@@ -163,10 +147,15 @@ func (gr *GoerDo) getGoerRuntime(action string) (didClose bool) {
 }
 
 /*
-#[index] [waitcount] ([adds]) [thread-ID or parent-thread-ID] add: add-location
-# go-creator index
+String outputs:
+#[index] [waitcount]([adds]):
+—lines: #[Goer-index] [waitcount]([adds]) ID: [thread-ID or parent-thread-ID] [create location].
+
+index is a main-invocation-unique numeric identifier for the Goer.
+waitcount is the oustanding number of done invocations for the Goer.
+adds is the number of adds invoked for the Goer.
 */
-func (gr *GoerDo) String() (s string) {
+func (gr *Goer) String() (s string) {
 	sList := []string{fmt.Sprintf("#%d", gr.index)}
 	adds, dones := gr.counters()
 	sList = append(sList, fmt.Sprintf("%d(%d)", adds-dones, adds))
@@ -176,7 +165,7 @@ func (gr *GoerDo) String() (s string) {
 		sList = append(sList, "pID: "+gr.parentID.String())
 	}
 	if gr.funcLocation.FuncName != "" {
-		sList = append(sList, gr.funcLocation.PackFunc())
+		sList = append(sList, gr.funcLocation.Short())
 	} else {
 		sList = append(sList, "add: "+gr.addLocation.Short())
 	}

@@ -6,6 +6,9 @@ ISC License
 package goid
 
 import (
+	"path/filepath"
+	"strconv"
+
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/pruntime"
 )
@@ -24,4 +27,9 @@ func (f *Frame) Loc() (location *pruntime.CodeLocation) {
 
 func (f *Frame) Args() (args string) {
 	return f.args
+}
+
+func (f *Frame) String() (s string) {
+	return f.CodeLocation.FuncName + f.args + "\n" +
+		filepath.Base(f.CodeLocation.File) + ":" + strconv.Itoa(f.CodeLocation.Line)
 }

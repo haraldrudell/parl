@@ -13,9 +13,11 @@ type Stack interface {
 	IsMain() (isMain bool)
 	Frames() (frames []Frame)
 	Creator() (creator *pruntime.CodeLocation)
+	String() (s string)
 }
 
 type Frame interface {
 	Loc() (location *pruntime.CodeLocation)
 	Args() (args string)
+	String() (s string)
 }

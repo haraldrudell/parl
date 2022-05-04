@@ -48,7 +48,7 @@ type NBChan[T any] struct {
 	sendQueue               []T  // inside lock
 	waitForCloseInitialized bool // inside lock
 
-	nbChanCloseInvoked AtomicBool
+	closeInvoked AtomicBool
 
 	waitForClose sync.WaitGroup // initialization inside lock
 
@@ -78,7 +78,7 @@ func (nb *NBChan[T]) Send(value T) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	if nb.nbChanCloseInvoked.IsTrue() {
+	if nb.closeInvoked.IsTrue() {
 		return // no send after Close()
 	}
 
@@ -109,7 +109,7 @@ func (nb *NBChan[T]) Close() (didClose bool) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	if !nb.nbChanCloseInvoked.Set() {
+	if !nb.closeInvoked.Set() {
 		return // Close was already invoked
 	}
 
@@ -124,7 +124,7 @@ func (nb *NBChan[T]) Close() (didClose bool) {
 }
 
 func (nb *NBChan[T]) DidClose() (didClose bool) {
-	return nb.nbChanCloseInvoked.IsTrue()
+	return nb.closeInvoked.IsTrue()
 }
 
 // IsClosed indicates whether the channel has actually closed.
@@ -151,7 +151,7 @@ func (nb *NBChan[T]) CloseNow(errp ...*error) (err error, didClose bool) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	nb.nbChanCloseInvoked.Set()
+	nb.closeInvoked.Set()
 
 	// discard pending data
 	if len(nb.sendQueue) > 0 {
@@ -207,7 +207,7 @@ func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
 }
 
 func (nb *NBChan[T]) sendThreadDefer() {
-	if nb.nbChanCloseInvoked.IsTrue() { // Close() was invoked after thread started
+	if nb.closeInvoked.IsTrue() { // Close() was invoked after thread started
 		nb.closableChan.Close() // close if Close was invoked. Idempotent
 	}
 

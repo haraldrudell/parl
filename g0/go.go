@@ -12,7 +12,7 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-type GoDo struct {
+type Go struct {
 	addError func(err error)
 	add      func(delta int)
 	done     func(err *error)
@@ -26,7 +26,7 @@ func NewGo(
 	done func(err *error),
 	context func() (ctx context.Context),
 	cancel func()) (g0 parl.Go) {
-	return &GoDo{
+	return &Go{
 		addError: errorReceiver,
 		add:      add,
 		done:     done,
@@ -35,30 +35,30 @@ func NewGo(
 	}
 }
 
-func (g0 *GoDo) Register() {
+func (g0 *Go) Register() {
 	g0.add(0)
 }
 
-func (g0 *GoDo) Add(delta int) {
+func (g0 *Go) Add(delta int) {
 	g0.add(delta)
 }
 
-func (g0 *GoDo) AddError(err error) {
+func (g0 *Go) AddError(err error) {
 	g0.addError(err)
 }
 
-func (g0 *GoDo) Done(errp *error) {
+func (g0 *Go) Done(errp *error) {
 	g0.done(errp)
 }
 
-func (g0 *GoDo) Context() (ctx context.Context) {
+func (g0 *Go) Context() (ctx context.Context) {
 	return g0.context()
 }
 
-func (g0 *GoDo) Cancel() {
+func (g0 *Go) Cancel() {
 	g0.cancel()
 }
 
-func (g0 *GoDo) SubGo() (goCancel parl.SubGo) {
+func (g0 *Go) SubGo() (goCancel parl.SubGo) {
 	return NewGoSub(g0)
 }

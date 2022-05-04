@@ -28,7 +28,7 @@ func TestGoCreatorDo_Add(t *testing.T) {
 	}(goer.Go())
 
 	waitForRegister.Wait()
-	gd := goer.(*GoerDo)
+	gd := goer.(*Goer)
 	var otherIDs []parl.ThreadID
 	for key := range gd.otherIDs {
 		otherIDs = append(otherIDs, key)

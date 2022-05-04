@@ -6,19 +6,23 @@ ISC License
 package g0
 
 import (
+	"fmt"
+
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // waiterr is a private combined error channel and waitgroup.
 // parl.NBChan is a non-blocking channel.
 // waiter is an observable WaitGroup such as parl.WaitGroup or
-// parl.TraceGroup
+// parl.TraceGroup.
 // public is exactly Ch() IsExit() Wait() String().
 // waiterr is initialized in a composite literal:
 //  waiterr{wg: &parl.WaitGroup{}}
 type waiterr struct {
 	errCh parl.NBChan[parl.GoError]
 	wg    waiter
+	index parl.GoIndex
 }
 
 func (we *waiterr) Ch() (ch <-chan parl.GoError) {
@@ -63,4 +67,14 @@ func (we *waiterr) counters() (adds, dones int) {
 
 func (we *waiterr) didClose() (diClose bool) {
 	return we.errCh.DidClose()
+}
+
+func (we *waiterr) string(errp ...*error) (s string) {
+	if len(errp) > 0 {
+		if errp0 := errp[0]; errp0 != nil && *errp0 != nil {
+			s = " err: " + perrors.Short(*errp0)
+		}
+	}
+	adds, dones := we.counters()
+	return fmt.Sprintf("#%d %d(%d)%s", we.index, adds-dones, adds, s)
 }

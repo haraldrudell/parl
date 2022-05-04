@@ -9,29 +9,30 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-type GoSub struct {
-	parl.Go
+type SubGo struct {
+	parl.Go          // Register() AddError()
 	waiter           // Wait() String()
 	cancelAndContext // Cancel() Context()
 }
 
-func NewGoSub(g0 parl.Go) (goCancel parl.SubGo) {
-	return &GoSub{
+func NewGoSub(g0 parl.Go) (subGo parl.SubGo) {
+	return &SubGo{
 		Go:               g0,
+		waiter:           &parl.TraceGroup{},
 		cancelAndContext: *newCancelAndContext(g0.Context()),
 	}
 }
 
-func (gc *GoSub) Add(delta int) {
+func (gc *SubGo) Add(delta int) {
 	gc.waiter.Add(delta)
 	gc.Go.Add(delta)
 }
 
-func (gc *GoSub) Done(errp *error) {
+func (gc *SubGo) Done(errp *error) {
 	gc.waiter.Done() // done without sending error
 	gc.Go.Done(errp)
 }
 
-func (gc *GoSub) SubGo() (goCancel parl.SubGo) {
+func (gc *SubGo) SubGo() (goCancel parl.SubGo) {
 	return NewGoSub(gc)
 }

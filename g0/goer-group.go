@@ -19,7 +19,7 @@ type GoerGroup struct {
 
 func NewGoerGroup(ctx context.Context) (goer parl.Goer) {
 	return &GoerGroup{
-		waiterr:          waiterr{wg: &parl.TraceGroup{}},
+		waiterr:          waiterr{wg: &parl.TraceGroup{}, index: Index.goIndex()},
 		cancelAndContext: *newCancelAndContext(ctx),
 	}
 }
@@ -49,11 +49,12 @@ func (gr *GoerGroup) AddError(err error) {
 }
 
 func (gr *GoerGroup) done(errp *error) {
+	parl.Debug("GoerGroup.done" + gr.string(errp))
 	if gr.didClose() {
 		panic(perrors.New("Go.Done after close"))
 	}
 
-	isDone, goError := gr.getError(errp)
+	isDone, goError := gr.doneAndErrp(errp)
 	gr.send(goError)
 
 	// possibly close error channel
@@ -62,7 +63,7 @@ func (gr *GoerGroup) done(errp *error) {
 	}
 }
 
-func (gr *GoerGroup) getError(errp *error) (isDone bool, goError parl.GoError) {
+func (gr *GoerGroup) doneAndErrp(errp *error) (isDone bool, goError parl.GoError) {
 	// execute done
 	isDone = gr.doneBool()
 

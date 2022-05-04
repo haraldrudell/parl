@@ -19,6 +19,8 @@ type goerIndex struct {
 	index uint64 // atomic
 }
 
+var Index goerIndex
+
 // goIndex returns the next parl.GoIndex value.
 func (gi *goerIndex) goIndex() (goIndex parl.GoIndex) {
 	return parl.GoIndex(atomic.AddUint64(&gi.index, 1))

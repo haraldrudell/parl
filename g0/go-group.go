@@ -25,22 +25,21 @@ const (
 type GoGroup struct {
 	waiterr          // Add() IsExit() Wait() Ch() send()
 	lock             sync.Mutex
-	m                map[parl.GoIndex]*GoerDo // behind lock
-	goerIndex                                 // goIndex()
-	cancelAndContext                          // Cancel() Context()
+	m                map[parl.GoIndex]*Goer // behind lock
+	cancelAndContext                        // Cancel() Context()
 }
 
 func NewGoGroup(ctx context.Context) (goCreator parl.GoGroup) {
 	return &GoGroup{
-		waiterr:          waiterr{wg: &parl.WaitGroup{}},
-		m:                map[parl.GoIndex]*GoerDo{},
+		waiterr:          waiterr{wg: &parl.WaitGroup{}, index: Index.goIndex()},
+		m:                map[parl.GoIndex]*Goer{},
 		cancelAndContext: *newCancelAndContext(ctx),
 	}
 }
 
 func (gc *GoGroup) Add(conduit parl.ErrorConduit, exitAction parl.ExitAction) (goer parl.Goer) {
 	gc.add(1)
-	index := gc.goIndex()
+	index := Index.goIndex()
 	goer = NewGoer(
 		conduit,
 		exitAction,
@@ -49,8 +48,8 @@ func (gc *GoGroup) Add(conduit parl.ErrorConduit, exitAction parl.ExitAction) (g
 		goid.GoID(),
 		pruntime.NewCodeLocation(gcAddFrames),
 	)
-	goerDo := goer.(*GoerDo)
-	gc.addGoer(goerDo, index)
+	goerStruct := goer.(*Goer)
+	gc.addGoer(goerStruct, index)
 
 	return
 }
@@ -108,7 +107,7 @@ func (gc *GoGroup) String() (s string) {
 	sort.Slice(goList, func(i, j int) bool { return goList[i] < goList[j] })
 
 	adds, dones := gc.wg.Counters()
-	s = parl.Sprintf("%s %d(%d)", timeStamp, adds-dones, adds)
+	s = parl.Sprintf("%s GoGroup#%d %d(%d)", timeStamp, gc.index, adds-dones, adds)
 
 	if len(goIndex) == 0 {
 		return s + "\x20None"
@@ -125,9 +124,11 @@ func (gc *GoGroup) String() (s string) {
 }
 
 func (gc *GoGroup) exitAction(err error, exitAction parl.ExitAction, index parl.GoIndex) {
+	parl.Debug("GoGroup.exit %s #%d", gc.string(&err), index)
 	gc.wg.Done()
 	if gc.deleteGoer(index) == 0 {
-		gc.waiterr.close()
+		parl.Debug("GoGroup#%d.close", gc.index)
+		gc.close()
 	}
 
 	if exitAction == parl.ExIgnoreExit ||
@@ -138,7 +139,7 @@ func (gc *GoGroup) exitAction(err error, exitAction parl.ExitAction, index parl.
 	gc.Cancel()
 }
 
-func (gc *GoGroup) addGoer(goer *GoerDo, index parl.GoIndex) {
+func (gc *GoGroup) addGoer(goer *Goer, index parl.GoIndex) {
 	gc.lock.Lock()
 	defer gc.lock.Unlock()
 
@@ -153,11 +154,11 @@ func (gc *GoGroup) deleteGoer(index parl.GoIndex) (remaining int) {
 	return len(gc.m)
 }
 
-func (gc *GoGroup) getGoerList() (goIndex map[parl.GoIndex]*GoerDo) {
+func (gc *GoGroup) getGoerList() (goIndex map[parl.GoIndex]*Goer) {
 	gc.lock.Lock()
 	defer gc.lock.Unlock()
 
-	goIndex = map[parl.GoIndex]*GoerDo{}
+	goIndex = map[parl.GoIndex]*Goer{}
 	for index, goer := range gc.m {
 		goIndex[index] = goer
 	}

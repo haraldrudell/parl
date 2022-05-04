@@ -112,7 +112,7 @@ func (cl *CodeLocation) Short() (funcName string) {
 	return fmt.Sprintf("%s-%s:%d", filepath.Base(cl.FuncName), filepath.Base(cl.File), cl.Line)
 }
 
-// Short returns base package name, an optional type name and
+// Long returns full package path, an optional type name and
 // the function name, base filename and line number:
 //   mains.(*Executable).AddErr-executable.go:25
 func (cl *CodeLocation) Long() (funcName string) {

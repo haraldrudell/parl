@@ -18,6 +18,7 @@ const (
 	// debug.Stack uses this prefix in the first line of the result
 	runFirstRexpT       = "^goroutine ([[:digit:]]+) [[]([^]]+)[]]:$"
 	runtCreatedByPrefix = "created by "
+	fileLineTabRune     = '\t'
 )
 
 var firstRexp = regexp.MustCompile(runFirstRexpT)
@@ -47,16 +48,19 @@ func ParseFirstLine(debugStack string) (ID parl.ThreadID, status parl.ThreadStat
 
 // ParseFileLine parses a line of a tab character then absolue file path,
 // followed by a colon and line number, then a space character and
-// a byte offset
+// a byte offset.
 //  "\t/gp-debug-stack/debug-stack.go:29 +0x44"
+//  "\t/opt/sw/parl/g0/waiterr.go:49"
 func ParseFileLine(fileLine string) (file string, line int) {
 	var hasTab bool
 	var lastColon = -1
 	var spaceAfterColon = -1
 	if len(fileLine) > 0 {
-		hasTab = fileLine[:1] == "\t"
+		hasTab = fileLine[0] == fileLineTabRune
 		lastColon = strings.LastIndex(fileLine, ":")
-		spaceAfterColon = strings.LastIndex(fileLine, "\x20")
+		if spaceAfterColon = strings.LastIndex(fileLine, "\x20"); spaceAfterColon == -1 {
+			spaceAfterColon = len(fileLine)
+		}
 	}
 	if !hasTab || lastColon == -1 || spaceAfterColon < lastColon {
 		panic(perrors.Errorf("bad debug.Stack: file line: %q", fileLine))
@@ -82,15 +86,13 @@ func ParseFileLine(fileLine string) (file string, line int) {
 //  main.main()
 func ParseCreatedLine(createdLine string) (funcName string, IsMainThread bool) {
 
-	// if its starts with created, it is a goroutine
-	if strings.HasPrefix(createdLine, runtCreatedByPrefix) {
-		funcName = createdLine[len(runtCreatedByPrefix):]
+	// check if created frame exists
+	if !strings.HasPrefix(createdLine, runtCreatedByPrefix) {
+		IsMainThread = true
 		return
 	}
 
-	// it is main.main()
-	funcName, _ = ParseFuncLine(createdLine)
-	IsMainThread = true
+	funcName = createdLine[len(runtCreatedByPrefix):]
 
 	return
 }
