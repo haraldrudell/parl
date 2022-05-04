@@ -6,6 +6,7 @@ ISC License
 package parl
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -34,11 +35,16 @@ func (wg *WaitGroup) Add(delta int) {
 }
 
 func (wg *WaitGroup) Done() {
+	wg.DoneBool()
+}
+
+func (wg *WaitGroup) DoneBool() (isExit bool) {
 	wg.lock.Lock()
 	defer wg.lock.Unlock()
 
 	wg.dones++
 	wg.WaitGroup.Done()
+	return wg.dones == wg.adds
 }
 
 func (wg *WaitGroup) Counters() (adds int, dones int) {
@@ -53,4 +59,9 @@ func (wg *WaitGroup) Counters() (adds int, dones int) {
 func (wg *WaitGroup) IsZero() (isZero bool) {
 	adds, dones := wg.Counters()
 	return adds == dones
+}
+
+func (wg *WaitGroup) String() (s string) {
+	adds, dones := wg.Counters()
+	return fmt.Sprintf("%d(%d)", adds-dones, adds)
 }

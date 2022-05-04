@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/haraldrudell/parl"
@@ -24,23 +23,23 @@ const (
 )
 
 type GoGroup struct {
-	sharedChan parl.NBChan[parl.GoError]
-	wg         parl.WaitGroup
-	lock       sync.Mutex
-	m          map[parl.GoIndex]*GoerDo // behind lock
-	index      uint64                   // atomic
-	ctx        parl.CancelContext
+	waiterr          // Add() IsExit() Wait() Ch() send()
+	lock             sync.Mutex
+	m                map[parl.GoIndex]*GoerDo // behind lock
+	goerIndex                                 // goIndex()
+	cancelAndContext                          // Cancel() Context()
 }
 
 func NewGoGroup(ctx context.Context) (goCreator parl.GoGroup) {
 	return &GoGroup{
-		m:   map[parl.GoIndex]*GoerDo{},
-		ctx: parl.NewCancelContext(ctx),
+		waiterr:          waiterr{wg: &parl.WaitGroup{}},
+		m:                map[parl.GoIndex]*GoerDo{},
+		cancelAndContext: *newCancelAndContext(ctx),
 	}
 }
 
 func (gc *GoGroup) Add(conduit parl.ErrorConduit, exitAction parl.ExitAction) (goer parl.Goer) {
-	gc.wg.Add(1)
+	gc.add(1)
 	index := gc.goIndex()
 	goer = NewGoer(
 		conduit,
@@ -56,18 +55,10 @@ func (gc *GoGroup) Add(conduit parl.ErrorConduit, exitAction parl.ExitAction) (g
 	return
 }
 
-func (gc *GoGroup) Warnings() (ch <-chan parl.GoError) {
-	return gc.sharedChan.Ch()
-}
-
-func (gc *GoGroup) Wait() {
-	gc.wg.Wait()
-}
-
 func (gc *GoGroup) WaitPeriod(duration ...time.Duration) {
 
 	// is GoCreator already done?
-	if gc.wg.IsZero() {
+	if gc.IsExit() {
 		return
 	}
 
@@ -84,7 +75,7 @@ func (gc *GoGroup) WaitPeriod(duration ...time.Duration) {
 	waitCh := make(chan struct{})
 	go func() {
 		parl.Recover(parl.Annotation(), nil, parl.Infallible)
-		gc.wg.Wait()
+		gc.Wait()
 		close(waitCh)
 	}()
 
@@ -92,7 +83,7 @@ func (gc *GoGroup) WaitPeriod(duration ...time.Duration) {
 	ticker := time.NewTicker(d)
 	defer ticker.Stop()
 
-	parl.Console(gc.List())
+	parl.Console(gc.String())
 	for keepGoing := true; keepGoing; {
 		select {
 		case <-waitCh:
@@ -100,15 +91,11 @@ func (gc *GoGroup) WaitPeriod(duration ...time.Duration) {
 		case <-ticker.C:
 		}
 
-		parl.Console(gc.List())
+		parl.Console(gc.String())
 	}
 }
 
-func (gc *GoGroup) IsExit() (isExit bool) {
-	return gc.wg.IsZero()
-}
-
-func (gc *GoGroup) List() (s string) {
+func (gc *GoGroup) String() (s string) {
 	timeStamp := ptime.Short()
 	goIndex := gc.getGoerList()
 
@@ -137,16 +124,10 @@ func (gc *GoGroup) List() (s string) {
 	return strings.Join(sList, "\n")
 }
 
-func (gc *GoGroup) errorReceiver(err parl.GoError) {
-
-	// emit the error
-	gc.sharedChan.Send(err)
-}
-
 func (gc *GoGroup) exitAction(err error, exitAction parl.ExitAction, index parl.GoIndex) {
 	gc.wg.Done()
 	if gc.deleteGoer(index) == 0 {
-		gc.sharedChan.Close()
+		gc.waiterr.close()
 	}
 
 	if exitAction == parl.ExIgnoreExit ||
@@ -154,7 +135,7 @@ func (gc *GoGroup) exitAction(err error, exitAction parl.ExitAction, index parl.
 		return
 	}
 
-	gc.ctx.Cancel()
+	gc.Cancel()
 }
 
 func (gc *GoGroup) addGoer(goer *GoerDo, index parl.GoIndex) {
@@ -182,8 +163,4 @@ func (gc *GoGroup) getGoerList() (goIndex map[parl.GoIndex]*GoerDo) {
 	}
 
 	return
-}
-
-func (gc *GoGroup) goIndex() (goIndex parl.GoIndex) {
-	return parl.GoIndex(atomic.AddUint64(&gc.index, 1))
 }

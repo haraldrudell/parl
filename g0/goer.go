@@ -6,7 +6,6 @@ ISC License
 package g0
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -23,20 +22,20 @@ const (
 )
 
 type GoerDo struct {
-	conduit        parl.ErrorConduit
-	exitAction     parl.ExitAction
-	index          parl.GoIndex
-	gc             *GoGroup
-	errCh          parl.NBChan[parl.GoError]
-	lock           sync.Mutex
-	parentID       parl.ThreadID              // behind lock
-	threadID       parl.ThreadID              // behind lock
-	otherIDs       map[parl.ThreadID]struct{} // behind lock
-	addLocation    pruntime.CodeLocation      // behind lock
-	createLocation pruntime.CodeLocation      // behind lock
-	funcLocation   pruntime.CodeLocation      // behind lock
-	gr             *GoerRuntime               // behind lock
-	ctx            parl.CancelContext
+	GoerGroup
+	conduit          parl.ErrorConduit
+	exitAction       parl.ExitAction
+	index            parl.GoIndex
+	gc               *GoGroup
+	waiterr          // Ch() IsExit() Wait()
+	lock             sync.Mutex
+	parentID         parl.ThreadID              // behind lock
+	threadID         parl.ThreadID              // behind lock
+	otherIDs         map[parl.ThreadID]struct{} // behind lock
+	addLocation      pruntime.CodeLocation      // behind lock
+	createLocation   pruntime.CodeLocation      // behind lock
+	funcLocation     pruntime.CodeLocation      // behind lock
+	cancelAndContext                            // Cancel() Context()
 }
 
 func NewGoer(
@@ -46,7 +45,12 @@ func NewGoer(
 	gc *GoGroup,
 	parentID parl.ThreadID,
 	addLocation *pruntime.CodeLocation) (goer parl.Goer) {
-	goer0 := GoerDo{
+
+	return &GoerDo{
+		GoerGroup: GoerGroup{
+			waiterr:          waiterr{wg: &parl.WaitGroup{}},
+			cancelAndContext: *newCancelAndContext(gc.Context()),
+		},
 		conduit:     conduit,
 		exitAction:  exitAction,
 		index:       index,
@@ -54,67 +58,49 @@ func NewGoer(
 		parentID:    parentID,
 		otherIDs:    map[parl.ThreadID]struct{}{},
 		addLocation: *addLocation,
-		ctx:         parl.NewCancelContext(gc.ctx),
 	}
-	gruntime := GoerRuntime{
-		g0: NewGo(
-			goer0.errorReceiver,
-			goer0.add,
-			goer0.done,
-			goer0.Context,
-		),
+}
+
+func (gr *GoerDo) AddError(err error) {
+	gr.getGoerRuntime("Go.AddError")
+
+	// package error
+	if err == nil {
+		return
 	}
-	gruntime.wg.Add(1)
-	goer0.gr = &gruntime
-	return &goer0
-}
+	goError := NewGoError(err, parl.GeNonFatal, gr)
 
-func (gr *GoerDo) Go() (g0 parl.Go) {
-	goerRuntime := gr.getGoerRuntime(false)
-	if goerRuntime == nil {
-		panic(perrors.New("Goer.GO after thread exit"))
+	// send GoError on shared channel
+	if gr.conduit == parl.EcSharedChan {
+		gr.gc.send(goError)
+		return
 	}
-	return goerRuntime.g0
-}
 
-func (gr *GoerDo) Ch() (ch <-chan parl.GoError) {
-	return gr.errCh.Ch()
-}
-
-func (gr *GoerDo) Context() (ctx context.Context) {
-	return gr.ctx
-}
-
-func (gr *GoerDo) Cancel() {
-	gr.ctx.Cancel()
-}
-
-func (gr *GoerDo) Wait() {
-	goerRuntime := gr.getGoerRuntime(false)
-	if goerRuntime != nil {
-		goerRuntime.wg.Wait()
-	}
+	// send err on dedicated error channel
+	gr.send(goError)
 }
 
 func (gr *GoerDo) add(delta int) {
-	goerRuntime := gr.getGoerRuntime(true)
-	if goerRuntime == nil {
-		panic(perrors.New("Go.Add after thread exit"))
-	}
-	goerRuntime.wg.Add(delta)
+	gr.getGoerRuntime("Go.AddError")
+	gr.waiterr.add(delta)
 }
 
-func (gr *GoerDo) done(err error) {
-	goerRuntime := gr.getGoerRuntime(true)
-	if goerRuntime == nil {
-		panic(perrors.New("Go.Done after thread exit"))
-	}
+func (gr *GoerDo) done(errp *error) {
+	gr.getGoerRuntime("Go.Done")
 
 	// execute Done
-	goerRuntime.wg.Done()
+	isDone := gr.doneBool()
+
+	// get error value
+	var err error
+	if errp != nil {
+		err = *errp
+	} else {
+		err = perrors.New("g0.Done with errp nil")
+	}
+
 	// isDone indicates that this thread exited
 	// it ir otherwise a sub-thread exit
-	isDone := goerRuntime.wg.IsZero()
 	var source parl.GoErrorSource
 	if isDone {
 		source = parl.GeExit
@@ -129,11 +115,11 @@ func (gr *GoerDo) done(err error) {
 		gr,
 	)
 	if gr.conduit == parl.EcSharedChan {
-		gr.gc.errorReceiver(goError)
+		gr.gc.send(goError)
 	} else {
 
 		// send ThreadResult on dedicated error channel
-		gr.errCh.Send(goError)
+		gr.send(goError)
 	}
 
 	if !isDone {
@@ -141,57 +127,39 @@ func (gr *GoerDo) done(err error) {
 	}
 
 	// mark Done
+	gr.close()
 	gr.gc.exitAction(err, gr.exitAction, gr.index)
+}
 
+func (gr *GoerDo) getGoerRuntime(action string) (didClose bool) {
+	didClose = gr.didClose()
+	defer func() {
+		if didClose {
+			panic(perrors.New(action + " after close"))
+		}
+	}()
+
+	stack := goid.NewStack(grCheckThreadFrames)
 	gr.lock.Lock()
 	defer gr.lock.Unlock()
 
-	gr.gr = nil
-	gr.errCh.Close()
-}
-
-func (gr *GoerDo) errorReceiver(err error) {
-	goerRuntime := gr.getGoerRuntime(true)
-	if goerRuntime == nil {
-		panic(perrors.New("Go.AddError after thread exit"))
-	}
-
-	// send GoError
-	goError := NewGoError(
-		err,
-		parl.GeNonFatal,
-		gr,
-	)
-	if gr.conduit == parl.EcSharedChan {
-		gr.gc.errorReceiver(goError)
+	// unitialize thread data
+	if gr.threadID == "" {
+		gr.threadID = stack.ID()
+		gr.createLocation = *stack.Creator()
+		gr.funcLocation = *stack.Frames()[len(stack.Frames())-1].Loc()
 		return
 	}
 
-	// send err on dedicated error channel
-	gr.errCh.Send(goError)
-}
-
-func (gr *GoerDo) getGoerRuntime(checkThread bool) (goerRuntime *GoerRuntime) {
-	var stack *goid.Stack
-	if checkThread {
-		stack = goid.NewStack(grCheckThreadFrames)
+	// collect thread IDs
+	if stack.ID() == gr.threadID {
+		return
 	}
-	gr.lock.Lock()
-	defer gr.lock.Unlock()
-
-	if checkThread {
-		if gr.threadID == "" {
-			gr.threadID = stack.ID
-			gr.createLocation = stack.Creator
-			gr.funcLocation = stack.Frames[len(stack.Frames)-1].CodeLocation
-		} else if stack.ID != gr.threadID {
-			if _, ok := gr.otherIDs[stack.ID]; !ok {
-				gr.otherIDs[stack.ID] = struct{}{}
-			}
-		}
+	if _, ok := gr.otherIDs[stack.ID()]; !ok {
+		gr.otherIDs[stack.ID()] = struct{}{}
 	}
 
-	return gr.gr
+	return
 }
 
 /*
@@ -200,10 +168,8 @@ func (gr *GoerDo) getGoerRuntime(checkThread bool) (goerRuntime *GoerRuntime) {
 */
 func (gr *GoerDo) String() (s string) {
 	sList := []string{fmt.Sprintf("#%d", gr.index)}
-	if goerRuntime := gr.getGoerRuntime(false); goerRuntime != nil {
-		adds, dones := goerRuntime.wg.Counters()
-		sList = append(sList, fmt.Sprintf("%d(%d)", adds-dones, adds))
-	}
+	adds, dones := gr.counters()
+	sList = append(sList, fmt.Sprintf("%d(%d)", adds-dones, adds))
 	if gr.threadID != "" {
 		sList = append(sList, "ID: "+gr.threadID.String())
 	} else {

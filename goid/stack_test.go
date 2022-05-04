@@ -18,11 +18,11 @@ func TestNewStack(t *testing.T) {
 	if stack == nil {
 		t.Errorf("NewStack nil return")
 	}
-	actualLength := len(stack.Frames)
+	actualLength := len(stack.Frames())
 	if actualLength != expectedFrameLength {
 		t.Errorf("Bad stack.Frames length %d expected %d", actualLength, expectedFrameLength)
 	}
-	if stack.Creator.Line == 0 {
+	if stack.Creator().Line == 0 {
 		t.Errorf("NewStack failed")
 	}
 	// goid.Frame{
@@ -34,8 +34,8 @@ func TestNewStack(t *testing.T) {
 	//	Args:"(0x1400011a340)"
 	// }
 	cl := pruntime.NewCodeLocation(0)
-	if stack.Frames[0].File != cl.File {
-		t.Errorf("Bad file: %s expected %s", stack.Frames[0].File, cl.File)
+	if stack.Frames()[0].Loc().File != cl.File {
+		t.Errorf("Bad file: %s expected %s", stack.Frames()[0].Loc().File, cl.File)
 	}
 }
 

@@ -3,32 +3,35 @@
 ISC License
 */
 
+// Package g0 facilitates launch, management and execution of goroutines
 package g0
 
 import (
 	"context"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/perrors"
 )
 
 type GoDo struct {
-	errorReceiver func(err error)
-	add           func(delta int)
-	done          func(err error)
-	ctxFn         func() (ctx context.Context)
+	addError func(err error)
+	add      func(delta int)
+	done     func(err *error)
+	context  func() (ctx context.Context)
+	cancel   func()
 }
 
 func NewGo(
 	errorReceiver func(err error),
 	add func(delta int),
-	done func(err error),
-	ctxFn func() (ctx context.Context)) (g0 parl.Go) {
+	done func(err *error),
+	context func() (ctx context.Context),
+	cancel func()) (g0 parl.Go) {
 	return &GoDo{
-		errorReceiver: errorReceiver,
-		add:           add,
-		done:          done,
-		ctxFn:         ctxFn,
+		addError: errorReceiver,
+		add:      add,
+		done:     done,
+		context:  context,
+		cancel:   cancel,
 	}
 }
 
@@ -41,21 +44,19 @@ func (g0 *GoDo) Add(delta int) {
 }
 
 func (g0 *GoDo) AddError(err error) {
-	g0.errorReceiver(err)
+	g0.addError(err)
 }
 
 func (g0 *GoDo) Done(errp *error) {
-	var err error
-	if errp != nil {
-		err = *errp
-	} else {
-		err = perrors.New("g0.Done with errp nil")
-	}
-	g0.done(err)
+	g0.done(errp)
 }
 
 func (g0 *GoDo) Context() (ctx context.Context) {
-	return g0.ctxFn()
+	return g0.context()
+}
+
+func (g0 *GoDo) Cancel() {
+	g0.cancel()
 }
 
 func (g0 *GoDo) SubGo() (goCancel parl.SubGo) {

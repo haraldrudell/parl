@@ -5,7 +5,9 @@ ISC License
 
 package parl
 
-import "context"
+import (
+	"context"
+)
 
 // Waitable is the invoker’s Wait part of sync.WaitGroup and
 // other implementations.
@@ -21,6 +23,52 @@ import "context"
 //    go somethingElse()
 type Waitable interface {
 	Wait()
+}
+
+type SyncWait interface {
+	Wait()
+}
+
+type SyncAdd interface {
+	Add(delta int)
+}
+
+type SyncDone interface {
+	Done()
+}
+
+type WaitedOn interface {
+	SyncAdd
+	SyncDone
+	DoneBool() (isExit bool)
+	IsZero() (isZero bool)
+}
+
+type WaitingFor interface {
+	SyncAdd
+	IsZero() (isZero bool)
+	Counters() (adds, dones int)
+	SyncWait
+	String() (s string)
+}
+
+// waiter allows to use any of observable parl.WaitGroup or parl.TraceGroup
+type Waiter interface {
+	WaitedOn
+	WaitingFor
+}
+
+type ErrorManager interface {
+	Ch() (ch <-chan GoError)
+}
+
+type ErrorSink interface {
+	AddError(err error)
+}
+
+type ErrorCloser interface {
+	InvokeIfError(addError func(err error))
+	Close()
 }
 
 // Doneable is the callee part of sync.Waitgroup

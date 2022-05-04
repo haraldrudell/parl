@@ -3,13 +3,11 @@
 ISC License
 */
 
-package g0
+package goid
 
-import (
-	"github.com/haraldrudell/parl"
-)
+import "github.com/haraldrudell/parl/breakcycle"
 
-type GoerRuntime struct {
-	wg parl.WaitGroup
-	g0 parl.Go
-}
+var _ = func() (i int) {
+	breakcycle.SetV(NewStack)
+	return
+}()

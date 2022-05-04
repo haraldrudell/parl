@@ -3,13 +3,11 @@
 ISC License
 */
 
-package psync
+package parl
 
 import (
 	"strings"
 	"sync"
-
-	"github.com/haraldrudell/parl"
 )
 
 const (
@@ -21,7 +19,7 @@ const (
 //
 // TraceGroup cannot be in parl because WaitAction imports goid
 type TraceGroup struct {
-	parl.WaitGroup
+	WaitGroup
 	lock sync.Mutex
 	list []WaitAction // behind lock
 }
@@ -54,7 +52,7 @@ func (wg *TraceGroup) action(delta int, isDone bool) {
 
 func (wg *TraceGroup) String() (s string) {
 	adds, dones := wg.WaitGroup.Counters()
-	s = parl.Sprintf("%d(%d)", dones, adds)
+	s = Sprintf("%d(%d)", dones, adds)
 
 	wg.lock.Lock()
 	defer wg.lock.Unlock()

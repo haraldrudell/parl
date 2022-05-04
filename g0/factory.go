@@ -21,10 +21,10 @@ func (gf *goCreatorFactory) NewGoGroup(ctx context.Context) (goCreator parl.GoGr
 	return NewGoGroup(ctx)
 }
 
-var GoerGroupFactory parl.GoerGroupFactory = &goerFactory{}
+var GoerFactory parl.GoerFactory = &goerFactory{}
 
 type goerFactory struct{}
 
-func (gf *goerFactory) NewGoerGroup(ctx context.Context) (goer parl.GoerGroup) {
+func (gf *goerFactory) NewGoer(ctx context.Context) (goer parl.Goer) {
 	return NewGoerGroup(ctx)
 }

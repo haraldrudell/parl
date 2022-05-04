@@ -81,7 +81,7 @@ parl package features:
  Debouncer — Invocation debouncer, pre-generics
  Sprintf — Supporting thousands separator
 
-Parl is about 9,000 lines of Go code with first line written on November 21, 2018
+Parl is about 15,000 lines of Go code with first line written on November 21, 2018
 
 On March 16th, 2022, parl was open-sourced under an ISC License
 
@@ -104,17 +104,6 @@ type Password interface {
 type FSLocation interface {
 	Directory() (directory string)
 }
-
-/*
-ThreadID is an opaque type that uniquley identifies a thread,
-ie. a goroutine.
-goid.GoID obtains ThreadID for the executing
-thread.
-ThreadID is comparable, ie. can be used as a map key.
-ThreadID can be cast to string using .String()
-func (threadID ThreadID) String() (s string)
-*/
-type ThreadID string
 
 // ThreadStatus indicates the current stat of a thread
 // most often it is "running"

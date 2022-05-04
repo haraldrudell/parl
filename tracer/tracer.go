@@ -3,6 +3,7 @@
 ISC License
 */
 
+// tracer has events by task then time rather than time or thread
 package tracer
 
 import (

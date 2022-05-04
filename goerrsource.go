@@ -5,6 +5,10 @@ ISC License
 
 package parl
 
+type GoErrorSource uint8
+
+const none = "NONE"
+
 var goErrorMap = map[GoErrorSource]string{
 	GeNonFatal:    "GeNonFatal",
 	GePreDoneExit: "GePreDoneExit",
@@ -12,5 +16,10 @@ var goErrorMap = map[GoErrorSource]string{
 }
 
 func (ge GoErrorSource) String() (s string) {
-	return goErrorMap[ge]
+	var ok bool
+	if s, ok = goErrorMap[ge]; !ok {
+		s = none
+	}
+
+	return
 }

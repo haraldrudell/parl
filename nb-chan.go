@@ -47,7 +47,8 @@ type NBChan[T any] struct {
 	unsentCount             int  // inside lock
 	sendQueue               []T  // inside lock
 	waitForCloseInitialized bool // inside lock
-	nbChanCloseInvoked      bool // inside lock
+
+	nbChanCloseInvoked AtomicBool
 
 	waitForClose sync.WaitGroup // initialization inside lock
 
@@ -77,7 +78,7 @@ func (nb *NBChan[T]) Send(value T) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	if nb.nbChanCloseInvoked {
+	if nb.nbChanCloseInvoked.IsTrue() {
 		return // no send after Close()
 	}
 
@@ -108,10 +109,9 @@ func (nb *NBChan[T]) Close() (didClose bool) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	if nb.nbChanCloseInvoked {
+	if !nb.nbChanCloseInvoked.Set() {
 		return // Close was already invoked
 	}
-	nb.nbChanCloseInvoked = true
 
 	if !nb.waitForThread.IsZero() {
 		return // there is a pending thread that will execute close on exit
@@ -121,6 +121,10 @@ func (nb *NBChan[T]) Close() (didClose bool) {
 		nb.AddError(err) // store posible close error
 	}
 	return
+}
+
+func (nb *NBChan[T]) DidClose() (didClose bool) {
+	return nb.nbChanCloseInvoked.IsTrue()
 }
 
 // IsClosed indicates whether the channel has actually closed.
@@ -146,6 +150,8 @@ func (nb *NBChan[T]) CloseNow(errp ...*error) (err error, didClose bool) {
 	}
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
+
+	nb.nbChanCloseInvoked.Set()
 
 	// discard pending data
 	if len(nb.sendQueue) > 0 {
@@ -201,10 +207,7 @@ func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
 }
 
 func (nb *NBChan[T]) sendThreadDefer() {
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	if nb.nbChanCloseInvoked { // Close() was invoked after thread started
+	if nb.nbChanCloseInvoked.IsTrue() { // Close() was invoked after thread started
 		nb.closableChan.Close() // close if Close was invoked. Idempotent
 	}
 

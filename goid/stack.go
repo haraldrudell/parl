@@ -7,20 +7,14 @@ package goid
 
 import (
 	"fmt"
-	"regexp"
 	"runtime/debug"
-	"strconv"
 	"strings"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
-	// debug.Stack uses this prefix in the first line of the result
-	runFirstRexpT             = "^goroutine ([[:digit:]]+) [[]([^]]+)[]]:$"
-	runtCreatedByPrefix       = "created by "
 	runtDebugAndStackFrames   = 2
 	runtStatusAndCreatorLines = 3
 	runtLinesPerFrame         = 2
@@ -32,33 +26,25 @@ type Stack struct {
 	// ThreadID is a unqique ID associated with this thread.
 	// typically numeric string “1”…
 	// it can be used as a map key or converted to string
-	ID parl.ThreadID
+	threadID parl.ThreadID
 	// Status is typically word “running”
-	Status parl.ThreadStatus
-	// IsMainThread indicates if this is the thread that launched main.main
-	IsMainThread bool
+	status parl.ThreadStatus
+	// isMainThread indicates if this is the thread that launched main.main
+	isMainThread bool
 	// Frames is a list of code locations for this thread.
 	// [0] is the invoker of goid.NewStack().
 	// last is the function starting this thread.
 	// Frame.Args is invocation values like "(0x14000113040)".
-	Frames []Frame
+	frames []parl.Frame
 	// Creator is the code location of the go statement launching
 	// this thread.
 	// FuncName is "main.main()" for main thread
-	Creator pruntime.CodeLocation
+	creator pruntime.CodeLocation
 }
-
-type Frame struct {
-	pruntime.CodeLocation
-	// args like "(1, 2, 3)"
-	Args string
-}
-
-var firstRexp = regexp.MustCompile(runFirstRexpT)
 
 // NewStack populates a Stack object with the current thread
 // and its stack using debug.Stack
-func NewStack(skipFrames int) (stack *Stack) {
+func NewStack(skipFrames int) (stack parl.Stack) {
 	var err error
 	if skipFrames < 0 {
 		skipFrames = 0
@@ -84,7 +70,7 @@ func NewStack(skipFrames int) (stack *Stack) {
 	}
 
 	// first line: s.ID s.Status
-	if s.ID, s.Status, err = ParseFirstLine(trace[0]); err != nil {
+	if s.threadID, s.status, err = ParseFirstLine(trace[0]); err != nil {
 		panic(err)
 	}
 
@@ -98,123 +84,41 @@ func NewStack(skipFrames int) (stack *Stack) {
 	firstIndex := runtStatusLineLength + (skipFrames+runtDebugAndStackFrames)*runtLinesPerFrame
 	for i := firstIndex; i < len(trace)-runtCreatorLines; i += runtLinesPerFrame {
 
-		// get a pointer into the slice where to store
-		s.Frames = append(s.Frames, Frame{})
-		framep := &s.Frames[len(s.Frames)-1]
+		var frame Frame
 
 		// parse function line
-		framep.CodeLocation.FuncName, framep.Args = ParseFuncLine(trace[i])
+		frame.CodeLocation.FuncName, frame.args = ParseFuncLine(trace[i])
 
 		// parse file line
-		framep.CodeLocation.File, framep.CodeLocation.Line = ParseFileLine(trace[i+1])
+		frame.CodeLocation.File, frame.CodeLocation.Line = ParseFileLine(trace[i+1])
+		s.frames = append(s.frames, &frame)
 	}
 
 	// populate s.IsMainThread s.Creator
 	// last 2 lines
-	s.Creator.FuncName, s.IsMainThread = ParseCreatedLine(trace[len(trace)-2])
-	s.Creator.File, s.Creator.Line = ParseFileLine(trace[len(trace)-1])
+	s.creator.FuncName, s.isMainThread = ParseCreatedLine(trace[len(trace)-2])
+	s.creator.File, s.creator.Line = ParseFileLine(trace[len(trace)-1])
 
 	stack = &s
 	return
 }
 
-// getID obtains gorutine ID, as of go1.18 a numeric string "1"…
-func ParseFirstLine(debugStack string) (ID parl.ThreadID, status parl.ThreadStatus, err error) {
-
-	// remove possible lines 2…
-	if index := strings.Index(debugStack, "\n"); index != -1 {
-		debugStack = debugStack[:index]
-	}
-
-	// find ID and status
-	matches := firstRexp.FindAllStringSubmatch(debugStack, -1)
-	if matches == nil {
-		err = perrors.Errorf("goid.ParseFirstStackLine failed to parse: %q", debugStack)
-		return
-	}
-
-	// return values
-	values := matches[0][1:]
-	ID = parl.ThreadID(values[0])
-	status = parl.ThreadStatus(values[1])
-
-	return
+func (s *Stack) ID() (threadID parl.ThreadID) {
+	return s.threadID
 }
 
-// ParseFileLine parses a line of a tab character then absolue file path,
-// followed by a colon and line number, then a space character and
-// a byte offset
-//  "\t/gp-debug-stack/debug-stack.go:29 +0x44"
-func ParseFileLine(fileLine string) (file string, line int) {
-	var hasTab bool
-	var lastColon = -1
-	var spaceAfterColon = -1
-	if len(fileLine) > 0 {
-		hasTab = fileLine[:1] == "\t"
-		lastColon = strings.LastIndex(fileLine, ":")
-		spaceAfterColon = strings.LastIndex(fileLine, "\x20")
-	}
-	if !hasTab || lastColon == -1 || spaceAfterColon < lastColon {
-		panic(perrors.Errorf("bad debug.Stack: file line: %q", fileLine))
-	}
-
-	var err error
-	if line, err = strconv.Atoi(fileLine[lastColon+1 : spaceAfterColon]); err != nil {
-		panic(perrors.Errorf("bad debug.Stack file line number: %w %q", err, fileLine))
-	}
-	if line < 1 {
-		panic(perrors.Errorf("bad debug.Stack file line number <1: %q", fileLine))
-	}
-
-	file = fileLine[1:lastColon]
-
-	return
+func (s *Stack) IsMain() (isMainThread bool) {
+	return s.isMainThread
 }
 
-// ParseCreatedLine parses the second-to-last line of the stack trace.
-// samples:
-//  created by main.main
-//  created by main.(*MyType).goroutine1
-//  main.main()
-func ParseCreatedLine(createdLine string) (funcName string, IsMainThread bool) {
-
-	// if its starts with created, it is a goroutine
-	if strings.HasPrefix(createdLine, runtCreatedByPrefix) {
-		funcName = createdLine[len(runtCreatedByPrefix):]
-		return
-	}
-
-	// it is main.main()
-	funcName, _ = ParseFuncLine(createdLine)
-	IsMainThread = true
-
-	return
+func (s *Stack) Status() (status parl.ThreadStatus) {
+	return s.status
 }
 
-// ParseFuncLine parses a line of a package name, optionally fully qualified, and
-// a possible receiver type name and a function name, followed by a parenthesised
-// argument list.
-// samples:
-//  main.main()
-//  main.(*MyType).goroutine1(0x0?, 0x140000120d0, 0x2)
-//  codeberg.org/haraldrudell/goprogramming/std/runtime-debug/gp-debug-stack/mypackage.Fn(...)
-func ParseFuncLine(funcLine string) (funcName string, args string) {
-	leftIndex := strings.Index(funcLine, "(")
-	if leftIndex < 1 {
-		panic(perrors.Errorf("Bad debug.Stack function line: no left parenthesis: %q", funcLine))
-	}
+func (s *Stack) Creator() (creator *pruntime.CodeLocation) {
+	return &s.creator
+}
 
-	// determine if parenthesis is for optional type name rarther than function arguments
-	if funcLine[leftIndex-1:leftIndex] == "." {
-		nextIndex := strings.Index(funcLine[leftIndex+1:], "(")
-		if nextIndex < 1 {
-			panic(perrors.Errorf("Bad debug.Stack function line: no second left parenthesis: %q", funcLine))
-		}
-		leftIndex += nextIndex + 1
-	}
-
-	funcName = funcLine[:leftIndex]
-	args = funcLine[leftIndex:]
-
-	return
+func (s *Stack) Frames() (frames []parl.Frame) {
+	return s.frames
 }

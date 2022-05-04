@@ -3,6 +3,8 @@
 ISC License
 */
 
+// plog provides log instances with Log Logw Info Debug D SetDebug SetRegexp
+// SetRegexp SetSilent IsThisDebug IsSilent
 package plog
 
 import (

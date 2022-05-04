@@ -4,7 +4,7 @@ ISC License
 */
 
 /*
-Package error116 enrichens error values with string data, stack traces, associated errors,
+Package perrors enrichens error values with string data, stack traces, associated errors,
 less severe warnings, thread-safe containers and
 comprehensive error string representations.
 

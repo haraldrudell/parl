@@ -3,6 +3,7 @@
 ISC License
 */
 
+// pstrings provides FilteredJoin QuoteList StrSliceContains
 package pstrings
 
 import (

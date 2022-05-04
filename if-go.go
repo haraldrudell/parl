@@ -22,63 +22,45 @@ type GoGroup interface {
 	// exitAction describes what actions the GoCreator object
 	// will take upon goroutine exit
 	Add(conduit ErrorConduit, exitAction ExitAction) (goer Goer)
-	// Warnings provides an error channel shared by goroutines that
-	// do not have an individual channel
-	Warnings() (ch <-chan GoError)
-	// Wait waits for all goroutines managed by this GoCreator
-	// to exit
-	Wait()
 	// WaitPeriod waits for all goroutines managed by this GoCreator
 	// to exit, periodically printing a description of the goroutines
 	// that have yet to exit
 	WaitPeriod(duration ...time.Duration)
-	IsExit() (isExit bool)
-	List() (s string)
+	GoManager
 }
 
-// GoerGroup uniformly manages any number of go statements.
-// Each go statement can send errors, receive cancel, initiate cancel and be waited on.
-// All go statements share error channel.
-// Cancel affects all go statements.
-// Wait waits for all go statements
+// Goer manages one or more go statements.
+// Goer is obtained from a GoGroup to manage a single go statement or
+// from a GoerFactory to manage any number of go statements uniformly or
+// from a GoError.
+// The managed go statements can send errors, receive cancel, initiate cancel and be waited on.
+// Cancel and Wait are separate for the Goer and only pertains to the managed go statements.
 // The wait mechanic used is observable.
-type GoerGroup interface {
-	// Go gets a Go object, to be used as an argument in a go statement.
+type Goer interface {
+	// Go returns a Go object to be provided to a go statement.
+	// A Goer obained from GoGroup is only intended to manage one go statement.
 	Go() (g0 Go)
-	// Ch is a channel that sends errors as they occur amd will close after GeExit
-	// Ch send GeNonFatal for non-fatal errors, err is non-nil
-	// Ch sends GePreDoneExit for sub-thread exits, err may be nil
-	// Ch sends a final GeExit for the final exit, err may be nil
-	Ch() (ch <-chan GoError)
-	// Cancel cancels all goroutines managed by the Subgoer
-	// AddError allows a goroutine to send non-fatal errors
+	// AddError emits a GeNonFatal error on the error channel
 	AddError(err error)
-	Cancel()
-	// Wait allows to wait for all goroutines to exit
-	// Context will cancel when work done on behalf of this context
-	// should be canceled
-	Context() (ctx context.Context)
-	Wait()
-	IsExit() (isExit bool)
-	String() (s string)
+	GoManager
 }
 
-// Goer manages a single go statement.
-// Goer is obtained from a GoGroup or a GoError.
-type Goer interface {
-	// Go gets the Go object, that is provided to its goroutine in a go statement
-	Go() (g0 Go)
-	// Ch is a channel that will close on thread exit.
-	// Ch will emit errors as they occur if the thread was launched with ECErrChan
-	// Ch emitting
-	// Ch will emit an Exit result if the thread was launched with ECErrChan
+type GoManager interface {
+	// Ch is a channel that will close once all go statements have exited.
+	// If the Goer was obtained from a GoGroup, Ch only emits data for EcErrChan.
+	// Ch emits errors and exit results as they occur.
 	Ch() (ch <-chan GoError)
+	// IsExit indicates whether all go statements and Go.Add incovations
+	// has exited.
+	IsExit() (isExit bool)
+	// Wait waits for all go statements and Go.Add invocations
+	Wait()
+	// Cancel indicates to all threads managed by this Goer that
+	// work done on behalf of this context should be canceled
+	Cancel()
 	// Context will cancel when work done on behalf of this context
 	// should be canceled
 	Context() (ctx context.Context)
-	Cancel()
-	// Wait allows to wait for this exact goroutine
-	Wait()
 	String() (s string)
 }
 
@@ -100,12 +82,18 @@ type Go interface {
 	// Done indicates that a goroutine has finished.
 	// err nil typically means successful exit.
 	// Done is deferrable.
+	// If the waitGroup is not done, a GePreDoneExit status is sent.
+	// If Done is for the final goroutine, GeExit is sent.
 	Done(errp *error)
+	// Cancel allows for the goroutine or its sub-threads to initiate local cancel
+	Cancel()
 	// Context will cancel when work done on behalf of this context
 	// should be canceled
 	Context() (ctx context.Context)
-	// SubGo allows a sub-group of threads to be cancelled and waited for separately.
-	// Subgo still has access to AddError error sink.
+	// SubGo allows a sub-group of threads that can be canceled and waited for separately.
+	// Subgo has access to the AddError error sink.
+	// Subgo has its own sub-context and waitgroup.
+	// Subgo Add and Done are duplicated.
 	SubGo() (subGo SubGo)
 }
 
@@ -118,8 +106,6 @@ type SubGo interface {
 	Go
 	// Wait allows a thread to wait for (many) sub-threads
 	Wait()
-	// Cancel allows for any thread to cancel all sub-threads
-	Cancel()
 	String() (s string)
 }
 
@@ -151,10 +137,6 @@ const (
 	GeExit
 )
 
-type GoErrorSource uint8
-
-type GoIndex int
-
 const (
 	// EcSharedChan emits error on a shared error channel of the GoCreator object
 	EcSharedChan ErrorConduit = iota + 1
@@ -163,8 +145,6 @@ const (
 	// TODO 220418 ECErrorStore stores error in a perrors.ErrorStore of the GoCreator object
 	//ECErrorStore
 )
-
-type ErrorConduit uint8
 
 const (
 	// ExCancelOnExit cancels the GoCreator context ie. all actions on behalf of the
@@ -177,12 +157,14 @@ const (
 	ExCancelOnFailure
 )
 
+type GoIndex int
+type ErrorConduit uint8
 type ExitAction uint8
 
 type GoGroupFactory interface {
 	NewGoGroup(ctx context.Context) (goGroup GoGroup)
 }
 
-type GoerGroupFactory interface {
-	NewGoerGroup(ctx context.Context) (goer GoerGroup)
+type GoerFactory interface {
+	NewGoer(ctx context.Context) (goer Goer)
 }

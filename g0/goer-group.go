@@ -9,84 +9,79 @@ import (
 	"context"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/psync"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 type GoerGroup struct {
-	errCh parl.NBChan[parl.GoError]
-	wg    psync.TraceGroup
-	ctx   parl.CancelContext
+	waiterr          // Ch() IsExit() Wait() String()
+	cancelAndContext // Cancel() Context()
 }
 
-func NewGoerGroup(ctx context.Context) (goer parl.GoerGroup) {
-	return &GoerGroup{ctx: parl.NewCancelContext(ctx)}
+func NewGoerGroup(ctx context.Context) (goer parl.Goer) {
+	return &GoerGroup{
+		waiterr:          waiterr{wg: &parl.TraceGroup{}},
+		cancelAndContext: *newCancelAndContext(ctx),
+	}
 }
 
 func (gr *GoerGroup) Go() (g0 parl.Go) {
-	gr.wg.Add(1)
+	if gr.didClose() {
+		panic(perrors.New("Go after close"))
+	}
+	gr.add(1)
 	return NewGo(
-		gr.errorReceiver,
-		gr.wg.Add,
+		gr.AddError,
+		gr.waiterr.add,
 		gr.done,
-		gr.ctxFn,
+		gr.Context,
+		gr.Cancel,
 	)
 }
 
-func (gr *GoerGroup) Ch() (ch <-chan parl.GoError) {
-	return gr.errCh.Ch()
-}
-
 func (gr *GoerGroup) AddError(err error) {
-	gr.errCh.Send(NewGoError(
-		err,
-		parl.GeNonFatal,
-		gr,
-	))
-}
-
-func (gr *GoerGroup) Context() (ctx context.Context) {
-	return gr.ctx
-}
-
-func (gr *GoerGroup) Cancel() {
-	gr.ctx.Cancel()
-}
-
-func (gr *GoerGroup) Wait() {
-	gr.wg.Wait()
-}
-
-func (gr *GoerGroup) IsExit() (isExit bool) {
-	return gr.wg.IsZero()
-}
-
-func (gr *GoerGroup) String() (s string) {
-	return gr.wg.String()
-}
-
-func (gr *GoerGroup) errorReceiver(err error) {
+	if gr.didClose() {
+		panic(perrors.New("Go.AddError after close"))
+	}
 	if err == nil {
 		return
 	}
-	gr.errCh.Send(NewGoError(err, parl.GeNonFatal, gr))
+	gr.send(NewGoError(err, parl.GeNonFatal, gr))
 }
 
-func (gr *GoerGroup) ctxFn() (ctx context.Context) {
-	return gr.ctx
+func (gr *GoerGroup) done(errp *error) {
+	if gr.didClose() {
+		panic(perrors.New("Go.Done after close"))
+	}
+
+	isDone, goError := gr.getError(errp)
+	gr.send(goError)
+
+	// possibly close error channel
+	if isDone {
+		gr.close()
+	}
 }
 
-func (gr *GoerGroup) done(err error) {
-	isZero := gr.wg.DoneBool()
+func (gr *GoerGroup) getError(errp *error) (isDone bool, goError parl.GoError) {
+	// execute done
+	isDone = gr.doneBool()
 
+	// get error value
+	var err error
+	if errp != nil {
+		err = *errp
+	} else {
+		err = perrors.New("g0.Done with errp nil")
+	}
+
+	// send result
 	var source parl.GoErrorSource
-	if isZero {
+	if isDone {
 		source = parl.GeExit
 	} else {
 		source = parl.GePreDoneExit
 	}
-	gr.errCh.Send(NewGoError(err, source, gr))
+	goError = NewGoError(err, source, gr)
 
-	if isZero {
-		gr.errCh.Close()
-	}
+	return
 }

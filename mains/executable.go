@@ -30,6 +30,8 @@ const (
 	helpHelp      = "\x20\x20-help -h --help\n\x20\x20\tShows this help"
 	timeHeader    = "time: %s"
 	hostHeader    = "host: %s"
+	defaultOK     = " completed successfully"
+	NoOK          = "-"
 )
 
 const (
@@ -65,6 +67,7 @@ type Executable struct {
 	Description    string // [Description part of usage] configures firewall and routing
 	Copyright      string // © 2020…
 	License        string // ISC License
+	OKtext         string // Completed successfully
 	ArgumentsUsage string
 	Arguments      ArgumentSpec // eg. NoArguments
 	// fields below popualted by .Init()
@@ -410,6 +413,17 @@ func (ex *Executable) Recover(errp ...*error) {
 		}
 		err = parl.Errorf("Unhandled panic to exe.Recover: '%w'", err)
 		ex.AddErr(err)
+	}
+
+	// print completed successfully
+	if ex.err == nil && ex.OKtext != NoOK {
+		var s string
+		if ex.OKtext != "" {
+			s = ex.OKtext
+		} else {
+			s = ex.Program + defaultOK
+		}
+		parl.Log(s)
 	}
 
 	ex.Exit()

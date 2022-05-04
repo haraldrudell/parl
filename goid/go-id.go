@@ -3,7 +3,7 @@
 ISC License
 */
 
-// Package goid provides goid.GoID(), unique goroutine identifiers
+// goid.GoID() provides a unique goroutine identifier.
 //  m := map[goid.ThreadID]SomeInterface{}
 //  m[goid.GoID()] = …
 package goid

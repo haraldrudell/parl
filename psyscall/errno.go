@@ -3,6 +3,7 @@
 ISC License
 */
 
+// psyscall has functions to examine syscall.Errno errors
 package psyscall
 
 import (

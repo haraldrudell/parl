@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package ghandi interfaces Android devices
 package threadprof
 
 type CounterValue struct {
