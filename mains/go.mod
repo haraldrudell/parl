@@ -1,10 +1,10 @@
-module github.com/haraldrudell/parl/process
+module github.com/haraldrudell/parl/mains
 
 go 1.18
 
 require (
 	github.com/elastic/go-sysinfo v1.7.1
-	github.com/haraldrudell/parl v0.4.21
+	github.com/haraldrudell/parl v0.4.22
 )
 
 require (

@@ -4,13 +4,11 @@ go 1.18
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/haraldrudell/parl v0.4.21
-	github.com/haraldrudell/parl/pfs v0.4.21
+	github.com/haraldrudell/parl v0.4.22
 	modernc.org/sqlite v1.17.1
 )
 
 require (
-	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect

@@ -2,7 +2,7 @@ go 1.18
 
 use (
 	.
-	./process
+	./mains
 	./pterm
 	./sqliter
 	./watchfs

@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -18,7 +17,6 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/plog"
 	"github.com/haraldrudell/parl/pos"
-	"github.com/haraldrudell/parl/process"
 	"github.com/haraldrudell/parl/pruntime"
 	"github.com/haraldrudell/parl/pstrings"
 )
@@ -93,7 +91,7 @@ Init supports function chaining like:
    …
 */
 func (ex *Executable) Init() *Executable {
-	now := process.ProcessStartTime()
+	now := ProcessStartTime()
 	ex.Launch = now
 	ex.LaunchString = now.Format(rfcTimeFormat)
 	ex.Host = pos.ShortHostname()
@@ -123,42 +121,6 @@ func (ex *Executable) LongErrors(isLongErrors bool, isErrorLocation bool) *Execu
 	ex.IsLongErrors = isLongErrors
 	ex.IsErrorLocation = isErrorLocation
 	return ex
-}
-
-// ParentDir gets absolute path of executable parent directory
-func ParentDir() (dir string) {
-	if dir = ExecDir(); dir != "" {
-		dir = filepath.Dir(dir)
-	}
-	return
-}
-
-// ExecDir gets abolute path to directory where executable is located
-func ExecDir() (dir string) {
-	if len(os.Args) == 0 {
-		return
-	}
-	dir = Abs(filepath.Dir(os.Args[0]))
-	return
-}
-
-// Abs ensures a file system path is fully qualified.
-// Abs is single-return-value and panics on troubles
-func Abs(dir string) (out string) {
-	var err error
-	if out, err = filepath.Abs(dir); err != nil {
-		panic(parl.Errorf("filepath.Abs: '%w'", err))
-	}
-	return
-}
-
-// UserHomeDir gets file system path of user’s home directory
-func UserHomeDir() (dir string) {
-	var err error
-	if dir, err = os.UserHomeDir(); err != nil {
-		panic(parl.Errorf("os.UserHomeDir: '%w'", err))
-	}
-	return
 }
 
 /*

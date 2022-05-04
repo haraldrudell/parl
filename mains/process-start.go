@@ -3,7 +3,7 @@
 ISC License
 */
 
-package process
+package mains
 
 import (
 	"time"

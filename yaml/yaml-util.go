@@ -17,6 +17,7 @@ import (
 	"path"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/pfs"
 	"github.com/haraldrudell/parl/pos"
 )
 
@@ -40,11 +41,11 @@ func GetTopLevelKey(topKey string) (key string) {
 // FindFile locates and read the yaml file
 func FindFile(filename0, program string) (out string, bytes []byte) {
 	if filename0 != "" {
-		out = Abs(filename0)
+		out = pfs.Abs(filename0)
 		bytes, _ = readFile(out)
 		return
 	}
-	dirs := []string{path.Join(pos.UserHomeDir(), appsName), ParentDir(), Abs(etcName)}
+	dirs := []string{path.Join(pos.UserHomeDir(), appsName), ParentDir(), pfs.Abs(etcName)}
 	filenames := []string{fmt.Sprintf("%s-%s%s", program, pos.ShortHostname(), yamlExt),
 		program + yamlExt}
 	for _, dir := range dirs {
