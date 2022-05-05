@@ -50,7 +50,8 @@ func (s *Socket) RunHandler(handler func(net.Conn)) (errCh <-chan error) {
 func (s *Socket) accept(handler func(net.Conn), errCh chan<- error) {
 	defer close(errCh)
 	defer s.wg.Done()
-	parl.Recover2(parl.Annotation(), nil, func(e error) { errCh <- e })
+	defer parl.Recover2(parl.Annotation(), nil, func(e error) { errCh <- e })
+
 	for {
 		var err error
 		var conn net.Conn

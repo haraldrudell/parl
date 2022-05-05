@@ -3,7 +3,7 @@
 ISC License
 */
 
-// Package sqldb interfaces database/sql
+// Package psql augments database/sql
 package psql
 
 import (

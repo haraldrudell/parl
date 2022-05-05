@@ -4,7 +4,8 @@ ISC License
 */
 
 // plog provides log instances with Log Logw Info Debug D SetDebug SetRegexp
-// SetRegexp SetSilent IsThisDebug IsSilent
+// SetRegexp SetSilent IsThisDebug IsSilent.
+// Static delegasting functions are available in parl, like parl.Log.
 package plog
 
 import (
@@ -24,9 +25,10 @@ import (
 )
 
 const (
-	logInstDefFrames       = 2
-	logInstDebugFrameDelta = -1
-	isThisDebugDelta       = -1
+	logInstDefFrames              = 2
+	logInstDebugFrameDelta        = -1
+	isThisDebugDelta              = -1
+	uint32True             uint32 = 1
 )
 
 // LogInstance provide logging delegating to log.Output
@@ -113,6 +115,26 @@ func (lg *LogInstance) Debug(format string, a ...interface{}) {
 	lg.invokeOutput(appendLocation(sprintf(format, a...), cloc))
 }
 
+// Debug outputs only if debug is configured or the code location package matches regexp
+func (lg *LogInstance) GetDebug(skipFrames int) (debug func(format string, a ...interface{})) {
+
+	// determine if printing
+	doPrint := atomic.LoadUint32(&lg.isDebug) != 0
+	cloc := pruntime.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta + skipFrames)
+	if !doPrint {
+		regExp := lg.getRegexp()
+		doPrint = regExp != nil && regExp.MatchString(cloc.FuncName)
+	}
+
+	if !doPrint {
+		return NoPrint
+	}
+
+	return func(format string, a ...interface{}) {
+		lg.invokeOutput(appendLocation(sprintf(format, a...), cloc))
+	}
+}
+
 // D prints to stderr with code location
 // Thread safe. D is meant for temporary output intended to be removed before check-in
 func (lg *LogInstance) D(format string, a ...interface{}) {
@@ -123,7 +145,7 @@ func (lg *LogInstance) D(format string, a ...interface{}) {
 func (lg *LogInstance) SetDebug(debug bool) {
 	var v uint32
 	if debug {
-		v = 1
+		v = uint32True
 	}
 	atomic.StoreUint32(&lg.isDebug, v)
 }
@@ -151,7 +173,7 @@ func (lg *LogInstance) SetSilent(silent bool) {
 }
 
 // IsThisDebug returns whether debug logging is configured
-func (lg *LogInstance) IsThisDebug() bool {
+func (lg *LogInstance) IsThisDebug() (isDebug bool) {
 	if atomic.LoadUint32(&lg.isDebug) != 0 {
 		return true
 	}
@@ -160,6 +182,18 @@ func (lg *LogInstance) IsThisDebug() bool {
 		return false
 	}
 	cloc := pruntime.NewCodeLocation(lg.stackFramesToSkip - isThisDebugDelta)
+	return regExp.MatchString(cloc.FuncName)
+}
+
+func (lg *LogInstance) IsThisDebugN(skipFrames int) (isDebug bool) {
+	if atomic.LoadUint32(&lg.isDebug) != 0 {
+		return true
+	}
+	regExp := lg.getRegexp()
+	if regExp == nil {
+		return false
+	}
+	cloc := pruntime.NewCodeLocation(lg.stackFramesToSkip - isThisDebugDelta + skipFrames)
 	return regExp.MatchString(cloc.FuncName)
 }
 

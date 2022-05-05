@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pfs provides file-system related functions
 package pfs
 
 import (

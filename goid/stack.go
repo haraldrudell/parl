@@ -154,6 +154,19 @@ func (s *Stack) Frames() (frames []parl.Frame) {
 	return s.frames
 }
 
+func (st *Stack) Shorts(prepend string) (s string) {
+	sL := []string{
+		prepend + "Thread ID: " + st.threadID.String(),
+	}
+	for _, frame := range st.frames {
+		sL = append(sL, prepend+frame.Loc().Short())
+	}
+	if st.creator.IsSet() {
+		sL = append(sL, prepend+"creator: "+st.creator.Short())
+	}
+	return strings.Join(sL, "\n")
+}
+
 func (st *Stack) String() (s string) {
 	sL := make([]string, 2*len(st.frames))
 	for i, frame := range st.frames {

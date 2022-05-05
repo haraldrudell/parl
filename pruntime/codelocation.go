@@ -126,6 +126,10 @@ func (cl *CodeLocation) Full() (funcName string) {
 	return fmt.Sprintf("%s-%s:%d", cl.FuncName, cl.File, cl.Line)
 }
 
+func (cl *CodeLocation) IsSet() (isSet bool) {
+	return cl.File != "" || cl.FuncName != ""
+}
+
 // String returns a two-line string representation suitable for a multi-line stack trace.
 // Typical output:
 //   github.com/haraldrudell/parl/error116.(*TypeName).FuncName\n

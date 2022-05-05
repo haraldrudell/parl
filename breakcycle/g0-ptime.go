@@ -9,7 +9,7 @@ var short interface{}
 var shortReceiver func(v interface{})
 var g0PtimeDone bool
 
-// ParlImport receives a function value from parl to receive the symbol value
+// G0Import receives a function value from g0 to receive the symbol value
 func G0Import(receiver func(v interface{})) {
 	if g0PtimeDone {
 		return
@@ -22,7 +22,7 @@ func G0Import(receiver func(v interface{})) {
 	}
 }
 
-// GoidExport receives a symbol value from a parl sub-package
+// PtimeExport receives a symbol value from ptime
 func PtimeExport(shortValue interface{}) {
 	if g0PtimeDone {
 		return

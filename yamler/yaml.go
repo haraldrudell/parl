@@ -18,6 +18,8 @@ import (
 type UnmarshalFunc func(in []byte, out interface{}) (err error) // yaml.Unmarshal
 type UnmarshalThunk func(bytes []byte, unmarshal UnmarshalFunc, yamlKey string) (hasDate bool, err error)
 
+var Unmarshal = yaml.Unmarshal
+
 /*
 ApplyYaml adds options read from a yaml file.
 

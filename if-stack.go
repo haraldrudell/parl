@@ -13,6 +13,7 @@ type Stack interface {
 	IsMain() (isMain bool)
 	Frames() (frames []Frame)
 	Creator() (creator *pruntime.CodeLocation)
+	Shorts(prepend string) (s string)
 	String() (s string)
 }
 

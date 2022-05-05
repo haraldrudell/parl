@@ -4,8 +4,6 @@ ISC License
 */
 
 /*
-Package breakcycle breaks import cycles with parl
-
 Typically import cycles appears with parl when:
 — a sub-package imports symbols from parl and
 — parl imports symbols from the sub-package
@@ -24,6 +22,8 @@ sub→parl→bc←sub
 In the time between parl and sub-package initialization,
 — parl symbol values are invalid
 */
+
+// Package breakcycle breaks import cycles with parl
 package breakcycle
 
 var newStack interface{}
@@ -43,7 +43,7 @@ func ParlImport(receiver func(v interface{})) {
 	}
 }
 
-// GoidExport receives a symbol value from a parl sub-package
+// GoidExport receives a symbol value from goid
 func GoidExport(newStackValue interface{}) {
 	if goidParlDone {
 		return

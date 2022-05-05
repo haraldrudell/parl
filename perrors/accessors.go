@@ -100,6 +100,11 @@ func Short(err error) string {
 	return errorglue.ChainString(err, errorglue.ShortFormat)
 }
 
+// Deferr invokes a printing function for an error pointer.
+// Deferr is deferrable.
+// a colon and a space is appended to label
+// If *errp contains an error it is printed in Short form.
+// If *errp is nil, OK is printed.
 func Deferr(label string, errp *error, fn func(format string, a ...interface{})) string {
 	if errp == nil {
 		return "perrors.Deferr: errp nil"

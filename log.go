@@ -63,9 +63,18 @@ func Debug(format string, a ...interface{}) {
 	stderrLogger.Debug(format, a...)
 }
 
+// GetDebug obtains a Debug based on the invocation location for later execution
+func GetDebug(skipFrames int) (debug func(format string, a ...interface{})) {
+	return stderrLogger.GetDebug(skipFrames)
+}
+
 // IsThisDebug returns whether debug logging is configured for the executing function
 func IsThisDebug() bool {
 	return stderrLogger.IsThisDebug()
+}
+
+func IsThisDebugN(skipFrames int) (isDebug bool) {
+	return stderrLogger.IsThisDebugN(skipFrames)
 }
 
 // IsSilent if true it means that Info does not print

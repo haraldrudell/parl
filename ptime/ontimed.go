@@ -9,16 +9,15 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/g0"
 )
 
 // OnTimedThread returns an OnTimed object that send time values by calendar period.
 // period is the calendar operiod such as time.Hour.
 // timeZone is time zone such as time.Local or time.UTC.
-func OnTimedThread(send func(time.Time), period time.Duration, loc *time.Location, g0 g0.Go) {
+func OnTimedThread(send func(time.Time), period time.Duration, loc *time.Location, g0 parl.Go) {
 	var err error
-	g0.Done(&err)
-	parl.Recover(parl.Annotation(), &err, parl.NoOnError)
+	defer g0.Done(&err)
+	defer parl.Recover(parl.Annotation(), &err, parl.NoOnError)
 
 	timer := OnTimer(period, time.Now().In(loc))
 	defer timer.Stop()

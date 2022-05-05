@@ -7,6 +7,11 @@ package parl
 
 import "context"
 
+const (
+	ccSkipFrames = 1
+	ccPrepend    = "— "
+)
+
 type CancelAndContext struct {
 	ctx CancelContextDo
 }
@@ -17,6 +22,9 @@ func NewCancelAndContext(ctx context.Context) (cc *CancelAndContext) {
 }
 
 func (cc *CancelAndContext) Cancel() {
+	if IsThisDebugN(ccSkipFrames) {
+		GetDebug(ccSkipFrames)("CancelAndContext.Cancel:\n" + newStack(ccSkipFrames).Shorts(ccPrepend))
+	}
 	cc.ctx.Cancel()
 }
 

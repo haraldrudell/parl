@@ -72,7 +72,8 @@ func (gc *GoGroup) WaitPeriod(duration ...time.Duration) {
 	// channel indicating Wait complete
 	waitCh := make(chan struct{})
 	go func() {
-		parl.Recover(parl.Annotation(), nil, parl.Infallible)
+		defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
+
 		gc.Wait()
 		close(waitCh)
 	}()
@@ -123,7 +124,7 @@ func (gc *GoGroup) String() (s string) {
 }
 
 func (gc *GoGroup) exitAction(err error, exitAction parl.ExitAction, index parl.GoIndex) {
-	parl.Debug("GoGroup.exit %s #%d", gc.string(&err), index)
+	parl.Debug("GoGroup.exit%s #%d", gc.string(&err), index)
 	gc.wg.Done()
 	if gc.deleteGoer(index) == 0 {
 		parl.Debug("GoGroup#%d.close", gc.index)

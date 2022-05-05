@@ -3,7 +3,7 @@
 ISC License
 */
 
-// Package parlnet provides IP-related functions with few dependencies beyond the net package
+// Package pnet provides IP-related functions with few dependencies beyond the net package
 package pnet
 
 import (
