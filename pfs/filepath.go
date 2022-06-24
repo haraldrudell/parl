@@ -8,7 +8,7 @@ package pfs
 import (
 	"path/filepath"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // Abs ensures a file system path is fully qualified.
@@ -16,7 +16,7 @@ import (
 func Abs(dir string) (out string) {
 	var err error
 	if out, err = filepath.Abs(dir); err != nil {
-		panic(parl.Errorf("filepath.Abs: '%w'", err))
+		panic(perrors.Errorf("filepath.Abs: '%w'", err))
 	}
 	return
 }

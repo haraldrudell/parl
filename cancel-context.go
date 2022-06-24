@@ -27,6 +27,10 @@ func NewCancelContext(ctx context.Context) (cancelCtx CancelContext) {
 	return &c
 }
 
+func NewCancelContextFunc(ctx context.Context, cancel context.CancelFunc) (cancelCtx CancelContext) {
+	return &CancelContextDo{ctx, cancel}
+}
+
 // Cancel cancels this context
 func (cc *CancelContextDo) Cancel() {
 	if cc == nil {
@@ -37,4 +41,11 @@ func (cc *CancelContextDo) Cancel() {
 		panic(perrors.Errorf("CancelContext.Cancel nil"))
 	}
 	cancel()
+}
+
+func (cc *CancelContextDo) CancelOnError(errp *error) {
+	if errp == nil || *errp == nil {
+		return // there was not an error
+	}
+	cc.Cancel()
 }

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 type DLEntry struct {
@@ -33,7 +33,7 @@ type EntryResult struct {
 
 func GetErrorResult(err error) (result *EntryResult) {
 	if err == nil {
-		panic(parl.Errorf("GetErrorResult with error nil"))
+		panic(perrors.Errorf("GetErrorResult with error nil"))
 	}
 	return &EntryResult{Err: err}
 }

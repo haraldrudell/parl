@@ -13,18 +13,17 @@ import (
 	"net/http"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/parlca"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pstrings"
 )
 
 type Https struct {
 	Http
-	Cert    parlca.CertificateDER
+	Cert    parl.CertificateDer
 	Private crypto.Signer
 }
 
-func NewHttps(host, network string, certDER parlca.CertificateDER, signer crypto.Signer) (hp *Https) {
+func NewHttps(host, network string, certDER parl.CertificateDer, signer crypto.Signer) (hp *Https) {
 	if host == "" {
 		host = httpsAddr
 	}

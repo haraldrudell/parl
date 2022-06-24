@@ -16,13 +16,24 @@ import (
 const (
 	e116StacknFramesToSkip = 1
 	e116StackFrames        = 1
+	perrNewFrames          = 1
 )
 
 // error116.New is similar to errors.New but ensures that the returned error
 // has at least one stack trace associated
 func New(s string) error {
 	if s == "" { // ensure there is an error message
-		s = "StackNew from " + pruntime.NewCodeLocation(1).Short()
+		s = "StackNew from " + pruntime.NewCodeLocation(perrNewFrames).Short()
+	}
+	return Stackn(errors.New(s), e116StackFrames)
+}
+
+func NewPF(s string) error {
+	packFunc := pruntime.NewCodeLocation(perrNewFrames).PackFunc()
+	if s == "" {
+		s = packFunc
+	} else {
+		s = packFunc + "\x20" + s
 	}
 	return Stackn(errors.New(s), e116StackFrames)
 }
@@ -30,6 +41,21 @@ func New(s string) error {
 // error116.Errorf is similar to fmt.Errorf but ensures that the returned err
 // has at least one stack trace associated
 func Errorf(format string, a ...interface{}) (err error) {
+	err = fmt.Errorf(format, a...)
+	if HasStack(err) {
+		return
+	}
+	return Stackn(err, e116StackFrames)
+}
+
+func ErrorfPF(format string, a ...interface{}) (err error) {
+	packFunc := pruntime.NewCodeLocation(perrNewFrames).PackFunc()
+	if format == "" {
+		format = "%s"
+	} else {
+		format = "%s " + format
+	}
+	a = append([]interface{}{packFunc}, a...)
 	err = fmt.Errorf(format, a...)
 	if HasStack(err) {
 		return

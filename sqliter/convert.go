@@ -6,6 +6,7 @@ All rights reserved.
 package sqliter
 
 import (
+	"database/sql"
 	"errors"
 	"time"
 
@@ -14,8 +15,16 @@ import (
 	"github.com/haraldrudell/parl/ptime"
 )
 
+// SQLite errors are of type sqlite.Error.
+// sqlite.Error has a code int value.
+// Some code values are not exported.
+// For calling code to not have to import the driver,
+// frequent code values are here.
 const (
-	CodeBusy = 5
+	CodeBusy                    = 5    // sqlite3.SQLITE_BUSY
+	CodeConstraintFailedNOTNULL = 1299 // SQLITE_CONSTRAINT_NOTNULL
+	CodeConstraintFailedUNIQUE  = 2067 // SQLITE_CONSTRAINT_UNIQUE
+	CodeDatabaseIsLocked        = 261  // locked WAL file
 )
 
 const (
@@ -97,16 +106,11 @@ func TimeToDBNullable(t time.Time) (dbValue any) {
 	return ptime.Rfc3339nsz(t)
 }
 
-func NullableToTime(dbValue any) (t time.Time, err error) {
-	if dbValue == nil {
+func NullableToTime(nullString sql.NullString) (t time.Time, err error) {
+	if !nullString.Valid {
 		return // NULL: t.IsZero()
 	}
-	var s string
-	var ok bool
-	if s, ok = dbValue.(string); !ok {
-		err = perrors.Errorf("NullableToTime: not string: %T", dbValue)
-	}
-	return ToTime(s)
+	return ToTime(nullString.String)
 }
 
 // GetErrorCode traverses an error chain looking for an SQLite error.

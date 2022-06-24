@@ -61,7 +61,7 @@ func (s *Socket) accept(handler func(net.Conn), errCh chan<- error) {
 					break // ListenTCP4 is closed
 				}
 			}
-			errCh <- parl.Errorf("TCPListener.Accept: %T '%[1]w'", err) // some error
+			errCh <- perrors.Errorf("TCPListener.Accept: %T '%[1]w'", err) // some error
 			continue
 		}
 

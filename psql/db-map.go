@@ -34,12 +34,8 @@ func NewDBMap(dsnr parl.DataSourceNamer,
 func (dm *DBMap) Exec(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (execResult parl.ExecResult, err error) {
-	var dbCache *DBCache
-	if dbCache, err = dm.getOrCreateDBCache(dm.dsnr.DSN(partition), ctx); err != nil {
-		return
-	}
-	var stmt *sql.Stmt
-	if stmt, err = dbCache.Stmt(query, ctx); err != nil {
+	var stmt Stmt
+	if stmt, err = dm.getStmt(partition, query, ctx); err != nil {
 		return
 	}
 	if execResult, err = NewExecResult(stmt.ExecContext(ctx, args...)); err != nil {
@@ -53,12 +49,8 @@ func (dm *DBMap) Exec(
 func (dm *DBMap) Query(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (sqlRows *sql.Rows, err error) {
-	var dbCache *DBCache
-	if dbCache, err = dm.getOrCreateDBCache(dm.dsnr.DSN(partition), ctx); err != nil {
-		return
-	}
-	var stmt *sql.Stmt
-	if stmt, err = dbCache.Stmt(query, ctx); err != nil {
+	var stmt Stmt
+	if stmt, err = dm.getStmt(partition, query, ctx); err != nil {
 		return
 	}
 	if sqlRows, err = stmt.QueryContext(ctx, args...); err != nil {
@@ -72,12 +64,8 @@ func (dm *DBMap) Query(
 func (dm *DBMap) QueryRow(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (sqlRow *sql.Row, err error) {
-	var dbCache *DBCache
-	if dbCache, err = dm.getOrCreateDBCache(dm.dsnr.DSN(partition), ctx); err != nil {
-		return
-	}
-	var stmt *sql.Stmt
-	if stmt, err = dbCache.Stmt(query, ctx); err != nil {
+	var stmt Stmt
+	if stmt, err = dm.getStmt(partition, query, ctx); err != nil {
 		return
 	}
 	sqlRow = stmt.QueryRowContext(ctx, args...)
@@ -92,12 +80,8 @@ func (dm *DBMap) QueryRow(
 func (dm *DBMap) QueryString(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (value string, err error) {
-	var dbCache *DBCache
-	if dbCache, err = dm.getOrCreateDBCache(dm.dsnr.DSN(partition), ctx); err != nil {
-		return
-	}
-	var stmt *sql.Stmt
-	if stmt, err = dbCache.Stmt(query, ctx); err != nil {
+	var stmt Stmt
+	if stmt, err = dm.getStmt(partition, query, ctx); err != nil {
 		return
 	}
 	if err = stmt.QueryRowContext(ctx, args...).Scan(&value); err != nil {
@@ -111,12 +95,8 @@ func (dm *DBMap) QueryString(
 func (dm *DBMap) QueryInt(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (value int, err error) {
-	var dbCache *DBCache
-	if dbCache, err = dm.getOrCreateDBCache(dm.dsnr.DSN(partition), ctx); err != nil {
-		return
-	}
-	var stmt *sql.Stmt
-	if stmt, err = dbCache.Stmt(query, ctx); err != nil {
+	var stmt Stmt
+	if stmt, err = dm.getStmt(partition, query, ctx); err != nil {
 		return
 	}
 	if err = stmt.QueryRowContext(ctx, args...).Scan(&value); err != nil {
@@ -151,6 +131,19 @@ func (dm *DBMap) Close() (err error) {
 		dm.closeErr = err // store close status
 	}
 
+	return
+}
+
+func (dm *DBMap) getStmt(partition parl.DBPartition, query string, ctx context.Context) (stmt Stmt, err error) {
+	var dbCache *DBCache
+	if dbCache, err = dm.getOrCreateDBCache(dm.dsnr.DSN(partition), ctx); err != nil {
+		return
+	}
+	var sqlStmt *sql.Stmt
+	if sqlStmt, err = dbCache.Stmt(query, ctx); err != nil {
+		return
+	}
+	stmt = dbCache.WrapStmt(sqlStmt)
 	return
 }
 

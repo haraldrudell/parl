@@ -23,3 +23,16 @@ func ScanToInt(sqlRow *sql.Row, e error) (value int, err error) {
 
 	return
 }
+
+func ScanToString(sqlRow *sql.Row, e error) (value string, err error) {
+	if e != nil {
+		err = e
+		return
+	}
+	if err = sqlRow.Scan(&value); err != nil {
+		err = perrors.Errorf("QueryRow.Scan: %v", err)
+		return
+	}
+
+	return
+}

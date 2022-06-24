@@ -68,6 +68,11 @@ func GetDebug(skipFrames int) (debug func(format string, a ...interface{})) {
 	return stderrLogger.GetDebug(skipFrames)
 }
 
+// GetD obtains always printing D based on the invocation location for later execution
+func GetD(skipFrames int) (debug func(format string, a ...interface{})) {
+	return stderrLogger.GetD(skipFrames)
+}
+
 // IsThisDebug returns whether debug logging is configured for the executing function
 func IsThisDebug() bool {
 	return stderrLogger.IsThisDebug()

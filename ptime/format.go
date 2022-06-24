@@ -10,13 +10,10 @@ import (
 )
 
 const (
-	rfc3339sz         = "2006-01-02T15:04:05Z"
-	rfc3339msz        = "2006-01-02T15:04:05.000Z"
-	rfc3339usz        = "2006-01-02T15:04:05.000000Z"
-	rfc3339nsz        = "2006-01-02T15:04:05.000000000Z"
-	shortHour         = "060102_15:04:05Z07"
-	shortMinute       = "060102_15:04:05Z0700"
-	offsetHourDivisor = int(time.Hour / time.Second)
+	rfc3339sz  = "2006-01-02T15:04:05Z"
+	rfc3339msz = "2006-01-02T15:04:05.000Z"
+	rfc3339usz = "2006-01-02T15:04:05.000000Z"
+	rfc3339nsz = "2006-01-02T15:04:05.000000000Z"
 )
 
 // Rfc3339nsz prints a time using UTC and nanoseconds precision.
@@ -52,24 +49,4 @@ func Rfc3339sz(t time.Time) (s string) {
 func ParseRfc3339nsz(timeString string) (t time.Time, err error) {
 	t, err = time.Parse(rfc3339nsz, timeString)
 	return
-}
-
-func Short(tim ...time.Time) (s string) {
-
-	// ensure t holds a time
-	var t time.Time
-	if len(tim) > 0 {
-		t = tim[0]
-	}
-	if t.IsZero() {
-		t = time.Now()
-	}
-
-	// pick layout using Zone.offset
-	layout := shortHour
-	if _, offsetS := t.Zone(); offsetS%offsetHourDivisor != 0 {
-		layout = shortMinute
-	}
-
-	return t.Format(layout)
 }

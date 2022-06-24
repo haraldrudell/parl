@@ -10,7 +10,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 const (
@@ -26,7 +26,7 @@ func StoreDB(ctx context.Context, db *sql.DB) {
 func GetDB(ctx context.Context) (db *sql.DB) {
 	db, ok := ctx.Value(contextDBformat).(*sql.DB)
 	if !ok {
-		panic(parl.New("No db in context"))
+		panic(perrors.New("No db in context"))
 	}
 	return
 }

@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 func TestSocket(t *testing.T) {
@@ -62,7 +62,7 @@ func TestRunHandler(t *testing.T) {
 	var count int64
 	connFunc := func(conn net.Conn) {
 		if err := conn.Close(); err != nil {
-			panic(parl.Errorf("conn.Close: '%w'", err))
+			panic(perrors.Errorf("conn.Close: '%w'", err))
 		}
 		atomic.AddInt64(&count, 1)
 	}

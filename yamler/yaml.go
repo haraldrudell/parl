@@ -11,6 +11,7 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/mains"
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pstrings"
 	"gopkg.in/yaml.v3"
 )
@@ -53,7 +54,7 @@ is then svcaned for its Y pointers to copy yaml settings to options.
 */
 func ApplyYaml(ex mains.Executable, yamlFile, yamlKey string, thunk UnmarshalThunk, om []mains.OptionData) {
 	if thunk == nil {
-		panic(parl.New("yaml.ApplyYaml: thunk cannot be nil"))
+		panic(perrors.New("yaml.ApplyYaml: thunk cannot be nil"))
 	}
 	parl.Debug("Arguments: yamlFile: %q yamlKey: %q", yamlFile, yamlKey)
 	filename, byts := FindFile(yamlFile, ex.Program)
@@ -80,7 +81,7 @@ func ApplyYaml(ex mains.Executable, yamlFile, yamlKey string, thunk UnmarshalThu
 
 	hasData, err := thunk(byts, yaml.Unmarshal, yamlDictionaryKey)
 	if err != nil {
-		ex.AddErr(parl.Errorf("ex.ApplyYaml thunk: filename: %q: %w", filename, err)).Exit()
+		ex.AddErr(perrors.Errorf("ex.ApplyYaml thunk: filename: %q: %w", filename, err)).Exit()
 	} else if !hasData {
 		return
 	}

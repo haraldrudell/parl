@@ -94,7 +94,7 @@ type Go interface {
 	// Subgo has access to the AddError error sink.
 	// Subgo has its own sub-context and waitgroup.
 	// Subgo Add and Done are duplicated.
-	SubGo() (subGo SubGo)
+	SubGo(local ...GoSubLocal) (subGo SubGo)
 }
 
 // SubGo allows an executing go statement provided a Go object to have sub-thread go statements.
@@ -106,6 +106,7 @@ type SubGo interface {
 	Go
 	// Wait allows a thread to wait for (many) sub-threads
 	Wait()
+	IsErr() (isNonFatal bool, isErrorExit bool)
 	String() (s string)
 }
 
@@ -157,6 +158,11 @@ const (
 	ExCancelOnFailure
 )
 
+const (
+	GoSubIsLocal GoSubLocal = "local"
+)
+
+type GoSubLocal string
 type GoIndex int
 type ErrorConduit uint8
 type ExitAction uint8

@@ -38,7 +38,8 @@ func (we *waiterr) Wait() {
 }
 
 func (we *waiterr) String() (s string) {
-	return we.wg.String()
+	adds, dones := we.wg.Counters()
+	return fmt.Sprintf("%d(%d)", adds-dones, adds)
 }
 
 func (we *waiterr) send(goError parl.GoError) {

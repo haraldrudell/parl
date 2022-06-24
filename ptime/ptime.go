@@ -9,7 +9,7 @@ package ptime
 import (
 	"time"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 const (
@@ -27,7 +27,7 @@ func Rfc3339(t time.Time) string {
 // ParseTime parses output from Rfc3339
 func ParseTime(dateString string) (tm time.Time, err error) {
 	if tm, err = time.Parse(rfc3339, dateString); err != nil {
-		err = parl.Errorf("time.Parse: '%w'", err)
+		err = perrors.Errorf("time.Parse: '%w'", err)
 	}
 	return
 }

@@ -7,17 +7,30 @@ package g0
 
 import (
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
+)
+
+const (
+	subGoFrames = 1
 )
 
 type SubGo struct {
-	parl.Go          // Register() AddError()
+	parl.Go          // Register()
+	local            bool
 	waiter           // Wait() String()
+	isNonFatal       parl.AtomicBool
+	isErrorExit      parl.AtomicBool
 	cancelAndContext // Cancel() Context()
 }
 
-func NewGoSub(g0 parl.Go) (subGo parl.SubGo) {
+func NewGoSub(g0 parl.Go, local ...parl.GoSubLocal) (subGo parl.SubGo) {
+	var local0 bool
+	if len(local) > 0 {
+		local0 = local[0] == parl.GoSubIsLocal
+	}
 	return &SubGo{
 		Go:               g0,
+		local:            local0,
 		waiter:           &parl.TraceGroup{},
 		cancelAndContext: *newCancelAndContext(g0.Context()),
 	}
@@ -25,14 +38,43 @@ func NewGoSub(g0 parl.Go) (subGo parl.SubGo) {
 
 func (gc *SubGo) Add(delta int) {
 	gc.waiter.Add(delta)
-	gc.Go.Add(delta)
+	if !gc.local {
+		gc.Go.Add(delta)
+	}
+}
+
+func (gc *SubGo) AddError(err error) {
+	if err != nil {
+		if !perrors.HasStack(err) {
+			err = perrors.Stackn(err, subGoFrames)
+		}
+		gc.isNonFatal.Set()
+	}
+	gc.Go.AddError(err)
 }
 
 func (gc *SubGo) Done(errp *error) {
+	if errp == nil {
+		if *errp != nil {
+			gc.isErrorExit.Set()
+		}
+		if !perrors.HasStack(*errp) {
+			*errp = perrors.Stackn(*errp, subGoFrames)
+		}
+	}
 	gc.waiter.Done() // done without sending error
-	gc.Go.Done(errp)
+	if gc.local {
+		if errp != nil && *errp != nil {
+			gc.AddError(*errp)
+		}
+	} else {
+		gc.Go.Done(errp)
+	}
 }
 
-func (gc *SubGo) SubGo() (goCancel parl.SubGo) {
-	return NewGoSub(gc)
+func (gc *SubGo) IsErr() (isNonFatal bool, isErrorExit bool) {
+	return gc.isNonFatal.IsTrue(), gc.isErrorExit.IsTrue()
+}
+func (gc *SubGo) SubGo(local ...parl.GoSubLocal) (goCancel parl.SubGo) {
+	return NewGoSub(gc, local...)
 }

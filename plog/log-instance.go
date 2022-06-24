@@ -135,6 +135,14 @@ func (lg *LogInstance) GetDebug(skipFrames int) (debug func(format string, a ...
 	}
 }
 
+func (lg *LogInstance) GetD(skipFrames int) (debug func(format string, a ...interface{})) {
+	cloc := pruntime.NewCodeLocation(lg.stackFramesToSkip + logInstDebugFrameDelta + skipFrames)
+
+	return func(format string, a ...interface{}) {
+		lg.invokeOutput(appendLocation(sprintf(format, a...), cloc))
+	}
+}
+
 // D prints to stderr with code location
 // Thread safe. D is meant for temporary output intended to be removed before check-in
 func (lg *LogInstance) D(format string, a ...interface{}) {

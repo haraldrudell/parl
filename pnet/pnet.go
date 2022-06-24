@@ -129,3 +129,11 @@ func IPAddr(IP net.IP, index IfIndex, zone string) (ipa *net.IPAddr, err error) 
 	}
 	return
 }
+
+func IsErrClosed(err error) (isErrNetClosing bool) {
+	// if err is nil, ok is false
+	if netOpError, ok := err.(*net.OpError); ok { // error occured during the operation
+		isErrNetClosing = netOpError.Err == net.ErrClosed // and it is that the listener was closed
+	}
+	return
+}

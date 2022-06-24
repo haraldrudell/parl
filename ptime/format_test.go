@@ -76,13 +76,3 @@ func TestRfc3339sz(t *testing.T) {
 		t.Errorf(".Format(parl.Rfc3339sz) format: %q actual: %s exp: %s", rfc3339sz, actual, expS)
 	}
 }
-
-func TestShort(t *testing.T) {
-	exp := "220101_00:00:00-08"
-	input := timeFixture
-	actual := Short(input)
-
-	if actual != exp {
-		t.Errorf("ptime.Short %q exp %q", actual, exp)
-	}
-}

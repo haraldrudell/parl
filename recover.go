@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	recAnnStackFrames = 1
-	recRecStackFrames = 2
+	recAnnStackFrames       = 1
+	recRecStackFrames       = 2
+	recEnsureErrorFrames    = 2
+	recProcessRecoverFrames = 4
 )
 
 // Recover recovers from a panic invoking a function no more than once.
@@ -75,38 +77,53 @@ func invokeOnError(onError func(error), err error) {
 	}
 }
 
+// NoOnError is used with Recover to silence the default error logging
 func NoOnError(err error) {}
 
+// Annotation provides a default annotation [base package].[function]: "mypackage.MyFunc"
 func Annotation() (annotation string) {
 	return fmt.Sprintf("Recover from panic in %s:", pruntime.NewCodeLocation(recAnnStackFrames).PackFunc())
 }
 
 // processRecover ensures non-nil result to be error with Stack
 func processRecover(annotation string, panicValue interface{}) (err error) {
-	if err = EnsureError(panicValue); err == nil {
+	if err = ensureError(panicValue, recProcessRecoverFrames); err == nil {
 		return
 	}
 
 	// annotate
 	if annotation != "" {
-		err = Errorf("%s '%w'", annotation, err)
+		err = perrors.Errorf("%s '%w'", annotation, err)
 	}
 	return
 }
 
+// AddToPanic ensures that a recover() value is an error or nil.
 func EnsureError(panicValue interface{}) (err error) {
+	return ensureError(panicValue, recEnsureErrorFrames)
+}
+
+func ensureError(panicValue interface{}, frames int) (err error) {
+
 	if panicValue == nil {
-		return
+		return // no panic return
 	}
 
 	// ensure value to be error
 	var ok bool
 	if err, ok = panicValue.(error); !ok {
-		err = Errorf("non-error value: %T %+[1]v", panicValue)
+		err = fmt.Errorf("non-error value: %T %+[1]v", panicValue)
 	}
+
+	// ensure stack trace
+	if !perrors.HasStack(err) {
+		err = perrors.Stackn(err, frames)
+	}
+
 	return
 }
 
+// AddToPanic takes a recover() value and adds it to additionalErr.
 func AddToPanic(panicValue interface{}, additionalErr error) (err error) {
 	if err = EnsureError(panicValue); err == nil {
 		return additionalErr
@@ -117,27 +134,30 @@ func AddToPanic(panicValue interface{}, additionalErr error) (err error) {
 	return perrors.AppendError(err, additionalErr)
 }
 
-// HandlePanic recovers from panics when executing fn.
-// A panic is returned in err
+// HandlePanic recovers from panic in fn returning error.
 func HandlePanic(fn func()) (err error) {
 	defer Recover(Annotation(), &err, nil)
+
 	fn()
 	return
 }
 
-// HandleErrp recovers from panics when executing fn.
-// A panic is stored at errp using error116.AppendError()
+// HandleErrp recovers from a panic in fn storing at *errp.
+// HandleErrp is deferable.
 func HandleErrp(fn func(), errp *error) {
 	defer Recover(Annotation(), errp, nil)
+
 	fn()
 }
 
-// HandleErrp recovers from panics when executing fn.
-// A panic is provided to the storeError function.
-// storeError can be the thread-safe error116.ParlError.AddErrorProc()
-func HandleParlError(fn func(), storeError func(error)) {
+// HandleParlError recovers from panic in fn invoking an error callback.
+// HandleParlError is deferable
+// storeError can be the thread-safe perrors.ParlError.AddErrorProc()
+func HandleParlError(fn func(), storeError func(err error)) {
 	defer Recover(Annotation(), nil, storeError)
+
 	fn()
 }
 
-var _ = (&perrors.ParlError{}).AddErrorProc
+// perrors.ParlError.AddErrorProc can be used with HandleParlError
+var _ func(err error) = (&perrors.ParlError{}).AddErrorProc

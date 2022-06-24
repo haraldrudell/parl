@@ -7,55 +7,61 @@ package parl
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
-const (
-	TimerCh TriggeringChan = iota
-	DoneCh
-	ValueCh
-)
+type Debouncer[T any] struct {
+	d      time.Duration
+	in     <-chan T
+	sender func([]T)
+	errFn  func(err error)
+	wg     sync.WaitGroup
+	ctx    context.Context
+}
 
-type TriggeringChan uint8
+// Debouncer debounces event stream values.
+// sender and errFb functions must be thread-safe.
+// Debouncer is shutdown by in channel close or via context.
+func NewDebouncer[T any](d time.Duration, in <-chan T,
+	sender func([]T),
+	errFn func(err error), ctx context.Context) (db *Debouncer[T]) {
+	db0 := Debouncer[T]{d: d, in: in, sender: sender, ctx: ctx}
+	db0.wg.Add(1)
+	go db0.debouncerThread()
+	return &db0
+}
 
-// Value is an event value that is being debounced
-type Value interface{}
+func (db *Debouncer[T]) Wait() {
+	db.wg.Wait()
+}
 
-// SenderFunc takes an untyped value, type asserts and sends on a typed channel
-type SenderFunc func([]Value)
+func (db *Debouncer[T]) debouncerThread() {
+	defer db.wg.Done()
+	Recover(Annotation(), nil, db.errFn)
 
-// ReceiverFunc takes two channels, listens to them and a typed channel, returns what channel triggered and a possible untyped value
-type ReceiverFunc func(c <-chan time.Time, done <-chan struct{}) (which TriggeringChan, value Value)
+	timer := time.NewTimer(time.Second)
+	timer.Stop()
+	defer timer.Stop()
 
-// Debouncer debounces event streams of Value
-func NewDebouncer(d time.Duration, receiver ReceiverFunc, sender SenderFunc, ctx context.Context) (err error) {
-	var values []Value
-	var timer *time.Timer
-	c := make(<-chan time.Time)
-	C := c
-	defer func() {
-		if timer != nil {
-			timer.Stop()
-		}
-	}()
+	done := db.ctx.Done()
+	var values []T
 	for {
-		switch which, value := receiver(C, ctx.Done()); which {
-		case ValueCh:
-			if timer == nil {
-				timer = time.NewTimer(d)
-				C = timer.C
+		select {
+		case value, ok := <-db.in:
+			if !ok {
+				if len(values) > 0 {
+					db.sender(values)
+				}
+				return // in closed return
 			}
 			values = append(values, value)
-			continue
-		case TimerCh:
-			timer = nil
-			C = c
-			sender(values)
+			timer.Reset(db.d)
+		case <-done:
+			return // ctx shutdown return
+		case <-timer.C:
+			db.sender(values)
 			values = nil
-			continue
-		case DoneCh:
 		}
-		break
 	}
-	return
 }

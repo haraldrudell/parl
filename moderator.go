@@ -7,14 +7,8 @@ package parl
 
 import (
 	"context"
-	"fmt"
-	"sync"
 
 	"github.com/haraldrudell/parl/perrors"
-)
-
-const (
-	defaultParallelism = 20
 )
 
 /*
@@ -28,70 +22,87 @@ It is a ticketing system
  m.String() → waiting: 2(20)
 */
 type Moderator struct {
-	parallelism uint64
-	cond        *sync.Cond
-	ctx         context.Context
-	active      uint64 // behind lock
-	waiting     uint64 // behind lock
+	moderatorCore
+	ctx context.Context
 }
 
-// NewModerator creates a new Moderator used to limit parallelism
+// NewModerator creates a cancelable Moderator used to limit parallelism
 func NewModerator(parallelism uint64, ctx context.Context) (mo *Moderator) {
-	if parallelism == 0 {
-		parallelism = defaultParallelism
-	}
+	return NewModeratorFromCore(NewModeratorCore(parallelism), ctx)
+}
+
+// NewModeratorFromCore allows multiple cancelable Moderators to share
+// a ModeratorCore ticket pool
+func NewModeratorFromCore(mc *ModeratorCore, ctx context.Context) (mo *Moderator) {
 	if ctx == nil {
 		panic(perrors.New("NewModerator with nil context"))
 	}
-	m := Moderator{parallelism: parallelism, ctx: ctx}
-	m.cond = sync.NewCond(&sync.Mutex{})
+	m := Moderator{
+		moderatorCore: moderatorCore{mc},
+		ctx:           ctx,
+	}
 	go m.shutdownThread()
 	return &m
 }
 
-// Do calls fn limited by the moderator’s parallelism.
-// If the moderator is shut down, ErrModeratorShutdown is returned
-func (mo *Moderator) Do(fn func() error) (err error) {
-	if fn == nil {
-		return New("Moderator.Do with nil function")
-	}
+func (mo *Moderator) DoErr(fn func() error) (err error) {
 	if err = mo.getTicket(); err != nil {
-		return
+		return // failed to obtain ticket due to cancelation
 	}
 	defer mo.returnTicket() // we will always get a ticket, and it should be returned
-	return fn()
+
+	if fn != nil {
+		err = fn()
+	}
+	return
+}
+
+// Do calls fn limited by the moderator’s parallelism.
+// If the moderator is shut down, ErrModeratorShutdown is returned
+func (mo *Moderator) Do(fn func()) {
+	if err := mo.getTicket(); err != nil {
+		panic(err) // failed to obtain ticket due to cancelation
+	}
+	defer mo.returnTicket() // we will always get a ticket, and it should be returned
+
+	if fn != nil {
+		fn()
+	}
 }
 
 func (mo *Moderator) getTicket() (err error) {
 	mo.cond.L.Lock()
 	defer mo.cond.L.Unlock()
+
 	isWaiting := false
 	for {
+
+		// check for cancelation
 		if mo.ctx.Err() != nil {
 			err = mo.ctx.Err()
-			break
+			return // moderator cancelled return
 		}
+
+		// check for available ticket
 		if mo.active < mo.parallelism {
 			mo.active++
-			break
+
+			// maintain waiting counter
+			if isWaiting {
+				mo.waiting--
+			}
+			return // obtained ticket return
 		}
+
+		// maintain waiting counter
 		if !isWaiting {
 			isWaiting = true
 			mo.waiting++
 		}
+
+		// block until cond.Notify or cond.Broadcast
 		mo.cond.Wait()
 	}
-	if isWaiting {
-		mo.waiting--
-	}
-	return
-}
-
-func (mo *Moderator) returnTicket() {
-	mo.cond.L.Lock()
-	mo.cond.Signal()
-	defer mo.cond.L.Unlock()
-	mo.active--
 }
 
 func (mo *Moderator) shutdownThread() {
@@ -100,23 +111,14 @@ func (mo *Moderator) shutdownThread() {
 }
 
 func (mo *Moderator) Status() (parallelism uint64, active uint64, waiting uint64, isShutdown bool) {
-	parallelism = mo.parallelism
-	mo.cond.L.Lock()
-	active = mo.active
-	waiting = mo.waiting
-	mo.cond.L.Unlock()
+	parallelism, active, waiting = mo.moderatorCore.Status()
 	isShutdown = mo.ctx.Err() != nil
 	return
 }
 
 func (mo *Moderator) String() (s string) {
-	parallelism, active, waiting, sd := mo.Status()
-	if active < parallelism {
-		s = fmt.Sprintf("available: %d(%d)", parallelism-active, parallelism)
-	} else {
-		s = fmt.Sprintf("waiting: %d(%d)", waiting, parallelism)
-	}
-	if sd {
+	s = mo.moderatorCore.String()
+	if mo.ctx.Err() != nil {
 		s += " shutdown"
 	}
 	return

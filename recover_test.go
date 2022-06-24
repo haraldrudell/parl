@@ -6,7 +6,12 @@ ISC License
 package parl
 
 import (
+	"errors"
+	"strings"
 	"testing"
+
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 func TestResultPanic(t *testing.T) {
@@ -33,7 +38,7 @@ func parlPanic(text string, fne func(error)) (err error) {
 
 func parlError(text string, fne func(error)) (err error) {
 	defer Recover(Annotation(), &err, fne)
-	return New(text)
+	return perrors.New(text)
 }
 
 func parlSuccess(text string, fne func(error)) (err error) {
@@ -93,5 +98,99 @@ func doFn(testID, text, expectedErr string, fn func(text string, fne func(error)
 				t.Fail()
 			}
 		}
+	}
+}
+func TestRecoverErrp(t *testing.T) {
+	annotation := "annotation"
+	exp := annotation + " 'runtime error: invalid memory address or nil pointer dereference'"
+
+	var err error
+
+	func() {
+		defer Recover(annotation, &err, NoOnError)
+		var pt *int
+		_ = *pt
+	}()
+
+	if err == nil {
+		t.Error("Expected error missing")
+	} else if err.Error() != exp {
+		t.Errorf("bad Error: %q exp %q", err.Error(), exp)
+	}
+}
+
+func TestEnsureError(t *testing.T) {
+	text := "text"
+	panicValue := errors.New(text)
+	loc := pruntime.NewCodeLocation(0).Short()
+	if index := strings.LastIndex(loc, ":"); index != -1 {
+		loc = loc[:index]
+	}
+
+	actual := EnsureError(panicValue)
+	var err error
+	var ok bool
+	if err, ok = actual.(error); !ok {
+		t.Errorf("not error: %T %+[1]v", actual)
+		t.FailNow()
+	}
+	short := perrors.Short(err)
+	if !strings.Contains(short, text) ||
+		!strings.Contains(short, loc) {
+		t.Errorf("bad short: %q exp %q, %q", short, text, loc)
+	}
+}
+
+func TestEnsureErrorNonErr(t *testing.T) {
+	panicValue := "panicValue"
+	loc := pruntime.NewCodeLocation(0).Short()
+	if index := strings.LastIndex(loc, ":"); index != -1 {
+		loc = loc[:index]
+	}
+
+	actual := EnsureError(panicValue)
+	var err error
+	var ok bool
+	if err, ok = actual.(error); !ok {
+		t.Errorf("not error: %T %+[1]v", actual)
+		t.FailNow()
+	}
+	short := perrors.Short(err)
+	if !strings.Contains(short, panicValue) ||
+		!strings.Contains(short, loc) {
+		t.Errorf("bad short: %q exp %q, %q", short, panicValue, loc)
+	}
+}
+
+func TestRecoverOnError(t *testing.T) {
+	annotation := "annotation"
+	exp := annotation + " 'runtime error: invalid memory address or nil pointer dereference'"
+	loc := "runtime.gopanic"
+
+	var err error
+
+	func() {
+		defer Recover(annotation, nil, func(e error) { err = e })
+
+		var pt *int
+		_ = *pt
+	}()
+
+	if err == nil {
+		t.Error("Expected error missing")
+	} else if err.Error() != exp {
+		t.Errorf("bad Error: %q exp %q", err.Error(), exp)
+	} else {
+		short := perrors.Short(err)
+		if !strings.Contains(short, loc) {
+			t.Errorf("bad Short: %q exp %q", short, loc)
+		}
+	}
+}
+func TestAnnotation(t *testing.T) {
+	exp := Sprintf("Recover from panic in %s:", pruntime.NewCodeLocation(0).PackFunc())
+	actual := Annotation()
+	if actual != exp {
+		t.Errorf("Annotation: %q exp: %q", actual, exp)
 	}
 }

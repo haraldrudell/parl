@@ -6,18 +6,39 @@ ISC License
 package parlca
 
 import (
-	"crypto/ed25519"
 	"crypto/x509"
+	"encoding/pem"
 
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// x509Certificate extends x509.Certificate with utility methods
-type x509Certificate struct {
-	*x509.Certificate
+// Certificate wraps a der format x509 certificate.
+// A der-format certificate is produced by x509.CreateCertificate.
+// An x509.Certificate can be obtained by using x509.ParseCertificate.
+type Certificate struct {
+	/*
+		// x509.Certificate
+
+		CheckCRLSignature(crl *pkix.CertificateList) (err error)
+		CheckSignature(algo x509.SignatureAlgorithm, signed, signature []byte) (err error)
+		CheckSignatureFrom(parent *x509.Certificate) (err error)
+		CreateCRL(rand io.Reader, priv any, revokedCerts []pkix.RevokedCertificate,
+			now, expiry time.Time) (crlBytes []byte, err error)
+		Equal(other *x509.Certificate) (isEqual bool)
+		Verify(opts x509.VerifyOptions) (chains [][]*x509.Certificate, err error)
+		VerifyHostname(host string) (err error)
+	*/
+
+	der parl.CertificateDer
 }
 
-func (c *x509Certificate) IsValid() (isValid bool) {
+func NewCertificate(certificateDer parl.CertificateDer) (certificate parl.Certificate) {
+	return &Certificate{der: certificateDer}
+}
+
+/*
+func (c *Certificate) IsValid() (isValid bool) {
 	if !c.HasPublic() {
 		return
 	}
@@ -34,7 +55,7 @@ func (c *x509Certificate) IsValid() (isValid bool) {
 	return
 }
 
-func (c *x509Certificate) HasPublic() (hasPublic bool) {
+func (c *Certificate) HasPublic() (hasPublic bool) {
 	if len(c.PublicKeyBytes()) == 0 ||
 		c.Certificate.PublicKeyAlgorithm == x509.UnknownPublicKeyAlgorithm {
 		return
@@ -43,7 +64,7 @@ func (c *x509Certificate) HasPublic() (hasPublic bool) {
 	return
 }
 
-func (c *x509Certificate) PublicKeyBytes() (bytes []byte) {
+func (c *Certificate) PublicKeyBytes() (bytes []byte) {
 	if c == nil {
 		return
 	}
@@ -51,10 +72,35 @@ func (c *x509Certificate) PublicKeyBytes() (bytes []byte) {
 	if cert == nil {
 		return
 	}
-	ed25519PublicKey, ok := cert.PublicKey.(ed25519.PublicKey)
+	//ed25519PublicKey, ok := cert.PublicKey.(*rsa.PublicKey)
+	ok := false
+
+	//ed25519PublicKey, ok := cert.PublicKey.(ed25519.PublicKey)
 	if !ok {
 		panic(perrors.Errorf("Bad PublicKey type: %T", cert.PublicKey))
 	}
-	bytes = ed25519PublicKey
+	//bytes = ed25519PublicKey
+	return
+}
+*/
+func (ca *Certificate) DER() (certificateDer parl.CertificateDer) {
+	return ca.der
+}
+
+func (ca *Certificate) PEM() (pemBytes parl.PemBytes) {
+	return append([]byte(PemText(ca.der, ca.der)), pem.EncodeToMemory(&pem.Block{
+		Type:  pemCertificateType,
+		Bytes: ca.DER(),
+	})...)
+}
+
+func (ca *Certificate) ParseCertificate() (certificate *x509.Certificate, err error) {
+	certificateDer := ca.der
+	if len(certificateDer) == 0 {
+		err = perrors.New("certificate der uninitialized")
+		return
+	}
+	certificate, err = x509.ParseCertificate(certificateDer)
+	perrors.IsPF(&err, "x509.ParseCertificate: '%w'", err)
 	return
 }

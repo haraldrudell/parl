@@ -9,43 +9,41 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/x509"
-	"io"
-	"math/big"
-	"os"
-	"strings"
-	"time"
 
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 )
 
 type SelfSigned struct {
-	Reader io.Reader
-	CaDER  CertificateDER // der: Distinguished Encoding Rules is a binary format
-	KeyPair
+	parl.Certificate // DER() PEM()
+	PrivateKey       parl.PrivateKey
 }
+
+var _ parl.CertificateAuthority = &SelfSigned{}
 
 type DER []byte
 
-//func NewCertificateAuthority()
-func NewSelfSigned(canonicalName string) (ca CertificateAuthority) {
+func NewSelfSigned(canonicalName string, algo x509.PublicKeyAlgorithm) (ca parl.CertificateAuthority, err error) {
+	c := SelfSigned{}
 
-	// get private key
-	var keyPair KeyPair
-	var err error
-	if keyPair, err = NewEd25519(); err != nil {
-		panic(err)
+	// create private key
+	if c.PrivateKey, err = NewPrivateKey(algo); err != nil {
+		return
 	}
 
-	//  reate certificate authority
-	c := SelfSigned{Reader: rand.Reader, KeyPair: keyPair}
-
-	// sign self-signed ca certificate
+	// create certificate of certificate authority
+	var certificateDer parl.CertificateDer
 	cert := &x509.Certificate{}
 	EnsureSelfSigned(cert)
-	signer := c.Private()
-	if c.CaDER, err = x509.CreateCertificate(rand.Reader, cert, cert, signer.Public(), signer); err != nil {
-		panic(perrors.Errorf("x509.CreateCertificate ca: '%w'", err))
+	if certificateDer, err = x509.CreateCertificate(rand.Reader,
+		cert,                  // template
+		cert,                  // parent
+		c.PrivateKey.Public(), // pub any: *rsa.PublicKey *ecdsa.PublicKey ed25519.PublicKey
+		c.PrivateKey,          // priv any: crypto.Signer
+	); perrors.IsPF(&err, "x509.CreateCertificate %w", err) {
+		return
 	}
+	c.Certificate = NewCertificate(certificateDer)
 	ca = &c
 	return
 }
@@ -58,119 +56,38 @@ const (
 		UseFileSystem
 		DefaultStrategy = GenerateOnTheFly
 	*/
-	DefaultCountry  = "US"
-	notAfterYears   = 10
-	caSubjectSuffix = "ca"
+	DefaultCountry  = "US" // certificate country: US
+	notAfterYears   = 10   // certificate validity for 10 years
+	caSubjectSuffix = "ca" // ca appended to commonName
 )
 
-func (ca *SelfSigned) Sign(template *x509.Certificate, publicKey crypto.PublicKey) (certDER CertificateDER, err error) {
+func (ca *SelfSigned) Sign(template *x509.Certificate, publicKey crypto.PublicKey) (certDER parl.CertificateDer, err error) {
 
 	// get certificate authority x509.Certificate
-	var isValid bool
 	var caCert *x509.Certificate
-	if isValid, caCert, err = ca.Check(); err != nil {
-		return
-	} else if !isValid {
-		err = perrors.New("Self-Signed Certiicate Auhtority not valid")
+	if caCert, err = ca.Check(); err != nil {
 		return
 	}
-	caSigner := ca.KeyPair.Private()
+	caSigner := ca.PrivateKey //.Private()
 
 	// sign template
-	if certDER, err = x509.CreateCertificate(ca.Reader, template, caCert, publicKey, caSigner); err != nil {
+	if certDER, err = x509.CreateCertificate(rand.Reader, template, caCert, publicKey, caSigner); err != nil {
 		err = perrors.Errorf("x509.CreateCertificate: '%w'", err)
 		return
 	}
 	return
 }
 
-func (ca *SelfSigned) Check() (isValid bool, cert *x509.Certificate, err error) {
-	if !ca.HasKey() || !ca.HasDER() {
+func (ca *SelfSigned) Check() (cert *x509.Certificate, err error) {
+	if err = ca.PrivateKey.Validate(); err != nil {
 		return
 	}
-	var c x509Certificate
-	if c.Certificate, err = x509.ParseCertificate(ca.CaDER); err != nil {
-		err = perrors.Errorf("x509.ParseCertificate: '%w'", err)
+	if cert, err = ca.ParseCertificate(); perrors.IsPF(&err, "x509.ParseCertificate: '%w'", err) {
 		return
 	}
-	isValid = c.HasPublic()
-	cert = c.Certificate
-	return
-}
-
-func EnsureTemplate(cert *x509.Certificate) {
-	if cert.SerialNumber == nil {
-		cert.SerialNumber = big.NewInt(1)
+	if cert.PublicKey == nil {
+		err = perrors.NewPF("public key uninitialied")
+		return
 	}
-	if len(cert.Subject.Country) == 0 {
-		cert.Subject.Country = []string{DefaultCountry}
-	}
-	if cert.Subject.CommonName == "" {
-		if host, err := os.Hostname(); err != nil {
-			panic(perrors.Errorf("os.Hostname: '%w'", err))
-		} else {
-			if index := strings.Index(host, "."); index != -1 {
-				host = host[:index]
-			}
-			cert.Subject.CommonName = host
-		}
-	}
-	if cert.NotBefore.IsZero() {
-		nowUTC := time.Now().UTC()
-		year, month, day := nowUTC.Date()
-		cert.NotBefore = time.Date(year, month, day, 0, 0, 0, 0, nowUTC.Location())
-	}
-	if cert.NotAfter.IsZero() {
-		notBeforeUTC := cert.NotBefore.UTC()
-		year, month, day := notBeforeUTC.Date()
-		cert.NotAfter = time.Date(year+notAfterYears, month, day, 0, 0, -1, 0, notBeforeUTC.Location())
-	}
-	cert.BasicConstraintsValid = true
-}
-
-func EnsureSelfSigned(cert *x509.Certificate) {
-	if cert.Issuer.CommonName == "" {
-		if host, err := os.Hostname(); err != nil {
-			panic(perrors.Errorf("os.Hostname: '%w'", err))
-		} else {
-			if index := strings.Index(host, "."); index != -1 {
-				host = host[:index]
-			}
-			cert.Issuer.CommonName = host + caSubjectSuffix
-		}
-	}
-	if len(cert.Issuer.Country) == 0 {
-		cert.Issuer.Country = []string{DefaultCountry}
-	}
-	if len(cert.Subject.Country) == 0 {
-		cert.Subject = cert.Issuer
-	}
-	cert.IsCA = true
-	cert.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageCRLSign
-	EnsureTemplate(cert)
-}
-
-func EnsureServer(cert *x509.Certificate) {
-	EnsureTemplate(cert)
-	cert.KeyUsage = x509.KeyUsageDigitalSignature
-	cert.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
-}
-
-func EnsureClient(cert *x509.Certificate) {
-	EnsureTemplate(cert)
-	cert.KeyUsage = x509.KeyUsageDigitalSignature
-	cert.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
-}
-
-func (ca *SelfSigned) DER() (bytes CertificateDER) {
-	return ca.CaDER
-}
-
-func (ca *SelfSigned) SetReader(reader io.Reader) {
-	ca.Reader = reader
-}
-
-func (ca *SelfSigned) HasDER() (hasDER bool) {
-	hasDER = len(ca.CaDER) > 0
 	return
 }

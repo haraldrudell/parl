@@ -75,7 +75,6 @@ parl package features:
  ClosableChan — Initialization-free channel with observable deferrable panic-free close
  Moderator — A ticketing system for limited parallelism
  NBChan — A non-blocking channel with trillion-size dynamic buffer
- OnceChan — Initialization-free observable shutdown semaphore implementing Context
  SerialDo — Serialization of invocations
  WaitGroup —Observable WaitGroup
  Debouncer — Invocation debouncer, pre-generics

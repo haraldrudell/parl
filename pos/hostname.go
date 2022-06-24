@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // ShortHostname gets hostname without domain part
@@ -18,7 +18,7 @@ import (
 func ShortHostname() (host string) {
 	var err error
 	if host, err = os.Hostname(); err != nil {
-		panic(parl.Errorf("os.Hostname: '%w'", err))
+		panic(perrors.Errorf("os.Hostname: '%w'", err))
 	}
 	if index := strings.Index(host, "."); index != -1 {
 		host = host[:index]

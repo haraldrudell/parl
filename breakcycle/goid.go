@@ -30,8 +30,8 @@ var newStack interface{}
 var newStackReceiver func(v interface{})
 var goidParlDone bool
 
-// ParlImport receives a function value from parl to receive the symbol value
-func ParlImport(receiver func(v interface{})) {
+// ParlGoidImport receives a function value from parl to receive the symbol value
+func ParlGoidImport(receiver func(v interface{})) {
 	if goidParlDone {
 		return
 	}

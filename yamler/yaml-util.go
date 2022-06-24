@@ -16,7 +16,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pfs"
 	"github.com/haraldrudell/parl/pos"
 )
@@ -65,7 +65,7 @@ func readFile(filename string) (bytes []byte, exists bool) {
 	var err error
 	if bytes, err = ioutil.ReadFile(filename); err != nil {
 		if !os.IsNotExist(err) {
-			panic(parl.Errorf("ioutil.ReadFile: '%w'", err))
+			panic(perrors.Errorf("ioutil.ReadFile: '%w'", err))
 		}
 	} else {
 		exists = true

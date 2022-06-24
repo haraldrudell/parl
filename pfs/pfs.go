@@ -7,11 +7,12 @@ ISC License
 package pfs
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 )
 
-var E = 17
+var EndListing = errors.New("endListing")
 
 // AbsEval makes path absolute and resolves symlinks
 func AbsEval(path string) (p string, err error) {
@@ -21,8 +22,14 @@ func AbsEval(path string) (p string, err error) {
 	return
 }
 
-// Dirs retrieves absolute paths to all directories, while following symlinks, from initial dir argument
-func Dirs(dir string) (dirs []string, err error) {
+// Dirs retrieves absolute paths to all directories, while following symlinks, from initial dir argument.
+// callback: cb is 6–58% faster than slice, results are found faster, and it can be canceled midway.
+// if callback blocks, not good…
+func Dirs(dir string, callback ...func(dir string) (err error)) (dirs []string, err error) {
+	var callback0 func(dir string) (err error)
+	if len(callback) > 0 {
+		callback0 = callback[0]
+	}
 
 	// make dir path absolute
 	var dir0 string
@@ -31,14 +38,22 @@ func Dirs(dir string) (dirs []string, err error) {
 	}
 
 	// find directories to watch
-	err = Walk(dir0, func(path string, info os.FileInfo, err0 error) (err error) {
+	if err = Walk(dir0, func(path string, info os.FileInfo, err0 error) (err error) {
 		if err0 != nil {
-			return err0
+			return err0 // some error occured during Walk exit
 		}
 		if info.IsDir() {
-			dirs = append(dirs, path)
+			if callback0 != nil {
+				if err = callback0(path); err != nil {
+					return // callback error or abort exit
+				}
+			} else {
+				dirs = append(dirs, path)
+			}
 		}
-		return
-	})
+		return // good exit
+	}); err == EndListing {
+		err = nil
+	}
 	return
 }

@@ -50,6 +50,13 @@ func (dc *DBCache) Stmt(query string, ctx context.Context) (stmt *sql.Stmt, err 
 	return // new cached statement exit
 }
 
+func (dc *DBCache) WrapStmt(stmt *sql.Stmt) (stm Stmt) {
+	if stmtWrapper, ok := dc.ds.(StmtWrapper); ok {
+		return stmtWrapper.WrapStmt(stmt)
+	}
+	return stmt
+}
+
 func (dc *DBCache) Close() (err error) {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()

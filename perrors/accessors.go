@@ -64,7 +64,7 @@ func ErrorList(err error) (errs []error) {
 	return append([]error{err0}, errs...)
 }
 
-// error116.HasStack detects if the error chain already contains a stack trace
+// HasStack detects if the error chain already contains a stack trace
 func HasStack(err error) (hasStack bool) {
 	if err == nil {
 		return
@@ -73,26 +73,46 @@ func HasStack(err error) (hasStack bool) {
 	return errors.As(err, &e)
 }
 
-// error116.IsWarning determines if an error has been flagged as a warning.
-// error116.Warning() flags an error to be of warning level
+// IsWarning determines if an error has been flagged as a warning.
 func IsWarning(err error) (isWarning bool) {
-	for err != nil {
+	for ; err != nil; err = errors.Unwrap(err) {
 		if _, isWarning = err.(*errorglue.WarningType); isWarning {
-			break // found an error in the chain that is of warning type
+			return // is warning
 		}
-		err = errors.Unwrap(err)
 	}
-	return
+	return // not a warning
+}
+
+// IsPanic determines if an error is flagged to have originated from a panic.
+func IsPanic(err error) (isPanic bool) {
+	for ; err != nil; err = errors.Unwrap(err) {
+		if _, isPanic = err.(*errorglue.PanicType); isPanic {
+			return // is a panic
+		}
+	}
+	return // not a panic
 }
 
 // error116.PackFunc returns the package name and function name
 // of the caller:
 //   error116.FuncName
 func PackFunc() (packageDotFunction string) {
-	return pruntime.NewCodeLocation(e116PackFuncStackFrames).PackFunc()
+	return PackFuncN(1)
 }
 
-// error116.Short gets a one-line location string similar to printf %-v and ShortFormat.
+func PackFuncN(skipFrames int) (packageDotFunction string) {
+	if skipFrames < 0 {
+		skipFrames = 0
+	}
+	cl := pruntime.NewCodeLocation(e116PackFuncStackFrames + skipFrames)
+	packageDotFunction = cl.Name()
+	if pack := cl.Package(); pack != "main" {
+		packageDotFunction = pack + "." + packageDotFunction
+	}
+	return
+}
+
+// perrors.Short gets a one-line location string similar to printf %-v and ShortFormat.
 // Short() does not print stack traces, data and associated errors.
 // Short() does print a one-liner of the error message and a brief code location:
 //   error-message at error116.(*csTypeName).FuncName-chainstring_test.go:26
@@ -101,10 +121,14 @@ func Short(err error) string {
 }
 
 // Deferr invokes a printing function for an error pointer.
+// Deferr returns the message.
 // Deferr is deferrable.
-// a colon and a space is appended to label
-// If *errp contains an error it is printed in Short form.
+// A colon and a space is appended to label.
 // If *errp is nil, OK is printed.
+// If errp is nil, a message is printed.
+// if fn is nil, nothing is printed.
+// If *errp contains an error it is printed in Short form:
+//  label: Error message at error116.(*csTypeName).FuncName-chainstring_test.go:26
 func Deferr(label string, errp *error, fn func(format string, a ...interface{})) string {
 	if errp == nil {
 		return "perrors.Deferr: errp nil"
@@ -184,4 +208,11 @@ func IsType(err error, pointerToErrorValue interface{}) (hadErrpType bool) {
 		}
 	}
 	return // no match exit
+}
+
+func Error0(err error) (e error) {
+	for ; err != nil; err = errors.Unwrap(err) {
+		e = err
+	}
+	return
 }

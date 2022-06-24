@@ -6,29 +6,32 @@ ISC License
 package mains
 
 import (
+	"fmt"
+	"os"
 	"time"
 
-	gosysinfo "github.com/elastic/go-sysinfo"
-	"github.com/elastic/go-sysinfo/types"
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/shirou/gopsutil/process"
 )
 
 // ProcessStartTime returns the time the executing process was started.
-// The package used is:
-//   import "github.com/elastic/go-sysinfo"
-// This packlage was found on 220322 using Go package search: https://pkg.go.dev/search?q=sysinfo
-func ProcessStartTime() (t time.Time) {
+// Resolution is seconds, time zone is local
+func ProcessStartTime() (createTime time.Time) {
 
-	var process types.Process
+	// get process object for this process
+	var procData *process.Process
+	pid := os.Getpid()
 	var err error
-	if process, err = gosysinfo.Self(); err != nil {
-		panic(parl.Errorf("go-sysinfo.Self: %w", err))
+	if procData, err = process.NewProcess(int32(pid)); err != nil {
+		panic(perrors.NewPF(fmt.Sprintf("process.NewProcess(%d) error: %T %+[2]v", pid, err)))
 	}
 
-	var processInfo types.ProcessInfo
-	if processInfo, err = process.Info(); err != nil {
-		panic(parl.Errorf("go-sysinfo.Info: %w", err))
+	// get process create time in seconds
+	var epochMs int64
+	if epochMs, err = procData.CreateTime(); err != nil {
+		panic(perrors.ErrorfPF("Process.CreateTime error: %T %+[1]v", err))
 	}
+	createTime = time.UnixMilli(epochMs).Local()
 
-	return processInfo.StartTime
+	return
 }

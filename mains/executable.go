@@ -80,6 +80,8 @@ type Executable struct {
 	IsErrorLocation bool
 }
 
+var optionsWereParsed parl.AtomicBool
+
 /*
 Init populate launch time and sets silence if first argument is “-silent.”
 Init supports function chaining like:
@@ -196,6 +198,7 @@ func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executab
 	if count > 0 && (ex.Arguments&ManyArguments != 0) {
 		ex.Args = args
 	}
+	optionsWereParsed.Set()
 	return
 }
 
@@ -270,21 +273,71 @@ func (ex *Executable) Recover(errp ...*error) {
 		}
 	}
 
+	// ensure -debug honored if panic before options parsing
+	if !optionsWereParsed.IsTrue() {
+		for _, option := range os.Args {
+			if option == DebugOption {
+				parl.SetDebug(true)
+			}
+		}
+	}
+
 	// check for panic
-	if e := recover(); e != nil {
-		hasStack := false
-		if err, ok := e.(error); ok {
-			hasStack = perrors.HasStack(err)
+	if v := recover(); v != nil {
+
+		// determine if v is error
+		err, recoverValueIsError := v.(error)
+		var error0 error
+
+		// debug print
+		isDebug := parl.IsThisDebug()
+		if isDebug {
+			hasStack := false
+			var valueString string
+			var error0type string
+			if !recoverValueIsError {
+				valueString = parl.Sprintf(" '%+v'", v)
+			} else {
+				error0 = perrors.Error0(err)
+				error0type = parl.Sprintf(" panic error type: %T", error0)
+				hasStack = perrors.HasStack(err)
+				error0value := fmt.Sprintf("error0: %+v", error0)
+				if hasStack {
+					valueString = parl.Sprintf(" error-value:\n\n%s\n\n%s\n\n", perrors.Long(err), error0value)
+				} else {
+					valueString = err.Error() + "\n" + error0value
+				}
+			}
+			parl.Debug("%s: panic with -debug: recover-value type: %T%s hasStack: %t%s",
+				pruntime.NewCodeLocation(0).PackFunc(),
+				v, error0type, hasStack, valueString)
 		}
-		parl.Debug("exe.Recover: executable %s panic: %T hasStack: %t '%+[2]v'", ex.Program, e, hasStack)
-		parl.Log("Unhandled panic invoked exe.Recover: stack:")
-		debug.PrintStack()
-		var err error
-		var ok bool
-		if err, ok = e.(error); !ok {
-			err = fmt.Errorf("non-error value: %T %[1]v", e)
+
+		// print panic message and invocation stack
+		var stackString string
+		if isDebug {
+			stackString = " recovery stack trace:\n\n" + pruntime.DebugStack(0) + "\n\n"
 		}
-		err = parl.Errorf("Unhandled panic to exe.Recover: '%w'", err)
+		var programString string
+		if ex.Program != "" {
+			programString = "\x20" + ex.Program
+		}
+		parl.Log("\n\nProgram%s Recovered a Main-Thread panic:%s", programString, stackString)
+
+		// store recovery value as error
+		var prepend string
+		var postpend string
+		if !recoverValueIsError {
+			err = perrors.Errorf("panic: non-error value: %T %[1]v", v)
+		} else {
+			prepend = "panic: \x27"
+			postpend = "\x27"
+			if isDebug {
+				// put error0 type name in error message
+				postpend += parl.Sprintf(" type: %T", error0)
+			}
+		}
+		err = perrors.Errorf("main-thread %s%w%s", prepend, err, postpend)
 		ex.AddErr(err)
 	}
 
@@ -299,6 +352,7 @@ func (ex *Executable) Recover(errp ...*error) {
 		parl.Log(s)
 	}
 
+	// will print any errors
 	ex.Exit()
 }
 

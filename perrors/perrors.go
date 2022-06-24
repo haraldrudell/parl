@@ -46,6 +46,8 @@ Is compatible:
   fmt.Printf("err: %s", err) // no change
   fmt.Printf("err: %q", err) // no change
 
+perrors used to be called error116 becaue Rob Pike was going to put it into go1.16
+
 © 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 */
 package perrors

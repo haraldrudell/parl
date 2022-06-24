@@ -12,7 +12,7 @@ import (
 	"crypto/x509"
 	"testing"
 
-	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl"
 )
 
 func TestNewEd25519(t *testing.T) {
@@ -55,17 +55,19 @@ func TestNewEd25519(t *testing.T) {
 		t.Errorf("NewEd25519 returned nil")
 		return
 	}
-	if !keyPair.HasKey() {
-		t.Error(perrors.New("keyPair empty"))
-		return
-	}
+	/*
+		if !keyPair.HasKey() {
+			t.Error(perrors.New("keyPair empty"))
+			return
+		}
+	*/
 	algo := keyPair.Algo()
 	if algo != x509.Ed25519 {
 		t.Errorf("Unknown algo: %s", algo.String())
 		return
 	}
-	var keyDER KeyDER
-	if keyDER, err = keyPair.Bytes(); err != nil {
+	var keyDER parl.PrivateKeyDer
+	if keyDER, err = keyPair.DER(); err != nil {
 		t.Error(err)
 		return
 	}
@@ -73,9 +75,15 @@ func TestNewEd25519(t *testing.T) {
 		t.Errorf("private key empty")
 		return
 	}
-	bytes := keyPair.PublicBytes()
-	if len(bytes) == 0 {
+	publicKey := keyPair.PublicKey()
+
+	if len(publicKey.DERe()) == 0 {
 		t.Errorf("public key empty")
 		return
+	}
+
+	var key Ed25519PrivateKey
+	if err = key.Validate(); err == nil {
+		t.Errorf("Mising expected error: Ed25519PrivateKey.Validate")
 	}
 }

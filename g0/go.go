@@ -10,6 +10,11 @@ import (
 	"context"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
+)
+
+const (
+	goFrames = 1
 )
 
 type Go struct {
@@ -44,10 +49,16 @@ func (g0 *Go) Add(delta int) {
 }
 
 func (g0 *Go) AddError(err error) {
+	if err != nil && !perrors.HasStack(err) {
+		err = perrors.Stackn(err, goFrames)
+	}
 	g0.addError(err)
 }
 
 func (g0 *Go) Done(errp *error) {
+	if errp != nil && *errp != nil && !perrors.HasStack(*errp) {
+		*errp = perrors.Stackn(*errp, goFrames)
+	}
 	g0.done(errp)
 }
 
@@ -59,6 +70,6 @@ func (g0 *Go) Cancel() {
 	g0.cancel()
 }
 
-func (g0 *Go) SubGo() (goCancel parl.SubGo) {
-	return NewGoSub(g0)
+func (g0 *Go) SubGo(local ...parl.GoSubLocal) (goCancel parl.SubGo) {
+	return NewGoSub(g0, local...)
 }

@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 type YamlValue struct {
@@ -20,21 +20,21 @@ type YamlValue struct {
 func NewYamlValue(instancePointer interface{}, fieldPointer interface{}) (yv *YamlValue) {
 	reflectValue := reflect.ValueOf(instancePointer)
 	if !reflectValue.IsValid() {
-		parl.Errorf("NewYamlValue: instancePointer cannot be nil")
+		perrors.Errorf("NewYamlValue: instancePointer cannot be nil")
 	}
 	structValue := reflectValue.Elem() // retrieve what the pointer points to
 	if structValue.Kind() != reflect.Struct {
-		parl.Errorf("NewYamlValue: instancePointer not pointer to struct instance")
+		perrors.Errorf("NewYamlValue: instancePointer not pointer to struct instance")
 	}
 	numField := structValue.NumField()
 	for i := 0; i < numField; i++ {
 		fieldValue := structValue.Field(i)
 		if !fieldValue.CanAddr() {
-			parl.Errorf("NewYamlValue: field#%d: canAddr false", i)
+			perrors.Errorf("NewYamlValue: field#%d: canAddr false", i)
 		}
 		fieldAddr := fieldValue.Addr()
 		if !fieldAddr.CanInterface() {
-			parl.Errorf("NewYamlValue: field#%d: canInterface false", i)
+			perrors.Errorf("NewYamlValue: field#%d: canInterface false", i)
 		}
 		ifValue := fieldAddr.Interface()
 		if ifValue == fieldPointer {
@@ -43,6 +43,6 @@ func NewYamlValue(instancePointer interface{}, fieldPointer interface{}) (yv *Ya
 				Pointer: fieldPointer}
 		}
 	}
-	parl.Errorf("NewYamlValue: fieldPointer not found")
+	perrors.Errorf("NewYamlValue: fieldPointer not found")
 	return
 }

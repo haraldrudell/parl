@@ -71,7 +71,7 @@ func TestModerator(t *testing.T) {
 	wgAExit.Add(1)
 	// thread A goes into its Do function
 	go func() {
-		if err := mo.Do(func() (err error) {
+		if err := mo.DoErr(func() (err error) {
 			Append(taskALaunched)
 			wgADo.Done()
 			wgAWait.Wait()
@@ -100,7 +100,7 @@ func TestModerator(t *testing.T) {
 	wgBCExit.Add(2)
 	BC := func(goo, do, exit string) {
 		Append(goo)
-		if err := mo.Do(func() (err error) {
+		if err := mo.DoErr(func() (err error) {
 			Append(do)
 			wgBCWait.Wait()
 			return

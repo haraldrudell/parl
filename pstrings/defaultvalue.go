@@ -8,7 +8,7 @@ package pstrings
 import (
 	"time"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 func IsDefaultValue(pt interface{}) (isDefault bool) {
@@ -32,6 +32,6 @@ func IsDefaultValue(pt interface{}) (isDefault bool) {
 	case *[]string:
 		return len(*p) == 0
 	default:
-		panic(parl.Errorf("unknown pointer type: %T", p))
+		panic(perrors.Errorf("unknown pointer type: %T", p))
 	}
 }

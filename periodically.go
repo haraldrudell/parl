@@ -7,6 +7,7 @@ package parl
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ const (
 type Periodically struct {
 	period time.Duration
 	fn     func(t time.Time)
+	wg     sync.WaitGroup
 	ctx    context.Context
 }
 
@@ -28,11 +30,17 @@ func NewPeriodically(fn func(t time.Time), ctx context.Context, period ...time.D
 	if p.period < defaultPeriod {
 		p.period = defaultPeriod
 	}
+	p.wg.Add(1)
 	go p.doThread()
 	return &p
 }
 
+func (p *Periodically) Wait() {
+	p.wg.Wait()
+}
+
 func (p *Periodically) doThread() {
+	defer p.wg.Done()
 	defer Recover(Annotation(), nil, Infallible)
 
 	ticker := time.NewTicker(p.period)

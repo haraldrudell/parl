@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/plog"
 	"github.com/haraldrudell/parl/pruntime"
 )
@@ -237,7 +238,7 @@ func mocksLogStat() (text1, textNewline, expectedLocation, regexpLocation string
 	expectedLocation = location.Short()
 	// remove line number since this changes
 	if index := strings.Index(expectedLocation, ":"); index == -1 {
-		panic(Errorf("error116.NewCodeLocation failed: %q", expectedLocation))
+		panic(perrors.Errorf("error116.NewCodeLocation failed: %q", expectedLocation))
 	} else {
 		expectedLocation = expectedLocation[0:index]
 	}

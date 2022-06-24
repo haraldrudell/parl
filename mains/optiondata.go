@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 const (
@@ -103,59 +104,59 @@ func (om *OptionData) ApplyYaml() (err error) {
 	case *bool:
 		typedPointer, ok := yamlDataPointer.(*bool)
 		if !ok {
-			return parl.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
+			return perrors.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
 		}
 		*valuePointer = *typedPointer
 	case *time.Duration:
 		typedPointer, ok := yamlDataPointer.(*time.Duration)
 		if !ok {
-			return parl.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
+			return perrors.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
 		}
 		*valuePointer = *typedPointer
 	case *float64:
 		typedPointer, ok := yamlDataPointer.(*float64)
 		if !ok {
-			return parl.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
+			return perrors.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
 		}
 		*valuePointer = *typedPointer
 	case *int64:
 		typedPointer, ok := yamlDataPointer.(*int64)
 		if !ok {
-			return parl.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
+			return perrors.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
 		}
 		*valuePointer = *typedPointer
 	case *int:
 		typedPointer, ok := yamlDataPointer.(*int)
 		if !ok {
-			return parl.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
+			return perrors.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
 		}
 		*valuePointer = *typedPointer
 	case *string:
 		typedPointer, ok := yamlDataPointer.(*string)
 		if !ok {
-			return parl.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
+			return perrors.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
 		}
 		*valuePointer = *typedPointer
 	case *uint64:
 		typedPointer, ok := yamlDataPointer.(*uint64)
 		if !ok {
-			return parl.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
+			return perrors.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
 		}
 		*valuePointer = *typedPointer
 	case *uint:
 		typedPointer, ok := yamlDataPointer.(*uint)
 		if !ok {
-			return parl.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
+			return perrors.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
 		}
 		*valuePointer = *typedPointer
 	case *[]string:
 		typedPointer, ok := yamlDataPointer.(*[]string)
 		if !ok {
-			return parl.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
+			return perrors.Errorf(typeMismatch, om.Name, om.P, yamlDataPointer)
 		}
 		*valuePointer = *typedPointer
 	default:
-		return parl.Errorf("option %s: unknown value type: %T", om.Name, om.P)
+		return perrors.Errorf("option %s: unknown value type: %T", om.Name, om.P)
 	}
 	return
 }

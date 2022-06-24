@@ -95,7 +95,7 @@ func (gc *GoGroup) WaitPeriod(duration ...time.Duration) {
 }
 
 func (gc *GoGroup) String() (s string) {
-	timeStamp := short()
+	timeStamp := parl.Short()
 	goIndex := gc.getGoerList()
 
 	goList := make([]parl.GoIndex, len(goIndex))

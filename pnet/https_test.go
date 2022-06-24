@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/parlca"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pos"
@@ -26,7 +27,7 @@ import (
 func TestNewHttps(t *testing.T) {
 	TCPaddress := "127.0.0.1:0"
 	network := ""
-	var certDER parlca.CertificateDER
+	var certDER parl.CertificateDer
 	var signer crypto.Signer
 	hp := NewHttps(TCPaddress, network, certDER, signer)
 	_ = hp
@@ -52,17 +53,17 @@ func TestHttpsListen(t *testing.T) {
 	sleepDuration := time.Duration(secs) * time.Second
 
 	t.Log("Creating self-signed certificate authority")
-	caCert := parlca.NewSelfSigned(canonicalName)
+	var caCert parl.CertificateAuthority
+	var err error
+	if caCert, err = parlca.NewSelfSigned(canonicalName, x509.RSA); err != nil {
+		t.Errorf("parlca.NewSelfSigned %s %s", x509.RSA, perrors.Short(err))
+		t.FailNow()
+	}
 	writeFile(caCertFilename, caCert.DER(), ownerRW, t.Logf)
-	var isValid bool
 	var caX509 *x509.Certificate
-	isValid, caX509, err := caCert.Check()
+	caX509, err = caCert.Check()
 	if err != nil {
 		t.Error(err)
-		return
-	}
-	if !isValid {
-		t.Error(perrors.New("ca Check failed"))
 		return
 	}
 
@@ -72,10 +73,10 @@ func TestHttpsListen(t *testing.T) {
 		t.Error(perrors.Errorf("server parlca.NewEd25519: '%w'", err))
 		return
 	}
-	serverSigner := serverKey.Private()   // private key for running the server
+	serverSigner := serverKey             // private key for running the server
 	serverPublic := serverSigner.Public() // public key for creating server certificate
-	var keyDER parlca.KeyDER
-	if keyDER, err = serverKey.Bytes(); err != nil {
+	var keyDER parl.PrivateKeyDer
+	if keyDER, err = serverKey.DER(); err != nil {
 		t.Error(err)
 		return
 	}
@@ -86,7 +87,7 @@ func TestHttpsListen(t *testing.T) {
 		IPAddresses: []net.IP{IPv4loopback, net.IPv6loopback},
 	}
 	parlca.EnsureServer(&template)
-	var certDER parlca.CertificateDER
+	var certDER parl.CertificateDer
 	if certDER, err = caCert.Sign(&template, serverPublic); err != nil {
 		t.Errorf("signing server certificate: %+v", err)
 		return

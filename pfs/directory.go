@@ -15,6 +15,7 @@ import (
 	"syscall"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 type DirectoryLister struct {
@@ -44,7 +45,7 @@ func NewDirStream(path string, chanSize int) (dir *DirectoryLister) {
 	cleaned := filepath.Clean(path)
 	abs, err := filepath.Abs(cleaned)
 	if err != nil {
-		panic(parl.Errorf("filepath.Abs(%q) '%w'", path, err))
+		panic(perrors.Errorf("filepath.Abs(%q) '%w'", path, err))
 	}
 	no := atomic.AddInt32(&instanceNo, 1)
 	dir = &DirectoryLister{Path: cleaned, Abs: abs, Results: make(chan *EntryResult),

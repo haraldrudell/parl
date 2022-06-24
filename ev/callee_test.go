@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/evx"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 func TestResultPanic(t *testing.T) {
@@ -25,7 +25,7 @@ func TestResultPanic(t *testing.T) {
 	errX := "errX"
 	doFn("ERR", errX, func(ctx Callee) (err error) {
 		defer ctx.Result(&err)
-		return parl.New(errX)
+		return perrors.New(errX)
 	}, t)
 
 	// test success

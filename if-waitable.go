@@ -92,4 +92,5 @@ type Doneable interface {
 type CancelContext interface {
 	context.Context
 	Cancel()
+	CancelOnError(errp *error)
 }

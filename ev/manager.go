@@ -123,7 +123,7 @@ func (mgr *ThreadManager) Threads() (names []string, IDs []GoID) {
 func getMapValue(value interface{}) (thread *EvThread) {
 	var ok bool
 	if thread, ok = value.(*EvThread); !ok {
-		panic(parl.Errorf("Bad value type in thread map: %T", value))
+		panic(perrors.Errorf("Bad value type in thread map: %T", value))
 	}
 	return
 }
