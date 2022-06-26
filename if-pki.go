@@ -21,6 +21,7 @@ type CertificateAuthority interface {
 	DER() (certificateDer CertificateDer)       // untyped bytes, der: Distinguished Encoding Rules binary format
 	Sign(template *x509.Certificate, publicKey crypto.PublicKey) (certDER CertificateDer, err error)
 	PEM() (pemBytes PemBytes)
+	Private() (privateKey PrivateKey)
 }
 
 // PrivateKey implements crypto.Signer and can therefore be used as tls.Certificate.PrivateKey

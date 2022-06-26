@@ -14,14 +14,23 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
+const (
+	/*
+		NoPassword       PasswordType = "\tnoPassword"
+		GeneratePassword PasswordType = "\tgeneratePassword"
+		GenerateOnTheFly Strategy     = iota << 0
+		UseFileSystem
+		DefaultStrategy = GenerateOnTheFly
+	*/
+	DefaultCountry  = "US" // certificate country: US
+	notAfterYears   = 10   // certificate validity for 10 years
+	caSubjectSuffix = "ca" // ca appended to commonName
+)
+
 type SelfSigned struct {
 	parl.Certificate // DER() PEM()
 	PrivateKey       parl.PrivateKey
 }
-
-var _ parl.CertificateAuthority = &SelfSigned{}
-
-type DER []byte
 
 func NewSelfSigned(canonicalName string, algo x509.PublicKeyAlgorithm) (ca parl.CertificateAuthority, err error) {
 	c := SelfSigned{}
@@ -48,18 +57,9 @@ func NewSelfSigned(canonicalName string, algo x509.PublicKeyAlgorithm) (ca parl.
 	return
 }
 
-const (
-	/*
-		NoPassword       PasswordType = "\tnoPassword"
-		GeneratePassword PasswordType = "\tgeneratePassword"
-		GenerateOnTheFly Strategy     = iota << 0
-		UseFileSystem
-		DefaultStrategy = GenerateOnTheFly
-	*/
-	DefaultCountry  = "US" // certificate country: US
-	notAfterYears   = 10   // certificate validity for 10 years
-	caSubjectSuffix = "ca" // ca appended to commonName
-)
+func NewSelfSigned2(privateKey parl.PrivateKey, certificate parl.Certificate) (ca parl.CertificateAuthority) {
+	return &SelfSigned{Certificate: certificate, PrivateKey: privateKey}
+}
 
 func (ca *SelfSigned) Sign(template *x509.Certificate, publicKey crypto.PublicKey) (certDER parl.CertificateDer, err error) {
 
@@ -90,4 +90,8 @@ func (ca *SelfSigned) Check() (cert *x509.Certificate, err error) {
 		return
 	}
 	return
+}
+
+func (ca *SelfSigned) Private() (privateKey parl.PrivateKey) {
+	return ca.PrivateKey
 }
