@@ -11,7 +11,7 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/psyscall"
+	"github.com/haraldrudell/parl/punix"
 )
 
 func NewPrivateKey(algo x509.PublicKeyAlgorithm) (privateKey parl.PrivateKey, err error) {
@@ -73,7 +73,7 @@ func LoadFromPem(filename string, allowNotFound ...bool) (
 
 func ReadFile(filename string, allowNotFound bool) (byts []byte, err error) {
 	if byts, err = os.ReadFile(filename); err != nil {
-		if allowNotFound && psyscall.IsENOENT(err) {
+		if allowNotFound && punix.IsENOENT(err) {
 			err = nil
 			return // cert file does not exist: byts == nil, err == nil
 		}

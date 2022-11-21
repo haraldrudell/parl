@@ -3,7 +3,7 @@ module github.com/haraldrudell/parl/pterm
 go 1.18
 
 require (
-	github.com/haraldrudell/parl v0.4.26
+	github.com/haraldrudell/parl v0.4.27
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
 )
 

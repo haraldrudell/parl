@@ -74,7 +74,8 @@ func GetCodeLocation(rFrame *runtime.Frame) (cl *CodeLocation) {
 }
 
 // FuncName returns function name, characters no space:
-//   AddErr
+//
+//	AddErr
 func (cl *CodeLocation) Name() (funcName string) {
 	packageAndFunc := filepath.Base(cl.FuncName)
 	if lastDotIndex := strings.LastIndex(packageAndFunc, "."); lastDotIndex >= 0 {
@@ -84,7 +85,8 @@ func (cl *CodeLocation) Name() (funcName string) {
 }
 
 // Package return base package name, a single word of characters with no space:
-//   mains
+//
+//	mains
 func (cl *CodeLocation) Package() (funcName string) {
 	packageAndFunc := filepath.Base(cl.FuncName)
 	if dotIndex := strings.Index(packageAndFunc, "."); dotIndex >= 0 {
@@ -94,34 +96,39 @@ func (cl *CodeLocation) Package() (funcName string) {
 }
 
 // PackFunc return base package name and function:
-//   mains.AddErr
+//
+//	mains.AddErr
 func (cl *CodeLocation) PackFunc() (packageDotFunction string) {
 	return cl.Package() + "." + cl.Name()
 }
 
 // Base returns base package name, an optional type name and the function name:
-//   mains.(*Executable).AddErr
+//
+//	mains.(*Executable).AddErr
 func (cl *CodeLocation) Base() (baseName string) {
 	return filepath.Base(cl.FuncName)
 }
 
 // Short returns base package name, an optional type name and
 // the function name, base filename and line number:
-//   mains.(*Executable).AddErr-executable.go:25
+//
+//	mains.(*Executable).AddErr-executable.go:25
 func (cl *CodeLocation) Short() (funcName string) {
 	return fmt.Sprintf("%s-%s:%d", filepath.Base(cl.FuncName), filepath.Base(cl.File), cl.Line)
 }
 
 // Long returns full package path, an optional type name and
 // the function name, base filename and line number:
-//   mains.(*Executable).AddErr-executable.go:25
+//
+//	mains.(*Executable).AddErr-executable.go:25
 func (cl *CodeLocation) Long() (funcName string) {
 	return fmt.Sprintf("%s-%s:%d", cl.FuncName, filepath.Base(cl.File), cl.Line)
 }
 
 // Full returns all available information on one line
 // the function name, base filename and line number:
-//   mains.(*Executable).AddErr-executable.go:25
+//
+//	mains.(*Executable).AddErr-executable.go:25
 func (cl *CodeLocation) Full() (funcName string) {
 	return fmt.Sprintf("%s-%s:%d", cl.FuncName, cl.File, cl.Line)
 }
@@ -132,8 +139,9 @@ func (cl *CodeLocation) IsSet() (isSet bool) {
 
 // String returns a two-line string representation suitable for a multi-line stack trace.
 // Typical output:
-//   github.com/haraldrudell/parl/error116.(*TypeName).FuncName\n
-//     /opt/sw/privates/parl/error116/codelocation_test.go:20
+//
+//	github.com/haraldrudell/parl/error116.(*TypeName).FuncName\n
+//	  /opt/sw/privates/parl/error116/codelocation_test.go:20
 func (cl CodeLocation) String() string {
 	return fmt.Sprintf("%s\n\x20\x20%s:%d", cl.FuncName, cl.File, cl.Line)
 }

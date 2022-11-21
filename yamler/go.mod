@@ -3,7 +3,7 @@ module github.com/haraldrudell/parl/yamler
 go 1.18
 
 require (
-	github.com/haraldrudell/parl v0.4.26
+	github.com/haraldrudell/parl v0.4.27
 	github.com/haraldrudell/parl/mains v0.4.26
 	gopkg.in/yaml.v3 v3.0.1
 )

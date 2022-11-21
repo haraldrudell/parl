@@ -81,10 +81,14 @@ func TestByValue(t *testing.T) {
 	fo := func(p sync.Once) {}
 	fo(o)
 
-	// sync.WaitGroup can be passed by value
-	var wg sync.WaitGroup
-	fw := func(g sync.WaitGroup) {}
-	fw(wg)
+	// sync.WaitGroup unlike previously by 1.19.3 not be passed by value
+	//var wg sync.WaitGroup
+
+	// func passes lock by value: sync.WaitGroup contains sync.noCopy
+	//fw := func(g sync.WaitGroup) {}
+
+	// call of fw copies lock value: sync.WaitGroup contains sync.noCopy
+	//fw(wg)
 
 	// *sync.Cond can be pased by value
 	c := sync.NewCond(&sync.Mutex{})

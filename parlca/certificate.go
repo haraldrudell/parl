@@ -37,51 +37,54 @@ func NewCertificate(certificateDer parl.CertificateDer) (certificate parl.Certif
 	return &Certificate{der: certificateDer}
 }
 
+// 221121 don’t know what this is. Make it compile
+func LoadCertificate(filename string) {}
+
 /*
-func (c *Certificate) IsValid() (isValid bool) {
-	if !c.HasPublic() {
+	func (c *Certificate) IsValid() (isValid bool) {
+		if !c.HasPublic() {
+			return
+		}
+		cert := c.Certificate
+		if cert.SerialNumber == nil ||
+			cert.Issuer.CommonName == "" ||
+			len(cert.Issuer.Country) == 0 ||
+			cert.NotBefore.IsZero() ||
+			cert.NotAfter.IsZero() ||
+			cert.KeyUsage == 0 {
+			return
+		}
+		isValid = true
 		return
 	}
-	cert := c.Certificate
-	if cert.SerialNumber == nil ||
-		cert.Issuer.CommonName == "" ||
-		len(cert.Issuer.Country) == 0 ||
-		cert.NotBefore.IsZero() ||
-		cert.NotAfter.IsZero() ||
-		cert.KeyUsage == 0 {
-		return
-	}
-	isValid = true
-	return
-}
 
-func (c *Certificate) HasPublic() (hasPublic bool) {
-	if len(c.PublicKeyBytes()) == 0 ||
-		c.Certificate.PublicKeyAlgorithm == x509.UnknownPublicKeyAlgorithm {
+	func (c *Certificate) HasPublic() (hasPublic bool) {
+		if len(c.PublicKeyBytes()) == 0 ||
+			c.Certificate.PublicKeyAlgorithm == x509.UnknownPublicKeyAlgorithm {
+			return
+		}
+		hasPublic = true
 		return
 	}
-	hasPublic = true
-	return
-}
 
-func (c *Certificate) PublicKeyBytes() (bytes []byte) {
-	if c == nil {
-		return
-	}
-	cert := c.Certificate
-	if cert == nil {
-		return
-	}
-	//ed25519PublicKey, ok := cert.PublicKey.(*rsa.PublicKey)
-	ok := false
+	func (c *Certificate) PublicKeyBytes() (bytes []byte) {
+		if c == nil {
+			return
+		}
+		cert := c.Certificate
+		if cert == nil {
+			return
+		}
+		//ed25519PublicKey, ok := cert.PublicKey.(*rsa.PublicKey)
+		ok := false
 
-	//ed25519PublicKey, ok := cert.PublicKey.(ed25519.PublicKey)
-	if !ok {
-		panic(perrors.Errorf("Bad PublicKey type: %T", cert.PublicKey))
+		//ed25519PublicKey, ok := cert.PublicKey.(ed25519.PublicKey)
+		if !ok {
+			panic(perrors.Errorf("Bad PublicKey type: %T", cert.PublicKey))
+		}
+		//bytes = ed25519PublicKey
+		return
 	}
-	//bytes = ed25519PublicKey
-	return
-}
 */
 func (ca *Certificate) DER() (certificateDer parl.CertificateDer) {
 	return ca.der

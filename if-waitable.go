@@ -5,34 +5,34 @@ ISC License
 
 package parl
 
-import (
-	"context"
-)
-
 // Waitable is the invoker’s Wait part of sync.WaitGroup and
 // other implementations.
 // Waitable is a many-to-many relation.
 // Waitable allows the caller to await exit and free of all invocations.
-//  waitsForLots parl.WaitGroup
-//  shutsDownLots parl.OnceChan
-//  … = NewSomething(&waitsForLots, &shutsDownLots)
-//  go someThread(&waitsForLots, &shutsDownLots)
-//  func someThread(Doneable w, context.Context ctx) {
-//    defer w.Done()
-//    w.Add(2)
-//    go somethingElse()
+//
+//	waitsForLots parl.WaitGroup
+//	shutsDownLots parl.OnceChan
+//	… = NewSomething(&waitsForLots, &shutsDownLots)
+//	go someThread(&waitsForLots, &shutsDownLots)
+//	func someThread(Doneable w, context.Context ctx) {
+//	  defer w.Done()
+//	  w.Add(2)
+//	  go somethingElse()
 type Waitable interface {
-	Wait()
+	Wait() // similar to sync.WaitGroup.Wait()
 }
 
+// SyncWait provides sync.WaitGroup.Wait()
 type SyncWait interface {
 	Wait()
 }
 
+// SyncWait provides sync.WaitGroup.Add()
 type SyncAdd interface {
 	Add(delta int)
 }
 
+// SyncDone provides sync.WaitGroup.Done()
 type SyncDone interface {
 	Done()
 }
@@ -76,21 +76,14 @@ type ErrorCloser interface {
 // Doneable is a many-to-many relation.
 // Doneable allows the callee to instatiate and invoke any number
 // of things that are awaitable by the caller.
-//  … = NewSomething(&waitsForLots, &shutsDownLots)
-//  go someThread(&waitsForLots, &shutsDownLots)
-//  func someThread(Doneable w, context.Context ctx) {
-//    defer w.Done()
-//    w.Add(2)
-//    go somethingElse()
+//
+//	… = NewSomething(&waitsForLots, &shutsDownLots)
+//	go someThread(&waitsForLots, &shutsDownLots)
+//	func someThread(Doneable w, context.Context ctx) {
+//	  defer w.Done()
+//	  w.Add(2)
+//	  go somethingElse()
 type Doneable interface {
 	Add(delta int)
 	Done()
-}
-
-// context.WithCancel provides a thread-safe race-free idempotent
-// many-to-many shutdown relation.
-type CancelContext interface {
-	context.Context
-	Cancel()
-	CancelOnError(errp *error)
 }

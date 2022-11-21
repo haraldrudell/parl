@@ -9,13 +9,32 @@ import (
 	"context"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/goid"
 )
 
-// cancelAndContext makes parl.CancelAndContext private
+const (
+	ccSkipFrames = 1
+	ccPrepend    = "— "
+)
+
+// cancelAndContext provides a private field that promotes Cancel and Context methods
 type cancelAndContext struct {
-	parl.CancelAndContext // Cancel() Context()
+	ctx context.Context
 }
 
 func newCancelAndContext(ctx context.Context) (cc *cancelAndContext) {
-	return &cancelAndContext{CancelAndContext: *parl.NewCancelAndContext(ctx)}
+	return &cancelAndContext{ctx: parl.NewCancelContext(ctx)}
+}
+
+func (cc cancelAndContext) Cancel() {
+
+	// if caller is debug, debug-print cancel action
+	if parl.IsThisDebugN(ccSkipFrames) {
+		parl.GetDebug(ccSkipFrames)("CancelAndContext.Cancel:\n" + goid.NewStack(ccSkipFrames).Shorts(ccPrepend))
+	}
+	parl.InvokeCancel(cc.ctx)
+}
+
+func (cc cancelAndContext) Context() (ctx context.Context) {
+	return cc.ctx
 }

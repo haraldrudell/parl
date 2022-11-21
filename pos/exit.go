@@ -45,5 +45,5 @@ func Exit(code int, err error) {
 
 // OsExit does os.Exit
 func OsExit(code int) {
-	os.Exit(code)
+	os.Exit(code) // prints "exit status 1" to stderr
 }

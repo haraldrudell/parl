@@ -1,5 +1,5 @@
 /*
-© 2021–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+© 2021–present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
 ISC License
 */
 
@@ -21,4 +21,8 @@ func NewRoute(d *Destination, nextHop *NextHop) *Route {
 		r.NextHop = *nextHop
 	}
 	return &r
+}
+
+func (rt *Route) String() (s string) {
+	return rt.Destination.String() + " via " + rt.NextHop.String()
 }

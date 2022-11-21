@@ -15,8 +15,8 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pfs"
-	"github.com/haraldrudell/parl/psyscall"
 	"github.com/haraldrudell/parl/ptime"
+	"github.com/haraldrudell/parl/punix"
 )
 
 /*
@@ -104,7 +104,7 @@ func (w *Watcher) addCreatedDirectoriesToWatcher(absName string) {
 	var err error
 	if fsFileInfo, err = os.Stat(absName); err != nil {
 		// ignore ENOENT because the entry may already have been removed
-		if !psyscall.IsENOENT(err) {
+		if !punix.IsENOENT(err) {
 			w.errFn(perrors.Errorf("os.Stat: %w", err))
 		}
 		return // os.Stat failed, do not know if its a directory

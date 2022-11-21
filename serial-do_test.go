@@ -41,9 +41,9 @@ func TestSerialDo(t *testing.T) {
 		t.FailNow()
 	}, ctx)
 	defer serialDo.Wait()
-	defer ctx.Cancel()
+	defer InvokeCancel(ctx)
 
-	busySince, pendingSince, isCancel, isWaitComplete = serialDo.State()
+	busySince, pendingSince, isCancel, _ = serialDo.State()
 	if !busySince.IsZero() || !pendingSince.IsZero() || isCancel {
 		t.Errorf("Bad initial state: " + serialDo.String())
 	}
@@ -51,13 +51,13 @@ func TestSerialDo(t *testing.T) {
 	serialDo.Do() // busy
 	serialDo.Do() // pending
 
-	busySince, pendingSince, isCancel, isWaitComplete = serialDo.State()
+	busySince, pendingSince, isCancel, _ = serialDo.State()
 	if busySince.IsZero() || pendingSince.IsZero() || isCancel {
 		t.Errorf("Bad initial state: " + serialDo.String())
 	}
 
 	// cancel serialDo
-	ctx.Cancel()
+	InvokeCancel(ctx)
 	// allow thunk to complete
 	thunkWait.Done()
 	// wait for serialDo to complete

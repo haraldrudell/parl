@@ -3,7 +3,7 @@ module github.com/haraldrudell/parl/mains
 go 1.18
 
 require (
-	github.com/haraldrudell/parl v0.4.26
+	github.com/haraldrudell/parl v0.4.27
 	github.com/shirou/gopsutil v3.21.11+incompatible
 )
 

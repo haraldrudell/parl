@@ -127,13 +127,16 @@ func TestEnsureError(t *testing.T) {
 		loc = loc[:index]
 	}
 
-	actual := EnsureError(panicValue)
-	var err error
-	var ok bool
-	if err, ok = actual.(error); !ok {
-		t.Errorf("not error: %T %+[1]v", actual)
-		t.FailNow()
-	}
+	err := EnsureError(panicValue)
+	//var err error
+	//var ok bool
+
+	// go1.19.3: type assertion to the same type: actual already has type error (S1040)
+	//if err, ok = actual.(error); !ok {
+
+	//	t.Errorf("not error: %T %+[1]v", actual)
+	//	t.FailNow()
+	//}
 	short := perrors.Short(err)
 	if !strings.Contains(short, text) ||
 		!strings.Contains(short, loc) {
@@ -148,13 +151,7 @@ func TestEnsureErrorNonErr(t *testing.T) {
 		loc = loc[:index]
 	}
 
-	actual := EnsureError(panicValue)
-	var err error
-	var ok bool
-	if err, ok = actual.(error); !ok {
-		t.Errorf("not error: %T %+[1]v", actual)
-		t.FailNow()
-	}
+	err := EnsureError(panicValue)
 	short := perrors.Short(err)
 	if !strings.Contains(short, panicValue) ||
 		!strings.Contains(short, loc) {

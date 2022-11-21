@@ -28,7 +28,7 @@ const (
 	helpHelp      = "\x20\x20-help -h --help\n\x20\x20\tShows this help"
 	timeHeader    = "time: %s"
 	hostHeader    = "host: %s"
-	defaultOK     = " completed successfully"
+	defaultOK     = "completed successfully"
 	NoOK          = "-"
 )
 
@@ -48,15 +48,16 @@ type ArgumentSpec uint32
 Executable constant strings that describes an executable
 advisable static values include Program Version Comment Description Copyright License Arguments
 like:
- var exe = mains.Executable{
-   Program:     "getip",
-   Version:     "0.0.1",
-   Comment:     "first version",
-   Description: "finds ip address for hostname",
-   Copyright:   "© 2020-present Harald Rudell <harald.rudell@gmail.com> (http://www.haraldrudell.com)",
-   License:     "All rights reserved",
-   Arguments:   mains.NoArguments | mains.OneArgument,
- }
+
+	var exe = mains.Executable{
+	  Program:     "getip",
+	  Version:     "0.0.1",
+	  Comment:     "first version",
+	  Description: "finds ip address for hostname",
+	  Copyright:   "© 2020-present Harald Rudell <harald.rudell@gmail.com> (http://www.haraldrudell.com)",
+	  License:     "All rights reserved",
+	  Arguments:   mains.NoArguments | mains.OneArgument,
+	}
 */
 type Executable struct {
 	Program        string // gonet
@@ -85,12 +86,13 @@ var optionsWereParsed parl.AtomicBool
 /*
 Init populate launch time and sets silence if first argument is “-silent.”
 Init supports function chaining like:
- exe.Init().
-   PrintBannerAndParseOptions(optionData).
-   LongErrors(options.Debug, options.Verbosity != "").
-   ConfigureLog().
-   ApplyYaml(options.YamlFile, options.YamlKey, applyYaml, optionData)
-   …
+
+	exe.Init().
+	  PrintBannerAndParseOptions(optionData).
+	  LongErrors(options.Debug, options.Verbosity != "").
+	  ConfigureLog().
+	  ApplyYaml(options.YamlFile, options.YamlKey, applyYaml, optionData)
+	  …
 */
 func (ex *Executable) Init() *Executable {
 	now := ProcessStartTime()
@@ -106,17 +108,19 @@ func (ex *Executable) Init() *Executable {
 /*
 LongErrors sets if errors are printed with stack trace and values. LongErrors
 supports functional chaining:
- exe.Init().
-   …
-   LongErrors(options.Debug, options.Verbosity != "").
-   ConfigureLog()…
+
+	exe.Init().
+	  …
+	  LongErrors(options.Debug, options.Verbosity != "").
+	  ConfigureLog()…
 
 isLongErrors prints full stack traces, related errors and error data in string
 lists and string maps.
 
 isErrorLocation appends the innermost location to the error message when isLongErrors
 is not set:
- error-message at error116.(*csTypeName).FuncName-chainstring_test.go:26
+
+	error-message at error116.(*csTypeName).FuncName-chainstring_test.go:26
 */
 func (ex *Executable) LongErrors(isLongErrors bool, isErrorLocation bool) *Executable {
 	parl.Debug("exe.LongErrors long: %t location: %t", isLongErrors, isErrorLocation)
@@ -127,31 +131,40 @@ func (ex *Executable) LongErrors(isLongErrors bool, isErrorLocation bool) *Execu
 
 /*
 PrintBannerAndParseOptions prints greeting like:
- parl 0.1.0 parlca https server/client udp server
+
+	parl 0.1.0 parlca https server/client udp server
+
 It then parses options described by []OptionData stroing the values at OptionData.P.
 If options fail to parse, a proper message is printed to stderr and the process exits
 with status code 2. PrintBannerAndParseOptions supports functional chaining like:
- exe.Init().
-   PrintBannerAndParseOptions(…).
-   LongErrors(…
+
+	exe.Init().
+	  PrintBannerAndParseOptions(…).
+	  LongErrors(…
+
 Options and yaml is configured likeso:
- var options = &struct {
-   noStdin bool
-   *mains.BaseOptionsType
- }{BaseOptionsType: &mains.BaseOptions}
- var optionData = append(mains.BaseOptionData(exe.Program, mains.YamlYes), []mains.OptionData{
-   {P: &options.noStdin, Name: "no-stdin", Value: false, Usage: "Service: do not use standard input", Y: mains.NewYamlValue(&y, &y.NoStdin)},
- }...)
- type YamlData struct {
-   NoStdin bool // nostdin: true
- }
- var y YamlData
+
+	var options = &struct {
+	  noStdin bool
+	  *mains.BaseOptionsType
+	}{BaseOptionsType: &mains.BaseOptions}
+	var optionData = append(mains.BaseOptionData(exe.Program, mains.YamlYes), []mains.OptionData{
+	  {P: &options.noStdin, Name: "no-stdin", Value: false, Usage: "Service: do not use standard input", Y: mains.NewYamlValue(&y, &y.NoStdin)},
+	}...)
+	type YamlData struct {
+	  NoStdin bool // nostdin: true
+	}
+	var y YamlData
 */
 func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executable) {
 	ex1 = ex
 	// print program name and populated details
 	banner := pstrings.FilteredJoin([]string{
-		pstrings.FilteredJoin([]string{ex.Program, ex.Version, ex.Comment}, "\x20"),
+		pstrings.FilteredJoinWithHeading([]string{
+			"", ex.Program,
+			"version", ex.Version,
+			"comment", ex.Comment,
+		}, "\x20"),
 		ex.Copyright,
 		fmt.Sprintf(timeHeader, ex.LaunchString),
 		fmt.Sprintf(hostHeader, ex.Host),
@@ -207,10 +220,11 @@ func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executab
 // Settings come from BaseOptions.Silent and BaseOptions.Debug.
 //
 // ConfigureLog supports functional chaining like:
-//  exe.Init().
-//    …
-//    ConfigureLog().
-//    ApplyYaml(…)
+//
+//	exe.Init().
+//	  …
+//	  ConfigureLog().
+//	  ApplyYaml(…)
 func (ex *Executable) ConfigureLog() (ex1 *Executable) {
 	if BaseOptions.Silent {
 		parl.SetSilent(true)
@@ -255,9 +269,11 @@ func (ex *Executable) usage() {
 
 /*
 Recover function to be used in main.main:
-  func main() {
-    defer Recover()
-    …
+
+	func main() {
+	  defer Recover()
+	  …
+
 On panic, the function prints to stderr: "Unhandled panic invoked exe.Recover: stack:"
 followed by a stack trace. It then adds an error to mains.Executable and terminates
 the process with status code 1
@@ -343,13 +359,17 @@ func (ex *Executable) Recover(errp ...*error) {
 
 	// print completed successfully
 	if ex.err == nil && ex.OKtext != NoOK {
-		var s string
+		var program string
+		var completedSuccessfully string
+		now := "at " + parl.ShortSpace() // time now second precision
 		if ex.OKtext != "" {
-			s = ex.OKtext
+			completedSuccessfully = ex.OKtext // custom "Completed successfully"
 		} else {
-			s = ex.Program + defaultOK
+			program = ex.Program
+			completedSuccessfully = defaultOK // "<executable> completed successfully
 		}
-		parl.Log(s)
+		sList := []string{program, completedSuccessfully, now}
+		parl.Log(pstrings.FilteredJoin(sList)) // to stderr
 	}
 
 	// will print any errors
@@ -397,6 +417,8 @@ func (ex *Executable) PrintErr(err error) {
 
 // Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
 func (ex *Executable) Exit() {
+
+	// printouts when IsDebug
 	if ex.err == nil {
 		parl.Debug("\nexe.Exit: no error")
 	} else {
@@ -406,9 +428,13 @@ func (ex *Executable) Exit() {
 	if parl.IsThisDebug() { // add newline during debug without location
 		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}
+
+	// no error return
 	if ex.err == nil {
 		pos.Exit0()
 	}
+
+	// print the first error
 	errorList := perrors.ErrorList(ex.err)
 	isList := len(errorList) > 1
 	if isList {
@@ -419,5 +445,8 @@ func (ex *Executable) Exit() {
 	if ex.IsLongErrors || isList {
 		fmt.Fprintln(os.Stderr, ex.err)
 	}
-	pos.Exit1(nil)
+
+	// exit 1
+	parl.Logw(parl.ShortSpace() + "\x20") // outputs "060102 15:04:05Z07 " without newline to stderr
+	pos.Exit1(nil)                        // os.Exit(1) outputs "exit status 1" to stderr
 }

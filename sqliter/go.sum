@@ -4,8 +4,8 @@ github.com/google/go-cmp v0.5.3/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.8 h1:e6P7q2lk1O+qJJb4BtCQXlK8vWEO8V1ZeuEdJNOqZyg=
 github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
 github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/haraldrudell/parl v0.4.26 h1:Zb9hxuA+iK6cMDA4pp+nvuMxBZATEHFpHq84iBwq2vU=
-github.com/haraldrudell/parl v0.4.26/go.mod h1:2f3iLe7BE//zopDUoh6XN0qJVoUC1AB6nJcuCl6q3bg=
+github.com/haraldrudell/parl v0.4.27 h1:+iZaXr+65uspkYNXRjr1kfVMLaWsAgEekwVYDWHLBNw=
+github.com/haraldrudell/parl v0.4.27/go.mod h1:2f3iLe7BE//zopDUoh6XN0qJVoUC1AB6nJcuCl6q3bg=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 h1:Z9n2FFNUXsshfwJMBgNA0RU6/i7WVaAegv3PtuIHPMs=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51/go.mod h1:CzGEWj7cYgsdH8dAjBGEr58BoE7ScuLd+fwFZ44+/x8=
 github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=

@@ -15,7 +15,7 @@ const (
 )
 
 type SubGo struct {
-	parl.Go          // Register()
+	g0               parl.Go // Register()
 	local            bool
 	waiter           // Wait() String()
 	isNonFatal       parl.AtomicBool
@@ -29,17 +29,21 @@ func NewGoSub(g0 parl.Go, local ...parl.GoSubLocal) (subGo parl.SubGo) {
 		local0 = local[0] == parl.GoSubIsLocal
 	}
 	return &SubGo{
-		Go:               g0,
+		g0:               g0,
 		local:            local0,
 		waiter:           &parl.TraceGroup{},
 		cancelAndContext: *newCancelAndContext(g0.Context()),
 	}
 }
 
+func (gc *SubGo) Register() {
+	gc.g0.Register()
+}
+
 func (gc *SubGo) Add(delta int) {
 	gc.waiter.Add(delta)
 	if !gc.local {
-		gc.Go.Add(delta)
+		gc.g0.Add(delta)
 	}
 }
 
@@ -50,11 +54,11 @@ func (gc *SubGo) AddError(err error) {
 		}
 		gc.isNonFatal.Set()
 	}
-	gc.Go.AddError(err)
+	gc.g0.AddError(err)
 }
 
 func (gc *SubGo) Done(errp *error) {
-	if errp == nil {
+	if errp != nil {
 		if *errp != nil {
 			gc.isErrorExit.Set()
 		}
@@ -68,13 +72,14 @@ func (gc *SubGo) Done(errp *error) {
 			gc.AddError(*errp)
 		}
 	} else {
-		gc.Go.Done(errp)
+		gc.g0.Done(errp)
 	}
 }
 
 func (gc *SubGo) IsErr() (isNonFatal bool, isErrorExit bool) {
 	return gc.isNonFatal.IsTrue(), gc.isErrorExit.IsTrue()
 }
+
 func (gc *SubGo) SubGo(local ...parl.GoSubLocal) (goCancel parl.SubGo) {
 	return NewGoSub(gc, local...)
 }

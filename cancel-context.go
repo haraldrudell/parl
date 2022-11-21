@@ -7,45 +7,42 @@ package parl
 
 import (
 	"context"
+	"errors"
 
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// CancelContextDo implements parl.CancelContext.
-// CancelContextDo is a context with a thread-safe, race-free,
-// idempotent Cancel method
-type CancelContextDo struct {
-	context.Context
-	cancel context.CancelFunc
+// ErrNotCancelContext indicates that InvokeCancel was provided a context chain without NewCancelContext
+var ErrNotCancelContext = errors.New("context chain does not have CancelContext")
+
+type cancelContextKey string // type to use for context keys
+
+var cancelKey cancelContextKey // key for context value
+
+// NewCancelContext creates a context that can be provided to InvokeCancel
+// the return value encapsulates a cancel function
+func NewCancelContext(ctx context.Context) (cancelCtx context.Context) {
+	return NewCancelContextFunc(context.WithCancel(ctx))
 }
 
-// NewCancelContext instantiates parl.CancelContext, a context
-// with Cancel exposed as a method
-func NewCancelContext(ctx context.Context) (cancelCtx CancelContext) {
-	c := CancelContextDo{}
-	c.Context, c.cancel = context.WithCancel(ctx)
-	return &c
+// NewCancelContextFunc creates a context invoking the provided cancel function on InvokeCancel
+func NewCancelContextFunc(ctx context.Context, cancel context.CancelFunc) (cancelCtx context.Context) {
+	return context.WithValue(ctx, cancelKey, cancel)
 }
 
-func NewCancelContextFunc(ctx context.Context, cancel context.CancelFunc) (cancelCtx CancelContext) {
-	return &CancelContextDo{ctx, cancel}
-}
-
-// Cancel cancels this context
-func (cc *CancelContextDo) Cancel() {
-	if cc == nil {
-		panic(perrors.Errorf("CancelContext nil"))
-	}
-	cancel := cc.cancel
-	if cancel == nil {
-		panic(perrors.Errorf("CancelContext.Cancel nil"))
+// InvokeCancel finds the cancel method and invokes it
+func InvokeCancel(ctx context.Context) {
+	cancel, ok := ctx.Value(cancelKey).(context.CancelFunc)
+	if !ok {
+		panic(perrors.Errorf("%v", ErrNotCancelContext))
 	}
 	cancel()
 }
 
-func (cc *CancelContextDo) CancelOnError(errp *error) {
+// CancelOnError invokes InvokeCancel if errp has an error
+func CancelOnError(errp *error, ctx context.Context) {
 	if errp == nil || *errp == nil {
-		return // there was not an error
+		return // there was no error
 	}
-	cc.Cancel()
+	InvokeCancel(ctx)
 }

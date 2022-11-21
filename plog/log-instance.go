@@ -25,21 +25,38 @@ import (
 )
 
 const (
-	logInstDefFrames              = 2
-	logInstDebugFrameDelta        = -1
-	isThisDebugDelta              = -1
-	uint32True             uint32 = 1
+	logInstDefFrames = 2 // frames to skip in doLog() [Log() + doLog() == 2]
+	// logInstDebugFrameDelta adjust stack frame calculation to skip only 1 frame
+	// by adding logInstDebugFrameDelta to LogInstance.stackFramesToSkip.
+	// Used by 4 functions: Debug() GetDebug() D() GetD()
+	logInstDebugFrameDelta = -1
+	// isThisDebugDelta adjust stack frame calculation to skip only 1 frame
+	// by adding isThisDebugDelta to LogInstance.stackFramesToSkip.
+	// Used by 2 functions: IsThisDebug() IsThisDebugN()
+	isThisDebugDelta        = -1
+	uint32True       uint32 = 1 // because atomic is 32-bit, this is the value used indicating true
 )
 
 // LogInstance provide logging delegating to log.Output
 type LogInstance struct {
-	isSilence         uint32 // atomic
-	isDebug           uint32 // atomic
-	infoLock          sync.RWMutex
-	infoRegexp        *regexp.Regexp // behing infoLock
-	outLock           sync.Mutex
-	writer            io.Writer
-	output            func(calldepth int, s string) error
+	isSilence  uint32 // atomic
+	isDebug    uint32 // atomic
+	infoLock   sync.RWMutex
+	infoRegexp *regexp.Regexp // behing infoLock
+	outLock    sync.Mutex
+	writer     io.Writer
+	output     func(calldepth int, s string) error
+	// stackFramesToSkip is used for determining debug status and to get
+	// a printable code location.
+	// stackFramesToSkip default value is 2, which is one for the invocation of
+	// Log() etc., and one for the intermediate doLog() function.
+	// Debug(), GetDebug(), D(), GetD(), IsThisDebug() and IsThisDebugN()
+	// uses stackFramesToSkip to determine whether the invoking code
+	// location has debug active.
+
+	// stackFramesToSkip defaults to logInstDefFrames = 2, which is ?.
+	// NewLogFrames(…, extraStackFramesToSkip int) allos to skip
+	// additional stack frames
 	stackFramesToSkip int
 }
 
@@ -189,7 +206,7 @@ func (lg *LogInstance) IsThisDebug() (isDebug bool) {
 	if regExp == nil {
 		return false
 	}
-	cloc := pruntime.NewCodeLocation(lg.stackFramesToSkip - isThisDebugDelta)
+	cloc := pruntime.NewCodeLocation(lg.stackFramesToSkip + isThisDebugDelta)
 	return regExp.MatchString(cloc.FuncName)
 }
 
@@ -201,7 +218,7 @@ func (lg *LogInstance) IsThisDebugN(skipFrames int) (isDebug bool) {
 	if regExp == nil {
 		return false
 	}
-	cloc := pruntime.NewCodeLocation(lg.stackFramesToSkip - isThisDebugDelta + skipFrames)
+	cloc := pruntime.NewCodeLocation(lg.stackFramesToSkip + isThisDebugDelta + skipFrames)
 	return regExp.MatchString(cloc.FuncName)
 }
 

@@ -6,41 +6,53 @@ ISC License
 package pnet
 
 import (
-	"net"
+	"net/netip"
 	"strconv"
+	"strings"
+
+	"github.com/haraldrudell/parl/perrors"
 )
 
-// Destination contains IP, Zone and Mask
+// Destination represents a selector for routing, ie. an IPv4 or IPv6 address with zone
+// and prefix.
+// go1.18 introduced [netip.Prefix] for this purpose
+// see Linux: ip route add.
+// [ root PREFIX ] [ match PREFIX ] [ exact PREFIX ] [ table TABLE_ID ] [ vrf NAME ]
+// [ proto RTPROTO ] [ type TYPE ] [ scope SCOPE ]
+// contains IP, Zone and Mask
 type Destination struct {
-	net.IPAddr
-	net.IPMask
+	netip.Prefix
 }
 
-// NewDestination instantiates Destination
-func NewDestination(IPAddr *net.IPAddr, IPMask *net.IPMask) (d *Destination) {
-	d = &Destination{}
-	if IPAddr != nil {
-		d.IPAddr = *IPAddr
+// NewDestination instantiates Destination.
+// addr is IPv4 address or IPv6 address with Zone.
+// prefix is number of bits actually used 0…32 for IPv4, 0…128 for IPv6
+func NewDestination(prefix netip.Prefix) (d *Destination, err error) {
+	if !prefix.IsValid() {
+		err = perrors.ErrorfPF("invalid prefix: %#v", prefix)
+		return
 	}
-	if IPMask != nil {
-		d.IPMask = *IPMask
+	d0 := Destination{
+		Prefix: prefix,
 	}
+	d = &d0
 	return
 }
 
 // Key is a string suitable as a key in a map
-func (d Destination) Key() string {
-	ones, _ := d.IPMask.Size() // the suffix: /24 or /32 or such of CIDR
-	return d.IPAddr.String() + "/" + strconv.Itoa(ones)
+func (d Destination) Key() (key netip.Prefix) {
+	return d.Prefix
 }
 
 func (d Destination) String() (s string) {
-	if len(d.IPAddr.IP.To4()) == net.IPv4len {
-		s = shorten(d.IPAddr.IP)
-	} else {
-		s = d.IPAddr.String()
+
+	// abbreviate IPv4: 0.0.0.0/0 → 0/0 127.0.0.0/8 → 127/8
+	if d.Prefix.Addr().Is4() {
+		ipv4 := d.Prefix.Addr().String()
+		for strings.HasSuffix(ipv4, ".0") {
+			ipv4 = strings.TrimSuffix(ipv4, ".0")
+		}
+		return ipv4 + "/" + strconv.Itoa(d.Bits())
 	}
-	ones, _ := d.IPMask.Size() // the suffix: /24 or /32 or such of CIDR
-	s += "/" + strconv.Itoa(ones)
-	return
+	return d.Prefix.String()
 }
