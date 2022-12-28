@@ -7,41 +7,52 @@ package parl
 
 import (
 	"sync"
+	"time"
 
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
-/*
-NBChan is a non-blocking send channel with trillion-size buffer.
-NBChan can be used as an error channel where the thread does not
-block from a delayed or missing reader.
-NBChan is initialization-free, thread-safe, idempotent, deferrable and observable.
-Ch(), Send(), Close() CloseNow() IsClosed() Count() are not blocked by channel send
-and are panic-free.
-Close() CloseNow() are deferrable.
-WaitForClose() waits until the underlying channel has been closed.
-NBChan implements a thread-safe error store perrors.ParlError.
-NBChan.GetError() returns thread panics and close errors.
-No errors are added to the error store after the channel has closed.
-NBChan does not generate errors. When it does, errors are thread panics and close errors.
- var errCh parl.NBChan[error]
- go thread(&errCh)
- err, ok := <-errCh.Ch()
- errCh.WaitForClose()
- errCh.GetError()
- …
- func thread(errCh *parl.NBChan[error]) {
-   defer errCh.Close() // non-blocking close effective on send complete
-   var err error
-   defer parl.Recover(parl.Annotation(), &err, errCh.AddErrorProc)
-   errCh.Ch() <- err // non-blocking
-   if err = someFunc(); err != nil {
-     err = perrors.Errorf("someFunc: %w", err)
-     return
-*/
+// NBChan is a non-blocking send channel with trillion-size buffer.
+//
+//   - NBChan can be used as an error channel where the thread does not
+//     block from a delayed or missing reader.
+//   - errors can be read from the channel or fetched all at once using GetAll
+//   - NBChan is initialization-free, thread-safe, idempotent, deferrable and observable.
+//   - Ch(), Send(), Close() CloseNow() IsClosed() Count() are not blocked by channel send
+//     and are panic-free.
+//   - Close() CloseNow() are deferrable.
+//   - WaitForClose() waits until the underlying channel has been closed.
+//   - NBChan implements a thread-safe error store perrors.ParlError.
+//   - NBChan.GetError() returns thread panics and close errors.
+//   - No errors are added to the error store after the channel has closed.
+//   - NBChan does not generate errors. When it does, errors are thread panics
+//     or a close error. Neither is expected to occur
+//   - the underlying channel is closed after Close is invoked and the channel is emptied
+//   - cautious consumers may collect errors using the GetError method when:
+//   - — the Ch receive-only channel is detected as being closed or
+//   - — await using WaitForClose returns or
+//   - — IsClosed method returns true
+//
+// Usage:
+//
+//	var errCh parl.NBChan[error]
+//	go thread(&errCh)
+//	err, ok := <-errCh.Ch()
+//	errCh.WaitForClose()
+//	errCh.GetError()
+//	…
+//	func thread(errCh *parl.NBChan[error]) {
+//	defer errCh.Close() // non-blocking close effective on send complete
+//	var err error
+//	defer parl.Recover(parl.Annotation(), &err, errCh.AddErrorProc)
+//	errCh.Ch() <- err // non-blocking
+//	if err = someFunc(); err != nil {
+//	err = perrors.Errorf("someFunc: %w", err)
+//	return
 type NBChan[T any] struct {
 	closableChan ClosableChan[T]
+	pendingSend  AtomicBool
 
 	stateLock               sync.Mutex
 	unsentCount             int  // inside lock
@@ -60,16 +71,17 @@ type NBChan[T any] struct {
 // NewNBChan instantiates a non-blocking trillion-size buffer channel.
 // NewNBChan allows initialization based on an existing channel.
 // NewNBChan does not need initialization and can be used like:
-//  var nbChan NBChan[error]
-//  go thread(&nbChan)
+//
+//	var nbChan NBChan[error]
+//	go thread(&nbChan)
 func NewNBChan[T any](ch ...chan T) (nbChan *NBChan[T]) {
 	nb := NBChan[T]{}
 	nb.closableChan = *NewClosableChan(ch...) // store ch if present
 	return &nb
 }
 
-// Ch obtains the channel
-func (nb *NBChan[T]) Ch() (ch chan T) {
+// Ch obtains the receive-only channel
+func (nb *NBChan[T]) Ch() (ch <-chan T) {
 	return nb.closableChan.Ch()
 }
 
@@ -86,6 +98,7 @@ func (nb *NBChan[T]) Send(value T) {
 
 	// if no thread, send using new thread
 	if nb.waitForThread.IsZero() {
+		nb.pendingSend.Set()
 		nb.waitForThread.Add(1)
 		go nb.sendThread(value) // send err in new thread
 		return
@@ -93,6 +106,43 @@ func (nb *NBChan[T]) Send(value T) {
 
 	// put in queue
 	nb.sendQueue = append(nb.sendQueue, value) // put err in send queue
+}
+
+// GetAll returns a slice of all available items held by the channel.
+func (nb *NBChan[T]) GetAll() (allItems []T) {
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
+
+	// get possible item from send thread
+	var item T
+	var itemValid bool
+	for nb.pendingSend.IsTrue() && !itemValid {
+		select {
+		case item, itemValid = <-nb.closableChan.ch:
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+
+	// allocate and populate allItems
+	var itemLength int
+	if itemValid {
+		itemLength = 1
+	}
+	n := len(nb.sendQueue)
+	allItems = make([]T, n+itemLength)
+	if itemValid {
+		allItems[0] = item
+	}
+
+	// empty the send buffer
+	if n > 0 {
+		copy(allItems[itemLength:], nb.sendQueue)
+		nb.sendQueue = nb.sendQueue[:0]
+		nb.unsentCount -= n
+	}
+
+	return
 }
 
 // Count returns number of unsent values
@@ -128,7 +178,6 @@ func (nb *NBChan[T]) DidClose() (didClose bool) {
 }
 
 // IsClosed indicates whether the channel has actually closed.
-
 func (nb *NBChan[T]) IsClosed() (isClosed bool) {
 	return nb.closableChan.IsClosed()
 }
@@ -174,10 +223,12 @@ func (nb *NBChan[T]) sendThread(value T) {
 		}
 		nb.AddError(err)
 	})
+	defer nb.pendingSend.Clear()
 
 	ch := nb.closableChan.Ch()
 	for {
 		ch <- value // may block or panic
+		nb.pendingSend.Clear()
 
 		var ok bool
 		if value, ok = nb.valueToSend(); !ok {
@@ -203,6 +254,7 @@ func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
 	ok = true
 	copy(nb.sendQueue[0:], nb.sendQueue[1:])
 	nb.sendQueue = nb.sendQueue[:len(nb.sendQueue)-1]
+	nb.pendingSend.Set()
 	return
 }
 

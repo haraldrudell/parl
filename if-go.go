@@ -7,170 +7,237 @@ package parl
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"github.com/haraldrudell/parl/pruntime"
 )
 
-// GoGroup manages any number of go statements.
-// Exit action and error routing is configurable per go statement.
-// Each go statement can send errors, receive cancel, initiate cancel and be waited on.
-// The GoGroup and each go statement are cancelable.
-// The GoGroup and each go statement can be waited on.
-type GoGroup interface {
-	// Add indicates a new goroutine about to be launched.
-	// conduit indicates how errors will be propagated from
-	// the goroutine.
-	// exitAction describes what actions the GoCreator object
-	// will take upon goroutine exit
-	Add(conduit ErrorConduit, exitAction ExitAction) (goer Goer)
-	// WaitPeriod waits for all goroutines managed by this GoCreator
-	// to exit, periodically printing a description of the goroutines
-	// that have yet to exit
-	WaitPeriod(duration ...time.Duration)
-	GoManager
-}
+// Thread interface
 
-// Goer manages one or more go statements.
-// Goer is obtained from a GoGroup to manage a single go statement or
-// from a GoerFactory to manage any number of go statements uniformly or
-// from a GoError.
-// The managed go statements can send errors, receive cancel, initiate cancel and be waited on.
-// Cancel and Wait are separate for the Goer and only pertains to the managed go statements.
-// The wait mechanic used is observable.
-type Goer interface {
-	// Go returns a Go object to be provided to a go statement.
-	// A Goer obained from GoGroup is only intended to manage one go statement.
-	Go() (g0 Go)
-	// AddError emits a GeNonFatal error on the error channel
-	AddError(err error)
-	GoManager
-}
-
-type GoManager interface {
-	// Ch is a channel that will close once all go statements have exited.
-	// If the Goer was obtained from a GoGroup, Ch only emits data for EcErrChan.
-	// Ch emits errors and exit results as they occur.
-	Ch() (ch <-chan GoError)
-	// IsExit indicates whether all go statements and Go.Add incovations
-	// has exited.
-	IsExit() (isExit bool)
-	// Wait waits for all go statements and Go.Add invocations
-	Wait()
-	// Cancel indicates to all threads managed by this Goer that
-	// work done on behalf of this context should be canceled
-	Cancel()
-	// Context will cancel when work done on behalf of this context
-	// should be canceled
-	Context() (ctx context.Context)
-	String() (s string)
-}
-
-// Go offers all-in-one functions for a single go statement initiating goroutine execution.
-//  AddError sends non-fatal errors ocurring during goroutine execution.
-//  Done allows to provide outcome and for callers to wait for the goroutine.
-//  Add allows for additional sub-threads
-//  Context provide a Done channel and Err to determine if the goroutine should cancel.
-//  SubGo allows for sub-threads with separate cancelation and wait
+// Go provides methods for a running goroutione thread to be provided as a function
+// argument in the go statement function call launching the thread.
+//   - Go.Cancel affects this Go thread only.
+//   - The Go Context is canceled when
+//   - — the parent GoGroup thread-group’s context is Canceled or
+//   - —a thread in the parent GoGroup thread-group initiates Cancel
+//   - Cancel by threads in sub ordinate thread-groups do not Cancel this Go thread
 type Go interface {
 	// Register performs no function but allows the Go object to collect
-	// information on the new thread
+	// information on the new thread.
 	Register()
-	// Add allows for a goroutine to have the caller wait for
-	// additional internal goroutines.
-	Add(delta int)
-	// AddError allows a goroutine to send non-fatal errors
+	// AddError emits a non-fatal error.
 	AddError(err error)
-	// Done indicates that a goroutine has finished.
-	// err nil typically means successful exit.
-	// Done is deferrable.
-	// If the waitGroup is not done, a GePreDoneExit status is sent.
-	// If Done is for the final goroutine, GeExit is sent.
+	// Go returns a Go object to be provided as a go-statement function-argument
+	//	in a function call invocation launching a new gorotuine thread.
+	//	- the new thread belongs to the same GoGroup thread-group as the Go
+	//		object whose Go method was invoked.
+	Go() (g1 Go)
+	// SubGo returns a GoGroup thread-group whose fatal and non-fatel errors go to
+	//	the Go object’s parent thread-group.
+	//	- a SubGo is used to ensure sub-threads exiting prior to their parent thread
+	//		or to facilitate separate cancelation of the threads in the subordinate thread-group.
+	//	- fatal errors from SubGo threads are handled in the same way as those of the
+	//		Go object, typically terminating the application.
+	//   - the SubGo thread-group terminates when both its own threads have exited and
+	//	- the threads of its subordinate thread-groups.
+	SubGo(onFirstFatal ...GoFatalCallback) (subGo SubGo)
+	// SubGroup returns a thread-group with its own error channel.
+	//	- a SubGroup is used for threads whose fatal errors should be handled
+	//		in the Go thread.
+	//	- The threads of the Subgroup can be canceled separately.
+	//		- SubGroup’s error channel collects fatal thread terminations
+	//		- the SubGroup’s error channel needs to be read in real-time or after
+	//		SubGroup termination
+	//   - non-fatal errors in SubGroup threads are sent to the Go object’s parent
+	//		similar to the AddError method
+	//   - the SubGroup thread-group terminates when both its own threads have exited and
+	//	- the threads of its subordinate thread-groups.
+	SubGroup(onFirstFatal ...GoFatalCallback) (subGroup SubGroup)
+	// Done indicates that this goroutine has finished.
+	//	- err == nil means successful exit
+	//	- non-nil err indicates a fatal error.
+	// 	- Done is deferrable.
 	Done(errp *error)
-	// Cancel allows for the goroutine or its sub-threads to initiate local cancel
+	// Wait awaits exit of this Go thread.
+	Wait()
+	// CancelGo signals to this Go thread to exit.
+	CancelGo()
+	// Cancel signals for the threads in this Go thread’s parent GoGroup thread-group
+	// and any subordinate thread-groups to exit.
 	Cancel()
-	// Context will cancel when work done on behalf of this context
-	// should be canceled
+	// Context will Cancel when the parent thread-group Cancels
+	//	or Cancel is invoked on this Go object.
+	// Subordinate thread-groups do not Cancel the context of the Go thread.
 	Context() (ctx context.Context)
-	// SubGo allows a sub-group of threads that can be canceled and waited for separately.
-	// Subgo has access to the AddError error sink.
-	// Subgo has its own sub-context and waitgroup.
-	// Subgo Add and Done are duplicated.
-	SubGo(local ...GoSubLocal) (subGo SubGo)
+	ThreadInfo() (threadID ThreadID, createLocation pruntime.CodeLocation,
+		funcLocation pruntime.CodeLocation, isValid bool)
+	fmt.Stringer
 }
 
-// SubGo allows an executing go statement provided a Go object to have sub-thread go statements.
-// SubGo is a Go with individual cancel and obervable TraceGroup.
-// Wait waits for all sub-threads to exit.
-// Cancel affects all sub-threads.
-type SubGo interface {
-	// Go: SubGo behaves like a Go
-	Go
-	// Wait allows a thread to wait for (many) sub-threads
-	Wait()
-	IsErr() (isNonFatal bool, isErrorExit bool)
-	String() (s string)
+// GoFatalCallback receives the thread-group on its first fatal thread-exit
+//   - GoFatalCallback is an optional onFirstFatal argument to
+//   - —NewGoGroup
+//   - — SubGo
+//   - — SubGroup
+type GoFatalCallback func(goGen GoGen)
+
+// GoGen allows for new Go threads, new SubGo and SubGroup thread-groups and
+// cancel of threads in the thread-group and its subordinate thread-groups.
+//   - GoGen can be a GoGroup or a Go object
+type GoGen interface {
+	// Go returns a G1 object to be provided as a go statement function argument.
+	Go() (g1 Go)
+	// SubGo returns a thread-group whose fatal errors go to GoGen’s parent.
+	//   - both non-fatal and fatal errors in SubGo threads are sent to GoGen’s parent
+	// 		like Go.AddError and Go.Done.
+	//		- therefore, when a SubGo thread fails, the application will typically exit.
+	//		- by awaiting SubGo, Go can delay its exit until SubGo has terminated
+	//   - the SubGo thread-group terminates when the its thread exits
+	SubGo(onFirstFatal ...GoFatalCallback) (subGo SubGo)
+	// SubGroup creates a sub-ordinate thread-group
+	SubGroup(onFirstFatal ...GoFatalCallback) (subGroup SubGroup)
+	// Cancel terminates the threads in the Go consumer thread-group.
+	Cancel()
+	// Context will Cancel when the parent thread-group Cancels.
+	// Subordinate thread-groups do not Cancel this context.
+	Context() (ctx context.Context)
 }
+
+// Thread Group interfaces and Factory
+
+// GoGroup manages a thread-group.
+//   - A thread from this thread-group will terminate all threads in this
+//     and subordinate thread-groups if this thread-group was provided
+//     the FirstFailTerminates option, which is default.
+//   - A fatal thread-termination in a sub thread-group only affects this
+//     thread-group if the sub thread-group was provided a nil fatal function,
+//     the FirstFailTerminates option, which is default, and no explicit
+//     FailChannel option.
+//   - Fatal thread terminations will propagate to parent thread-groups if
+//     this thread group did not have a fatal function provided and was not
+//     explicitly provided the FailChannel option.
+//   - A Cancel in this thread-group or in a parent context cancels threads in
+//     this and all subordinate thread-groups.
+//   - A Cancel in a subordinate thread-group does not affect this thread-group.
+//   - Wait in this thread-group wait for threads in this and all subordinate
+//     thread-groups.
+type GoGroup interface {
+	// Go returns a G1 object to be provided as a go statement function argument.
+	Go() (g1 Go)
+	// SubGo returns athread-group whose fatal errors go to G1’s parent.
+	//   - both non-fatal and fatal errors in SubGo threads are sent to G1’s parent
+	// 		like G1.AddError and G1.Done.
+	//		- therefore, when a SUbGo thread fails, the application will typically exit.
+	//		- by awaiting SubGo, G1 can delay its exit until SubGo has terminated
+	//   - the SubGo thread-group terminates when the its thread exits
+	SubGo(onFirstFatal ...GoFatalCallback) (subGo SubGo)
+	// SubGroup creates a sub-ordinate G1Group.
+	//	- SubGroup fatal and non-fatal errors are sent to the parent G1Group.
+	//	-	SubGroup-context initiated Cancel only affect threads in the SubGroup thread-group
+	//	- parent-initiated Cancel terminates SubGroup threads
+	//	- SubGroup only awaits SubGroup threads
+	//	- parent await also awaits SubGroup threads
+	SubGroup(onFirstFatal ...GoFatalCallback) (subGroup SubGroup)
+	// Ch returns a channel sending the all fatal termination errors when
+	// the FailChannel option is present, or only the first when both
+	// FailChannel and StoreSubsequentFail options are present.
+	Ch() (ch <-chan GoError)
+	// Wait waits for all threads of this thread-group to terminate.
+	Wait()
+	// Cancel terminates the threads in this and subordinate thread-groups.
+	Cancel()
+	// Context will Cancel when the parent context Cancels.
+	// Subordinate thread-groups do not Cancel this context.
+	Context() (ctx context.Context)
+	fmt.Stringer
+}
+
+type SubGo interface {
+	// Go returns a G1 object to be provided as a go statement function argument.
+	Go() (g1 Go)
+	// SubGo returns athread-group whose fatal errors go to G1’s parent.
+	//   - both non-fatal and fatal errors in SubGo threads are sent to G1’s parent
+	// 		like G1.AddError and G1.Done.
+	//		- therefore, when a SUbGo thread fails, the application will typically exit.
+	//		- by awaiting SubGo, G1 can delay its exit until SubGo has terminated
+	//   - the SubGo thread-group terminates when the its thread exits
+	SubGo(onFirstFatal ...GoFatalCallback) (subGo SubGo)
+	// SubGroup creates a sub-ordinate G1Group.
+	//	- SubGroup fatal and non-fatal errors are sent to the parent G1Group.
+	//	-	SubGroup-context initiated Cancel only affect threads in the SubGroup thread-group
+	//	- parent-initiated Cancel terminates SubGroup threads
+	//	- SubGroup only awaits SubGroup threads
+	//	- parent await also awaits SubGroup threads
+	SubGroup(onFirstFatal ...GoFatalCallback) (subGroup SubGroup)
+	// Wait waits for all threads of this thread-group to terminate.
+	Wait()
+	// Cancel terminates the threads in this and subordinate thread-groups.
+	Cancel()
+	// Context will Cancel when the parent context Cancels.
+	// Subordinate thread-groups do not Cancel this context.
+	Context() (ctx context.Context)
+	fmt.Stringer
+}
+
+type SubGroup interface {
+	SubGo
+	// Ch returns a receive channel for fatal errors if this SubGo has LocalChannel option.
+	Ch() (ch <-chan GoError)
+	// FirstFatal allows to await or inspect the first thread terminating with error.
+	// it is valid if this SubGo has LocalSubGo or LocalChannel options.
+	// To wait for first fatal error using multiple-semaphore mechanic:
+	//  firstFatal := g1.FirstFatal()
+	//  for {
+	//    select {
+	//    case <-firstFatal.Ch():
+	//    …
+	// To inspect first fatal:
+	//  if firstFatal.DidOccur() …
+	FirstFatal() (firstFatal *OnceWaiterRO)
+}
+
+type GoFactory interface {
+	// NewG1 returns a light-weight thread-group.
+	//	- G1Group only receives Cancel from ctx, it does not cancel this context.
+	NewGoGroup(ctx context.Context, onFirstFatal ...GoFatalCallback) (g1 GoGroup)
+}
+
+// data types
 
 // GoError is an error or a thread exit associated with a goroutine
 // Goer returns the Goer object handling the goroutine that originated the error
 type GoError interface {
 	error // Error() string
-	// GetError retrieves the original error value
-	GetError() (err error)
-	// Source describes the source and significance of the error
-	Source() (source GoErrorSource)
-	// Goer provides the Goer object associated with the goroutine
-	// causing the error
-	Goer() (goer Goer)
-	String() (s string)
+	// Err retrieves the original error value
+	Err() (err error)
+	// Time provides when this error occurred
+	Time() time.Time
+	// IsThreadExit determines if this error is a thread exit
+	//	- thread exits may have err nil
+	//	- fatals are non-nil thread exits that may require specific actions such as
+	//		applicaiton termination
+	IsThreadExit() (isThreadExit bool)
+	// IsFatal determines if this error is a fatal thread-exit, ie. a thread exiting with non-nil error
+	IsFatal() (isThreadExit bool)
+	// ErrContext returns in what situation this error occurred
+	ErrContext() (errContext GoErrorContext)
+	// Go provides the thread and goroutine emitting this error
+	Go() (g0 Go)
+	fmt.Stringer
 }
 
 const (
 	// GeNonFatal indicates a non-fatal error ocurring during processing.
 	// err is non-nil
-	GeNonFatal GoErrorSource = iota + 1
+	GeNonFatal GoErrorContext = iota + 1
 	// GePreDoneExit indicates an exit value of a subordinate goroutine,
 	// other than the final exit of the last running goroutine.
 	// err may be nil
 	GePreDoneExit
+	GeLocalChan
 	// GeExit indicates exit of the last goroutine.
 	// err may be nil.
 	// The error channel may close after GeExit.
 	GeExit
 )
-
-const (
-	// EcSharedChan emits error on a shared error channel of the GoCreator object
-	EcSharedChan ErrorConduit = iota + 1
-	// EcErrChan emits error on an individual channel of the Goer object
-	EcErrChan
-	// TODO 220418 ECErrorStore stores error in a perrors.ErrorStore of the GoCreator object
-	//ECErrorStore
-)
-
-const (
-	// ExCancelOnExit cancels the GoCreator context ie. all actions on behalf of the
-	// GoCreator if the goroutine exits
-	ExCancelOnExit ExitAction = iota + 1
-	// ExIgnoreExit takes no action on goruotine exit
-	ExIgnoreExit
-	// ExCancelOnFailure cancels the GoCreator context ie. all actions on behalf of the
-	// GoCreator if the goroutine exits with error
-	ExCancelOnFailure
-)
-
-const (
-	GoSubIsLocal GoSubLocal = "local"
-)
-
-type GoSubLocal string
-type GoIndex int
-type ErrorConduit uint8
-type ExitAction uint8
-
-type GoGroupFactory interface {
-	NewGoGroup(ctx context.Context) (goGroup GoGroup)
-}
-
-type GoerFactory interface {
-	NewGoer(ctx context.Context) (goer Goer)
-}

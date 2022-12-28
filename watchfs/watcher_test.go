@@ -32,7 +32,7 @@ func TestNewDirNewFile(t *testing.T) {
 	var op string
 	var abs string
 
-	// create watcher
+	// create watcher watching the temporary directory
 	watcher := NewWatcher(directory, filter, nil, func(event *WatchEvent) {
 		events = append(events, event)
 	}, func(err error) {
@@ -110,8 +110,8 @@ func TestNewDirNewFile(t *testing.T) {
 	for i, ep := range events {
 		t.Logf("%d: %s", i+1, ep.String())
 	}
-	if len(list) != 3 {
-		t.Errorf("FAIL List length after file2: %d exp %d", len(list), 3)
+	if len(list) != 2 {
+		t.Errorf("FAIL List length after file2: %d exp %d", len(list), 2)
 	}
 	if len(events) > 0 {
 		op = events[0].Op
@@ -147,8 +147,8 @@ func TestNewDirNewFile(t *testing.T) {
 	for i, ep := range events {
 		t.Logf("%d: %s", i+1, ep.String())
 	}
-	if len(list) != 4 {
-		t.Errorf("FAIL List length after file: %d exp %d", len(list), 4)
+	if len(list) != 2 {
+		t.Errorf("FAIL List length after file: %d exp %d", len(list), 2)
 	}
 	if len(events) > 0 {
 		op = events[0].Op
@@ -183,8 +183,8 @@ func TestNewDirNewFile(t *testing.T) {
 	for i, ep := range events {
 		t.Logf("%d: %s", i+1, ep.String())
 	}
-	if len(list) != 2 {
-		t.Errorf("FAIL List length after remove dir2: %d exp %d", len(list), 2)
+	if len(list) != 1 {
+		t.Errorf("FAIL List length after remove dir2: %d exp %d", len(list), 1)
 	}
 	// 220506 on macOS 12.3.1 github.com/fsnotify/fsnotify v1.5.4
 	// there is some race condition producing 2 or 3 events unpredictably

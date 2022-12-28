@@ -83,19 +83,10 @@ func IsWarning(err error) (isWarning bool) {
 	return // not a warning
 }
 
-// IsPanic determines if an error is flagged to have originated from a panic.
-func IsPanic(err error) (isPanic bool) {
-	for ; err != nil; err = errors.Unwrap(err) {
-		if _, isPanic = err.(*errorglue.PanicType); isPanic {
-			return // is a panic
-		}
-	}
-	return // not a panic
-}
-
 // error116.PackFunc returns the package name and function name
 // of the caller:
-//   error116.FuncName
+//
+//	error116.FuncName
 func PackFunc() (packageDotFunction string) {
 	return PackFuncN(1)
 }
@@ -112,10 +103,24 @@ func PackFuncN(skipFrames int) (packageDotFunction string) {
 	return
 }
 
+func ErrpString(errp *error) (s string) {
+	var err error
+	if errp != nil {
+		err = *errp
+	}
+	if err == nil {
+		s = "OK"
+		return
+	}
+	s = err.Error()
+	return
+}
+
 // perrors.Short gets a one-line location string similar to printf %-v and ShortFormat.
 // Short() does not print stack traces, data and associated errors.
 // Short() does print a one-liner of the error message and a brief code location:
-//   error-message at error116.(*csTypeName).FuncName-chainstring_test.go:26
+//
+//	error-message at error116.(*csTypeName).FuncName-chainstring_test.go:26
 func Short(err error) string {
 	return errorglue.ChainString(err, errorglue.ShortFormat)
 }
@@ -128,7 +133,8 @@ func Short(err error) string {
 // If errp is nil, a message is printed.
 // if fn is nil, nothing is printed.
 // If *errp contains an error it is printed in Short form:
-//  label: Error message at error116.(*csTypeName).FuncName-chainstring_test.go:26
+//
+//	label: Error message at error116.(*csTypeName).FuncName-chainstring_test.go:26
 func Deferr(label string, errp *error, fn func(format string, a ...interface{})) string {
 	if errp == nil {
 		return "perrors.Deferr: errp nil"
@@ -148,11 +154,12 @@ func Deferr(label string, errp *error, fn func(format string, a ...interface{}))
 // ShortFormat does not print stack traces, data and associated errors.
 // Long() prints full stack traces, string key-value and list values for both the error chain
 // of err, and associated errors and their chains
-//   error-message
-//     github.com/haraldrudell/parl/error116.(*csTypeName).FuncName
-//       /opt/sw/privates/parl/error116/chainstring_test.go:26
-//     runtime.goexit
-//       /opt/homebrew/Cellar/go/1.17.8/libexec/src/runtime/asm_arm64.s:1133
+//
+//	error-message
+//	  github.com/haraldrudell/parl/error116.(*csTypeName).FuncName
+//	    /opt/sw/privates/parl/error116/chainstring_test.go:26
+//	  runtime.goexit
+//	    /opt/homebrew/Cellar/go/1.17.8/libexec/src/runtime/asm_arm64.s:1133
 func Long(err error) string {
 	return errorglue.ChainString(err, errorglue.LongFormat)
 }
@@ -165,8 +172,9 @@ IsType is different from errors.Is in that it works for error implementations mi
 the Is() method.
 IsType uses reflection.
 pointerToErrorValue argument is a pointer to an error implementation value, ie:
- if the target struct has pointer reciever, the argument type *targetStruct
- if the target struct has value receiver, the argument type targetStruct
+
+	if the target struct has pointer reciever, the argument type *targetStruct
+	if the target struct has value receiver, the argument type targetStruct
 */
 func IsType(err error, pointerToErrorValue interface{}) (hadErrpType bool) {
 

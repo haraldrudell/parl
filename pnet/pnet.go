@@ -137,3 +137,22 @@ func IsErrClosed(err error) (isErrNetClosing bool) {
 	}
 	return
 }
+
+func NetworkPrefixBitCount(byts []byte) (bits int) {
+
+	// count bits that are 1 from the high order bit until a zero bit is found
+	for _, byt := range byts {
+		if byt == 255 {
+			bits += 8
+			continue
+		}
+		for byt != 0 {
+			if byt&128 != 0 {
+				bits++
+			}
+			byt <<= 1
+		}
+		break
+	}
+	return
+}

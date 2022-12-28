@@ -22,8 +22,13 @@ const (
 // StackSlice represents a StackSlice of program counters.
 type StackSlice []CodeLocation
 
-// NewStackSlice gets a slice of stack frames
+// NewStackSlice returns a slice of stack frames for the current execution.
+//   - if skip is 0, the caller of NewStackSlice is the first stack frame
+//   - for skip argument less than 0, 0 is used
 func NewStackSlice(skip int) (slice StackSlice) {
+	if skip < 0 {
+		skip = 0
+	}
 
 	// get the slice of runtime.Frames
 	var frames *runtime.Frames

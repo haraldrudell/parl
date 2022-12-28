@@ -109,3 +109,57 @@ func TestCodeLocation(t *testing.T) {
 		t.Errorf("NewCodeLocation.String() bad prefix: %q expected: %q", actualString, expectedStringPrefix)
 	}
 }
+
+func TestSplitAbsoluteFunctionName(t *testing.T) {
+	panic := true
+	noPanic := false
+	type args struct {
+		absPath string
+	}
+	tests := []struct {
+		name            string
+		args            args
+		wantPackagePath string
+		wantPackageName string
+		wantTypePath    string
+		wantFuncName    string
+		wantPanic       bool
+	}{
+		{"empty", args{""}, "", "", "", "", panic},
+		{"full", args{"github.com/haraldrudell/parl/error116.(*TypeName).FuncName[...]"},
+			"github.com/haraldrudell/parl/", "error116", "(*TypeName)", "FuncName[...]", noPanic},
+		{"set_test", args{"github.com/haraldrudell/parl.RecoverInvocationPanic"},
+			"github.com/haraldrudell/", "parl", "", "RecoverInvocationPanic", noPanic},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotPackagePath, gotPackageName, gotTypePath, gotFuncName string
+			var recoverValue any
+			func() {
+				defer func() {
+					recoverValue = recover()
+				}()
+				gotPackagePath, gotPackageName, gotTypePath, gotFuncName = SplitAbsoluteFunctionName(tt.args.absPath)
+			}()
+			isPanic := recoverValue != nil
+			if isPanic != tt.wantPanic {
+				t.Errorf("SplitAbsoluteFunctionName() isPanic = %v, want %v", recoverValue, tt.wantPanic)
+			}
+			if isPanic {
+				return
+			}
+			if gotPackagePath != tt.wantPackagePath {
+				t.Errorf("SplitAbsoluteFunctionName() gotPackagePath = %v, want %v", gotPackagePath, tt.wantPackagePath)
+			}
+			if gotPackageName != tt.wantPackageName {
+				t.Errorf("SplitAbsoluteFunctionName() gotPackageName = %v, want %v", gotPackageName, tt.wantPackageName)
+			}
+			if gotTypePath != tt.wantTypePath {
+				t.Errorf("SplitAbsoluteFunctionName() gotTypePath = %v, want %v", gotTypePath, tt.wantTypePath)
+			}
+			if gotFuncName != tt.wantFuncName {
+				t.Errorf("SplitAbsoluteFunctionName() gotFuncName = %v, want %v", gotFuncName, tt.wantFuncName)
+			}
+		})
+	}
+}

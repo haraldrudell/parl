@@ -11,6 +11,16 @@ func TestAtomicBool(t *testing.T) {
 	var b AtomicBool
 
 	if b.IsTrue() {
-		t.Errorf("default AtomicBool value is true")
+		t.Error("default AtomicBool value is true")
+	}
+
+	if !b.Set() {
+		t.Error("Set returned false")
+	}
+	if b.Set() {
+		t.Error("Set returned true second time")
+	}
+	if !b.Clear() {
+		t.Error("Clear returned true second time")
 	}
 }

@@ -15,7 +15,7 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/plog"
+	"github.com/haraldrudell/parl/plogger"
 	"github.com/haraldrudell/parl/pos"
 	"github.com/haraldrudell/parl/pruntime"
 	"github.com/haraldrudell/parl/pstrings"
@@ -378,6 +378,9 @@ func (ex *Executable) Recover(errp ...*error) {
 
 // AddErr extended with immediate printing of first error
 func (ex *Executable) AddErr(err error) (x *Executable) {
+	x = ex
+
+	// debug printing
 	if parl.IsThisDebug() {
 		packFunc := perrors.PackFunc()
 		var errS string
@@ -387,26 +390,52 @@ func (ex *Executable) AddErr(err error) (x *Executable) {
 			errS = "nil"
 		}
 		parl.Debug("\n%s(error: %s)\n%[1]s invocation:\n%[3]s", packFunc, errS, pruntime.Invocation(0))
-		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
+		plogger.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}
-	x = ex
+
+	// if AddErr with no error, do nothing
 	if err == nil {
-		return
+		return // no error do nothing return
 	}
+
+	// if the first error, immediately print it
 	if ex.err == nil {
-		ex.PrintErr(err)
+
+		// check if this first error is caused by panic
+		var panicString string
+		if isPanic, stack, recoveryIndex, panicIndex := perrors.IsPanic(err); isPanic {
+			panicString = parl.Sprintf(
+				"\nPANIC detected at %s\n"+
+					"A Go panic may indicate a software problem\n"+
+					"recovery was made at %s\n",
+				stack[panicIndex].Short(),
+				stack[recoveryIndex].Short(),
+			)
+		}
+
+		// print and store the first error
+		ex.PrintErr(err, panicString)
 		ex.err = err
-		return
+		return // first error stored return
 	}
+
+	// append subsequent error
 	ex.err = perrors.AppendError(ex.err, err)
-	return
+	return // subsequent error stored return
 }
 
 // PrintErr prints an error
-func (ex *Executable) PrintErr(err error) {
+func (ex *Executable) PrintErr(err error, panicString ...string) {
 	var s string
-	if ex.IsLongErrors {
-		s = perrors.Long(err) + "\n"
+
+	// get panic string
+	if len(panicString) > 0 {
+		s = panicString[0]
+	}
+
+	// print the error
+	if ex.IsLongErrors || s != "" {
+		s += perrors.Long(err) + "\n"
 	} else if ex.IsErrorLocation {
 		s = perrors.Short(err)
 	} else if err != nil {
@@ -426,27 +455,32 @@ func (ex *Executable) Exit() {
 	}
 	parl.Debug("\nexe.Exit invocation:\n%s\n", debug.Stack())
 	if parl.IsThisDebug() { // add newline during debug without location
-		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
+		plogger.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}
 
-	// no error return
+	// return when there are no errors
 	if ex.err == nil {
 		pos.Exit0()
 	}
 
-	// print the first error
+	// determine how many errors we have
 	errorList := perrors.ErrorList(ex.err)
 	isList := len(errorList) > 1
+
+	// print all errors except the first one
+	// the was already printed when  it occurred
 	if isList {
 		for _, e := range errorList[1:] {
 			ex.PrintErr(e)
 		}
 	}
+
+	// just before exit, print the one-liner message of the first occurring error again
 	if ex.IsLongErrors || isList {
 		fmt.Fprintln(os.Stderr, ex.err)
 	}
 
 	// exit 1
-	parl.Logw(parl.ShortSpace() + "\x20") // outputs "060102 15:04:05Z07 " without newline to stderr
-	pos.Exit1(nil)                        // os.Exit(1) outputs "exit status 1" to stderr
+	parl.Log(parl.ShortSpace() + "\x20" + ex.Program + ": exit status 1") // outputs "060102 15:04:05Z07 " without newline to stderr
+	pos.Exit1(nil)                                                        // os.Exit(1) outputs "exit status 1" to stderr
 }

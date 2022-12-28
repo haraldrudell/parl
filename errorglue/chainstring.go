@@ -11,34 +11,9 @@ import (
 )
 
 const (
-	// DefaultFormat is similar to printf %v, printf %s and error.Error().
-	// For an error with data, stack trace and associated errors,
-	// DefaultFormat only prints the error message:
-	//   error-message
-	DefaultFormat CSFormat = iota + 1
-	// ShortFormat has one-line location similar to printf %-v.
-	// ShortFormat does not print stack traces, data and associated errors.
-	// ShortFormat does print a one-liner of the error message and a brief code location:
-	//   error-message at error116.(*csTypeName).FuncName-chainstring_test.go:26
-	ShortFormat
-	// LongFormat is similar to printf %+v.
-	// ShortFormat does not print stack traces, data and associated errors.
-	//   error-message
-	//     github.com/haraldrudell/parl/error116.(*csTypeName).FuncName
-	//       /opt/sw/privates/parl/error116/chainstring_test.go:26
-	//     runtime.goexit
-	//       /opt/homebrew/Cellar/go/1.17.8/libexec/src/runtime/asm_arm64.s:1133
-	LongFormat
-	// ShortSuffix one-line without message
-	ShortSuffix
-	// LongSuffix full stack trace without message
-	LongSuffix
+	atStringChain = "\x20at\x20"
+	csNilString   = "OK"
 )
-
-const csNilString = "OK"
-
-// CSFormat describes string conversion of an error chain
-type CSFormat byte
 
 // ChainString() gets a string representation of a single error chain
 // TODO 220319 finish comment
@@ -55,7 +30,7 @@ func ChainString(err error, format CSFormat) (s string) {
 			if e2, ok := e.(ChainStringer); ok {
 				loc := e2.ChainString(ShortSuffix)
 				if loc != "" {
-					return err.Error() + loc
+					return err.Error() + atStringChain + loc
 				}
 			}
 		}

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -34,7 +35,8 @@ type CodeLocation struct {
 }
 
 // NewCodeLocation gets data for a single stack frame.
-// if stackFramesToSkip it returns data for the caller of NewCodeLocation
+// if stackFramesToSkip is 0, NewCodeLocation returns data for
+// its immediate caller.
 func NewCodeLocation(stackFramesToSkip int) (cl *CodeLocation) {
 	if stackFramesToSkip < 0 {
 		stackFramesToSkip = 0
@@ -77,29 +79,24 @@ func GetCodeLocation(rFrame *runtime.Frame) (cl *CodeLocation) {
 //
 //	AddErr
 func (cl *CodeLocation) Name() (funcName string) {
-	packageAndFunc := filepath.Base(cl.FuncName)
-	if lastDotIndex := strings.LastIndex(packageAndFunc, "."); lastDotIndex >= 0 {
-		return packageAndFunc[lastDotIndex+1:]
-	}
-	return packageAndFunc
+	_, _, _, funcName = SplitAbsoluteFunctionName(cl.FuncName)
+	return
 }
 
 // Package return base package name, a single word of characters with no space:
 //
 //	mains
-func (cl *CodeLocation) Package() (funcName string) {
-	packageAndFunc := filepath.Base(cl.FuncName)
-	if dotIndex := strings.Index(packageAndFunc, "."); dotIndex >= 0 {
-		return packageAndFunc[:dotIndex]
-	}
-	return packageAndFunc
+func (cl *CodeLocation) Package() (packageName string) {
+	_, packageName, _, _ = SplitAbsoluteFunctionName(cl.FuncName)
+	return
 }
 
 // PackFunc return base package name and function:
 //
 //	mains.AddErr
 func (cl *CodeLocation) PackFunc() (packageDotFunction string) {
-	return cl.Package() + "." + cl.Name()
+	_, packageName, _, funcName := SplitAbsoluteFunctionName(cl.FuncName)
+	return packageName + "." + funcName
 }
 
 // Base returns base package name, an optional type name and the function name:
@@ -107,6 +104,10 @@ func (cl *CodeLocation) PackFunc() (packageDotFunction string) {
 //	mains.(*Executable).AddErr
 func (cl *CodeLocation) Base() (baseName string) {
 	return filepath.Base(cl.FuncName)
+}
+
+func (cl *CodeLocation) FuncLine() (funcLine string) {
+	return cl.FuncName + ":" + strconv.Itoa(cl.Line)
 }
 
 // Short returns base package name, an optional type name and
@@ -133,6 +134,7 @@ func (cl *CodeLocation) Full() (funcName string) {
 	return fmt.Sprintf("%s-%s:%d", cl.FuncName, cl.File, cl.Line)
 }
 
+// IsSet returns true if this CodeLocation has a value, ie. is not zero-value
 func (cl *CodeLocation) IsSet() (isSet bool) {
 	return cl.File != "" || cl.FuncName != ""
 }
@@ -144,4 +146,53 @@ func (cl *CodeLocation) IsSet() (isSet bool) {
 //	  /opt/sw/privates/parl/error116/codelocation_test.go:20
 func (cl CodeLocation) String() string {
 	return fmt.Sprintf("%s\n\x20\x20%s:%d", cl.FuncName, cl.File, cl.Line)
+}
+
+// SplitAbsoluteFunctionName splits an absolute function name into its parts
+//   - input: github.com/haraldrudell/parl/error116.(*TypeName).FuncName[...]
+//   - packagePath: "github.com/haraldrudell/parl/"
+//   - packageName: "error116" single identifier, not empty
+//   - typePath: "(*TypeName)" may be empty
+//   - funcName: "FuncName[...]"
+func SplitAbsoluteFunctionName(absPath string) (
+	packagePath, packageName, typePath, funcName string) {
+
+	// get multiple-slashes package path excluding single-word base package name
+	// "github.com/haraldrudell/parl/"
+	// "error116.(*TypeName).FuncName[...]"
+	remainder := absPath
+	if lastSlash := strings.LastIndex(remainder, "/"); lastSlash != -1 {
+		// "github.com/haraldrudell/parl/"
+		packagePath = remainder[:lastSlash+1]
+		remainder = remainder[lastSlash+1:]
+	}
+
+	// get base package name: "error116"
+	periodIndex := strings.Index(remainder, ".")
+	if periodIndex == -1 {
+		panic(errors.New("no period ending package name: " + strconv.Quote(absPath)))
+	}
+	packageName = remainder[:periodIndex]
+	remainder = remainder[periodIndex+1:]
+	if remainder == "" {
+		panic(errors.New("frame ends with package name: " + strconv.Quote(absPath)))
+	}
+
+	// get types: "(*TypeName)"
+	if remainder[0:1] == "(" {
+		endIndex := strings.Index(remainder, ")")
+		if endIndex == -1 {
+			panic(errors.New("package types ')' mising: " + strconv.Quote(absPath)))
+		}
+		// "(*TypeName)"
+		typePath = remainder[:endIndex+1]
+		if endIndex+2 >= len(remainder) || remainder[endIndex+1:endIndex+2] != "." {
+			panic(errors.New("no function name after ')': " + strconv.Quote(absPath)))
+		}
+		remainder = remainder[endIndex+2:]
+	}
+
+	// "FuncName[...]"
+	funcName = remainder
+	return
 }

@@ -41,8 +41,7 @@ func DoThreadError(op func() (err error), errCh chan<- error, g0 Go) {
 // DoGoGetError blocks until the goroutine completes.
 func DoGoGetError(op func() (err error), g0 Go) (err error) {
 	errCh := make(chan error)
-	g0.Add(1)
-	go DoThreadError(op, errCh, g0)
+	go DoThreadError(op, errCh, g0.Go())
 	err = <-errCh // block until goroutine completes
 	return
 }

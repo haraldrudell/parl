@@ -13,10 +13,15 @@ import (
 )
 
 const (
-	recAnnStackFrames       = 1
-	recRecStackFrames       = 2
-	recEnsureErrorFrames    = 2
-	recProcessRecoverFrames = 4
+	recAnnStackFrames    = 1
+	recRecStackFrames    = 2
+	recEnsureErrorFrames = 2
+	// Recover() and Recover2() are deferred functions invoked on panic
+	// Because the functions are directly invoked by runtime panic code,
+	// there are no intermediate stack frames between Recover*() and runtime.panic*.
+	// therefore, the Recover stack frame must be included in the error stack frames
+	// recover2() + processRecover() + ensureError() == 3
+	recProcessRecoverFrames = 3
 )
 
 // Recover recovers from a panic invoking a function no more than once.
@@ -34,8 +39,7 @@ func Recover2(annotation string, errp *error, onError func(error)) {
 	recover2(annotation, errp, onError, true, recover())
 }
 
-func recover2(annotation string, errp *error, onError func(error), multiple bool, v interface{}) {
-
+func recover2(annotation string, errp *error, onError func(error), multiple bool, recoverValue interface{}) {
 	// ensure non-empty annotation
 	if annotation == "" {
 		annotation = pruntime.NewCodeLocation(recRecStackFrames).PackFunc() + ": panic:"
@@ -50,7 +54,7 @@ func recover2(annotation string, errp *error, onError func(error), multiple bool
 	}
 
 	// consume recover()
-	if e := processRecover(annotation, v); e != nil {
+	if e := processRecover(annotation, recoverValue); e != nil {
 		if multiple {
 			invokeOnError(onError, e)
 		} else {
@@ -88,12 +92,12 @@ func Annotation() (annotation string) {
 // processRecover ensures non-nil result to be error with Stack
 func processRecover(annotation string, panicValue interface{}) (err error) {
 	if err = ensureError(panicValue, recProcessRecoverFrames); err == nil {
-		return
+		return // panicValue nil return: no error
 	}
 
 	// annotate
 	if annotation != "" {
-		err = perrors.Errorf("%s '%w'", annotation, err)
+		err = perrors.Errorf("%s \x27%w\x27", annotation, err)
 	}
 	return
 }

@@ -9,9 +9,9 @@ import (
 	"database/sql"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/counter"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/psql"
-	"github.com/haraldrudell/parl/threadprof"
 	_ "modernc.org/sqlite"
 )
 
@@ -28,7 +28,7 @@ type DataSource struct {
 // NewDB get a DB object that repreents the databases in a directory
 func NewDataSource(dataSourceName string) (dataSource parl.DataSource, err error) {
 	d := DataSource{
-		counters: threadprof.CountersFactory.NewCounters(true),
+		counters: counter.CountersFactory.NewCounters(true, nil), // nil: no rate counters
 	}
 
 	if d.DB, err = sql.Open(sqLiteDriverName, dataSourceName); err != nil {

@@ -5,17 +5,17 @@ ISC License
 
 package parl
 
-type GoErrorSource uint8
+type GoErrorContext uint8
 
 const none = "NONE"
 
-var goErrorMap = map[GoErrorSource]string{
+var goErrorMap = map[GoErrorContext]string{
 	GeNonFatal:    "GeNonFatal",
 	GePreDoneExit: "GePreDoneExit",
 	GeExit:        "GeExit",
 }
 
-func (ge GoErrorSource) String() (s string) {
+func (ge GoErrorContext) String() (s string) {
 	var ok bool
 	if s, ok = goErrorMap[ge]; !ok {
 		s = none

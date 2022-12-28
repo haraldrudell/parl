@@ -6,12 +6,15 @@ ISC License
 package pslices
 
 import (
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/slices"
 )
 
-// InsertOrdered inserts values into a slice making it ordered
+// InsertOrdered inserts value into an ordered slice
+//   - duplicate values are allowed, new values are placed at the end
+//   - insert is O(log n)
 func InsertOrdered[E constraints.Ordered](slice0 []E, value E) (slice []E) {
 
 	// find position
@@ -31,18 +34,19 @@ func InsertOrdered[E constraints.Ordered](slice0 []E, value E) (slice []E) {
 	return slices.Insert(slice0, position, value)
 }
 
-// InsertOrderedFunc inserts values into a slice making it ordered using a comparison function
-func InsertOrderedFunc[E any](slice0 []E, value E, cmp func(E, E) (result int)) (slice []E) {
+// InsertOrderedFunc inserts a value into a slice making it ordered using a comparison function.
+//   - duplicate values are allowed, new values are placed at the end
+//   - insert is O(log n)
+//   - cmp function can be provided by E being a type with Cmp method.
+//   - cmp(a, b) is expected to return an integer comparing the two parameters:
+//     0 if a == b, a negative number if a < b and a positive number if a > b
+func InsertOrderedFunc[E any](slice0 []E, value E, cmp func(a, b E) (result int)) (slice []E) {
+
+	// obtain comparison function
 	if cmp == nil {
-		var c Comparable[E]
-		var ok bool
-		if c, ok = any(value).(Comparable[E]); ok {
-			cmp = c.Cmp
-		}
-		if cmp == nil {
-			panic(perrors.New("InsertOrderedFunc with cmp nil"))
-		}
+		cmp = CmpFromComparable(value)
 	}
+
 	// find position
 	var position int
 	var wasFound bool
@@ -58,4 +62,23 @@ func InsertOrderedFunc[E any](slice0 []E, value E, cmp func(E, E) (result int)) 
 	}
 
 	return slices.Insert(slice0, position, value)
+}
+
+func CmpFromComparable[E any](value E) (cmp func(a, b E) (result int)) {
+
+	// comparison function with value receiver
+	if _, ok := any(value).(parl.Comparable[E]); ok {
+		return func(a, b E) (result int) {
+			return any(a).(parl.Comparable[E]).Cmp(b)
+		}
+	}
+
+	// comparison function with pointer receiver
+	if _, ok := any(&value).(parl.Comparable[E]); ok {
+		return func(a, b E) (result int) {
+			return any(&a).(parl.Comparable[E]).Cmp(b)
+		}
+	}
+
+	panic(perrors.NewPF("cmp cannot be nil if value is not parl.Comparable"))
 }

@@ -14,4 +14,5 @@ func Sprintf(format string, a ...interface{}) string {
 	return parlSprintf(format, a...)
 }
 
+// parlSprintf is an instantiated English-language sprintf
 var parlSprintf = message.NewPrinter(language.English).Sprintf

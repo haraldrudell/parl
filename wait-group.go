@@ -8,22 +8,35 @@ package parl
 import (
 	"fmt"
 	"sync"
+
+	"github.com/haraldrudell/parl/perrors"
 )
 
 /*
 parl.WaitGroup is like a sync.Waitgroup that can be inspected.
 The Waiting method returns the number of threads waited for.
 parl.WaitGroup requires no initialization.
- var wg parl.WaitGroup
- wg.Add(1)
- …
- wg.Waiting()
+
+	var wg parl.WaitGroup
+	wg.Add(1)
+	…
+	wg.Waiting()
 */
 type WaitGroup struct {
-	sync.WaitGroup
-	lock  sync.Mutex
-	adds  int
-	dones int
+	sync.WaitGroup // Wait()
+	lock           sync.Mutex
+	adds           int
+	dones          int
+}
+
+func InitWaitGroup(wgp *WaitGroup) {
+	if wgp == nil {
+		panic(perrors.NewPF("wgp cannot be nil"))
+	}
+	wgp.WaitGroup = sync.WaitGroup{}
+	wgp.lock = sync.Mutex{}
+	wgp.adds = 0
+	wgp.dones = 0
 }
 
 func (wg *WaitGroup) Add(delta int) {

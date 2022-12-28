@@ -11,20 +11,10 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-var GoGroupFactory parl.GoGroupFactory = &goGroupFactory{}
+var GoGroupFactory parl.GoFactory = &goGroupFactory{}
 
 type goGroupFactory struct{}
 
-var _ parl.GoGroupFactory = &goGroupFactory{}
-
-func (gf *goGroupFactory) NewGoGroup(ctx context.Context) (goCreator parl.GoGroup) {
-	return NewGoGroup(ctx)
-}
-
-var GoerFactory parl.GoerFactory = &goerFactory{}
-
-type goerFactory struct{}
-
-func (gf *goerFactory) NewGoer(ctx context.Context) (goer parl.Goer) {
-	return NewGoerGroup(ctx)
+func (gf *goGroupFactory) NewGoGroup(ctx context.Context, onFirstFatal ...parl.GoFatalCallback) (g1 parl.GoGroup) {
+	return NewGoGroup(ctx, onFirstFatal...)
 }

@@ -12,11 +12,17 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
+const (
+	iANASweetHomeSanFrancisco = "America/Los_Angeles"
+	timeZonePST               = "PST"
+	offsetPSTh                = -8
+)
+
 var locCaliforniaFixture = func() (loc *time.Location) {
 	var err error
 
 	// get a known time for a known location
-	if loc, err = time.LoadLocation(IANASweetHomeSanFrancisco); err != nil {
+	if loc, err = time.LoadLocation(iANASweetHomeSanFrancisco); err != nil {
 		panic(perrors.Errorf("time.LoadLocation: %w", err))
 	}
 	return loc

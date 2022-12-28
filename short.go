@@ -17,20 +17,29 @@ const (
 	msMinute          = "060102_15:04:05.000Z0700"
 )
 
-// Short provides exact world time in compact second-precision: 060102_15:04:05Z07
-// the time printed is either tim or time.Now().
+// Short provides a brief time-stamp in compact second-precision including time-zone.
+//   - sample: 060102_15:04:05-08
+//   - The timestamp does not contain space.
+//   - time zone is what is included in tim, typically time.Local
+//   - if tim is not specified, time.Now() in local time zone
 func Short(tim ...time.Time) (s string) {
 	return timeAndFormat(tim, shortHour, shortMinute)
 }
 
-// Short provides exact world time in compact second-precision: 060102 15:04:05Z07
-// the time printed is either tim or time.Now().
+// Short provides a brief time-stamp in compact second-precision including time-zone.
+//   - sample: 060102 15:04:05-08
+//   - date is 6-digit separated from time by a space
+//   - time zone is what is included in tim, typically time.Local
+//   - if tim is not specified, time.Now() in local time zone
 func ShortSpace(tim ...time.Time) (s string) {
 	return timeAndFormat(tim, shortHourSpace, shortMinuteSpace)
 }
 
-// ShortMs provides exact world time in compact milli-second-precision: 060102_15:04:05Z07
-// the time printed is either tim or time.Now().
+// ShortMs provides a brief time-stamp in compact milli-second-precision including time-zone.
+//   - sample: 060102_15:04:05.123-08
+//   - The timestamp does not contain space.
+//   - time zone is what is included in tim, typically time.Local
+//   - if tim is not specified, time.Now() in local time zone
 func ShortMs(tim ...time.Time) (s string) {
 	return timeAndFormat(tim, msHour, msMinute)
 }

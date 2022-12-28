@@ -7,161 +7,318 @@ package g0
 
 import (
 	"context"
-	"sort"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/goid"
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pmaps"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
-	gcAddFrames = 1
+	goGroupExtraFrames = 0
 )
 
+// GoGroup is a Go thread-group. Thread-safe.
+//   - GoGroup has its own error channel and waitgroup and no parent thread-group.
+//   - thread exits are processed by G1Done and the g1WaitGroup
+//   - the thread-group terminates when its erropr channel closes
+//   - non-fatal erors are processed by ConsumeError and the error channel
+//   - new Go threads are handled by the g1WaitGroup
+//   - SubGroup creates a subordinate thread-group using this threadgroup’s error channel
 type GoGroup struct {
-	waiterr          // Add() IsExit() Wait() Ch() send()
-	lock             sync.Mutex
-	m                map[parl.GoIndex]*Goer // behind lock
-	cancelAndContext                        // Cancel() Context()
+	goEntityID
+	parent          goGroupParent
+	hasErrorChannel parl.AtomicBool
+	isSubGroup      parl.AtomicBool
+	isWaitGroupDone parl.AtomicBool
+	hadFatal        parl.AtomicBool
+	onFirstFatal    parl.GoFatalCallback
+	gos             parl.ThreadSafeMap[GoEntityID, *ThreadData]
+	goWaitGroup     // Go() SubGroup() Wait()
+	ch              parl.NBChan[parl.GoError]
+	doneLock        sync.Mutex // for GoDone method
+
+	owLock     sync.Mutex
+	onceWaiter *parl.OnceWaiter
 }
 
-func NewGoGroup(ctx context.Context) (goCreator parl.GoGroup) {
-	return &GoGroup{
-		waiterr:          waiterr{wg: &parl.WaitGroup{}, index: Index.goIndex()},
-		m:                map[parl.GoIndex]*Goer{},
-		cancelAndContext: *newCancelAndContext(ctx),
+var _ goGroupParent = &GoGroup{}
+var _ goParent = &GoGroup{}
+
+// NewGoGroup returns a stand-alone thread-group with its own error channel. Thread-safe.
+//   - ctx is not canceled by the thread-group
+//   - ctx may initiate thread-group Cancel
+//   - a stand-alone GoGroup thread-group has goGroupParent nil
+//   - non-fatal and fatal errors from the thread-group’s threads are sent on the GoGroup’s
+//     error channel
+//   - the GoGroup processes Go invocations and thread-exits from its own threads and
+//     the threads of its subordinate thread-groups
+//     wait-group and that of its parent
+//   - cancel of the GoGroup’s context signals termination to its own threads and all threads of its
+//     subordinate thread-groups
+//   - the GoGroup’s context is canceled when its provided parent context is canceled or any of its
+//     threads invoke the GoGroup’s Cancel method
+//   - the GoGroup terminates when its error channel closes from all threads in its own
+//     thread-group and that of any subordinate thread-groups have exited.
+func NewGoGroup(ctx context.Context, onFirstFatal ...parl.GoFatalCallback) (g0 parl.GoGroup) {
+	return new(nil, ctx, true, false, onFirstFatal...)
+}
+
+// Go returns a parl.Go thread-features object
+//   - Go is invoked by a g0-package consumer
+//   - the Go return value is to be used as a function argument in a go-statement
+//     function-call launching a goroutine thread
+func (g0 *GoGroup) Go() (g1 parl.Go) {
+	if g0.isEnd() {
+		panic(perrors.NewPF("after GoGroup termination"))
 	}
-}
 
-func (gc *GoGroup) Add(conduit parl.ErrorConduit, exitAction parl.ExitAction) (goer parl.Goer) {
-	gc.add(1)
-	index := Index.goIndex()
-	goer = NewGoer(
-		conduit,
-		exitAction,
-		index,
-		gc,
-		goid.GoID(),
-		pruntime.NewCodeLocation(gcAddFrames),
-	)
-	goerStruct := goer.(*Goer)
-	gc.addGoer(goerStruct, index)
+	// At this point, Go invocation is accessible so retrieve it
+	// the goroutine has not been created yet, so there is no creator
+	// instead, use top of the stack, the invocation location for the Go() function call
+	goInvocation := pruntime.NewCodeLocation(g1Gropupg0StackFranmes)
+
+	// the only location creating Go objects
+	var threadData *ThreadData
+	var goEntityID GoEntityID
+	g1, goEntityID, threadData = newGo(g0, goInvocation)
+
+	// count the running thread in this thread-group and its parents
+	g0.Add(goEntityID, threadData)
 
 	return
 }
 
-func (gc *GoGroup) WaitPeriod(duration ...time.Duration) {
+// newSubGo returns a subordinate thread-group witthout an error channel. Thread-safe.
+//   - a SubGo has goGroupParent non-nil and isSubGo true
+//   - the SubGo thread’s fatal and non-fatal errors are forwarded to its parent
+//   - SubGo has FirstFatal mechanic but no error channel of its own.
+//   - the SubGo’s Go invocations and thread-exits are processed by the SubGo’s wait-group
+//     and the thread-group of its parent
+//   - cancel of the SubGo’s context signals termination to its own threads and all threads of its
+//     subordinate thread-groups
+//   - the SubGo’s context is canceled when its parent’s context is canceled or any of its
+//     threads invoke the SubGo’s Cancel method
+//   - the SubGo thread-group terminates when all threads in its own thread-group and
+//     that of any subordinate thread-groups have exited.
+func (g0 *GoGroup) SubGo(onFirstFatal ...parl.GoFatalCallback) (g1 parl.SubGo) {
+	return new(g0, nil, false, false, onFirstFatal...)
+}
 
-	// is GoCreator already done?
-	if gc.IsExit() {
-		return
+// newSubGroup returns a subordinate thread-group with an error channel handling fatal
+// errors only. Thread-safe.
+//   - a SubGroup has goGroupParent non-nil and isSubGo false
+//   - fatal errors from the SubGroup’s threads are sent on its own error channel
+//   - non-fatal errors from the SubGroup’s threads are forwarded to the parent
+//   - the SubGroup’s Go invocations and thread-exits are processed in the SubGroup’s
+//     wait-group and that of its parent
+//   - cancel of the SubGroup’s context signals termination to its own threads and all threads of its
+//     subordinate thread-groups
+//   - the SubGroup’s context is canceled when its parent’s context is canceled or any of its
+//     threads invoke the SubGroup’s Cancel method
+//   - SubGroup thread-group terminates when its error channel closes after all of its threads
+//     and threads of its subordinate thread-groups have exited.
+func (g0 *GoGroup) SubGroup(onFirstFatal ...parl.GoFatalCallback) (g1 parl.SubGroup) {
+	return new(g0, nil, true, true, onFirstFatal...)
+}
+
+// new returns a new GoGroup as parl.GoGroup
+func new(
+	parent goGroupParent, ctx context.Context,
+	hasErrorChannel, isSubGroup bool,
+	onFirstFatal ...parl.GoFatalCallback,
+) (g0 *GoGroup) {
+	if ctx == nil && parent != nil {
+		ctx = parent.Context()
+	}
+	g := GoGroup{
+		goEntityID:  *newGoEntityID(goGroupExtraFrames),
+		parent:      parent,
+		gos:         pmaps.NewRWMap[GoEntityID, *ThreadData](),
+		goWaitGroup: *newGoWaitGroup(ctx),
+	}
+	if len(onFirstFatal) > 0 {
+		g.onFirstFatal = onFirstFatal[0]
+	}
+	if hasErrorChannel {
+		g.hasErrorChannel.Set()
+	}
+	if isSubGroup {
+		g.isSubGroup.Set()
+	}
+	return &g
+}
+
+// Add processes a thread from this or a subordinate thread-group
+func (g0 *GoGroup) Add(goEntityID GoEntityID, threadData *ThreadData) {
+	g0.wg.Add(1)
+	g0.gos.Put(goEntityID, threadData)
+	if g0.parent != nil {
+		g0.parent.Add(goEntityID, threadData)
+	}
+}
+
+func (g0 *GoGroup) UpdateThread(goEntityID GoEntityID, threadData *ThreadData) {
+	g0.gos.Put(goEntityID, threadData)
+	if g0.parent != nil {
+		g0.parent.UpdateThread(goEntityID, threadData)
+	}
+}
+
+// Done receives thread exits from threads in subordinate thread-groups
+func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
+	if g0.isEnd() {
+		panic(perrors.ErrorfPF("in GoGroup after termination: %s", perrors.Short(err)))
 	}
 
-	// get duration
-	var d time.Duration
-	if len(duration) > 0 {
-		d = duration[0]
-	}
-	if d < time.Second {
-		d = time.Second
-	}
+	// first fatal thread-exit of this thread-group
+	if err != nil && g0.hadFatal.Set() {
 
-	// channel indicating Wait complete
-	waitCh := make(chan struct{})
-	go func() {
-		defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
+		// handle FirstFatal()
+		g0.setFirstFatal()
 
-		gc.Wait()
-		close(waitCh)
-	}()
-
-	// ticker for period status prints
-	ticker := time.NewTicker(d)
-	defer ticker.Stop()
-
-	parl.Console(gc.String())
-	for keepGoing := true; keepGoing; {
-		select {
-		case <-waitCh:
-			keepGoing = false
-		case <-ticker.C:
+		// onFirstFatal callback
+		if g0.onFirstFatal != nil {
+			var errPanic error
+			parl.RecoverInvocationPanic(func() {
+				g0.onFirstFatal(g0)
+			}, &errPanic)
+			if errPanic != nil {
+				g0.ConsumeError(NewGoError(
+					perrors.ErrorfPF("onFatal callback: %w", errPanic), parl.GeNonFatal, thread))
+			}
 		}
-
-		parl.Console(gc.String())
 	}
+
+	g0.doneLock.Lock()
+	defer g0.doneLock.Unlock()
+
+	// process thread-exit
+	isTermination := g0.goWaitGroup.wg.DoneBool()
+	var g1impl goImpl
+	var ok bool
+	if g1impl, ok = thread.(goImpl); !ok {
+		panic(perrors.NewPF("type assertion failed"))
+	}
+	g0.gos.Delete(g1impl.G0ID())
+	if g0.isSubGroup.IsTrue() {
+
+		// SubGroup with its own error channel with fatals not affecting parent
+		// send fatal error to parent as non-fatal error with error context GeLocalChan
+		if err != nil {
+			g0.ConsumeError(NewGoError(err, parl.GeLocalChan, thread))
+		}
+		// pretend good thread exit to parent
+		g0.parent.GoDone(thread, nil)
+	}
+	if g0.hasErrorChannel.IsTrue() {
+
+		// emit on local error channel
+		var context parl.GoErrorContext
+		if isTermination {
+			context = parl.GeExit
+		} else {
+			context = parl.GePreDoneExit
+		}
+		g0.ch.Send(NewGoError(err, context, thread))
+		if isTermination {
+			g0.ch.Close() // close local error channel
+		}
+	} else {
+
+		// SubGo case: all forwarded to parent
+		g0.parent.GoDone(thread, err)
+	}
+
+	if !isTermination {
+		return // GoGroup not yet terminated return
+	}
+
+	// mark GoGroup terminated
+	g0.isWaitGroupDone.Set()
 }
 
-func (gc *GoGroup) String() (s string) {
-	timeStamp := parl.Short()
-	goIndex := gc.getGoerList()
-
-	goList := make([]parl.GoIndex, len(goIndex))
-	i := 0
-	for key := range goIndex {
-		goList[i] = key
-		i++
+// ConsumeError receives non-fatal errors from a Go thread.
+// Go.AddError delegates to this method
+func (g0 *GoGroup) ConsumeError(goError parl.GoError) {
+	if g0.ch.DidClose() {
+		panic(perrors.ErrorfPF("in GoGroup after termination: %s", goError))
 	}
-	sort.Slice(goList, func(i, j int) bool { return goList[i] < goList[j] })
-
-	adds, dones := gc.wg.Counters()
-	s = parl.Sprintf("%s GoGroup#%d %d(%d)", timeStamp, gc.index, adds-dones, adds)
-
-	if len(goIndex) == 0 {
-		return s + "\x20None"
+	if goError == nil {
+		panic(perrors.NewPF("goError cannot be nil"))
 	}
-	if len(goIndex) == 1 {
-		return s + "\x20" + (goIndex[goList[0]]).String()
+	// non-fatal errors are:
+	//	- parl.GeNonFatal or
+	//	- parl.GeLocalChan when a SubGroup send fatal errors as non-fatal
+	if goError.ErrContext() != parl.GeNonFatal && // it is a non-fatal error
+		goError.ErrContext() != parl.GeLocalChan { // it is a fatal error store in a local error channel
+		panic(perrors.ErrorfPF("G1Group received termination as non-fatal error: goError: %s", goError))
 	}
 
-	sList := []string{"\n" + s + ":"}
-	for _, index := range goList {
-		sList = append(sList, goIndex[index].String())
+	// it is a non-fatal error that should be processed
+
+	// if we have a parent GoGroup, send it there
+	if g0.parent != nil {
+		g0.parent.ConsumeError(goError)
 	}
-	return strings.Join(sList, "\n")
+
+	// send the error to the channel of this stand-alone G1Group
+	g0.ch.Send(goError)
 }
 
-func (gc *GoGroup) exitAction(err error, exitAction parl.ExitAction, index parl.GoIndex) {
-	parl.Debug("GoGroup.exit%s #%d", gc.string(&err), index)
-	gc.wg.Done()
-	if gc.deleteGoer(index) == 0 {
-		parl.Debug("GoGroup#%d.close", gc.index)
-		gc.close()
-	}
+func (g0 *GoGroup) Ch() (ch <-chan parl.GoError) { return g0.ch.Ch() }
 
-	if exitAction == parl.ExIgnoreExit ||
-		err == nil && exitAction == parl.ExCancelOnFailure {
-		return
-	}
+func (g0 *GoGroup) FirstFatal() (firstFatal *parl.OnceWaiterRO) {
+	g0.owLock.Lock()
+	defer g0.owLock.Unlock()
 
-	gc.Cancel()
+	if g0.onceWaiter == nil {
+		g0.onceWaiter = parl.NewOnceWaiter(context.Background())
+		if g0.hadFatal.IsTrue() {
+			g0.onceWaiter.Cancel()
+		}
+	}
+	return parl.NewOnceWaiterRO(g0.onceWaiter)
 }
 
-func (gc *GoGroup) addGoer(goer *Goer, index parl.GoIndex) {
-	gc.lock.Lock()
-	defer gc.lock.Unlock()
+func (g0 *GoGroup) setFirstFatal() {
+	g0.owLock.Lock()
+	defer g0.owLock.Unlock()
 
-	gc.m[index] = goer
-}
-
-func (gc *GoGroup) deleteGoer(index parl.GoIndex) (remaining int) {
-	gc.lock.Lock()
-	defer gc.lock.Unlock()
-
-	delete(gc.m, index)
-	return len(gc.m)
-}
-
-func (gc *GoGroup) getGoerList() (goIndex map[parl.GoIndex]*Goer) {
-	gc.lock.Lock()
-	defer gc.lock.Unlock()
-
-	goIndex = map[parl.GoIndex]*Goer{}
-	for index, goer := range gc.m {
-		goIndex[index] = goer
+	if g0.onceWaiter == nil {
+		return // FirstFatal not invoked return
 	}
 
-	return
+	g0.onceWaiter.Cancel()
+}
+
+// isEnd determines if this goGroup has ended
+//   - if goGroup has error channel, the goGroup ends when its error channel closes
+//   - — this is true for goGroups without a parent
+//   - — this is true for sub-goGroups only collecting fatal errors
+//   - — for subGo, it ends when all threads have exited
+//   - if goGroup otherwise has
+func (g0 *GoGroup) isEnd() (isEnd bool) {
+
+	// SubGo termination flag
+	if !g0.hasErrorChannel.IsTrue() {
+		return g0.isWaitGroupDone.IsTrue()
+	}
+
+	// others is by error channel — wait until all errors have been read
+	return g0.ch.IsClosed()
+}
+
+func (g0 *GoGroup) listThreads() (threads []*ThreadData) {
+	return g0.gos.List()
+}
+
+// g1Group#3threads:1(1)g0.TestNewG1Group-g1-group_test.go:60
+func (g0 *GoGroup) String() (s string) {
+	return parl.Sprintf("goGroup#%d_threads:%s_New:%s",
+		g0.goEntityID.id,
+		g0.goWaitGroup.wg.String(),
+		g0.goEntityID.creator.Short(),
+	)
 }

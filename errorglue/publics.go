@@ -79,20 +79,29 @@ func ErrorsWithStack(err error) (errs []error) {
 
 // GetInnerMostStack gets the oldest stack trace in the error chain
 func GetInnerMostStack(err error) (stack pruntime.StackSlice) {
+
+	// find the innermost implementation of ErrorCallStacker interface
 	var e ErrorCallStacker
-	for errors.As(err, &e) {
+	for ; err != nil; err = errors.Unwrap(err) {
+		if ecs, ok := err.(ErrorCallStacker); ok {
+			e = ecs
+		}
 	}
-	if e != nil {
-		stack = e.StackTrace()
+	if e == nil {
+		return // no implementation found
 	}
+
+	stack = e.StackTrace()
 	return
 }
 
 // GetStackTrace gets the last stack trace
 func GetStackTrace(err error) (stack pruntime.StackSlice) {
-	var e ErrorCallStacker
-	if errors.As(err, &e) {
-		stack = e.StackTrace()
+	for ; err != nil; err = errors.Unwrap(err) {
+		if ecs, ok := err.(ErrorCallStacker); ok {
+			stack = ecs.StackTrace()
+			return
+		}
 	}
 	return
 }
@@ -113,8 +122,9 @@ func GetStacks(err error) (stacks []pruntime.StackSlice) {
 // error implementation type-names found in the error
 // chain of err.
 // err can be nil
-//   fmt.Println(Stack(errors.New("an error")))
-//   *error116.errorStack *errors.errorString
+//
+//	fmt.Println(Stack(errors.New("an error")))
+//	*error116.errorStack *errors.errorString
 func DumpChain(err error) (typeNames string) {
 	var strs []string
 	for err != nil {
@@ -132,7 +142,7 @@ func DumpChain(err error) (typeNames string) {
 func DumpGo(err error) (typeNames string) {
 	var strs []string
 	for ; err != nil; err = errors.Unwrap(err) {
-		strs = append(strs, fmt.Sprintf("%T %[1]v", err))
+		strs = append(strs, fmt.Sprintf("%T %#[1]v", err))
 	}
 	typeNames = strings.Join(strs, "\n")
 	return

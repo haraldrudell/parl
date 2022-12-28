@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/plogger"
 	"github.com/haraldrudell/parl/pruntime"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -60,7 +61,16 @@ type LogInstance struct {
 	stackFramesToSkip int
 }
 
-var sprintf = message.NewPrinter(language.English).Sprintf
+var messageSprintf = message.NewPrinter(language.English).Sprintf
+
+func sprintf(format string, a ...interface{}) (s string) {
+	if len(a) > 0 {
+		s = messageSprintf(format, a...)
+	} else {
+		s = format
+	}
+	return
+}
 
 // NewLog gets a logger for Fatal and Warning for specific output
 func NewLog(writers ...io.Writer) (lg *LogInstance) {
@@ -71,7 +81,7 @@ func NewLog(writers ...io.Writer) (lg *LogInstance) {
 	if writer == nil {
 		writer = os.Stderr
 	}
-	logger := logMap[writer]
+	logger := plogger.GetLog(writer)
 	if logger == nil {
 		logger = log.New(writer, "", 0)
 	}

@@ -3,24 +3,66 @@
 ISC License
 */
 
-package pfs
+package pexec
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os/exec"
 	"sync"
+	"syscall"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"golang.org/x/sys/unix"
 )
 
-// ExecStream executes a system command with flexible streaming
-func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser, env []string, ctx context.Context, args ...string) (err error) {
+//  1. Replace multiple slashes with a single slash.
+//  2. Eliminate each . path name element (the current directory).
+//  3. Eliminate each inner .. path name element (the parent directory)
+//     along with the non-.. element that precedes it.
+//  4. Eliminate .. elements that begin a rooted path:
+//     that is, replace "/.." by "/" at the beginning of a path.
+
+//  1. one
+//  2. two
+//  3. three
+//  4. Eliminate
+//     kk
+var ErrArgsListEmpty = errors.New("args list empty")
+
+// ExecStream executes a system command using the exec.Cmd type and flexible streaming.
+// ExecStream blocks during command execution.
+// ExecStream returns any errors occurring during launch or execution including
+// any errors in copy threads
+//
+//   - args is the command followed by arguments.
+//   - args[0] must specify an executable in the file system.
+//     env.PATH is used to resolve the command executable
+//   - if stdin should not be used, pio.EofReader can be used
+//   - for stdout and stderr pio has usable types:
+//   - pio.NewWriteCloserToString
+//   - pio.NewWriteCloserToChan
+//   - pio.NewWriteCloserToChanLine
+//   - pio.NewReadWriteCloserSlice
+//   - if stdin stdout or stderr are nil, os.Stdin os.Stdout os.Stderr are used.
+//     Additional threads are used to copy data when stdin stdout or stderr are non-nil
+//   - If env is nil, the new process uses the current process’ environment
+//   - ctx is used to kill the process (by calling os.Process.Kill) if the context becomes
+//     done before the command completes on its own
+//   - startCallback is invoked immediately after cmd.Exec.Start returns with
+//     its result. To not use a callback, set startCallback to nil
+func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
+	env []string, ctx context.Context, startCallback func(err error),
+	args ...string) (isCancel bool, err error) {
 	if len(args) == 0 {
-		err = perrors.NewPF("args list empty")
+		err = perrors.ErrorfPF("%w", ErrArgsListEmpty)
 		return
 	}
+
+	// execCtx allows for local cancel, ie. failing copyThreads
+	execCtx := parl.NewCancelContext(ctx)
 
 	// thread management: waitgroup and thread-safe error store
 	var wg sync.WaitGroup
@@ -35,7 +77,7 @@ func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser, e
 	isStart := false
 	defer func() {
 		if isStart {
-			return
+			return // do nothing: if exec.Cmd.Start succeeded, exe.Cmd close the streams
 		}
 		for _, c := range closers {
 			if e := c.Close(); e != nil {
@@ -46,7 +88,8 @@ func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser, e
 
 	// get Cmd structure, possibly resolve args[0] using environment PATH
 	var execCmd *exec.Cmd
-	execCmd = exec.CommandContext(ctx, args[0], args[1:]...)
+	_ = execCmd
+	execCmd = exec.CommandContext(execCtx, args[0], args[1:]...)
 
 	// possibly replace current process's environment os.Environ()
 	if env != nil {
@@ -58,10 +101,10 @@ func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser, e
 		var ioWriteCloser io.WriteCloser
 		if ioWriteCloser, err = execCmd.StdinPipe(); err != nil {
 			err = perrors.ErrorfPF("execCmd.StdinPipe %w", err)
-			return
+			return // pipe error return
 		}
 		wg.Add(1)
-		go copyThread("stdin", stdin, ioWriteCloser, errs.AddErrorProc, &wg)
+		go copyThread("stdin", stdin, ioWriteCloser, errs.AddErrorProc, execCtx, &wg)
 	}
 
 	// pipe stdout to process
@@ -69,10 +112,10 @@ func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser, e
 		var ioReadCloser io.ReadCloser
 		if ioReadCloser, err = execCmd.StdoutPipe(); err != nil {
 			err = perrors.ErrorfPF("execCmd.StdoutPipe %w", err)
-			return
+			return // pipe error return
 		}
 		wg.Add(1)
-		go copyThread("stdout", ioReadCloser, stdout, errs.AddErrorProc, &wg)
+		go copyThread("stdout", ioReadCloser, stdout, errs.AddErrorProc, execCtx, &wg)
 	}
 
 	// pipe stderr to process
@@ -80,30 +123,57 @@ func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser, e
 		var ioReadCloser io.ReadCloser
 		if ioReadCloser, err = execCmd.StderrPipe(); err != nil {
 			err = perrors.ErrorfPF("execCmd.StderrPipe %w", err)
-			return
+			return // pipe error return
 		}
 		wg.Add(1)
-		go copyThread("stderr", ioReadCloser, stderr, errs.AddErrorProc, &wg)
+		go copyThread("stderr", ioReadCloser, stderr, errs.AddErrorProc, execCtx, &wg)
 	}
 
 	// execute
 	err = execCmd.Start()
 	isStart = true
+	if startCallback != nil {
+		parl.RecoverInvocationPanic(func() {
+			startCallback(err)
+		}, &err)
+	}
 	if err != nil {
 		err = perrors.Errorf("execCmd.Start %w", err)
-		return
+		return // command Start error return
 	}
 	if err = execCmd.Wait(); err != nil {
-		err = perrors.Errorf("execCmd.Wait %w", err)
-		return
+		// was the context canceled?
+		if execCtx.Err() != nil {
+			// if the command did not complete successfully, it’s exec.ExitError
+			if exitExrror, ok := err.(*exec.ExitError); ok {
+				// if it was SIGKILL, ignore it: it was cuased by context cancelation
+				if waitStatus, ok := exitExrror.ProcessState.Sys().(syscall.WaitStatus); ok {
+					if waitStatus.Signal() == unix.SIGKILL {
+						err = nil // ignore the error
+						isCancel = true
+					}
+				}
+			}
+		}
+		return // Wait() error return
 	}
-	return
+	return // command completed successfully return
 }
 
-func copyThread(label string, reader io.Reader, writer io.Writer, addError func(err error), wg *sync.WaitGroup) {
-	var err error
+// copyThread copies from a io.Reader to io.Writer.
+//   - label is used for thread identification on panics
+//   - reader could be the stdin io.Reader being copied to the execCmd.StdinPipe Writer
+//   - addError receives panics
+//   - on panic exeCtx context is cancelled
+//   - the thread itself never fails
+func copyThread(label string,
+	reader io.Reader, writer io.Writer,
+	addError func(err error), execCtx context.Context,
+	wg *sync.WaitGroup) {
 	defer wg.Done()
-	parl.Recover("copy command i/o "+label, &err, addError)
+	var err error
+	defer parl.CancelOnError(&err, execCtx) // cancel the command if copyThread failes
+	defer parl.Recover("copy command i/o "+label, &err, addError)
 
 	_, err = io.Copy(writer, reader)
 }

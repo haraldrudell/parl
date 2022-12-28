@@ -4,14 +4,16 @@ ISC License
 */
 
 // goid.GoID() provides a unique goroutine identifier.
-//  m := map[goid.ThreadID]SomeInterface{}
-//  m[goid.GoID()] = …
+//
+//	m := map[goid.ThreadID]SomeInterface{}
+//	m[goid.GoID()] = …
 package goid
 
 import (
 	"runtime/debug"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/pdebug"
 )
 
 // GoID obtains a numeric string that as of Go1.18 is
@@ -19,7 +21,7 @@ import (
 // unsigned integer beginning at 1 for the main invocation
 func GoID() (threadID parl.ThreadID) {
 	var err error
-	if threadID, _, err = ParseFirstLine(string(debug.Stack())); err != nil {
+	if threadID, _, err = pdebug.ParseFirstLine(string(debug.Stack())); err != nil {
 		panic(err)
 	}
 	return

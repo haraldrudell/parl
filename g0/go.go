@@ -3,73 +3,152 @@
 ISC License
 */
 
-// Package g0 facilitates launch, management and execution of goroutines
 package g0
 
 import (
-	"context"
-
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/pdebug"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
-	goFrames = 1
+	goFrames            = 1 // newG1 is invoked from interrnal Go() function
+	grCheckThreadFrames = 0
 )
 
+// Go supports a goroutine executing part of a thread-group. Thread-safe.
+//   - a single thread exit is handled by Done, delegated to parent, and is deferrable.
+//   - the Go thread terminates on Done invocation.
+//   - non-fatal errors are processed by AddError delegated to parent
+//   - new Go threads are delegated to parent
+//   - SubGo creates a subordinate thread-group with its own error channel
+//   - SubGroup creates a subordinate thread-group with FirstFatal mechanic
 type Go struct {
-	addError func(err error)
-	add      func(delta int)
-	done     func(err *error)
-	context  func() (ctx context.Context)
-	cancel   func()
+	goEntityID
+	isTerminated parl.AtomicBool
+	goParent     // ConsumeError() Go() Cancel() Context()
+	thread       ThreadDataWrap
+	goWaitGroup
 }
 
-func NewGo(
-	errorReceiver func(err error),
-	add func(delta int),
-	done func(err *error),
-	context func() (ctx context.Context),
-	cancel func()) (g0 parl.Go) {
-	return &Go{
-		addError: errorReceiver,
-		add:      add,
-		done:     done,
-		context:  context,
-		cancel:   cancel,
+// newGo returns a Go object for a thread operating in a Go thread-group. Thread-safe.
+func newGo(parent goParentArg, goInvocation *pruntime.CodeLocation) (
+	g0 parl.Go,
+	goEntityID GoEntityID,
+	threadData *ThreadData) {
+	if parent == nil {
+		panic(perrors.NewPF("parent cannot be nil"))
 	}
+	g := Go{
+		goEntityID:  *newGoEntityID(goFrames),
+		goParent:    parent,
+		goWaitGroup: *newGoWaitGroup(parent.Context()),
+	}
+	g.wg.Add(1)
+	g.thread.SetCreator(goInvocation)
+
+	goEntityID = g.G0ID()
+	threadData, _ = g.thread.Get()
+	g0 = &g
+	return
 }
 
-func (g0 *Go) Register() {
-	g0.add(0)
+func (g0 *Go) Register() { g0.checkState(false) }
+
+// SubGo returns a thread-group without its own error channel but
+// with FirstFatal mechanic
+func (g0 *Go) SubGo(onFirstFatal ...parl.GoFatalCallback) (subGo parl.SubGo) {
+	g0.checkState(false)
+	return g0.goParent.SubGo(onFirstFatal...)
 }
 
-func (g0 *Go) Add(delta int) {
-	g0.add(delta)
+// SubGroup returns a thread-group with its own error channel.
+func (g0 *Go) SubGroup(onFirstFatal ...parl.GoFatalCallback) (subGroup parl.SubGroup) {
+	g0.checkState(false)
+	return g0.goParent.SubGroup(onFirstFatal...)
 }
 
 func (g0 *Go) AddError(err error) {
-	if err != nil && !perrors.HasStack(err) {
-		err = perrors.Stackn(err, goFrames)
+	g0.checkState(false)
+
+	if err == nil {
+		return // nil error return
 	}
-	g0.addError(err)
+
+	g0.ConsumeError(NewGoError(perrors.Stack(err), parl.GeNonFatal, g0))
 }
 
+// Done handles thread exit. Deferrable
 func (g0 *Go) Done(errp *error) {
-	if errp != nil && *errp != nil && !perrors.HasStack(*errp) {
-		*errp = perrors.Stackn(*errp, goFrames)
+	g0.checkState(true)
+	if !g0.isTerminated.Set() {
+		panic(perrors.ErrorfPF("Go received multiple Done: ", perrors.ErrpString(errp)))
 	}
-	g0.done(errp)
+
+	// obtain error and ensure it has stack
+	var err error
+	if errp != nil {
+		err = perrors.Stack(*errp)
+	}
+
+	g0.goParent.GoDone(g0, err)
 }
 
-func (g0 *Go) Context() (ctx context.Context) {
-	return g0.context()
+func (g0 *Go) ThreadData() (threadData *ThreadData) {
+	threadData, _ = g0.thread.Get()
+	return
 }
 
+// Wait awaits exit of this Go thread
+func (g0 *Go) Wait() {
+	g0.wg.Wait()
+}
+
+// CancelGo signals to this Go thread to exit.
+func (g0 *Go) CancelGo() {
+	g0.goWaitGroup.Cancel()
+}
+
+// Cancel cancels the GoGroup
 func (g0 *Go) Cancel() {
-	g0.cancel()
+	g0.goParent.Cancel()
 }
 
-func (g0 *Go) SubGo(local ...parl.GoSubLocal) (goCancel parl.SubGo) {
-	return NewGoSub(g0, local...)
+func (g0 *Go) ThreadInfo() (
+	threadID parl.ThreadID,
+	createLocation pruntime.CodeLocation,
+	funcLocation pruntime.CodeLocation,
+	isValid bool) {
+	var threadData *ThreadData
+	threadData, isValid = g0.thread.Get()
+	threadID, createLocation, funcLocation = threadData.Get()
+	return
+}
+
+// checkState is invoked by all public methods ensuring that terminated
+// objects are not being used
+//   - checkState also collects data on the new thread
+func (g0 *Go) checkState(skipTerminated bool) {
+	if !skipTerminated && g0.isTerminated.IsTrue() {
+		panic(perrors.NewPF("operation on terminated Go thread object"))
+	}
+
+	// ensure we have a threadID
+	if g0.thread.HaveThreadID() {
+		return
+	}
+
+	// update thread information
+	g0.thread.Update(pdebug.NewStack(grCheckThreadFrames))
+
+	// propagate thread information
+	threadData, _ := g0.thread.Get()
+	g0.UpdateThread(g0.G0ID(), threadData)
+}
+
+// g1ID:4:g0.(*g1WaitGroup).Go-g1-thread-group.go:63
+func (g0 *Go) String() (s string) {
+	td, _ := g0.thread.Get()
+	return parl.Sprintf("go:%s:%s", td.threadID, td.createLocation.Short())
 }

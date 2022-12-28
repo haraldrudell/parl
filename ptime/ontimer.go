@@ -11,7 +11,10 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// OnTimer waits from now to the next on-the-hour-like period in local time zone
+// OnTimer returns a time.Timer that waits from t to the next period-multiple from zero time.
+//   - period must be greater than zero or panic
+//   - t contains time zone that matters for durations 24 h or longer, typicaly this is time.Local
+//   - default t is time.Now()
 func OnTimer(period time.Duration, t ...time.Time) (timer *time.Timer) {
 	var t0 time.Time
 	if len(t) > 0 {
@@ -23,10 +26,10 @@ func OnTimer(period time.Duration, t ...time.Time) (timer *time.Timer) {
 	return time.NewTimer(Duro(period, t0))
 }
 
-// Duro returns the duration to the next triggering time.
-// period is the period duration.
-// atTime is the time from which to calculate duration.
-// atTime location contains the time zone for calculations of day and longer durations.
+// Duro returns the duration in nanoseconds until the next duration-multiple from zero time.
+//   - The period starts from atTime
+//   - time zone for multiple-calculation is defined by atTime, often time.Local
+//   - time zone matters for 24 h or longer durations
 func Duro(period time.Duration, atTime time.Time) (d time.Duration) {
 	if period <= 0 {
 		panic(perrors.Errorf("Duro with non-positive period: %s", period))

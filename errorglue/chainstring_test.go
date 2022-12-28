@@ -104,6 +104,7 @@ func TestChainString(t *testing.T) {
 
 	// ShortFormat
 	// error1 at error116.(*csTypeName).FuncName-chainstring_test.go:26
+	t.Logf("dumpChain: %s", DumpChain(cst.err))
 	actualString = ChainString(cst.err, ShortFormat)
 	expected := cst.expectedMessage + "\x20at\x20" + GetStacks(cst.err)[0][0].Short()
 	if actualString != expected {

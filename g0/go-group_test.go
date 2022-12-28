@@ -7,39 +7,72 @@ package g0
 
 import (
 	"context"
-	"sync"
+	"errors"
 	"testing"
 
 	"github.com/haraldrudell/parl"
 )
 
-func TestGoCreatorDo_Add(t *testing.T) {
-	ctx := context.Background()
+func TestGoGroup(t *testing.T) {
+	messageBad := "bad"
+	errBad := errors.New(messageBad)
 
-	gc := NewGoGroup(ctx)
-	goer := gc.Add(parl.EcSharedChan, parl.ExCancelOnExit)
+	var goGroup parl.GoGroup
+	var goGroupImpl *GoGroup
+	var g0 parl.Go
+	var goError parl.GoError
+	var goError2 parl.GoError
+	var ok bool
 
-	var waitForRegister sync.WaitGroup
-	waitForRegister.Add(1)
-	go func(g0 parl.Go) {
-		g0.Register() // give thread information to goer
-		waitForRegister.Done()
-		// TODO
-	}(goer.Go())
-
-	waitForRegister.Wait()
-	gd := goer.(*Goer)
-	var otherIDs []parl.ThreadID
-	for key := range gd.otherIDs {
-		otherIDs = append(otherIDs, key)
+	// instantiate a G1Group
+	goGroup = NewGoGroup(context.Background())
+	if goGroup == nil {
+		t.Error("NewGoGroup nil")
+		t.FailNow()
 	}
-	t.Logf("parentID: %s threadID: %s otherIDs: %v "+
-		"add:\n%s create:\n%s func:\n%s",
-		gd.parentID, gd.threadID, otherIDs,
-		gd.addLocation.Short(),
-		gd.createLocation.Short(),
-		gd.funcLocation.Short(),
-	)
+	if goGroupImpl, ok = goGroup.(*GoGroup); !ok {
+		t.Error("type assertion failed")
+		t.FailNow()
+	}
 
+	// fail a thread
+	g0 = goGroup.Go()
+	if g0 == nil {
+		t.Error("g1Group.Go nil")
+		t.FailNow()
+	}
+	goGroupImpl.GoDone(g0, errBad)
+
+	// check G1Error
+	count := goGroupImpl.ch.Count()
+	if count != 1 {
+		t.Errorf("bad Ch Count: %d exp 1", count)
+	}
+	goError = <-goGroup.Ch()
+	if goError == nil {
+		t.Error("goError nil")
+		t.FailNow()
+	}
+	if !errors.Is(goError.Err(), errBad) {
+		t.Errorf("wrong error: %q %x exp %q %x", goError.Error(), goError, errBad.Error(), errBad)
+	}
+	if !goGroupImpl.isEnd() {
+		t.Error("g1group did not terminate")
+	}
+
+	// instangiate g1 group
+	goGroup = NewGoGroup(context.Background())
+	goGroupImpl = goGroup.(*GoGroup)
+
+	// ConsumeError
+	g0 = goGroup.Go()
+	goError2 = NewGoError(errBad, parl.GeNonFatal, g0)
+	goGroupImpl.ConsumeError(goError2)
+	if goGroupImpl.isEnd() {
+		t.Error("g1group terminated")
+	}
+
+	//	String
+	t.Log(goGroup.String())
 	//t.Fail()
 }

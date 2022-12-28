@@ -16,11 +16,6 @@ const (
 	puFrames = 1
 )
 
-// Panic indicates that err originated from a panic.
-func Panic(err error) error {
-	return Stack(errorglue.NewPanic(err))
-}
-
 // error116.Warning indicates that err is a problem of less severity than error.
 // It is uesed for errors that are not to terminate the thread.
 // A Warning can be detected using error116.IsWarning().

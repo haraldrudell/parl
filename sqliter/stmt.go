@@ -88,7 +88,7 @@ func (st *Stmt) retry(query func() (err error)) {
 		if !shouldQueryPrint(retryDelay) {
 			return // no print exit
 		}
-		incs, decs, max, _, _ := c.CounterValue(false).Get()
+		incs, decs, max := c.(parl.CounterValues).Get()
 		parl.Info("query-count: %d(conc: %d) idle: %s query: total-duration: %s execution-time: %s",
 			incs-decs, max, ptime.Duration(idleDuration(now)),
 			ptime.Duration(totalQueryDuration), ptime.Duration(queryExecutionTime),

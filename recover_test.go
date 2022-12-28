@@ -160,12 +160,13 @@ func TestEnsureErrorNonErr(t *testing.T) {
 }
 
 func TestRecoverOnError(t *testing.T) {
-	annotation := "annotation"
-	exp := annotation + " 'runtime error: invalid memory address or nil pointer dereference'"
-	loc := "runtime.gopanic"
+	annotation := "annotation-fixture"
+	exp := annotation + "\x20\x27runtime error: invalid memory address or nil pointer dereference\x27"
+	loc := "TestRecoverOnError"
 
 	var err error
 
+	// cause a panic that is recovered and stored in err
 	func() {
 		defer Recover(annotation, nil, func(e error) { err = e })
 
@@ -173,16 +174,28 @@ func TestRecoverOnError(t *testing.T) {
 		_ = *pt
 	}()
 
+	// examine err
 	if err == nil {
 		t.Error("Expected error missing")
+		t.FailNow()
 	} else if err.Error() != exp {
-		t.Errorf("bad Error: %q exp %q", err.Error(), exp)
+		t.Errorf("bad err.Error() after panic recovery: %q exp %q", err.Error(), exp)
 	} else {
+		// 221226 perrors.Short now detects panic!
+		// the line provided will be the exact line of the panic,
+		// not some frame from the recovering runtime.
+		//	- errorglue.Indices:
+		//	- recovery perrors.Short(err):
+		//		"annotation-fixture 'runtime error: invalid memory address or nil pointer dereference'
+		//		at parl.TestRecoverOnError.func1-recover_test.go:174"
 		short := perrors.Short(err)
 		if !strings.Contains(short, loc) {
-			t.Errorf("bad Short: %q exp %q", short, loc)
+			t.Errorf("bad perrors.Short(err) after panic recovery: %q exp %q", short, loc)
 		}
 	}
+	t.Logf("recovery err.Error(): %q", err.Error())
+	t.Logf("recovery perrors.Short(err): %q", perrors.Short(err))
+	//t.Fail()
 }
 func TestAnnotation(t *testing.T) {
 	exp := Sprintf("Recover from panic in %s:", pruntime.NewCodeLocation(0).PackFunc())

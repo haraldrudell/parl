@@ -6,6 +6,7 @@ ISC License
 package parl
 
 import (
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
@@ -17,6 +18,9 @@ type WaitAction struct {
 }
 
 func NewWaitAction(skipFrames int, delta int, isDone bool) (waitAction *WaitAction) {
+	if newStack == nil {
+		panic(perrors.NewPF("pdebug has not invoked ImportNewStack"))
+	}
 	stack := newStack(skipFrames)
 	return &WaitAction{
 		ID:     stack.ID(),

@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestCloser(t *testing.T) {
+func TestClosableChanClosing(t *testing.T) {
 
 	// Closer can be invoked multiple times
 	ch := make(chan struct{})
