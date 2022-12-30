@@ -28,9 +28,9 @@ func TestNewOrderedThreadSafe(t *testing.T) {
 	exp1 := []*entity{&entity2, &entity1}
 	expLength := 2
 
-	var ranking parl.Ranking[entity, int]
-	var pmapsRankingThreadSafe *RankingThreadSafe[entity, int]
-	var pmapsRanking *Ranking[entity, int]
+	var ranking parl.PriorityQueue[entity, int]
+	var pmapsRankingThreadSafe *PriorityQueueThreadSafe[entity, int]
+	var pmapsRanking *PriorityQueue[entity, int]
 	var ok bool
 	var rankList []*entity
 	var length int
@@ -53,20 +53,20 @@ func TestNewOrderedThreadSafe(t *testing.T) {
 		return
 	}
 
-	ranking = NewRankingThreadSafe(ranker)
+	ranking = NewPriorityQueueThreadSafe(ranker)
 	ranking.AddOrUpdate(&entity1)
 	ranking.AddOrUpdate(&entity2)
-	pmapsRankingThreadSafe, ok = ranking.(*RankingThreadSafe[entity, int])
+	pmapsRankingThreadSafe, ok = ranking.(*PriorityQueueThreadSafe[entity, int])
 	if !ok {
 		t.Errorf("type assertion failed: ranking.(*RankingThreadSafe[entity, int])")
 		t.FailNow()
 	}
-	pmapsRanking, ok = pmapsRankingThreadSafe.Ranking.(*Ranking[entity, int])
+	pmapsRanking, ok = pmapsRankingThreadSafe.PriorityQueue.(*PriorityQueue[entity, int])
 	if !ok {
 		t.Errorf("type assertion failed: pmapsRankingThreadSafe.Ranking.(*Ranking[entity, int])")
 		t.FailNow()
 	}
-	length = pmapsRanking.ranking.Length()
+	length = pmapsRanking.queue.Length()
 	if length != expLength {
 		t.Errorf("bad Length1 %d exp %d", length, expLength)
 	}

@@ -8,7 +8,6 @@ package pslices
 import (
 	"testing"
 
-	"github.com/haraldrudell/parl"
 	"golang.org/x/exp/slices"
 )
 
@@ -62,83 +61,5 @@ func TestInsertOrderedFunc(t *testing.T) {
 	}
 	if slice3 = InsertOrderedFunc(slice2, v1, descending); slices.Compare(slice3, exp3) != 0 {
 		t.Errorf("bad slice3 %v exp %v", slice3, exp3)
-	}
-}
-
-type CmpPointer struct {
-	value int
-	ID    int
-}
-
-var _ parl.Comparable[CmpPointer] = &CmpPointer{}
-
-func (e *CmpPointer) Cmp(b CmpPointer) (result int) {
-	if e.value > b.value {
-		return 1
-	} else if e.value < b.value {
-		return -1
-	}
-	return 0
-}
-
-func TestInsertOrderedFunc_CmpPointer(t *testing.T) {
-	e1 := CmpPointer{1, 1}
-	var sliceA = []CmpPointer{e1}
-	expB := []CmpPointer{e1, e1}
-
-	// slice of struct: comparable but not Constraints.Ordered
-	var sliceB []CmpPointer
-	_ = sliceB
-
-	sliceB = InsertOrderedFunc(sliceA, e1, nil)
-	// slices.Compare requires Constraint.Ordered
-	different := len(sliceB) != len(expB)
-	if !different {
-		for i, e := range sliceB {
-			if different = e != expB[i]; different {
-				break
-			}
-		}
-	}
-	if different {
-		t.Errorf("bad sliceB %v exp %v", sliceB, expB)
-	}
-}
-
-type CmpValue struct {
-	value int
-	ID    int
-}
-
-var _ parl.Comparable[CmpValue] = CmpValue{}
-
-func (e CmpValue) Cmp(b CmpValue) (result int) {
-	if e.value > b.value {
-		return 1
-	} else if e.value < b.value {
-		return -1
-	}
-	return 0
-}
-
-func TestInsertOrderedFunc_CmpValue(t *testing.T) {
-	e1 := CmpValue{1, 1}
-	var sliceA = []CmpValue{e1}
-	expB := []CmpValue{e1, e1}
-
-	var sliceB []CmpValue
-	_ = sliceB
-
-	sliceB = InsertOrderedFunc(sliceA, e1, nil)
-	different := len(sliceB) != len(expB)
-	if !different {
-		for i, e := range sliceB {
-			if different = e != expB[i]; different {
-				break
-			}
-		}
-	}
-	if different {
-		t.Errorf("bad sliceB %v exp %v", sliceB, expB)
 	}
 }

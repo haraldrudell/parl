@@ -9,6 +9,7 @@ package pslices
 
 import (
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/exp/slices"
 )
 
@@ -34,12 +35,12 @@ type OrderedAny[E any] struct {
 //   - cmp(a, b) is expected to return an integer comparing the two parameters:
 //     0 if a == b, a negative number if a < b and a positive number if a > b
 //   - duplicate values are allowed and inserted in order with later values last
+//   - if E is an interface-type and cmp is nil, every provided value must be checked
+//     to be comparable
 func NewOrderedAny[E any](cmp func(a, b E) (result int)) (list parl.Ordered[E]) {
 	if cmp == nil {
-		var e E
-		cmp = CmpFromComparable(e)
+		panic(perrors.NewPF("cmp cannot be nil"))
 	}
-
 	return &OrderedAny[E]{cmp: cmp}
 }
 

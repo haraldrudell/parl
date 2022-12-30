@@ -50,6 +50,7 @@ func (rw *RWMap[K, V]) Get(key K) (value V, ok bool) {
 }
 
 // GetOrCreate returns an item from the map if it exists otherwise creates it.
+//   - GetOrCreate adds to thread-safety by making the get-put operations atomic
 //   - newV or makeV are invoked in the critical section, ie. these functions
 //     may not access the map or deadlock
 //   - if a key is mapped, its value is returned

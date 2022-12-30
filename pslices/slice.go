@@ -29,6 +29,17 @@ func (o *Slice[E]) Clear() {
 }
 
 // List returns a clone of the ordered slice.
-func (o *Slice[E]) List() (list []E) {
-	return slices.Clone(o.list)
+func (o *Slice[E]) List(n ...int) (list []E) {
+	length := o.Length()
+
+	// get number of items n0
+	var n0 int
+	if len(n) > 0 {
+		n0 = n[0]
+	}
+	if n0 < 1 || n0 > length {
+		n0 = length
+	}
+
+	return slices.Clone(o.list[:n0])
 }

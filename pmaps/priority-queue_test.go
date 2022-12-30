@@ -35,8 +35,8 @@ func TestNewRanking(t *testing.T) {
 	exp3 := []*entity{&entity1}
 	expLength := 3
 
-	var ranking parl.Ranking[entity, int]
-	var pmapsRanking *Ranking[entity, int]
+	var ranking parl.PriorityQueue[entity, int]
+	var pmapsRanking *PriorityQueue[entity, int]
 	var ok bool
 	var rankList []*entity
 	var length int
@@ -60,8 +60,8 @@ func TestNewRanking(t *testing.T) {
 		return
 	}
 
-	ranking = NewRanking(ranker)
-	if pmapsRanking, ok = ranking.(*Ranking[entity, int]); !ok {
+	ranking = NewPriorityQueue(ranker)
+	if pmapsRanking, ok = ranking.(*PriorityQueue[entity, int]); !ok {
 		t.Error("type asserton failed")
 		t.FailNow()
 	}
@@ -74,7 +74,7 @@ func TestNewRanking(t *testing.T) {
 	if length = len(pmapsRanking.m); length != expLength {
 		t.Errorf("bad map length1 %d exp %d", length, expLength)
 	}
-	if pmapsRanking.ranking.Length(); length != expLength {
+	if pmapsRanking.queue.Length(); length != expLength {
 		t.Errorf("bad Length1 %d exp %d", length, expLength)
 	}
 	if rankList = ranking.List(); !isSameRanking(rankList, exp1) {

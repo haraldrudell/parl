@@ -48,5 +48,5 @@ type Slice[E any] interface {
 	// Clear empties the ordered slice
 	Clear()
 	// List returns a clone of the internal slice
-	List() (list []E)
+	List(n ...int) (list []E)
 }

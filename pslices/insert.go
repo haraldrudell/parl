@@ -6,7 +6,6 @@ ISC License
 package pslices
 
 import (
-	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/slices"
@@ -44,7 +43,7 @@ func InsertOrderedFunc[E any](slice0 []E, value E, cmp func(a, b E) (result int)
 
 	// obtain comparison function
 	if cmp == nil {
-		cmp = CmpFromComparable(value)
+		panic(perrors.NewPF("cmp cannot be nil"))
 	}
 
 	// find position
@@ -62,23 +61,4 @@ func InsertOrderedFunc[E any](slice0 []E, value E, cmp func(a, b E) (result int)
 	}
 
 	return slices.Insert(slice0, position, value)
-}
-
-func CmpFromComparable[E any](value E) (cmp func(a, b E) (result int)) {
-
-	// comparison function with value receiver
-	if _, ok := any(value).(parl.Comparable[E]); ok {
-		return func(a, b E) (result int) {
-			return any(a).(parl.Comparable[E]).Cmp(b)
-		}
-	}
-
-	// comparison function with pointer receiver
-	if _, ok := any(&value).(parl.Comparable[E]); ok {
-		return func(a, b E) (result int) {
-			return any(&a).(parl.Comparable[E]).Cmp(b)
-		}
-	}
-
-	panic(perrors.NewPF("cmp cannot be nil if value is not parl.Comparable"))
 }

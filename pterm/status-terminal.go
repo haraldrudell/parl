@@ -82,18 +82,21 @@ func (st *StatusTerminal) Status(s string) {
 	lastIndex := len(lines) - 1
 	for i, line := range lines {
 		printablesLine := TrimANSIEscapes(line)
-		displayLineCount += len(printablesLine)/width + 1
+		length := len([]rune(printablesLine)) // length in unicode code points
+		displayLineCount += length/width + 1
 		output += line
+		cursorAtEndOfLine := length > 0 && length%width == 0
 		if i < lastIndex {
-			isAtDisplayWidth := len(printablesLine) > 0 && len(printablesLine)%width == 0
-			if !isAtDisplayWidth {
+			if !cursorAtEndOfLine {
 				output += eraseEndOfLine + newLine
 			}
 		} else {
 			displayLineCount-- // last line has no newline
+			if !cursorAtEndOfLine {
+				output += space // places cursor one step to the right of final output character
+			}
 		}
 	}
-	output += space // places cursor one step to the right of final output character
 
 	st.lock.Lock()
 	defer st.lock.Unlock()
@@ -103,20 +106,6 @@ func (st *StatusTerminal) Status(s string) {
 	// save display status
 	st.output = output
 	st.displayLineCount = displayLineCount
-}
-
-func (st *StatusTerminal) clearStatus() (s string) {
-	if len(st.output) > 0 {
-		s = moveCursorToColumnZero + strings.Repeat(cursorUp, st.displayLineCount) + eraseEndOfDisplay
-	}
-	return
-}
-
-func (st *StatusTerminal) restoreStatus() (s string) {
-	if len(st.output) > 0 {
-		s = st.output + eraseEndOfDisplay
-	}
-	return
 }
 
 // Log outputs text ending with at least one newline while maintaining status information
@@ -155,4 +144,26 @@ func (st *StatusTerminal) Log(format string, a ...interface{}) {
 	defer st.lock.Unlock()
 
 	parl.Logw(st.clearStatus() + s + st.restoreStatus())
+}
+
+func (st *StatusTerminal) Width() (width int) {
+	var err error
+	if width, _, err = term.GetSize(st.Fd); err != nil {
+		panic(perrors.ErrorfPF("term.GetSize %w", err))
+	}
+	return
+}
+
+func (st *StatusTerminal) clearStatus() (s string) {
+	if len(st.output) > 0 {
+		s = moveCursorToColumnZero + strings.Repeat(cursorUp, st.displayLineCount) + eraseEndOfDisplay
+	}
+	return
+}
+
+func (st *StatusTerminal) restoreStatus() (s string) {
+	if len(st.output) > 0 {
+		s = st.output + eraseEndOfDisplay
+	}
+	return
 }
