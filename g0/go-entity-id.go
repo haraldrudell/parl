@@ -6,6 +6,7 @@ ISC License
 package g0
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/haraldrudell/parl"
@@ -47,4 +48,8 @@ func newGoEntityID(extraFrames int) (g0EntityID *goEntityID) {
 
 func (gi *goEntityID) G0ID() (id GoEntityID) {
 	return gi.id
+}
+
+func (gi GoEntityID) String() (s string) {
+	return strconv.FormatUint(uint64(gi), 10)
 }

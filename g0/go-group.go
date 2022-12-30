@@ -7,6 +7,7 @@ package g0
 
 import (
 	"context"
+	"strconv"
 	"sync"
 
 	"github.com/haraldrudell/parl"
@@ -29,8 +30,8 @@ const (
 type GoGroup struct {
 	goEntityID
 	parent          goGroupParent
-	hasErrorChannel parl.AtomicBool
-	isSubGroup      parl.AtomicBool
+	hasErrorChannel parl.AtomicBool // this GoGroup uses its error channel: NewGoGroup() or SubGroup()
+	isSubGroup      parl.AtomicBool // is SubGroup(): not NewGoGroup() or SubGo()
 	isWaitGroupDone parl.AtomicBool
 	hadFatal        parl.AtomicBool
 	onFirstFatal    parl.GoFatalCallback
@@ -86,6 +87,10 @@ func (g0 *GoGroup) Go() (g1 parl.Go) {
 
 	// count the running thread in this thread-group and its parents
 	g0.Add(goEntityID, threadData)
+
+	if parl.IsThisDebug() {
+		parl.Debug("Go#%s(%s)", goEntityID.String(), g0.goGroupState())
+	}
 
 	return
 }
@@ -147,6 +152,15 @@ func new(
 	if isSubGroup {
 		g.isSubGroup.Set()
 	}
+	if parl.IsThisDebug() {
+		s := "new:" + g.typeString()
+		if parent != nil {
+			if p, ok := parent.(*GoGroup); ok {
+				s += "(" + p.typeString() + ")"
+			}
+		}
+		parl.Debug(s)
+	}
 	return &g
 }
 
@@ -168,7 +182,7 @@ func (g0 *GoGroup) UpdateThread(goEntityID GoEntityID, threadData *ThreadData) {
 
 // Done receives thread exits from threads in subordinate thread-groups
 func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
-	if g0.isEnd() {
+	if g0.isWaitGroupDone.IsTrue() {
 		panic(perrors.ErrorfPF("in GoGroup after termination: %s", perrors.Short(err)))
 	}
 
@@ -191,17 +205,27 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 		}
 	}
 
+	// atomic operation: DoneBool and g0.ch.Close
 	g0.doneLock.Lock()
 	defer g0.doneLock.Unlock()
 
 	// process thread-exit
 	isTermination := g0.goWaitGroup.wg.DoneBool()
-	var g1impl goImpl
+	var threadGo goImpl
 	var ok bool
-	if g1impl, ok = thread.(goImpl); !ok {
+	if threadGo, ok = thread.(*Go); !ok {
 		panic(perrors.NewPF("type assertion failed"))
 	}
-	g0.gos.Delete(g1impl.G0ID())
+	if parl.IsThisDebug() {
+		var s string
+		if err == nil {
+			s = "OK"
+		} else {
+			s = "Err"
+		}
+		parl.Debug("GoX#%s:%s(%s)", threadGo.G0ID().String(), s, g0.goGroupState())
+	}
+	g0.gos.Delete(threadGo.G0ID())
 	if g0.isSubGroup.IsTrue() {
 
 		// SubGroup with its own error channel with fatals not affecting parent
@@ -314,10 +338,27 @@ func (g0 *GoGroup) listThreads() (threads []*ThreadData) {
 	return g0.gos.List()
 }
 
+// "goGroup#1" "subGroup#2" "subGo#3"
+func (g0 *GoGroup) typeString() (s string) {
+	if g0.parent == nil {
+		s = "goGroup"
+	} else if g0.isSubGroup.IsTrue() {
+		s = "subGroup"
+	} else {
+		s = "subGo"
+	}
+	return s + "#" + g0.goEntityID.G0ID().String()
+}
+
+// "goGroup#1:2" "subGroup#2:1" "subGo#3:0"
+func (g0 *GoGroup) goGroupState() (s string) {
+	adds, dones := g0.goWaitGroup.wg.Counters()
+	return g0.typeString() + ":" + strconv.Itoa(adds-dones)
+}
+
 // g1Group#3threads:1(1)g0.TestNewG1Group-g1-group_test.go:60
 func (g0 *GoGroup) String() (s string) {
-	return parl.Sprintf("goGroup#%d_threads:%s_New:%s",
-		g0.goEntityID.id,
+	return g0.typeString() + parl.Sprintf("_threads:%s_New:%s",
 		g0.goWaitGroup.wg.String(),
 		g0.goEntityID.creator.Short(),
 	)

@@ -70,7 +70,7 @@ func (ge *GoError) String() (s string) {
 	}
 	var message string
 	if err != nil {
-		message = err.Error()
+		message = perrors.Short(err)
 	} else {
 		message = "OK"
 	}
