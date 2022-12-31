@@ -33,9 +33,9 @@ func Fit(s string, width int, pad bool) (s2 string) {
 	// length > width:
 	// "abcdef" width:4: center:3, cut:3 right:2, left:1: "ab…ef"
 	center := length / 2      // center of string, rounded down
-	cut := length - width + 1 // number of characters to delete, add "…"
-	right := cut/2 + 1        // characters to delete at end, rounded up
-	left := cut - right       // characters
+	cut := length - width + 1 // number of characters to delete, add 1 for "…"
+	right := cut/2 + 1        // characters to delete after center
+	left := cut - right       // characters to delete before center
 	runes := []rune(s)
 	runes[center-left] = epsilonRune
 	copy(runes[center-left+1:], runes[center+right:])

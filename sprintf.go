@@ -11,6 +11,9 @@ import (
 
 // Sprintf is a printer that supports comma in large numbers
 func Sprintf(format string, a ...interface{}) string {
+	if len(a) == 0 {
+		return format
+	}
 	return parlSprintf(format, a...)
 }
 
