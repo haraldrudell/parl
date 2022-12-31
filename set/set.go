@@ -1,6 +1,6 @@
 /*
-© 2022-present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved
+© 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
 */
 
 package set
@@ -52,6 +52,14 @@ func (st *SetImpl[T]) IsValid(value T) (isValid bool) {
 func (st *SetImpl[T]) Element(value T) (element parl.Element[T]) {
 	if e, ok := st.elementMap[value]; ok {
 		element = e
+	}
+	return
+}
+
+func (st *SetImpl[T]) Description(value T) (full string) {
+	var v any = value
+	if e, ok := v.(parl.ElementFull[T]); ok {
+		full = e.Description()
 	}
 	return
 }

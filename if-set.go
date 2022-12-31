@@ -1,6 +1,6 @@
 /*
-© 2022-present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved
+© 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
 */
 
 package parl
@@ -35,6 +35,7 @@ type Set[T comparable] interface {
 	// StringT returns a string representation for an element of this set.
 	// if value is not a valid element, a fmt.Printf value is output like ?'%v'
 	StringT(value T) (s string)
+	Description(value T) (s string)
 	fmt.Stringer
 }
 
@@ -44,6 +45,11 @@ type Set[T comparable] interface {
 type Element[T comparable] interface {
 	Value() (value T)
 	fmt.Stringer
+}
+
+type ElementFull[T comparable] interface {
+	Element[T]
+	Description() (full string)
 }
 
 type SetFactory[T comparable] interface {
