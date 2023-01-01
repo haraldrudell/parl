@@ -19,7 +19,6 @@ import (
 // RWMap implements [parl.ThreadSafeMap][K comparable, V any].
 //   - GetOrCreate method is a thread-safe atomic operation as opposed to
 //     Get-then-Put
-//   - RWMap does not need to be initialized
 //   - For using RWMap as periodically updated thread-safe mapping collection, use with
 //     parl.AtomicReference
 //   - V is copied so if size of V is large or V contains locks, use pointer
@@ -35,15 +34,16 @@ func NewRWMap[K comparable, V any]() (rwMap parl.ThreadSafeMap[K, V]) {
 	return &RWMap[K, V]{m: map[K]V{}}
 }
 
+func NewRWMap2[K comparable, V any]() (rwMap *RWMap[K, V]) {
+	return &RWMap[K, V]{m: map[K]V{}}
+}
+
 // Get returns the value mapped by key or the V zero-value otherwise.
 //   - the ok return value is true if a mapping was found.
 //   - O(1)
 func (rw *RWMap[K, V]) Get(key K) (value V, ok bool) {
 	rw.lock.RLock()
 	defer rw.lock.RUnlock()
-	if rw.m == nil {
-		rw.m = map[K]V{}
-	}
 
 	value, ok = rw.m[key]
 	return
@@ -67,9 +67,6 @@ func (rw *RWMap[K, V]) GetOrCreate(
 ) (value V, ok bool) {
 	rw.lock.Lock()
 	defer rw.lock.Unlock()
-	if rw.m == nil {
-		rw.m = map[K]V{}
-	}
 
 	// try exiting mapping
 	if value, ok = rw.m[key]; ok {
@@ -99,9 +96,6 @@ func (rw *RWMap[K, V]) GetOrCreate(
 func (rw *RWMap[K, V]) Put(key K, value V) {
 	rw.lock.Lock()
 	defer rw.lock.Unlock()
-	if rw.m == nil {
-		rw.m = map[K]V{}
-	}
 
 	rw.m[key] = value
 }
@@ -112,9 +106,6 @@ func (rw *RWMap[K, V]) Put(key K, value V) {
 func (rw *RWMap[K, V]) Delete(key K) {
 	rw.lock.Lock()
 	defer rw.lock.Unlock()
-	if rw.m == nil {
-		rw.m = map[K]V{}
-	}
 
 	delete(rw.m, key)
 }
@@ -123,9 +114,6 @@ func (rw *RWMap[K, V]) Delete(key K) {
 func (rw *RWMap[K, V]) Clear() {
 	rw.lock.Lock()
 	defer rw.lock.Unlock()
-	if rw.m == nil {
-		rw.m = map[K]V{}
-	}
 
 	maps.Clear(rw.m)
 }
@@ -134,9 +122,6 @@ func (rw *RWMap[K, V]) Clear() {
 func (rw *RWMap[K, V]) Length() (length int) {
 	rw.lock.Lock()
 	defer rw.lock.Unlock()
-	if rw.m == nil {
-		rw.m = map[K]V{}
-	}
 
 	return len(rw.m)
 }
@@ -147,9 +132,7 @@ func (rw *RWMap[K, V]) Clone() (clone parl.ThreadSafeMap[K, V]) {
 	defer rw.lock.Unlock()
 
 	var c RWMap[K, V]
-	if rw.m != nil {
-		c.m = maps.Clone(rw.m)
-	}
+	c.m = maps.Clone(rw.m)
 	return &c
 }
 
@@ -158,9 +141,6 @@ func (rw *RWMap[K, V]) Clone() (clone parl.ThreadSafeMap[K, V]) {
 func (rw *RWMap[K, V]) List() (list []V) {
 	rw.lock.Lock()
 	defer rw.lock.Unlock()
-	if rw.m == nil {
-		rw.m = map[K]V{}
-	}
 
 	list = make([]V, len(rw.m))
 	i := 0
