@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Counter is a counter without rate information.
 package counter
 
 import (
@@ -11,9 +12,11 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-// Counter is a counter without rate information.
-// Counter implements parl.Couter and parl.CounterValues.
-// Counter is thread-safe
+// Counter is a counter without rate information. Thread-safe.
+//   - value: monotonically increasing: Inc
+//   - running: Inc - Dec
+//   - max: the highest value of running
+//   - Counter implements parl.Counter and parl.CounterValues.
 type Counter struct {
 	value   uint64 // atomic
 	running uint64 // atomic

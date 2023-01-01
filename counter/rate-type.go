@@ -21,9 +21,9 @@ var rateSet = set.NewSet(pslices.ConvertSliceToInterface[
 	set.Element[RateType],
 	parl.Element[RateType],
 ]([]set.Element[RateType]{
-	{RateType(parl.ValueRate), "value rate"},
-	{RateType(parl.ValueMaxRate), "value max rate"},
-	{RateType(parl.RunningRate), "running inc rate"},
-	{RateType(parl.RunningMaxRate), "runninc max inc rate"},
-	{RateType(parl.RunningMaxDecRate), "running max dec rate"},
+	{ValueV: RateType(parl.ValueRate), Name: "value rate"},
+	{ValueV: RateType(parl.ValueMaxRate), Name: "value max rate"},
+	{ValueV: RateType(parl.RunningRate), Name: "running inc rate"},
+	{ValueV: RateType(parl.RunningMaxRate), Name: "runninc max inc rate"},
+	{ValueV: RateType(parl.RunningMaxDecRate), Name: "running max dec rate"},
 }))

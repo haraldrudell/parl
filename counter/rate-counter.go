@@ -23,7 +23,7 @@ type RateCounter struct {
 	Counter
 	lock       sync.Mutex
 	hasValues  bool   // indicates that value and running was initialized at start of period
-	value      uint64 // value at beginning of periof
+	value      uint64 // value at beginning of period
 	running    uint64 // running at beginning of period
 	m          map[parl.RateType]int64
 	valueAvg   Averager
@@ -80,6 +80,8 @@ func (rc *RateCounter) Do() {
 	rc.m[parl.ValueRateAverage] = int64(rc.valueAvg.Add(uint64(rc.m[parl.ValueRate])))
 }
 
+// do performs rate counter calculation over a period starting at from value and
+// ending at to value.
 func (rc *RateCounter) do(from, to uint64, rateX, maxRateX, maxDecRateX parl.RateType) {
 	mapp := rc.m
 	if to == from {

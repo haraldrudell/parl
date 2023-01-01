@@ -127,14 +127,14 @@ type CountersFactory interface {
 }
 
 const (
-	ValueRate RateType = iota
-	ValueMaxRate
-	ValueRateAverage
+	ValueRate        RateType = iota // current rate of increase in value
+	ValueMaxRate                     // max seen rate of increase in value
+	ValueRateAverage                 // average rate of increase in value during last 10 periods
 	RunningRate
 	RunningMaxRate
 	RunningMaxDecRate
 	RunningAverage
-	NotAValue
+	NotAValue // NotAValue is an internal stand-in value indicating a value not in use
 )
 
 type RateType int
