@@ -42,6 +42,14 @@ func (pid Pid) IsValid() (isValid bool) {
 	return pid != 0
 }
 
+func (pid Pid) Int() (pidInt int) {
+	return int(pid)
+}
+
+func (pid Pid) Uint32() (pidUint32 uint32) {
+	return uint32(pid)
+}
+
 func (pid Pid) String() (s string) {
 	return strconv.Itoa(int(pid))
 }
