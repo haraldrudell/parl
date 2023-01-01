@@ -8,8 +8,11 @@ package iana
 
 import (
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/ints"
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pslices"
 	"github.com/haraldrudell/parl/set"
+	"golang.org/x/exp/constraints"
 )
 
 // iana provides Address Family Numbers for the Internet.
@@ -70,6 +73,41 @@ const (
 	AFreserved  AddressFamily = 65535        // 65535 65535	Reserved
 )
 
+func NewAddressFamily[T constraints.Integer](integer T) (addressFamily AddressFamily, err error) {
+
+	// convert to uint16
+	var u16 uint16
+	if u16, err = ints.ConvertU16(integer, perrors.PackFunc()); err != nil {
+		return
+	}
+
+	// convert to iana.AddressFamily, allow for invalid values
+	addressFamily = AddressFamily(u16)
+
+	return
+}
+
+func NewValidAddressFamily[T constraints.Integer](integer T) (addressFamily AddressFamily, err error) {
+	if addressFamily, err = NewAddressFamily(integer); err != nil {
+		return
+	}
+	if !addressFamily.IsValid() {
+		err = perrors.ErrorfPF("invalid address family value: %d 0x%[1]x", addressFamily)
+		return
+	}
+
+	return
+}
+
+func NewAddressFamily1[T constraints.Integer](integer T) (addressFamily AddressFamily) {
+	var err error
+	if addressFamily, err = NewAddressFamily(integer); err != nil {
+		panic(err)
+	}
+
+	return
+}
+
 func (af AddressFamily) String() (s string) {
 	return addressFamilySet.StringT(af)
 }
@@ -86,7 +124,7 @@ var addressFamilySet = set.NewSet(pslices.ConvertSliceToInterface[
 	set.SetElementFull[AddressFamily],
 	parl.Element[AddressFamily],
 ]([]set.SetElementFull[AddressFamily]{
-	{ValueV: AFreserved0, Name: "0", Full: "Reserved"},
+	//{ValueV: AFreserved0, Name: "0", Full: "Reserved"},
 	{ValueV: AFip, Name: "IP", Full: "(IP version 4)"},
 	{ValueV: AFip6, Name: "IP6", Full: "(IP version 6)"},
 	{ValueV: AFnsap, Name: "NSAP", Full: "NSAP"},
@@ -134,5 +172,5 @@ var addressFamilySet = set.NewSet(pslices.ConvertSliceToInterface[
 	{ValueV: AFuuid, Name: "UUID", Full: "Universally Unique Identifier (UUID)"},
 	{ValueV: AFafir, Name: "AFI", Full: "Routing Policy AFI	[draft-ietf-idr-rpd-02]"},
 	{ValueV: AFmplsns, Name: "MPLSNS", Full: "MPLS Namespaces"},
-	{ValueV: AFreserved, Name: "65535", Full: "65535	Reserved"},
+	//{ValueV: AFreserved, Name: "65535", Full: "65535	Reserved"},
 }))

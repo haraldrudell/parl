@@ -8,8 +8,11 @@ package iana
 
 import (
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/ints"
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pslices"
 	"github.com/haraldrudell/parl/set"
+	"golang.org/x/exp/constraints"
 )
 
 // iana provides Assigned Internet Protocol Numbers for IPv4 and IPv6.
@@ -168,6 +171,41 @@ const (
 	IP254                            // 254 Use for experimentation and testing IPv6xh RFC3692
 	IP255                            // Reserved Reserved
 )
+
+func NewProtocol[T constraints.Integer](integer T) (protocol Protocol, err error) {
+
+	// convert to uint8
+	var u8 uint8
+	if u8, err = ints.ConvertU8(integer, perrors.PackFunc()); err != nil {
+		return
+	}
+
+	// convert to iana.Protocol
+	protocol = Protocol(u8)
+
+	return
+}
+
+func NewValidProtocol[T constraints.Integer](integer T) (protocol Protocol, err error) {
+	if protocol, err = NewProtocol(integer); err != nil {
+		return
+	}
+	if !protocol.IsValid() {
+		err = perrors.ErrorfPF("invalid protocol value: %d 0x%[1]x", protocol)
+		return
+	}
+
+	return
+}
+
+func NewProtocol1[T constraints.Integer](integer T) (protocol Protocol) {
+	var err error
+	if protocol, err = NewProtocol(integer); err != nil {
+		panic(err)
+	}
+
+	return
+}
 
 func (pr Protocol) String() (s string) {
 	return ianaSet.StringT(pr)
@@ -332,5 +370,5 @@ var ianaSet = set.NewSet(pslices.ConvertSliceToInterface[
 	{ValueV: IPagg, Name: "AGGFRAG", Full: "AGGFRAG encapsulation payload for ESP RFC-ietf-ipsecme-iptfs-19"},
 	{ValueV: IP253, Name: "253", Full: "Use for experimentation and testing IPv6xh RFC3692"},
 	{ValueV: IP254, Name: "254", Full: "Use for experimentation and testing IPv6xh RFC3692"},
-	{ValueV: IP255, Name: "Reserved", Full: "Reserved"},
+	//{ValueV: IP255, Name: "Reserved", Full: "Reserved"},
 }))
