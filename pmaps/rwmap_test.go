@@ -60,11 +60,11 @@ func TestNewRWMap(t *testing.T) {
 
 	}
 
-	(&RWMap[string, int]{}).GetOrCreate(k1, nil, nil)
-	(&RWMap[string, int]{}).Get(k1)
-	(&RWMap[string, int]{}).List()
-	(&RWMap[string, int]{}).Put(k1, v1)
-	(&RWMap[string, int]{}).Delete(k1)
-	(&RWMap[string, int]{}).Clear()
-	(&RWMap[string, int]{}).Length()
+	(NewRWMap[string, int]()).GetOrCreate(k1, nil, nil)
+	(NewRWMap[string, int]()).Get(k1)
+	(NewRWMap[string, int]()).List()
+	(NewRWMap[string, int]()).Put(k1, v1)
+	(NewRWMap[string, int]()).Delete(k1)
+	(NewRWMap[string, int]()).Clear()
+	(NewRWMap[string, int]()).Length()
 }

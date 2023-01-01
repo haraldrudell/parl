@@ -15,6 +15,11 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// Counters is a container for counters, rate-counters and datapoints. Thread-Safe.
+//   - counter is Inc-Dec with: value running max
+//   - rate-counter measure over short time periods:
+//   - — value: current/max/average rate of increase
+//   - — running: rate up or down, max increase/decrease rate,
 type Counters struct {
 	lock    sync.Mutex
 	ordered []parl.CounterID       // behind lock: ordered list of counters and datapoints
