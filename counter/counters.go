@@ -16,9 +16,9 @@ import (
 )
 
 // Counters is a container for counters, rate-counters and datapoints. Thread-Safe.
-//   - counter is Inc-Dec with: value running max
-//   - rate-counter measure over short time periods:
-//   - — value: current/max/average rate of increase
+//   - a counter is Inc-Dec with: value running max
+//   - a rate-counter is a counter with addtional measuring over short time periods:
+//   - — value: rate of increase: current/max/average
 //   - — running: rate up or down, max increase/decrease rate,
 type Counters struct {
 	lock    sync.Mutex

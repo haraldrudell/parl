@@ -16,6 +16,10 @@ import (
 )
 
 // iana provides Assigned Internet Protocol Numbers for IPv4 and IPv6.
+//   - Protocol is ordered
+//   - Protocol implements fmt.Stringer
+//   - Protocol has methods IsValid Description Int Uint8
+//
 // IANA [protocol-numbers]
 //
 // [protocol-numbers]: https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
@@ -172,6 +176,10 @@ const (
 	IP255                            // Reserved Reserved
 )
 
+// NewProtocol returns iana.Protocol for any integer value.
+//   - values larger that 255 produce error testable with errors.Is(err, ints.ErrTooLarge)
+//   - protocol may be invalid, ie. not an iana-assigned value, check with protocol.IsValid
+//   - or use NewValidProtocol
 func NewProtocol[T constraints.Integer](integer T) (protocol Protocol, err error) {
 
 	// convert to uint8
@@ -186,6 +194,9 @@ func NewProtocol[T constraints.Integer](integer T) (protocol Protocol, err error
 	return
 }
 
+// NewProtocol returns iana.Protocol for any integer value.
+//   - values larger that 255 produce error testable with errors.Is(err, ints.ErrTooLarge)
+//   - protocol is valid
 func NewValidProtocol[T constraints.Integer](integer T) (protocol Protocol, err error) {
 	if protocol, err = NewProtocol(integer); err != nil {
 		return
@@ -198,6 +209,10 @@ func NewValidProtocol[T constraints.Integer](integer T) (protocol Protocol, err 
 	return
 }
 
+// NewProtocol returns iana.Protocol for any integer value.
+//   - if value is too large, panic
+//   - protocol may be invalid, ie. not an iana-assigned value, check with protocol.IsValid
+//   - or use NewValidProtocol
 func NewProtocol1[T constraints.Integer](integer T) (protocol Protocol) {
 	var err error
 	if protocol, err = NewProtocol(integer); err != nil {
@@ -211,10 +226,19 @@ func (pr Protocol) String() (s string) {
 	return ianaSet.StringT(pr)
 }
 
+func (pr Protocol) Int() (protocolInt int) {
+	return int(pr)
+}
+
+func (pr Protocol) Uint8() (protocolInt uint8) {
+	return uint8(pr)
+}
+
 func (pr Protocol) IsValid() (isValid bool) {
 	return ianaSet.IsValid(pr)
 }
 
+// Description returns a sentence describing protocol
 func (pr Protocol) Description() (full string) {
 	return ianaSet.Description(pr)
 }

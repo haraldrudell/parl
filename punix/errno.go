@@ -8,6 +8,7 @@ package punix
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/haraldrudell/parl"
@@ -45,6 +46,21 @@ func Errno(err error) (errnoValue unix.Errno) {
 		}
 	}
 	return // no match return
+}
+
+// ErrorNumberString returns the errno number as a string if
+// the err error chain has a non-zero syscall.Errno error.
+//   - returned string is similar to: "label: 5 0x5"
+//   - if label is empty string, no label is returned
+//   - if no syscall.Errno is found or it is zero, the empty string is returned
+func ErrorNumberString(err error, label string) (errnoNumericString string) {
+	if syscallErrno := Errno(err); syscallErrno != 0 {
+		if label != "" {
+			label += ": "
+		}
+		errnoNumericString = label + strconv.Itoa(int(syscallErrno)) + " 0x" + strconv.FormatInt(int64(syscallErrno), 16)
+	}
+	return
 }
 
 // ErrnoError gets the errno interpretation if the error chain does contain

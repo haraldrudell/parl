@@ -7,11 +7,14 @@ ISC License
 package ints
 
 import (
+	"errors"
 	"math"
 
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/exp/constraints"
 )
+
+var ErrTooLarge = errors.New("value too large")
 
 func ConvertU8[T constraints.Integer](integer T, label string) (u8 uint8, err error) {
 
@@ -26,7 +29,7 @@ func ConvertU8[T constraints.Integer](integer T, label string) (u8 uint8, err er
 		if label == "" {
 			label = perrors.PackFunc()
 		}
-		err = perrors.ErrorfPF("%s value too large: %d 0x%[1]x max: %d 0x%[2]x", label, u64, math.MaxUint8)
+		err = perrors.ErrorfPF("%s %w: %d 0x%[1]x max: %d 0x%[2]x", label, ErrTooLarge, u64, math.MaxUint8)
 		return
 	}
 

@@ -16,6 +16,10 @@ import (
 )
 
 // iana provides Address Family Numbers for the Internet.
+//   - AddressFamily is ordered
+//   - AddressFamily implements fmt.Stringer
+//   - AddressFamily has methods IsValid Description Int Uint16
+//
 // IANA [address-family-numbers]
 //
 // [address-family-numbers]: https://www.iana.org/assignments/address-family-numbers/address-family-numbers.xhtml
@@ -73,6 +77,10 @@ const (
 	AFreserved  AddressFamily = 65535        // 65535 65535	Reserved
 )
 
+// NewAddressFamily returns iana.AddressFamily for any integer value.
+//   - values larger that 255 produce error testable with errors.Is(err, ints.ErrTooLarge)
+//   - addressFamily may be invalid, ie. not an iana-assigned value, check with addressFamily.IsValid
+//   - or use NewValidAddressFamily
 func NewAddressFamily[T constraints.Integer](integer T) (addressFamily AddressFamily, err error) {
 
 	// convert to uint16
@@ -87,6 +95,9 @@ func NewAddressFamily[T constraints.Integer](integer T) (addressFamily AddressFa
 	return
 }
 
+// NewValidAddressFamily returns iana.AddressFamily for any integer value.
+//   - values larger that 65535 produce error testable with errors.Is(err, ints.ErrTooLarge)
+//   - addressFamily is valid
 func NewValidAddressFamily[T constraints.Integer](integer T) (addressFamily AddressFamily, err error) {
 	if addressFamily, err = NewAddressFamily(integer); err != nil {
 		return
@@ -99,6 +110,10 @@ func NewValidAddressFamily[T constraints.Integer](integer T) (addressFamily Addr
 	return
 }
 
+// NewAddressFamily1 returns iana.NewAddressFamily1 for any integer value.
+//   - if value is too large, panic
+//   - addressFamily may be invalid, ie. not an iana-assigned value, check with addressFamily.IsValid
+//   - or use NewValidAddressFamily
 func NewAddressFamily1[T constraints.Integer](integer T) (addressFamily AddressFamily) {
 	var err error
 	if addressFamily, err = NewAddressFamily(integer); err != nil {
@@ -110,6 +125,14 @@ func NewAddressFamily1[T constraints.Integer](integer T) (addressFamily AddressF
 
 func (af AddressFamily) String() (s string) {
 	return addressFamilySet.StringT(af)
+}
+
+func (af AddressFamily) Int() (addressFamilyInt int) {
+	return int(af)
+}
+
+func (af AddressFamily) Uint16() (addressFamilyInt uint16) {
+	return uint16(af)
 }
 
 func (af AddressFamily) IsValid() (isValid bool) {

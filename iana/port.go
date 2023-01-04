@@ -15,9 +15,13 @@ import (
 // Port contains an iana port number 1…65535.
 //   - Port is ordered
 //   - Port implements fmt.Stringer
-//   - Port has Uint16, Int and IsValid methods
+//   - Port has IsValid, Int and Uint16 methods
 type Port uint16
 
+// NewPort returns iana.Port for any integer value.
+//   - values larger that 65535 produce error testable with errors.Is(err, ints.ErrTooLarge)
+//   - port may be invalid, ie. not an iana-assigned value, check with port.IsValid
+//   - or use NewValidPort
 func NewPort[T constraints.Integer](integer T) (port Port, err error) {
 
 	// convert to uint16
@@ -32,6 +36,9 @@ func NewPort[T constraints.Integer](integer T) (port Port, err error) {
 	return
 }
 
+// NewValidPort returns iana.Port for any integer value.
+//   - values larger that 65535 produce error testable with errors.Is(err, ints.ErrTooLarge)
+//   - port is valid
 func NewValidPort[T constraints.Integer](integer T) (port Port, err error) {
 	if port, err = NewPort(integer); err != nil {
 		return
@@ -44,6 +51,10 @@ func NewValidPort[T constraints.Integer](integer T) (port Port, err error) {
 	return
 }
 
+// NewPort1 returns iana.Port for any integer value.
+//   - if value is too large, panic
+//   - port may be invalid, ie. not an iana-allowed value, check with port.IsValid
+//   - or use NewValidPort
 func NewPort1[T constraints.Integer](integer T) (port Port) {
 	var err error
 	if port, err = NewPort(integer); err != nil {
