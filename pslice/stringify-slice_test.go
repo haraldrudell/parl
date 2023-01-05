@@ -4,7 +4,7 @@ ISC License
 */
 
 // ConvertSliceToInterface converts a slice of a struct type to a slice of an interface type.
-package pslices
+package pslice
 
 import (
 	"testing"

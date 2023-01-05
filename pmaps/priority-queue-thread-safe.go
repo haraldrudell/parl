@@ -4,18 +4,18 @@ ISC License
 */
 
 // RankingThreadSafe is a thread-safe pointer-identity-to-value map of updatable values traversable by rank.
-// RankingThreadSafe implements [parl.Ranking][V comparable, R constraints.Ordered].
+// RankingThreadSafe implements [parli.Ranking][V comparable, R constraints.Ordered].
 package pmaps
 
 import (
 	"sync"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"golang.org/x/exp/constraints"
 )
 
 // PriorityQueueThreadSafe is a thread-safe pointer-identity-to-value map of updatable values traversable by rank.
-// PriorityQueueThreadSafe implements [parl.Ranking][V comparable, R constraints.Ordered].
+// PriorityQueueThreadSafe implements [parli.Ranking][V comparable, R constraints.Ordered].
 //   - V is a value reference composite type that is comparable, ie. not slice map function.
 //     Preferrably, V is interface or pointer to struct type.
 //   - P is an ordered type such as int floating-point string, used to rank the V values
@@ -27,13 +27,13 @@ import (
 //   - values can have the same rank. If they do, equal rank is provided in insertion order
 type PriorityQueueThreadSafe[V any, P constraints.Ordered] struct {
 	lock sync.RWMutex
-	parl.PriorityQueue[V, P]
+	parli.PriorityQueue[V, P]
 }
 
 // NewRanking returns a thread-safe map of updatable values traversable by rank
 func NewPriorityQueueThreadSafe[V any, P constraints.Ordered](
 	ranker func(value *V) (rank P),
-) (o1 parl.PriorityQueue[V, P]) {
+) (o1 parli.PriorityQueue[V, P]) {
 	return &PriorityQueueThreadSafe[V, P]{
 		PriorityQueue: NewPriorityQueue(ranker),
 	}

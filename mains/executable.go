@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -445,7 +446,13 @@ func (ex *Executable) PrintErr(err error, panicString ...string) {
 }
 
 // Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
-func (ex *Executable) Exit() {
+func (ex *Executable) Exit(stausCode ...int) {
+
+	// get requested status code
+	var statusCode0 int
+	if len(stausCode) > 0 {
+		statusCode0 = stausCode[0]
+	}
 
 	// printouts when IsDebug
 	if ex.err == nil {
@@ -460,6 +467,9 @@ func (ex *Executable) Exit() {
 
 	// return when there are no errors
 	if ex.err == nil {
+		if statusCode0 != 0 {
+			pos.OsExit(statusCode0)
+		}
 		pos.Exit0()
 	}
 
@@ -481,6 +491,9 @@ func (ex *Executable) Exit() {
 	}
 
 	// exit 1
-	parl.Log(parl.ShortSpace() + "\x20" + ex.Program + ": exit status 1") // outputs "060102 15:04:05Z07 " without newline to stderr
-	pos.Exit1(nil)                                                        // os.Exit(1) outputs "exit status 1" to stderr
+	if statusCode0 == 0 {
+		statusCode0 = pos.StatusCodeErr
+	}
+	parl.Log(parl.ShortSpace() + "\x20" + ex.Program + ": exit status " + strconv.Itoa(statusCode0)) // outputs "060102 15:04:05Z07 " without newline to stderr
+	pos.Exit(statusCode0, nil)                                                                       // os.Exit(1) outputs "exit status 1" to stderr
 }

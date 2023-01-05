@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	statusCode      = 1
+	StatusCodeErr   = 1
 	StatusCodeUsage = 2
 )
 
@@ -23,7 +23,7 @@ func Exit0() {
 
 // Exit1 terminate the command echoing a failure to stderr and returning status code 1
 func Exit1(err error) {
-	Exit(statusCode, err)
+	Exit(StatusCodeErr, err)
 }
 
 // Exit1OneLine terminate the command echoing to stderr returning status code 1
@@ -32,7 +32,7 @@ func Exit1OneLine(err error) {
 		err = errors.New("Exit1OneLine with err nil")
 	}
 	fmt.Fprintf(os.Stderr, "%v\n", err)
-	OsExit(statusCode)
+	OsExit(StatusCodeErr)
 }
 
 // Exit terminate the command echoing to stderr returning status code

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 )
 
 func TestNewOrderedThreadSafe(t *testing.T) {
@@ -28,7 +28,7 @@ func TestNewOrderedThreadSafe(t *testing.T) {
 	exp1 := []*entity{&entity2, &entity1}
 	expLength := 2
 
-	var ranking parl.PriorityQueue[entity, int]
+	var ranking parli.PriorityQueue[entity, int]
 	var pmapsRankingThreadSafe *PriorityQueueThreadSafe[entity, int]
 	var pmapsRanking *PriorityQueue[entity, int]
 	var ok bool

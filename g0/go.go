@@ -28,7 +28,7 @@ type Go struct {
 	goEntityID
 	isTerminated parl.AtomicBool
 	goParent     // ConsumeError() Go() Cancel() Context()
-	thread       ThreadDataWrap
+	thread       ThreadSafeThreadData
 	goWaitGroup
 }
 

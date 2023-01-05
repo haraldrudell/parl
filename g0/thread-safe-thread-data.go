@@ -12,10 +12,10 @@ import (
 	"github.com/haraldrudell/parl/pruntime"
 )
 
-// ThreadDataWrap controls access to a ThreadData object making it thread-safe.
-//   - ThreadDataWrap does not have initialization
+// ThreadSafeThreadData controls access to a ThreadData object making it thread-safe.
+//   - ThreadSafeThreadData does not have initialization
 //   - haveThreadID indicates whether data is present
-type ThreadDataWrap struct {
+type ThreadSafeThreadData struct {
 	haveThreadID parl.AtomicBool
 
 	lock sync.RWMutex
@@ -24,12 +24,12 @@ type ThreadDataWrap struct {
 
 // HaveThreadID indicates whether Update has been invoked on this ThreadDataWrap
 // object.
-func (tw *ThreadDataWrap) HaveThreadID() (haveThreadID bool) {
+func (tw *ThreadSafeThreadData) HaveThreadID() (haveThreadID bool) {
 	return tw.haveThreadID.IsTrue()
 }
 
 // Update populates the wrapped ThreadData from the stack trace.
-func (tw *ThreadDataWrap) Update(stack parl.Stack) {
+func (tw *ThreadSafeThreadData) Update(stack parl.Stack) {
 	tw.lock.Lock()
 	defer tw.lock.Unlock()
 
@@ -37,7 +37,7 @@ func (tw *ThreadDataWrap) Update(stack parl.Stack) {
 }
 
 // SetCreator gets preliminary Go identifier: the line invoking Go().
-func (tw *ThreadDataWrap) SetCreator(cl *pruntime.CodeLocation) {
+func (tw *ThreadSafeThreadData) SetCreator(cl *pruntime.CodeLocation) {
 	tw.lock.Lock()
 	defer tw.lock.Unlock()
 
@@ -45,7 +45,7 @@ func (tw *ThreadDataWrap) SetCreator(cl *pruntime.CodeLocation) {
 }
 
 // Get returns a clone of the wrapped ThreadData object.
-func (tw *ThreadDataWrap) Get() (thread *ThreadData, isValid bool) {
+func (tw *ThreadSafeThreadData) Get() (thread *ThreadData, isValid bool) {
 	tw.lock.RLock()
 	defer tw.lock.RUnlock()
 
@@ -59,7 +59,7 @@ func (tw *ThreadDataWrap) Get() (thread *ThreadData, isValid bool) {
 
 // ThreadID returns the thread id of the running thread or zero if
 // thread ID is missing.
-func (tw *ThreadDataWrap) ThreadID() (threadID parl.ThreadID) {
+func (tw *ThreadSafeThreadData) ThreadID() (threadID parl.ThreadID) {
 	tw.lock.RLock()
 	defer tw.lock.RUnlock()
 

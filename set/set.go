@@ -8,7 +8,6 @@ package set
 import (
 	"strings"
 
-	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pfmt"
 )
@@ -17,14 +16,14 @@ import (
 // PrintableEnum allows finite selection function arguments to have meaningful names and makes
 // those names printable.
 type SetImpl[T comparable] struct {
-	elementMap map[T]parl.Element[T]
+	elementMap map[T]Element[T]
 }
 
 // NewSet returns an enumeration of a printable semantic function argument.
 // elements are the elements that form this set.
-func NewSet[T comparable](elements []parl.Element[T]) (interfaceSet parl.Set[T]) {
+func NewSet[T comparable](elements []Element[T]) (interfaceSet Set[T]) {
 	length := len(elements)
-	set := SetImpl[T]{elementMap: map[T]parl.Element[T]{}}
+	set := SetImpl[T]{elementMap: map[T]Element[T]{}}
 	for i := 0; i < length; i++ {
 		ep := elements[i]
 		valueT := ep.Value()
@@ -49,7 +48,7 @@ func (st *SetImpl[T]) IsValid(value T) (isValid bool) {
 	return
 }
 
-func (st *SetImpl[T]) Element(value T) (element parl.Element[T]) {
+func (st *SetImpl[T]) Element(value T) (element Element[T]) {
 	if e, ok := st.elementMap[value]; ok {
 		element = e
 	}
@@ -58,7 +57,7 @@ func (st *SetImpl[T]) Element(value T) (element parl.Element[T]) {
 
 func (st *SetImpl[T]) Description(value T) (full string) {
 	var v any = value
-	if e, ok := v.(parl.ElementFull[T]); ok {
+	if e, ok := v.(ElementFull[T]); ok {
 		full = e.Description()
 	}
 	return
@@ -66,7 +65,7 @@ func (st *SetImpl[T]) Description(value T) (full string) {
 
 func PrintAsString(value any) (s string) {
 	tt := t{f: value}
-	s = parl.Sprintf("%v", tt)
+	s = pfmt.Sprintf("%v", tt)
 	s = strings.TrimPrefix(strings.TrimSuffix(s, "}"), "{")
 	return
 }
@@ -80,10 +79,10 @@ func (st *SetImpl[T]) StringT(value T) (s string) {
 	// StringT is intended to be the String method of a named type implementing set.
 	// if StringT method code would somehow invoke the T.String method again,
 	// this will cause infinite recursion and stack overflow panic.
-	var e parl.Element[T]
+	var e Element[T]
 	var ok bool
 	if e, ok = st.elementMap[value]; ok {
-		// e is parl.Element interface, likely set.Element runtime type.
+		// e is Element interface, likely set.Element runtime type.
 		// set.Element.String() returns a value from a type string, ie. type T
 		// is not involved.
 		// This ensures no T-type String-function recursion.
@@ -101,6 +100,6 @@ func (st *SetImpl[T]) StringT(value T) (s string) {
 
 func (st *SetImpl[T]) String() (s string) {
 	var t T
-	s = parl.Sprintf("%T:%d", t, len(st.elementMap))
+	s = pfmt.Sprintf("%T:%d", t, len(st.elementMap))
 	return
 }

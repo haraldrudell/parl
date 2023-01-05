@@ -11,7 +11,7 @@ func TestSetElement(t *testing.T) {
 	value := 1
 	name := "nname"
 
-	element := Element[int]{value, name}
+	element := SetElement[int]{value, name}
 
 	if element.Value() != value {
 		t.Errorf("Value %d exp %d", element.Value(), value)

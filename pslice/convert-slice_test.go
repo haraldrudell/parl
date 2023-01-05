@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pslices
+package pslice
 
 import (
 	"strings"

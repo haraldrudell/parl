@@ -8,7 +8,7 @@ package pslices
 import (
 	"testing"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"golang.org/x/exp/slices"
 )
 
@@ -19,7 +19,7 @@ func TestNewOrderedPointers(t *testing.T) {
 	v2p := &v2
 	exp := []*int{v1p, v1p, v2p}
 
-	var orderedPointers parl.OrderedPointers[int]
+	var orderedPointers parli.OrderedPointers[int]
 	var actual []*int
 	cmp := func(a, b *int) (result int) {
 		if *a < *b {

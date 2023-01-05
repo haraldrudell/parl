@@ -3,19 +3,18 @@
 ISC License
 */
 
-// iana provides Address Family Numbers for the Internet.
+// AddressFamily contains iana Address Family Numbers such as IP versions 4 and 6 for the Internet.
 package iana
 
 import (
-	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/ints"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pslices"
+	"github.com/haraldrudell/parl/pslice"
 	"github.com/haraldrudell/parl/set"
 	"golang.org/x/exp/constraints"
 )
 
-// iana provides Address Family Numbers for the Internet.
+// AddressFamily contains iana Address Family Numbers such as IP versions 4 and 6 for the Internet.
 //   - AddressFamily is ordered
 //   - AddressFamily implements fmt.Stringer
 //   - AddressFamily has methods IsValid Description Int Uint16
@@ -143,9 +142,9 @@ func (af AddressFamily) Description() (full string) {
 	return addressFamilySet.Description(af)
 }
 
-var addressFamilySet = set.NewSet(pslices.ConvertSliceToInterface[
+var addressFamilySet = set.NewSet(pslice.ConvertSliceToInterface[
 	set.SetElementFull[AddressFamily],
-	parl.Element[AddressFamily],
+	set.Element[AddressFamily],
 ]([]set.SetElementFull[AddressFamily]{
 	//{ValueV: AFreserved0, Name: "0", Full: "Reserved"},
 	{ValueV: AFip, Name: "IP", Full: "(IP version 4)"},

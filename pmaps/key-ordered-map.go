@@ -7,7 +7,7 @@ ISC License
 package pmaps
 
 import (
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/pslices"
 	"golang.org/x/exp/constraints"
 )
@@ -15,7 +15,7 @@ import (
 // KeyOrderedMap is a mapping whose keys are provided in order
 type KeyOrderedMap[K constraints.Ordered, V any] struct {
 	Map[K, V]
-	list parl.Ordered[K]
+	list parli.Ordered[K]
 }
 
 func NewKeyOrderedMap[K constraints.Ordered, V any]() (orderedMap *KeyOrderedMap[K, V]) {

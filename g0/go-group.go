@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pmaps"
 	"github.com/haraldrudell/parl/pruntime"
@@ -35,7 +36,7 @@ type GoGroup struct {
 	isWaitGroupDone parl.AtomicBool
 	hadFatal        parl.AtomicBool
 	onFirstFatal    parl.GoFatalCallback
-	gos             parl.ThreadSafeMap[GoEntityID, *ThreadData]
+	gos             parli.ThreadSafeMap[GoEntityID, *ThreadData]
 	goWaitGroup     // Go() SubGroup() Wait()
 	ch              parl.NBChan[parl.GoError]
 	doneLock        sync.Mutex // for GoDone method

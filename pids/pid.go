@@ -3,7 +3,7 @@
 ISC License
 */
 
-package parl
+package pids
 
 import (
 	"strconv"

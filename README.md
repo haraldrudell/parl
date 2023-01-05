@@ -24,6 +24,7 @@ import "github.com/haraldrudell/parl"
 
 <a href="https://pkg.go.dev/github.com/haraldrudell/parl"><img src="https://pkg.go.dev/badge/github.com/haraldrudell/parl.svg" alt="Go Reference">&emsp; Documentation in the Go Package Index</a>
 <br />
+parl targets latest versions of macOS and stable Linux, as of 1/3/2023 macOS 13.1 Darwin xnu and Linux 5.15<br />
 <br />
 <br />
 Parl features: moderator, sqlite interface, package-selectable logging, debouncer, self-signed certificate authority, watchers, thread management, file system scan and operations, …

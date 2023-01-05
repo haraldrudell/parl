@@ -5,15 +5,15 @@ ISC License
 
 package set
 
-type Element[T comparable] struct {
+type SetElement[T comparable] struct {
 	ValueV T
 	Name   string
 }
 
-func (pv *Element[T]) Value() (value T) {
+func (pv *SetElement[T]) Value() (value T) {
 	return pv.ValueV
 }
 
-func (pv *Element[T]) String() (s string) {
+func (pv *SetElement[T]) String() (s string) {
 	return pv.Name
 }

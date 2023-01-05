@@ -32,7 +32,7 @@ type Go interface {
 	//	in a function call invocation launching a new gorotuine thread.
 	//	- the new thread belongs to the same GoGroup thread-group as the Go
 	//		object whose Go method was invoked.
-	Go() (g1 Go)
+	Go() (g0 Go)
 	// SubGo returns a GoGroup thread-group whose fatal and non-fatel errors go to
 	//	the Go object’s parent thread-group.
 	//	- a SubGo is used to ensure sub-threads exiting prior to their parent thread
@@ -86,8 +86,8 @@ type GoFatalCallback func(goGen GoGen)
 // cancel of threads in the thread-group and its subordinate thread-groups.
 //   - GoGen can be a GoGroup or a Go object
 type GoGen interface {
-	// Go returns a G1 object to be provided as a go statement function argument.
-	Go() (g1 Go)
+	// Go returns a Go object to be provided as a go statement function argument.
+	Go() (g0 Go)
 	// SubGo returns a thread-group whose fatal errors go to GoGen’s parent.
 	//   - both non-fatal and fatal errors in SubGo threads are sent to GoGen’s parent
 	// 		like Go.AddError and Go.Done.
@@ -123,17 +123,17 @@ type GoGen interface {
 //   - Wait in this thread-group wait for threads in this and all subordinate
 //     thread-groups.
 type GoGroup interface {
-	// Go returns a G1 object to be provided as a go statement function argument.
-	Go() (g1 Go)
-	// SubGo returns athread-group whose fatal errors go to G1’s parent.
-	//   - both non-fatal and fatal errors in SubGo threads are sent to G1’s parent
-	// 		like G1.AddError and G1.Done.
-	//		- therefore, when a SUbGo thread fails, the application will typically exit.
-	//		- by awaiting SubGo, G1 can delay its exit until SubGo has terminated
+	// Go returns a Go object to be provided as a go statement function argument.
+	Go() (g0 Go)
+	// SubGo returns athread-group whose fatal errors go to Go’s parent.
+	//   - both non-fatal and fatal errors in SubGo threads are sent to Go’s parent
+	// 		like Go.AddError and Go.Done.
+	//		- therefore, when a SubGo thread fails, the application will typically exit.
+	//		- by awaiting SubGo, Go can delay its exit until SubGo has terminated
 	//   - the SubGo thread-group terminates when the its thread exits
 	SubGo(onFirstFatal ...GoFatalCallback) (subGo SubGo)
-	// SubGroup creates a sub-ordinate G1Group.
-	//	- SubGroup fatal and non-fatal errors are sent to the parent G1Group.
+	// SubGroup creates a sub-ordinate GoGroup.
+	//	- SubGroup fatal and non-fatal errors are sent to the parent GoGroup.
 	//	-	SubGroup-context initiated Cancel only affect threads in the SubGroup thread-group
 	//	- parent-initiated Cancel terminates SubGroup threads
 	//	- SubGroup only awaits SubGroup threads
@@ -154,17 +154,17 @@ type GoGroup interface {
 }
 
 type SubGo interface {
-	// Go returns a G1 object to be provided as a go statement function argument.
-	Go() (g1 Go)
-	// SubGo returns athread-group whose fatal errors go to G1’s parent.
-	//   - both non-fatal and fatal errors in SubGo threads are sent to G1’s parent
-	// 		like G1.AddError and G1.Done.
-	//		- therefore, when a SUbGo thread fails, the application will typically exit.
-	//		- by awaiting SubGo, G1 can delay its exit until SubGo has terminated
+	// Go returns a Go object to be provided as a go statement function argument.
+	Go() (g0 Go)
+	// SubGo returns athread-group whose fatal errors go to Go’s parent.
+	//   - both non-fatal and fatal errors in SubGo threads are sent to Go’s parent
+	// 		like Go.AddError and Go.Done.
+	//		- therefore, when a SubGo thread fails, the application will typically exit.
+	//		- by awaiting SubGo, Go can delay its exit until SubGo has terminated
 	//   - the SubGo thread-group terminates when the its thread exits
 	SubGo(onFirstFatal ...GoFatalCallback) (subGo SubGo)
-	// SubGroup creates a sub-ordinate G1Group.
-	//	- SubGroup fatal and non-fatal errors are sent to the parent G1Group.
+	// SubGroup creates a sub-ordinate GoGroup.
+	//	- SubGroup fatal and non-fatal errors are sent to the parent GoGroup.
 	//	-	SubGroup-context initiated Cancel only affect threads in the SubGroup thread-group
 	//	- parent-initiated Cancel terminates SubGroup threads
 	//	- SubGroup only awaits SubGroup threads
@@ -187,7 +187,7 @@ type SubGroup interface {
 	// FirstFatal allows to await or inspect the first thread terminating with error.
 	// it is valid if this SubGo has LocalSubGo or LocalChannel options.
 	// To wait for first fatal error using multiple-semaphore mechanic:
-	//  firstFatal := g1.FirstFatal()
+	//  firstFatal := g0.FirstFatal()
 	//  for {
 	//    select {
 	//    case <-firstFatal.Ch():
@@ -198,9 +198,9 @@ type SubGroup interface {
 }
 
 type GoFactory interface {
-	// NewG1 returns a light-weight thread-group.
-	//	- G1Group only receives Cancel from ctx, it does not cancel this context.
-	NewGoGroup(ctx context.Context, onFirstFatal ...GoFatalCallback) (g1 GoGroup)
+	// NewGo returns a light-weight thread-group.
+	//	- GoGroup only receives Cancel from ctx, it does not cancel this context.
+	NewGoGroup(ctx context.Context, onFirstFatal ...GoFatalCallback) (g0 GoGroup)
 }
 
 // data types

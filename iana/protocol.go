@@ -3,19 +3,18 @@
 ISC License
 */
 
-// iana provides Assigned Internet Protocol Numbers for IPv4 and IPv6.
+// Protocol represents iana Assigned Internet Protocol Numbers for IPv4 and IPv6.
 package iana
 
 import (
-	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/ints"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pslices"
+	"github.com/haraldrudell/parl/pslice"
 	"github.com/haraldrudell/parl/set"
 	"golang.org/x/exp/constraints"
 )
 
-// iana provides Assigned Internet Protocol Numbers for IPv4 and IPv6.
+// Protocol represents iana Assigned Internet Protocol Numbers for IPv4 and IPv6.
 //   - Protocol is ordered
 //   - Protocol implements fmt.Stringer
 //   - Protocol has methods IsValid Description Int Uint8
@@ -243,9 +242,9 @@ func (pr Protocol) Description() (full string) {
 	return ianaSet.Description(pr)
 }
 
-var ianaSet = set.NewSet(pslices.ConvertSliceToInterface[
+var ianaSet = set.NewSet(pslice.ConvertSliceToInterface[
 	set.SetElementFull[Protocol],
-	parl.Element[Protocol],
+	set.Element[Protocol],
 ]([]set.SetElementFull[Protocol]{
 	{ValueV: IPhopopt, Name: "HOPOPT", Full: "IPv6 Hop-by-Hop Option IPv6xh RFC8200"},
 	{ValueV: IPicmp, Name: "ICMP", Full: "Internet Control Message RFC792"},

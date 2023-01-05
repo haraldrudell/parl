@@ -7,7 +7,7 @@ ISC License
 package pslices
 
 import (
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/slices"
 )
@@ -22,7 +22,7 @@ type Ordered[E constraints.Ordered] struct {
 }
 
 // NewOrdered returns a slice ordered by value.
-func NewOrdered[E constraints.Ordered]() (list parl.Ordered[E]) {
+func NewOrdered[E constraints.Ordered]() (list parli.Ordered[E]) {
 	return &Ordered[E]{}
 }
 
@@ -54,6 +54,6 @@ func (o *Ordered[E]) Index(element E) (index int) {
 	return
 }
 
-func (o *Ordered[E]) Clone() (o2 parl.Ordered[E]) {
+func (o *Ordered[E]) Clone() (o2 parli.Ordered[E]) {
 	return &Ordered[E]{Slice: Slice[E]{list: slices.Clone(o.list)}}
 }

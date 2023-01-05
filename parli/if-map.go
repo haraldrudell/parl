@@ -3,7 +3,7 @@
 ISC License
 */
 
-package parl
+package parli
 
 import "golang.org/x/exp/constraints"
 

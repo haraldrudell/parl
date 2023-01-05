@@ -8,7 +8,7 @@ ISC License
 package pslices
 
 import (
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/exp/slices"
 )
@@ -37,7 +37,7 @@ type OrderedAny[E any] struct {
 //   - duplicate values are allowed and inserted in order with later values last
 //   - if E is an interface-type and cmp is nil, every provided value must be checked
 //     to be comparable
-func NewOrderedAny[E any](cmp func(a, b E) (result int)) (list parl.Ordered[E]) {
+func NewOrderedAny[E any](cmp func(a, b E) (result int)) (list parli.Ordered[E]) {
 	if cmp == nil {
 		panic(perrors.NewPF("cmp cannot be nil"))
 	}
@@ -68,7 +68,7 @@ func (o *OrderedAny[E]) Index(element E) (index int) {
 }
 
 // Length returns the number of elements
-func (o *OrderedAny[E]) Clone() (o2 parl.Ordered[E]) {
+func (o *OrderedAny[E]) Clone() (o2 parli.Ordered[E]) {
 	return &OrderedAny[E]{
 		Slice: Slice[E]{list: slices.Clone(o.list)},
 		cmp:   o.cmp,

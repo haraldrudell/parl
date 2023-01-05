@@ -8,15 +8,15 @@ package pslices
 import (
 	"testing"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 )
 
 func TestOrdered(t *testing.T) {
 	v1 := 2
 	v2 := 4
 
-	var ordered parl.Ordered[int]
-	var ordered2 parl.Ordered[int]
+	var ordered parli.Ordered[int]
+	var ordered2 parli.Ordered[int]
 	var index int
 
 	ordered = NewOrdered[int]()

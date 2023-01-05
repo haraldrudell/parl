@@ -14,11 +14,11 @@ import (
 func TestThreadDataWrap(t *testing.T) {
 	stack := pdebug.NewStack(0)
 
-	var threadDataWrap ThreadDataWrap
+	var threadDataWrap ThreadSafeThreadData
 	var threadData *ThreadData
 	var isValid bool
 
-	threadDataWrap = ThreadDataWrap{}
+	threadDataWrap = ThreadSafeThreadData{}
 	if threadDataWrap.HaveThreadID() {
 		t.Error("haveThreadID true")
 	}

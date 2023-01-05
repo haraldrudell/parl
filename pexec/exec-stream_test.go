@@ -8,10 +8,13 @@ package pexec
 import (
 	"context"
 	"errors"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pio"
 )
 
@@ -26,9 +29,10 @@ func TestExecStream(t *testing.T) {
 
 	var err error
 	var isCancel bool
+	var statusCode int
 
 	// empty args list
-	_, err = ExecStream(pio.EofReader, stdout, stderr, env, ctx, nil)
+	_, _, err = ExecStream(pio.EofReader, stdout, stderr, env, ctx, nil)
 	if err == nil {
 		t.Error("ExecStream missing err")
 	} else if !errors.Is(err, ErrArgsListEmpty) {
@@ -36,7 +40,7 @@ func TestExecStream(t *testing.T) {
 	}
 
 	// bash built-in: error
-	_, err = ExecStream(pio.EofReader, stdout, stderr, nil, ctx, nil, setCommand...)
+	_, _, err = ExecStream(pio.EofReader, stdout, stderr, nil, ctx, nil, setCommand...)
 	if err == nil {
 		t.Error("ExecStream missing err")
 	} else if !strings.Contains(err.Error(), messageNotFound) {
@@ -53,10 +57,35 @@ func TestExecStream(t *testing.T) {
 			t.Errorf("startCallback had error: %v", err)
 		}
 	}
-	isCancel, err = ExecStream(pio.EofReader, stdout, stderr, nil, ctxCancel, startCallback, sleepCommand...)
+	statusCode, isCancel, err = ExecStream(pio.EofReader, stdout, stderr, nil, ctxCancel, startCallback, sleepCommand...)
+	t.Logf("Context cancel: status code: %d isCancel: %t, err: %s", statusCode, isCancel, perrors.Short(err))
 	if err != nil {
 		t.Errorf("ExecStream canceled context produced error: %v", err)
 	} else if !isCancel {
 		t.Error("ExecStream canceled context returned isCancel false")
 	}
+	//t.Fail()
+}
+
+// ITEST= go test ./pexec
+func TestExecStreamGoodExit(t *testing.T) {
+	if _, ok := os.LookupEnv("ITEST"); !ok {
+		t.Skip("skiop because ITEST not set")
+	}
+	var args []string = []string{"sleep", "0"}
+
+	var stdout, stderr io.WriteCloser
+	var err error
+	var isCancel bool
+	var statusCode int
+	var ctx context.Context = context.Background()
+	var startCallback func(err error)
+
+	statusCode, isCancel, err = ExecStream(pio.EofReader, stdout, stderr, nil, ctx, startCallback, args...)
+
+	// Success: status code: 0 isCancel: false, err: OK
+	t.Logf("Success: status code: %d isCancel: %t, err: %s", statusCode, isCancel, perrors.Short(err))
+}
+
+func TestExecStreamControlBreak(t *testing.T) {
 }

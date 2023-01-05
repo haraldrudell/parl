@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 )
 
 func TestNewRanking(t *testing.T) {
@@ -35,7 +35,7 @@ func TestNewRanking(t *testing.T) {
 	exp3 := []*entity{&entity1}
 	expLength := 3
 
-	var ranking parl.PriorityQueue[entity, int]
+	var ranking parli.PriorityQueue[entity, int]
 	var pmapsRanking *PriorityQueue[entity, int]
 	var ok bool
 	var rankList []*entity

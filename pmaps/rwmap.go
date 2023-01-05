@@ -4,19 +4,19 @@ ISC License
 */
 
 // RWMap is a one-liner thread-safe mapping.
-// RWMap implements [parl.ThreadSafeMap][K comparable, V any].
+// RWMap implements [parli.ThreadSafeMap][K comparable, V any].
 package pmaps
 
 import (
 	"sync"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/exp/maps"
 )
 
 // RWMap is a one-liner thread-safe mapping.
-// RWMap implements [parl.ThreadSafeMap][K comparable, V any].
+// RWMap implements [parli.ThreadSafeMap][K comparable, V any].
 //   - GetOrCreate method is a thread-safe atomic operation as opposed to
 //     Get-then-Put
 //   - For using RWMap as periodically updated thread-safe mapping collection, use with
@@ -30,7 +30,7 @@ type RWMap[K comparable, V any] struct {
 }
 
 // NewRWMap returns a thread-safe map implementation
-func NewRWMap[K comparable, V any]() (rwMap parl.ThreadSafeMap[K, V]) {
+func NewRWMap[K comparable, V any]() (rwMap parli.ThreadSafeMap[K, V]) {
 	return &RWMap[K, V]{m: map[K]V{}}
 }
 
@@ -127,7 +127,7 @@ func (rw *RWMap[K, V]) Length() (length int) {
 }
 
 // Clone returns a shallow clone of the map
-func (rw *RWMap[K, V]) Clone() (clone parl.ThreadSafeMap[K, V]) {
+func (rw *RWMap[K, V]) Clone() (clone parli.ThreadSafeMap[K, V]) {
 	rw.lock.Lock()
 	defer rw.lock.Unlock()
 

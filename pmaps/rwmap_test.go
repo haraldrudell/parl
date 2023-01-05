@@ -9,7 +9,7 @@ package pmaps
 import (
 	"testing"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"golang.org/x/exp/slices"
 )
 
@@ -21,8 +21,8 @@ func TestNewRWMap(t *testing.T) {
 	exp := []int{v1, v2}
 	exp2 := []int{v2}
 
-	var m parl.ThreadSafeMap[string, int]
-	var m2 parl.ThreadSafeMap[string, int]
+	var m parli.ThreadSafeMap[string, int]
+	var m2 parli.ThreadSafeMap[string, int]
 	var list []int
 	var list2 []int
 	newV := func() (value *int) { return &v1 }

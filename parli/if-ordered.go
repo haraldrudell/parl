@@ -3,7 +3,7 @@
 ISC License
 */
 
-package parl
+package parli
 
 // OrderedPointers[E any] is an ordered list of pointers sorted by the referenced values.
 // OrderedPointers should be used when E is a large struct.

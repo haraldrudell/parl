@@ -8,7 +8,7 @@ ISC License
 package pslices
 
 import (
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"golang.org/x/exp/constraints"
 )
 
@@ -22,7 +22,7 @@ type OrderedPointers[E constraints.Ordered] struct {
 	OrderedAny[*E] // Element() Length() List() Clear() Insert() Delete() Index() Clone()
 }
 
-func NewOrderedPointers[E constraints.Ordered]() (list parl.OrderedPointers[E]) {
+func NewOrderedPointers[E constraints.Ordered]() (list parli.OrderedPointers[E]) {
 	var o = OrderedPointers[E]{}
 	o.OrderedAny = *NewOrderedAny(o.Cmp).(*OrderedAny[*E])
 	return &o

@@ -5,11 +5,11 @@ go 1.19
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.35
-	golang.org/x/sys v0.3.0
+	github.com/haraldrudell/parl v0.4.36
+	golang.org/x/sys v0.4.0
 )
 
 require (
-	golang.org/x/exp v0.0.0-20221230185412-738e83a70c30 // indirect
-	golang.org/x/text v0.5.0 // indirect
+	golang.org/x/exp v0.0.0-20230105000112-eab7a2c85304 // indirect
+	golang.org/x/text v0.6.0 // indirect
 )

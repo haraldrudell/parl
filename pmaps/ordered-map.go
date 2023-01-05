@@ -7,7 +7,7 @@ ISC License
 package pmaps
 
 import (
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/pslices"
 	"golang.org/x/exp/constraints"
 )
@@ -15,7 +15,7 @@ import (
 // OrderedMap is a mapping whose values are provided in order
 type OrderedMap[K comparable, V constraints.Ordered] struct {
 	Map[K, V]
-	list parl.Ordered[V]
+	list parli.Ordered[V]
 }
 
 func NewOrderedMap[K comparable, V constraints.Ordered]() (orderedMap *OrderedMap[K, V]) {

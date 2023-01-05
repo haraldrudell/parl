@@ -8,11 +8,10 @@ package pfmt
 import (
 	"strings"
 
-	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/pslices"
+	"github.com/haraldrudell/parl/pslice"
 )
 
 // "2[rob,pike]"
 func SliceString[E any](slic []E) (s string) {
-	return parl.Sprintf("%d[%s]", len(slic), strings.Join(pslices.StringifySlice(slic), ","))
+	return Sprintf("%d[%s]", len(slic), strings.Join(pslice.StringifySlice(slic), ","))
 }

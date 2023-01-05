@@ -33,19 +33,23 @@ import (
 var ErrArgsListEmpty = errors.New("args list empty")
 
 // ExecStream executes a system command using the exec.Cmd type and flexible streaming.
-// ExecStream blocks during command execution.
-// ExecStream returns any errors occurring during launch or execution including
-// any errors in copy threads
-//
+//   - ExecStream blocks during command execution
+//   - ExecStream returns any errors occurring during launch or execution including
+//     errors in copy threads
+//   - successful exit is: statusCode == 0, isCancel == false, err == nil
+//   - context cancel exit is: statusCode == -1, isCancel == true, err == nil
+//   - — statusCode -1 means the process was terminated by signal such as ^C or SIGTERM
+//   - failure is: statusCode != 0, isCancel == false, err != nil
+//   - —
 //   - args is the command followed by arguments.
 //   - args[0] must specify an executable in the file system.
 //     env.PATH is used to resolve the command executable
 //   - if stdin should not be used, pio.EofReader can be used
 //   - for stdout and stderr pio has usable types:
-//   - pio.NewWriteCloserToString
-//   - pio.NewWriteCloserToChan
-//   - pio.NewWriteCloserToChanLine
-//   - pio.NewReadWriteCloserSlice
+//   - — pio.NewWriteCloserToString
+//   - — pio.NewWriteCloserToChan
+//   - — pio.NewWriteCloserToChanLine
+//   - — pio.NewReadWriteCloserSlice
 //   - if stdin stdout or stderr are nil, os.Stdin os.Stdout os.Stderr are used.
 //     Additional threads are used to copy data when stdin stdout or stderr are non-nil
 //   - If env is nil, the new process uses the current process’ environment
@@ -55,7 +59,7 @@ var ErrArgsListEmpty = errors.New("args list empty")
 //     its result. To not use a callback, set startCallback to nil
 func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
 	env []string, ctx context.Context, startCallback func(err error),
-	args ...string) (isCancel bool, err error) {
+	args ...string) (statusCode int, isCancel bool, err error) {
 	if len(args) == 0 {
 		err = perrors.ErrorfPF("%w", ErrArgsListEmpty)
 		return
@@ -142,12 +146,22 @@ func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
 		return // command Start error return
 	}
 	if err = execCmd.Wait(); err != nil {
+
+		// get special exec.ExitError
+		var exitError *exec.ExitError
+		errors.As(err, &exitError)
+
+		// get status code
+		if exitError != nil {
+			statusCode = exitError.ExitCode()
+		}
+
 		// was the context canceled?
 		if execCtx.Err() != nil {
 			// if the command did not complete successfully, it’s exec.ExitError
-			if exitExrror, ok := err.(*exec.ExitError); ok {
+			if exitError != nil {
 				// if it was SIGKILL, ignore it: it was cuased by context cancelation
-				if waitStatus, ok := exitExrror.ProcessState.Sys().(syscall.WaitStatus); ok {
+				if waitStatus, ok := exitError.ProcessState.Sys().(syscall.WaitStatus); ok {
 					if waitStatus.Signal() == unix.SIGKILL {
 						err = nil // ignore the error
 						isCancel = true

@@ -9,7 +9,7 @@ package pslices
 import (
 	"testing"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parli"
 	"golang.org/x/exp/slices"
 )
 
@@ -18,8 +18,8 @@ func TestNewOrderedAny(t *testing.T) {
 	v2 := 2
 	exp2 := []int{v1, v2}
 
-	var list parl.Ordered[int]
-	var list2 parl.Ordered[int]
+	var list parli.Ordered[int]
+	var list2 parli.Ordered[int]
 	var actual []int
 	var actInt int
 	cmp := func(a, b int) (result int) {

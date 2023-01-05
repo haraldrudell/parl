@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/pslices"
+	"github.com/haraldrudell/parl/pslice"
+	"github.com/haraldrudell/parl/test"
 )
 
 func TestNewSet(t *testing.T) {
@@ -23,10 +23,10 @@ func TestNewSet(t *testing.T) {
 
 	var actual string
 
-	interfaceSet := NewSet(pslices.ConvertSliceToInterface[
+	interfaceSet := NewSet(pslice.ConvertSliceToInterface[
+		SetElement[int],
 		Element[int],
-		parl.Element[int],
-	]([]Element[int]{{value, name}}))
+	]([]SetElement[int]{{value, name}}))
 
 	if interfaceSet == nil {
 		t.Error("NewSet nil")
@@ -43,11 +43,11 @@ func TestNewSet(t *testing.T) {
 	}
 
 	var err error
-	parl.RecoverInvocationPanic(func() {
-		NewSet(pslices.ConvertSliceToInterface[
+	test.RecoverInvocationPanic(func() {
+		NewSet(pslice.ConvertSliceToInterface[
+			SetElement[int],
 			Element[int],
-			parl.Element[int],
-		]([]Element[int]{
+		]([]SetElement[int]{
 			{value, name},
 			{value, name},
 		}))
