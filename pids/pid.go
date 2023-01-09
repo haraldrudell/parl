@@ -16,7 +16,7 @@ import (
 // Pid is a unique named type for process identifiers
 //   - Pid implements fmt.Stringer
 //   - Pid is ordered
-//   - Pid has IsValid method
+//   - Pid has IsNonZero Int Uint32 methods
 type Pid uint32
 
 // NewPid returns a typed value process identifier
@@ -38,7 +38,7 @@ func NewPid1[T constraints.Integer](pid T) (typedPid Pid) {
 	return
 }
 
-func (pid Pid) IsValid() (isValid bool) {
+func (pid Pid) IsNonZero() (isValid bool) {
 	return pid != 0
 }
 

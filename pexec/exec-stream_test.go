@@ -22,7 +22,6 @@ func TestExecStream(t *testing.T) {
 	messageNotFound := "executable file not found"
 	stdout := pio.NewWriteCloserToString()
 	stderr := pio.NewWriteCloserToString()
-	env := []string{}
 	ctx := context.Background()
 	setCommand := []string{"set"}
 	sleepCommand := []string{"sleep", "1"}
@@ -32,7 +31,7 @@ func TestExecStream(t *testing.T) {
 	var statusCode int
 
 	// empty args list
-	_, _, err = ExecStream(pio.EofReader, stdout, stderr, env, ctx, nil)
+	_, _, err = ExecStream(pio.EofReader, stdout, stderr, ctx)
 	if err == nil {
 		t.Error("ExecStream missing err")
 	} else if !errors.Is(err, ErrArgsListEmpty) {
@@ -40,7 +39,7 @@ func TestExecStream(t *testing.T) {
 	}
 
 	// bash built-in: error
-	_, _, err = ExecStream(pio.EofReader, stdout, stderr, nil, ctx, nil, setCommand...)
+	_, _, err = ExecStream(pio.EofReader, stdout, stderr, ctx, setCommand...)
 	if err == nil {
 		t.Error("ExecStream missing err")
 	} else if !strings.Contains(err.Error(), messageNotFound) {
@@ -57,7 +56,7 @@ func TestExecStream(t *testing.T) {
 			t.Errorf("startCallback had error: %v", err)
 		}
 	}
-	statusCode, isCancel, err = ExecStream(pio.EofReader, stdout, stderr, nil, ctxCancel, startCallback, sleepCommand...)
+	statusCode, isCancel, err = ExecStreamFull(pio.EofReader, stdout, stderr, nil, ctxCancel, startCallback, nil, sleepCommand...)
 	t.Logf("Context cancel: status code: %d isCancel: %t, err: %s", statusCode, isCancel, perrors.Short(err))
 	if err != nil {
 		t.Errorf("ExecStream canceled context produced error: %v", err)
@@ -81,7 +80,7 @@ func TestExecStreamGoodExit(t *testing.T) {
 	var ctx context.Context = context.Background()
 	var startCallback func(err error)
 
-	statusCode, isCancel, err = ExecStream(pio.EofReader, stdout, stderr, nil, ctx, startCallback, args...)
+	statusCode, isCancel, err = ExecStreamFull(pio.EofReader, stdout, stderr, nil, ctx, startCallback, nil, args...)
 
 	// Success: status code: 0 isCancel: false, err: OK
 	t.Logf("Success: status code: %d isCancel: %t, err: %s", statusCode, isCancel, perrors.Short(err))

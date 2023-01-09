@@ -15,13 +15,18 @@ import (
 )
 
 type WriteCloserToChanLine struct {
-	lock sync.Mutex
-	s    string
-	ch   parl.NBChan[string]
+	lock        sync.Mutex
+	s           string
+	ch          parl.NBChan[string]
+	withNewline bool
 }
 
-func NewWriteCloserToChanLine() (writeCloser io.WriteCloser) {
-	return &WriteCloserToChanLine{}
+func NewWriteCloserToChanLine(withNewline ...bool) (writeCloser io.WriteCloser) {
+	var withNewline0 bool
+	if len(withNewline) > 0 {
+		withNewline0 = withNewline[0]
+	}
+	return &WriteCloserToChanLine{withNewline: withNewline0}
 }
 
 func (wc *WriteCloserToChanLine) Write(p []byte) (n int, err error) {
@@ -45,7 +50,13 @@ func (wc *WriteCloserToChanLine) Write(p []byte) (n int, err error) {
 		if index == -1 {
 			break // no more newlines
 		}
-		wc.ch.Send(s[:index])
+		var i int
+		if wc.withNewline {
+			i = index + 1
+		} else {
+			i = index
+		}
+		wc.ch.Send(s[:i])
 		s = s[index+1:]
 	}
 	wc.s = s // store remaining string characters

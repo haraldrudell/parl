@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -18,24 +19,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//  1. Replace multiple slashes with a single slash.
-//  2. Eliminate each . path name element (the current directory).
-//  3. Eliminate each inner .. path name element (the parent directory)
-//     along with the non-.. element that precedes it.
-//  4. Eliminate .. elements that begin a rooted path:
-//     that is, replace "/.." by "/" at the beginning of a path.
-
-//  1. one
-//  2. two
-//  3. three
-//  4. Eliminate
-//     kk
 var ErrArgsListEmpty = errors.New("args list empty")
 
 // ExecStream executes a system command using the exec.Cmd type and flexible streaming.
 //   - ExecStream blocks during command execution
 //   - ExecStream returns any errors occurring during launch or execution including
 //     errors in copy threads
+//   - any stream provided is not closed. However, upon return from ExecStream all i/o operations
+//     have completed and streams may be closed as the case may be
 //   - successful exit is: statusCode == 0, isCancel == false, err == nil
 //   - context cancel exit is: statusCode == -1, isCancel == true, err == nil
 //   - — statusCode -1 means the process was terminated by signal such as ^C or SIGTERM
@@ -58,7 +49,12 @@ var ErrArgsListEmpty = errors.New("args list empty")
 //   - startCallback is invoked immediately after cmd.Exec.Start returns with
 //     its result. To not use a callback, set startCallback to nil
 func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
-	env []string, ctx context.Context, startCallback func(err error),
+	ctx context.Context, args ...string) (statusCode int, isCancel bool, err error) {
+	return ExecStreamFull(stdin, stdout, stderr, nil, ctx, nil, nil, args...)
+}
+
+func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
+	env []string, ctx context.Context, startCallback func(err error), extraFiles []*os.File,
 	args ...string) (statusCode int, isCancel bool, err error) {
 	if len(args) == 0 {
 		err = perrors.ErrorfPF("%w", ErrArgsListEmpty)
@@ -133,6 +129,10 @@ func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
 		go copyThread("stderr", ioReadCloser, stderr, errs.AddErrorProc, execCtx, &wg)
 	}
 
+	if len(extraFiles) > 0 {
+		execCmd.ExtraFiles = extraFiles
+	}
+
 	// execute
 	err = execCmd.Start()
 	isStart = true
@@ -145,6 +145,7 @@ func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
 		err = perrors.Errorf("execCmd.Start %w", err)
 		return // command Start error return
 	}
+
 	if err = execCmd.Wait(); err != nil {
 
 		// get special exec.ExitError
