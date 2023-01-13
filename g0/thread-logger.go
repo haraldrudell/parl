@@ -23,10 +23,20 @@ type goGroup interface {
 
 // ThreadLogger waits for a GoGroup, SubGo or SubGroup while printing
 // information on threads that have yet to exit.
-func ThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interface{})) {
+//   - ThreadLogger is non-blocking and will invoke Done on wg
+//
+// Usage:
+//
+//	main() {
+//	  var debugWait sync.WaitGroup
+//	  defer debugWait.Wait()
+//	 …
+//	 debugWait.Add(1)
+//	 ThreadLogger(goGroup, &debugWait)
+func ThreadLogger(goGen parl.GoGen, wg parl.SyncDone, logFn ...func(format string, a ...interface{})) {
 
 	// obtain logging function
-	var log func(format string, a ...interface{})
+	var log parl.PrintfFunc
 	if len(logFn) > 0 {
 		log = logFn[0]
 	}
@@ -43,8 +53,16 @@ func ThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interface{
 
 	if g0.isEnd() {
 		log("ThreadLogger: IsEnd true")
+		wg.Done()
 		return // thread-group already ended
 	}
+
+	go printThread(wg, log, g0)
+}
+
+func printThread(wg parl.SyncDone, log parl.PrintfFunc, g0 goGroup) {
+	wg.Done()
+	defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
 
 	// channel indicating Wait complete
 	waitCh := make(chan struct{})

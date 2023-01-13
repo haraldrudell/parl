@@ -18,6 +18,7 @@ type OrderedMap[K comparable, V constraints.Ordered] struct {
 	list parli.Ordered[V]
 }
 
+// NewOrderedMap returns a mapping whose values are provided in order
 func NewOrderedMap[K comparable, V constraints.Ordered]() (orderedMap *OrderedMap[K, V]) {
 	return &OrderedMap[K, V]{Map: *NewMap[K, V](), list: pslices.NewOrdered[V]()}
 }

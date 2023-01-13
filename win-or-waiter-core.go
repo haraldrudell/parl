@@ -6,6 +6,7 @@ ISC License
 package parl
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -23,21 +24,21 @@ type WinOrWaiterCore struct {
 	// the time of starting the last initiated scan
 	tStart      time.Time
 	mustBeLater bool
-	g0          Go
+	ctx         context.Context
 }
 
 // WinOrWaiter returns a semaphore used for completing an on-demand task by
 // the first thread requesting it, and that result shared by subsequent threads held
 // waiting for the result.
-func NewWinOrWaiterCore(mustBeLater bool, g0 ...Go) (winOrWaiter *WinOrWaiterCore) {
-	var g00 Go
-	if len(g0) > 0 {
-		g00 = g0[0]
+func NewWinOrWaiterCore(mustBeLater bool, ctx ...context.Context) (winOrWaiter *WinOrWaiterCore) {
+	var ctx0 context.Context
+	if len(ctx) > 0 {
+		ctx0 = ctx[0]
 	}
 	return &WinOrWaiterCore{
 		Cond:        *sync.NewCond(&sync.Mutex{}),
 		mustBeLater: mustBeLater,
-		g0:          g00,
+		ctx:         ctx0,
 	}
 }
 
@@ -59,7 +60,7 @@ func (ww *WinOrWaiterCore) WinOrWait() (isWinner bool) {
 	for {
 
 		// check context
-		if ww.g0 != nil && ww.g0.Context().Err() != nil {
+		if ww.IsCancel() {
 			return // context canceled return
 		}
 
@@ -105,5 +106,5 @@ func (ww *WinOrWaiterCore) WinnerDone(errp *error) {
 }
 
 func (ww *WinOrWaiterCore) IsCancel() (isCancel bool) {
-	return ww.g0 != nil && ww.g0.Context().Err() != nil
+	return ww.ctx != nil && ww.ctx.Err() != nil
 }

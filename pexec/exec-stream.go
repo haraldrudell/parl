@@ -23,36 +23,64 @@ var ErrArgsListEmpty = errors.New("args list empty")
 
 // ExecStream executes a system command using the exec.Cmd type and flexible streaming.
 //   - ExecStream blocks during command execution
-//   - ExecStream returns any errors occurring during launch or execution including
+//   - ExecStream returns any error occurring during launch or execution including
 //     errors in copy threads
-//   - any stream provided is not closed. However, upon return from ExecStream all i/o operations
-//     have completed and streams may be closed as the case may be
 //   - successful exit is: statusCode == 0, isCancel == false, err == nil
+//   - statusCode may be set by the process but is otherwise:
+//   - — 0 successful exit
+//   - — -1 process was killed by signal such as ^C or SIGTERM
 //   - context cancel exit is: statusCode == -1, isCancel == true, err == nil
-//   - — statusCode -1 means the process was terminated by signal such as ^C or SIGTERM
-//   - failure is: statusCode != 0, isCancel == false, err != nil
+//   - failure exit is: statusCode != 0, isCancel == false, err != nil
 //   - —
 //   - args is the command followed by arguments.
 //   - args[0] must specify an executable in the file system.
 //     env.PATH is used to resolve the command executable
-//   - if stdin should not be used, pio.EofReader can be used
+//   - if stdin stdout or stderr are nil, the are /dev/null
+//     Additional threads are used to copy data when stdin stdout or stderr are non-nil
+//   - os.Stdin os.Stdout os.Stderr can be provided
 //   - for stdout and stderr pio has usable types:
 //   - — pio.NewWriteCloserToString
 //   - — pio.NewWriteCloserToChan
 //   - — pio.NewWriteCloserToChanLine
 //   - — pio.NewReadWriteCloserSlice
-//   - if stdin stdout or stderr are nil, os.Stdin os.Stdout os.Stderr are used.
-//     Additional threads are used to copy data when stdin stdout or stderr are non-nil
-//   - If env is nil, the new process uses the current process’ environment
+//   - any stream provided is not closed. However, upon return from ExecStream all i/o operations
+//     have completed and streams may be closed as the case may be
 //   - ctx is used to kill the process (by calling os.Process.Kill) if the context becomes
 //     done before the command completes on its own
-//   - startCallback is invoked immediately after cmd.Exec.Start returns with
-//     its result. To not use a callback, set startCallback to nil
 func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
 	ctx context.Context, args ...string) (statusCode int, isCancel bool, err error) {
 	return ExecStreamFull(stdin, stdout, stderr, nil, ctx, nil, nil, args...)
 }
 
+// ExecStreamFull executes a system command using the exec.Cmd type and flexible streaming.
+//   - ExecStreamFull blocks during command execution
+//   - ExecStreamFull returns any error occurring during launch or execution including
+//     errors in copy threads
+//   - successful exit is: statusCode == 0, isCancel == false, err == nil
+//   - statusCode may be set by the process but is otherwise:
+//   - — 0 successful exit
+//   - — -1 process was killed by signal such as ^C or SIGTERM
+//   - context cancel exit is: statusCode == -1, isCancel == true, err == nil
+//   - failure exit is: statusCode != 0, isCancel == false, err != nil
+//   - —
+//   - args is the command followed by arguments.
+//   - args[0] must specify an executable in the file system.
+//     env.PATH is used to resolve the command executable
+//   - if stdin stdout or stderr are nil, the are /dev/null
+//     Additional threads are used to copy data when stdin stdout or stderr are non-nil
+//   - os.Stdin os.Stdout os.Stderr can be provided
+//   - for stdout and stderr pio has usable types:
+//   - — pio.NewWriteCloserToString
+//   - — pio.NewWriteCloserToChan
+//   - — pio.NewWriteCloserToChanLine
+//   - — pio.NewReadWriteCloserSlice
+//   - any stream provided is not closed. However, upon return from ExecStream all i/o operations
+//     have completed and streams may be closed as the case may be
+//   - ctx is used to kill the process (by calling os.Process.Kill) if the context becomes
+//     done before the command completes on its own
+//   - startCallback is invoked immediately after cmd.Exec.Start returns with
+//     its result. To not use a callback, set startCallback to nil
+//   - If env is nil, the new process uses the current process’ environment
 func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
 	env []string, ctx context.Context, startCallback func(err error), extraFiles []*os.File,
 	args ...string) (statusCode int, isCancel bool, err error) {
@@ -66,6 +94,7 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 
 	// thread management: waitgroup and thread-safe error store
 	var wg sync.WaitGroup
+	defer parl.Debug("waitgroup complete")
 	defer wg.Wait()
 	var errs perrors.ParlError
 	defer func() {
@@ -75,6 +104,7 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 	// close if we are aborting
 	var closers []io.Closer
 	isStart := false
+	defer parl.Debug("closers complete")
 	defer func() {
 		if isStart {
 			return // do nothing: if exec.Cmd.Start succeeded, exe.Cmd close the streams
@@ -98,35 +128,47 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 
 	// pipe stdin to process
 	if stdin != nil {
-		var ioWriteCloser io.WriteCloser
-		if ioWriteCloser, err = execCmd.StdinPipe(); err != nil {
-			err = perrors.ErrorfPF("execCmd.StdinPipe %w", err)
-			return // pipe error return
+		if stdin == os.Stdin {
+			execCmd.Stdin = stdin
+		} else {
+			var ioWriteCloser io.WriteCloser
+			if ioWriteCloser, err = execCmd.StdinPipe(); err != nil {
+				err = perrors.ErrorfPF("execCmd.StdinPipe %w", err)
+				return // pipe error return
+			}
+			wg.Add(1)
+			go copyThread("stdin", stdin, ioWriteCloser, errs.AddErrorProc, execCtx, &wg)
 		}
-		wg.Add(1)
-		go copyThread("stdin", stdin, ioWriteCloser, errs.AddErrorProc, execCtx, &wg)
 	}
 
 	// pipe stdout to process
 	if stdout != nil {
-		var ioReadCloser io.ReadCloser
-		if ioReadCloser, err = execCmd.StdoutPipe(); err != nil {
-			err = perrors.ErrorfPF("execCmd.StdoutPipe %w", err)
-			return // pipe error return
+		if stdout == os.Stdout || stdout == os.Stderr {
+			execCmd.Stdout = stdout
+		} else {
+			var ioReadCloser io.ReadCloser
+			if ioReadCloser, err = execCmd.StdoutPipe(); err != nil {
+				err = perrors.ErrorfPF("execCmd.StdoutPipe %w", err)
+				return // pipe error return
+			}
+			wg.Add(1)
+			go copyThread("stdout", ioReadCloser, stdout, errs.AddErrorProc, execCtx, &wg)
 		}
-		wg.Add(1)
-		go copyThread("stdout", ioReadCloser, stdout, errs.AddErrorProc, execCtx, &wg)
 	}
 
 	// pipe stderr to process
 	if stderr != nil {
-		var ioReadCloser io.ReadCloser
-		if ioReadCloser, err = execCmd.StderrPipe(); err != nil {
-			err = perrors.ErrorfPF("execCmd.StderrPipe %w", err)
-			return // pipe error return
+		if stderr == os.Stdout || stderr == os.Stderr {
+			execCmd.Stderr = stderr
+		} else {
+			var ioReadCloser io.ReadCloser
+			if ioReadCloser, err = execCmd.StderrPipe(); err != nil {
+				err = perrors.ErrorfPF("execCmd.StderrPipe %w", err)
+				return // pipe error return
+			}
+			wg.Add(1)
+			go copyThread("stderr", ioReadCloser, stderr, errs.AddErrorProc, execCtx, &wg)
 		}
-		wg.Add(1)
-		go copyThread("stderr", ioReadCloser, stderr, errs.AddErrorProc, execCtx, &wg)
 	}
 
 	if len(extraFiles) > 0 {
@@ -134,6 +176,7 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 	}
 
 	// execute
+	parl.Debug("Start")
 	err = execCmd.Start()
 	isStart = true
 	if startCallback != nil {
@@ -146,7 +189,10 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 		return // command Start error return
 	}
 
-	if err = execCmd.Wait(); err != nil {
+	parl.Debug("Wait")
+	err = execCmd.Wait()
+	parl.Debug("Wait complete")
+	if err != nil {
 
 		// get special exec.ExitError
 		var exitError *exec.ExitError

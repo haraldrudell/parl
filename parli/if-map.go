@@ -99,6 +99,9 @@ type ThreadSafeMap[K comparable, V any] interface {
 	//     A nil return value from newV causes panic. A new mapping is created using
 	//     the value pointed to by the newV return value.
 	//   - otherwise, a mapping is created using whatever makeV returns
+	//	- newV and makeV may not access the map.
+	//		The map’s write lock is held during their execution
+	//	- GetOrCreate is an atomic, thread-safe operation
 	//   - value insert is O(log n)
 	GetOrCreate(
 		key K,
@@ -107,6 +110,13 @@ type ThreadSafeMap[K comparable, V any] interface {
 	) (value V, ok bool)
 	// Put saves or replaces a mapping
 	Put(key K, value V)
+	// Putif is conditional Put depending on the return value from the putIf function.
+	//	- if key does not exist in the map, the put is carried out and wasNewKey is true
+	//	- if key exists and putIf is nil or returns true, the put is carried out and wasNewKey is false
+	//	- if key exists and putIf returns false, the put is not carried out and wasNewKey is false
+	//   - during PutIf, the map cannot be accessed and the map’s write-lock is held
+	//	- PutIf is an atomic, thread-safe operation
+	PutIf(key K, value V, putIf func(value V) (doPut bool)) (wasNewKey bool)
 	// Delete removes mapping using key K.
 	//   - if key K is not mapped, the map is unchanged.
 	//   - O(log n)
@@ -117,6 +127,10 @@ type ThreadSafeMap[K comparable, V any] interface {
 	Length() (length int)
 	// Clone returns a shallow clone of the map
 	Clone() (clone ThreadSafeMap[K, V])
+	// Swap replaces the map with otherMap and returns the current map in previousMap
+	//	- if otherMap is not initialized RWMap, no swap takes place and previousMap is nil
+	//	- Swap is an atomic, thread-safe operation
+	Swap(otherMap ThreadSafeMap[K, V]) (previousMap ThreadSafeMap[K, V])
 	// List provides the mapped values, undefined ordering
 	//   - O(n)
 	List() (list []V)

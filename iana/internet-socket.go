@@ -28,6 +28,11 @@ func NewInternetSocket(protocol Protocol, addrPort netip.AddrPort) (internetSock
 		return
 	}
 
+	// remove possible Zone
+	if addrPort.Addr().Zone() != "" {
+		addrPort = netip.AddrPortFrom(addrPort.Addr().WithZone(""), addrPort.Port())
+	}
+
 	if addrPort.Port() == 0 {
 		internetSocket, err = NewInternetSocketNoPort(protocol, addrPort.Addr())
 		return
