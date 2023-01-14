@@ -25,7 +25,7 @@ import (
 type Go interface {
 	// Register performs no function but allows the Go object to collect
 	// information on the new thread.
-	Register()
+	Register() (g0 Go)
 	// AddError emits a non-fatal error.
 	AddError(err error)
 	// Go returns a Go object to be provided as a go-statement function-argument
@@ -70,8 +70,11 @@ type Go interface {
 	//	or Cancel is invoked on this Go object.
 	// Subordinate thread-groups do not Cancel the context of the Go thread.
 	Context() (ctx context.Context)
-	ThreadInfo() (threadID ThreadID, createLocation pruntime.CodeLocation,
-		funcLocation pruntime.CodeLocation, isValid bool)
+	ThreadInfo() (
+		threadID ThreadID, // small-integer numeric string, .IsValid determines if present
+		createLocation *pruntime.CodeLocation, // where go statement was
+		funcLocation *pruntime.CodeLocation, // the goroutine function with values
+	)
 	fmt.Stringer
 }
 

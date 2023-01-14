@@ -79,7 +79,7 @@ func printThread(wg parl.SyncDone, log parl.PrintfFunc, g0 goGroup) {
 		threads := g0.listThreads()
 		ts := make([]string, len(threads))
 		for i, t := range threads {
-			ts[i] = parl.Sprintf("threadID:%s go:%s", t.threadID, t.createLocation.Short())
+			ts[i] = ThreadInfo(t)
 		}
 		s := strings.Join(ts, "\n")
 		log("%s %s\n%s", parl.ShortSpace(), g0.String(), s)
@@ -89,6 +89,25 @@ func printThread(wg parl.SyncDone, log parl.PrintfFunc, g0 goGroup) {
 		case <-ticker.C:
 		}
 	}
+}
+
+func ThreadInfo(t *ThreadData) (s string) {
+	var sList []string
+	if t.threadID.IsValid() {
+		sList = append(sList, "threadID: "+t.threadID.String())
+	}
+	if t.funcLocation.IsSet() {
+		sList = append(sList, "func: "+t.funcLocation.Short())
+	}
+	if t.createLocation.IsSet() {
+		sList = append(sList, "go: "+t.createLocation.Short())
+	}
+	if len(sList) != 0 {
+		s = strings.Join(sList, "\x20")
+	} else {
+		s = "[no data]"
+	}
+	return
 }
 
 func threadLoggerThread(g0 goGroup, waitCh chan struct{}) {

@@ -16,7 +16,6 @@ func TestThreadDataWrap(t *testing.T) {
 
 	var threadDataWrap ThreadSafeThreadData
 	var threadData *ThreadData
-	var isValid bool
 
 	threadDataWrap = ThreadSafeThreadData{}
 	if threadDataWrap.HaveThreadID() {
@@ -27,8 +26,7 @@ func TestThreadDataWrap(t *testing.T) {
 	if threadDataWrap.ThreadID() != stack.ID() {
 		t.Errorf("bad ID %q exp %q", threadDataWrap.ThreadID(), stack.ID())
 	}
-	threadData, isValid = threadDataWrap.Get()
+	threadData = threadDataWrap.Get()
 	_ = threadData
-	_ = isValid
 	threadDataWrap.SetCreator(stack.Creator())
 }

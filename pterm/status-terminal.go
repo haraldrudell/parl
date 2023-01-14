@@ -45,6 +45,8 @@ type StatusTerminal struct {
 	IsTerminal parl.AtomicBool // configurable whether status texts should be output
 	width      int64           // atomic
 
+	statusEnded parl.AtomicBool // no more status should be output
+
 	lock             sync.Mutex
 	displayLineCount int    // behind lock: number of terminal lines occupied by the current status
 	output           string // behind lock: the current status
@@ -99,8 +101,8 @@ func new(fd int, writer io.Writer) (statusTerminal *StatusTerminal) {
 // Status updates a status are at the bottom of the display.
 // For non-ansi-terminal stderr, Status does nothing.
 func (st *StatusTerminal) Status(s string) {
-	if !st.IsTerminal.IsTrue() {
-		return // no status if not terminal
+	if !st.IsTerminal.IsTrue() || st.statusEnded.IsTrue() {
+		return // no status if not terminal or EndStatus
 	}
 	width := st.Width()
 	if width == 0 {
@@ -253,6 +255,18 @@ func (st *StatusTerminal) CopyLog(writer io.Writer, remove ...bool) {
 	if st.copyLog != nil {
 		delete(st.copyLog, writer)
 	}
+}
+
+func (st *StatusTerminal) EndStatus() {
+	if !st.statusEnded.Set() {
+		return
+	}
+
+	st.lock.Lock()
+	defer st.lock.Unlock()
+
+	st.output = ""
+	st.Print(NewLine)
 }
 
 func (st *StatusTerminal) clearStatus() (s string) {

@@ -31,6 +31,10 @@ type FutureValue[T any] struct {
 type Resolver[T any] func() (value T, err error)
 
 // NewFutureCore executes fn and returns a future for its result.
+// Usage:
+//
+//	f := NewFutureCore(computeTfunc)
+//	value, isPanic, err := f.Wait()
 func NewFutureCore[T any](resolver Resolver[T]) (futureCore *FutureCore[T]) {
 	f := FutureCore[T]{}
 	InitFutureCore(&f, resolver)

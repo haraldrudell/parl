@@ -49,12 +49,12 @@ func newGo(parent goParentArg, goInvocation *pruntime.CodeLocation) (
 	g.thread.SetCreator(goInvocation)
 
 	goEntityID = g.G0ID()
-	threadData, _ = g.thread.Get()
+	threadData = g.thread.Get()
 	g0 = &g
 	return
 }
 
-func (g0 *Go) Register() { g0.checkState(false) }
+func (g0 *Go) Register() (g00 parl.Go) { g0.checkState(false); return g0 }
 
 // SubGo returns a thread-group without its own error channel but
 // with FirstFatal mechanic
@@ -96,7 +96,7 @@ func (g0 *Go) Done(errp *error) {
 }
 
 func (g0 *Go) ThreadData() (threadData *ThreadData) {
-	threadData, _ = g0.thread.Get()
+	threadData = g0.thread.Get()
 	return
 }
 
@@ -117,12 +117,13 @@ func (g0 *Go) Cancel() {
 
 func (g0 *Go) ThreadInfo() (
 	threadID parl.ThreadID,
-	createLocation pruntime.CodeLocation,
-	funcLocation pruntime.CodeLocation,
-	isValid bool) {
-	var threadData *ThreadData
-	threadData, isValid = g0.thread.Get()
-	threadID, createLocation, funcLocation = threadData.Get()
+	createLocation *pruntime.CodeLocation,
+	funcLocation *pruntime.CodeLocation,
+) {
+	var threadData *ThreadData = g0.thread.Get() // a copy of data extracted from behind lock
+	threadID = threadData.threadID
+	createLocation = &threadData.createLocation
+	funcLocation = &threadData.funcLocation
 	return
 }
 
@@ -143,12 +144,12 @@ func (g0 *Go) checkState(skipTerminated bool) {
 	g0.thread.Update(pdebug.NewStack(grCheckThreadFrames))
 
 	// propagate thread information
-	threadData, _ := g0.thread.Get()
+	threadData := g0.thread.Get()
 	g0.UpdateThread(g0.G0ID(), threadData)
 }
 
 // g1ID:4:g0.(*g1WaitGroup).Go-g1-thread-group.go:63
 func (g0 *Go) String() (s string) {
-	td, _ := g0.thread.Get()
+	td := g0.thread.Get()
 	return parl.Sprintf("go:%s:%s", td.threadID, td.createLocation.Short())
 }

@@ -67,7 +67,7 @@ func TestCodeLocation(t *testing.T) {
 		expectedPackage = expectedPackage[:dotIndex]
 	}
 	expectedPackFunc := expectedPackage + "." + expectedFuncName
-	expectedShortPrefix := fmt.Sprintf("%s-%s:", expectedBase, filepath.Base(expectedFile))
+	expectedShortPrefix := fmt.Sprintf("%s()-%s:", expectedBase, filepath.Base(expectedFile))
 	expectedStringPrefix := fmt.Sprintf("%s\n\x20\x20%s:", expectedFunc, expectedFile)
 
 	// .Name() is FuncName

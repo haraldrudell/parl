@@ -34,6 +34,9 @@ func (tw *ThreadSafeThreadData) Update(stack parl.Stack) {
 	defer tw.lock.Unlock()
 
 	tw.td.Update(stack)
+	if stack.ID().IsValid() {
+		tw.haveThreadID.Set() // if we know have a vald ThreadID
+	}
 }
 
 // SetCreator gets preliminary Go identifier: the line invoking Go().
@@ -45,15 +48,14 @@ func (tw *ThreadSafeThreadData) SetCreator(cl *pruntime.CodeLocation) {
 }
 
 // Get returns a clone of the wrapped ThreadData object.
-func (tw *ThreadSafeThreadData) Get() (thread *ThreadData, isValid bool) {
+func (tw *ThreadSafeThreadData) Get() (thread *ThreadData) {
 	tw.lock.RLock()
 	defer tw.lock.RUnlock()
 
 	// duplicate ThreadData object
 	t := tw.td
-
 	thread = &t
-	isValid = tw.haveThreadID.IsTrue()
+
 	return
 }
 

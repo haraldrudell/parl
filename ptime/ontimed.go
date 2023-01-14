@@ -27,7 +27,7 @@ import (
 //	…
 func OnTimedThread(send func(at time.Time), period time.Duration, loc *time.Location, g0 parl.Go) {
 	var err error
-	defer g0.Done(&err)
+	defer g0.Register().Done(&err)
 	defer parl.Recover(parl.Annotation(), &err, parl.NoOnError)
 
 	// timer is a time.Timer delaying until the first trig point
