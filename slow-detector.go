@@ -20,6 +20,7 @@ const (
 	newFrames        = 1
 	ensureFrames     = 2
 	slowScanPeriod   = time.Second
+	slowScanInteval  = time.Minute
 )
 
 type slowID uint64
@@ -34,12 +35,12 @@ type SlowDetector struct {
 	max AtomicMax[time.Duration]
 	t0  AtomicReference[time.Time]
 
-	IDlock         sync.Mutex
-	ID             slowID
-	printf         PrintfFunc
-	label          string
-	threadID       ThreadID
-	didThreadPrint bool
+	IDlock      sync.Mutex
+	ID          slowID
+	printf      PrintfFunc
+	label       string
+	threadID    ThreadID
+	threadPrint time.Time
 }
 
 // NewSlowDetector returns a Start-Stop variable detecting slowness
@@ -111,7 +112,7 @@ func (sd *SlowDetector) ensureID() {
 	defer sd.IDlock.Unlock()
 
 	sd.threadID = goID()
-	sd.didThreadPrint = false
+	sd.threadPrint = time.Time{}
 	if sd.ID != 0 {
 		return
 	}
@@ -130,11 +131,14 @@ func (sd *SlowDetector) print(duration time.Duration, isThread bool) {
 	defer sd.IDlock.Unlock()
 
 	var pStr string
-	if isThread && sd.didThreadPrint {
-		return
-	} else {
-		sd.didThreadPrint = true
-		pStr = " in progress…"
+	now := time.Now()
+	if isThread {
+		if now.Sub(sd.threadPrint) < slowScanInteval {
+			return // only do thread-prints once a minute
+		} else {
+			sd.threadPrint = now
+			pStr = " in progress…"
+		}
 	}
 
 	var threadStr string

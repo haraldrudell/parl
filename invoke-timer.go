@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pmaps"
 	"github.com/haraldrudell/parl/pslice"
 	"github.com/haraldrudell/parl/ptime"
@@ -50,11 +51,15 @@ func NewInvokeTimer(
 	latencyWarningPoint time.Duration,
 	parallelismWarningPoint uint64,
 	timerPeriod time.Duration, g0 GoGen) (invokeTimer *InvokeTimer) {
+	if callback == nil {
+		panic(perrors.NewPF("callback cannot be nil"))
+	}
 	if timerPeriod < defaultTimer {
 		timerPeriod = defaultTimer
 	}
 	var ix invocationX
 	i := InvokeTimer{
+		callback:    callback,
 		timerPeriod: timerPeriod,
 		invoTimes:   *pmaps.NewThreadSafeOrderedMapAny[emid](ix.order),
 		g0:          g0,

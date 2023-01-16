@@ -108,10 +108,19 @@ func (nb *NBChan[T]) Send(value T) {
 	nb.sendQueue = append(nb.sendQueue, value) // put err in send queue
 }
 
-// GetAll returns a slice of all available items held by the channel.
-func (nb *NBChan[T]) GetAll() (allItems []T) {
+// Get returns a slice of n or default all available items held by the channel.
+func (nb *NBChan[T]) Get(n ...int) (allItems []T) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
+
+	// n0: 0 for all items, >0 that many items
+	var n0 int
+	if len(n) > 0 {
+		n0 = n[0]
+	}
+	if n0 < 1 {
+		n0 = 0
+	}
 
 	// get possible item from send thread
 	var item T
@@ -129,17 +138,22 @@ func (nb *NBChan[T]) GetAll() (allItems []T) {
 	if itemValid {
 		itemLength = 1
 	}
-	n := len(nb.sendQueue)
-	allItems = make([]T, n+itemLength)
+	nq := len(nb.sendQueue)
+	// cap n to set n0
+	if n0 != 0 && nq > n0 {
+		nq = n0
+	}
+	allItems = make([]T, nq+itemLength)
 	if itemValid {
 		allItems[0] = item
 	}
 
 	// empty the send buffer
-	if n > 0 {
+	if nq > 0 {
 		copy(allItems[itemLength:], nb.sendQueue)
-		nb.sendQueue = nb.sendQueue[:0]
-		nb.unsentCount -= n
+		copy(nb.sendQueue, nb.sendQueue[nq:])
+		nb.sendQueue = nb.sendQueue[:len(nb.sendQueue)-nq]
+		nb.unsentCount -= nq
 	}
 
 	return
