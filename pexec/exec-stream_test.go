@@ -35,7 +35,7 @@ func TestExecStream(t *testing.T) {
 	if err == nil {
 		t.Error("ExecStream missing err")
 	} else if !errors.Is(err, ErrArgsListEmpty) {
-		t.Errorf("ExecStream bad err: %q exp: %q", err.Error(), ErrArgsListEmpty)
+		t.Errorf("ExecStream bad err: %q exp: %q", perrors.Short(err), ErrArgsListEmpty)
 	}
 
 	// bash built-in: error
@@ -43,7 +43,7 @@ func TestExecStream(t *testing.T) {
 	if err == nil {
 		t.Error("ExecStream missing err")
 	} else if !strings.Contains(err.Error(), messageNotFound) {
-		t.Errorf("ExecStream bad err: %q exp: %q", err.Error(), messageNotFound)
+		t.Errorf("ExecStream bad err: %q exp: %q", perrors.Short(err), messageNotFound)
 	}
 
 	// terminate using context
@@ -53,13 +53,13 @@ func TestExecStream(t *testing.T) {
 			t.Log("startCallback invoking cancel")
 			parl.InvokeCancel(ctxCancel)
 		} else {
-			t.Errorf("startCallback had error: %v", err)
+			t.Errorf("startCallback had error: %s", perrors.Short(err))
 		}
 	}
 	statusCode, isCancel, err = ExecStreamFull(pio.EofReader, stdout, stderr, nil, ctxCancel, startCallback, nil, sleepCommand...)
-	t.Logf("Context cancel: status code: %d isCancel: %t, err: %s", statusCode, isCancel, perrors.Short(err))
+	t.Logf("ExecStreamFull returned values on context cancel: status code: %d isCancel: %t, err: %s", statusCode, isCancel, perrors.Short(err))
 	if err != nil {
-		t.Errorf("ExecStream canceled context produced error: %v", err)
+		t.Errorf("ExecStream canceled context produced error: %s", perrors.Long(err))
 	} else if !isCancel {
 		t.Error("ExecStream canceled context returned isCancel false")
 	}

@@ -83,10 +83,11 @@ func ConvertU32[T constraints.Integer](integer T, label string) (u32 uint32, err
 }
 
 func ConvertU64[T constraints.Integer](integer T, label string) (u64 uint64, err error) {
-
-	var anyValue any = integer
-	switch anyValue.(type) {
-	case int, int8, int16, int32, int64:
+	var T0 T
+	var u64Max uint64 = math.MaxUint64
+	var Tmax = T(u64Max)
+	isSigned := Tmax < T0
+	if isSigned {
 		i64 := int64(integer)
 		if i64 < 0 {
 			if label == "" {
@@ -96,8 +97,10 @@ func ConvertU64[T constraints.Integer](integer T, label string) (u64 uint64, err
 			return
 		}
 		u64 = uint64(i64)
-	case uint, uint8, uint16, uint32, uint64:
-		u64 = uint64(integer)
+		return
 	}
+
+	u64 = uint64(integer)
+
 	return
 }

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/recover"
 )
 
 func TestConvertSliceToInterface(t *testing.T) {
@@ -26,7 +26,7 @@ func TestConvertSliceToInterface(t *testing.T) {
 	messageNI := "not implement"
 
 	var err error
-	parl.RecoverInvocationPanic(func() {
+	recover.RecoverInvocationPanic(func() {
 		ConvertSliceToInterface[
 			b,
 			a,

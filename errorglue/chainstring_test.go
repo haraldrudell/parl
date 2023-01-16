@@ -107,7 +107,7 @@ func TestChainString(t *testing.T) {
 	t.Logf("dumpChain: %s", DumpChain(cst.err))
 	actualString = ChainString(cst.err, ShortFormat)
 	expected := cst.expectedMessage + "\x20at\x20" + GetStacks(cst.err)[0][0].Short()
-	if actualString != expected {
+	if !strings.HasPrefix(actualString, expected) {
 		t.Errorf("ShortFormat:\n%q expected:\n%q", actualString, expected)
 	}
 
@@ -203,4 +203,25 @@ func TestPrintNil(t *testing.T) {
 	//t.Log(fmt.Sprintf("%v", err))
 
 	//t.Fail()
+}
+
+func TestAppended(t *testing.T) {
+	message1 := "error1"
+	prefix1 := message1 + " at errorglue."
+	message2 := "error2"
+	contains2 := " 1[" + message2 + " at errorglue."
+	err := NewErrorStack(
+		errors.New(message1),
+		pruntime.NewStackSlice(0))
+	err2 := NewRelatedError(err, NewErrorStack(
+		errors.New(message2),
+		pruntime.NewStackSlice(0)))
+
+	var s string = ChainString(err2, ShortFormat)
+	if !strings.HasPrefix(s, prefix1) {
+		t.Errorf("does not start with: %q: %q", prefix1, s)
+	}
+	if !strings.Contains(s, contains2) {
+		t.Errorf("does not contain: %q: %q", contains2, s)
+	}
 }

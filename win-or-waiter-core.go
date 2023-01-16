@@ -9,6 +9,19 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pslice"
+	"github.com/haraldrudell/parl/set"
+)
+
+const (
+	// WinOrWaiterAnyValue causes a thread to accept any calculated value
+	WinOrWaiterAnyValue WinOrWaiterStrategy = iota + 1
+	// WinOrWaiterMustBeLater forces a calculation after the last arriving thread.
+	// WinOrWaiter caclulations are serialized, ie. a new calculation does not start prior to
+	// the conlusion of the previous calulation
+	WinOrWaiterMustBeLater
 )
 
 // WinOrWaiter picks a winner thread to carry out some task used by many threads.
@@ -17,28 +30,33 @@ import (
 //   - threads arriving to a WinOrWait in progress are held waiting until WinnerDone
 //   - the task is completed on demand, but only by the first thread requesting it
 type WinOrWaiterCore struct {
-	sync.Cond
-	// data version: the time scanning of the current version of data began.
+	cond sync.Cond
+	// available data version: the time scanning of the current version of data began.
 	// zero-time if no data version has been completed
 	tVersion time.Time
-	// the time of starting the last initiated scan
-	tStart      time.Time
-	mustBeLater bool
-	ctx         context.Context
+	// the time of starting the last initiated calculation
+	tStart time.Time
+	// calculation strategy for this WinOrWaiter
+	//	- WinOrWaiterAnyValue WinOrWaiterMustBeLater
+	strategy WinOrWaiterStrategy
+	// context used for cancellation, may be nil
+	ctx context.Context
 }
 
 // WinOrWaiter returns a semaphore used for completing an on-demand task by
 // the first thread requesting it, and that result shared by subsequent threads held
 // waiting for the result.
-func NewWinOrWaiterCore(mustBeLater bool, ctx ...context.Context) (winOrWaiter *WinOrWaiterCore) {
+//   - strategy: WinOrWaiterAnyValue WinOrWaiterMustBeLater
+//   - ctx allows foir cancelation of the WinOrWaiter
+func NewWinOrWaiterCore(strategy WinOrWaiterStrategy, ctx ...context.Context) (winOrWaiter *WinOrWaiterCore) {
 	var ctx0 context.Context
 	if len(ctx) > 0 {
 		ctx0 = ctx[0]
 	}
 	return &WinOrWaiterCore{
-		Cond:        *sync.NewCond(&sync.Mutex{}),
-		mustBeLater: mustBeLater,
-		ctx:         ctx0,
+		cond:     *sync.NewCond(&sync.Mutex{}),
+		strategy: strategy,
+		ctx:      ctx0,
 	}
 }
 
@@ -48,8 +66,9 @@ func NewWinOrWaiterCore(mustBeLater bool, ctx ...context.Context) (winOrWaiter *
 //   - threads arriving to a WinOrWait in progress are held waiting until WinnerDone
 //   - the task is completed on demand, but only by the first thread requesting it
 func (ww *WinOrWaiterCore) WinOrWait() (isWinner bool) {
-	ww.Cond.L.Lock()
-	defer ww.Cond.L.Unlock()
+	checkWinOrWaiter(ww)
+	ww.cond.L.Lock()
+	defer ww.cond.L.Unlock()
 
 	// the time this thread arrived
 	var tThis = time.Now()
@@ -66,14 +85,18 @@ func (ww *WinOrWaiterCore) WinOrWait() (isWinner bool) {
 
 		// if there has been a data update since this thread arrived
 		if !tVersion.Equal(ww.tVersion) {
-			if !ww.mustBeLater {
-				return // data change occurred and time does not matter return
-			}
-
-			if !tThis.Before(ww.tVersion) {
-				return // the data version is of a later time than when this thread arrived return
+			switch ww.strategy {
+			case WinOrWaiterAnyValue:
+				if !ww.tVersion.IsZero() {
+					return // any value accepted and a value is valid return
+				}
+			case WinOrWaiterMustBeLater:
+				if !tThis.Before(ww.tVersion) {
+					return // must be later and the data version is of a later time than when this thread arrived return
+				}
 			}
 		}
+		tVersion = ww.tVersion // absorb any changes
 
 		// ensure data processing is in progress
 		if isWinner = tVersion.Equal(ww.tStart); isWinner {
@@ -82,16 +105,32 @@ func (ww *WinOrWaiterCore) WinOrWait() (isWinner bool) {
 		}
 
 		// wait for any updates
-		ww.Cond.Wait()
+		ww.cond.Wait()
 	}
+}
+
+// Invalidate invalidates any completed calculation.
+// A calculation in progress may still be accepted.
+func (ww *WinOrWaiterCore) Invalidate() {
+	checkWinOrWaiter(ww)
+	ww.cond.L.Lock()
+	defer ww.cond.Broadcast()
+	defer ww.cond.L.Unlock()
+
+	if ww.tVersion.Equal(ww.tStart) {
+		ww.tStart = time.Time{} // no calculation in progress, ensure ww.tStart and ww.tVerison the same
+	}
+	// indicate that data value is not valid
+	ww.tVersion = time.Time{}
 }
 
 // WinOrWait allows a winning thread to announce completion of the task.
 // Deferrable.
 func (ww *WinOrWaiterCore) WinnerDone(errp *error) {
-	ww.Cond.L.Lock()
-	defer ww.Cond.Broadcast()
-	defer ww.Cond.L.Unlock()
+	checkWinOrWaiter(ww)
+	ww.cond.L.Lock()
+	defer ww.cond.Broadcast()
+	defer ww.cond.L.Unlock()
 
 	isError := errp != nil && *errp != nil
 
@@ -106,5 +145,28 @@ func (ww *WinOrWaiterCore) WinnerDone(errp *error) {
 }
 
 func (ww *WinOrWaiterCore) IsCancel() (isCancel bool) {
+	checkWinOrWaiter(ww)
 	return ww.ctx != nil && ww.ctx.Err() != nil
 }
+
+func checkWinOrWaiter(ww *WinOrWaiterCore) {
+	if ww == nil {
+		panic(perrors.NewPF("use of nil WinOrWaiterCore"))
+	} else if ww.cond.L == nil {
+		panic(perrors.NewPF("use of uninitialized WinOrWaiterCore"))
+	}
+}
+
+type WinOrWaiterStrategy uint8
+
+func (ws WinOrWaiterStrategy) String() (s string) {
+	return winOrWaiterSet.StringT(ws)
+}
+
+var winOrWaiterSet = set.NewSet(pslice.ConvertSliceToInterface[
+	set.SetElement[WinOrWaiterStrategy],
+	set.Element[WinOrWaiterStrategy],
+]([]set.SetElement[WinOrWaiterStrategy]{
+	{ValueV: WinOrWaiterAnyValue, Name: "anyValue"},
+	{ValueV: WinOrWaiterMustBeLater, Name: "mustBeLater"},
+}))

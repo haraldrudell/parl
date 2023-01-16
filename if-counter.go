@@ -39,6 +39,35 @@ type Counters interface {
 	GetOrCreateDatapoint(name CounterID, period time.Duration) (datapoint Datapoint)
 }
 
+// CounterSetData provides simple access to a set of counters, rate counters and datapoints/
+type CounterSetData interface {
+	Exists(name CounterID) (exists bool)
+	// Value returns the monotonically increasing value for a possible plain counter
+	//	- if no such counter exists, 0
+	Value(name CounterID) (value uint64)
+	// Running returns the increasing and decreasing running value for a possible plain counter
+	//	- if no such counter exists, 0
+	Running(name CounterID) (running uint64)
+	// Max returns the max seen value of running for a possible plain counter
+	//	- if no such counter exists, 0
+	Max(name CounterID) (max uint64)
+	// Rates returns the rate values a possible rate counter
+	//	- if no such counter exists or values are not yet available, nil
+	Rates(name CounterID) (rates map[RateType]int64)
+	// DatapointValue returns the latest value a possible datapoint
+	//	- if no such datapoint exists, 0
+	DatapointValue(name CounterID) (value uint64)
+	// DatapointMax returns the highest seen value for a possible datapoint
+	//	- if no such datapoint exists, 0
+	DatapointMax(name CounterID) (max uint64)
+	// DatapointMin returns the lowest seen value for a possible datapoint
+	//	- if no such datapoint exists, 0
+	DatapointMin(name CounterID) (min uint64)
+	// GetDatapoint returns dfatapoint data for a possible datapoint
+	//	- if no such datapoint exists, 0
+	GetDatapoint(name CounterID) (value, max, min uint64, isValid bool, average float64, n uint64)
+}
+
 // Counter is the data provider interface for a counter with Inc Dec SetValue operations.
 //   - value is a monotonously increasing value counting Inc and positive Add occurrences.
 //     value is used to count the total occurrences of something.

@@ -81,13 +81,17 @@ func (rw *RWMap[K, V]) GetOrCreate(
 		if pt == nil {
 			panic(perrors.NewPF("newV returned nil"))
 		}
-		rw.m[key] = *pt
+		value = *pt
+		rw.m[key] = value
+		ok = true
 		return // created using newV return
 	}
 
 	// create using makeV
 	if makeV != nil {
-		rw.m[key] = makeV()
+		value = makeV()
+		rw.m[key] = value
+		ok = true
 		return // created using makeV return
 	}
 

@@ -8,15 +8,18 @@ package ptime
 import (
 	"time"
 
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/recover"
 )
 
-// OnTimedThread invokes a callback on period-multiples since zero-time.
-//   - send is a thread-safe callback invoked on the schedule with the trig time provided
-//   - loc contains time zone for durations 24 h or greater eg. time.Local or time.UTC
-//   - the timer is cancelled using g0.Context
+// OnTimedThread invokes a callback on period-multiples since zero-time. thread-safe.
+// OnTimedThread is invoked in a go statement, running in its own thread.
+// The OnTimedThread thread invokes the send callback function periodically.
+//   - the send function callback needs to be thread-safe and is invoked with the trig time provided
+//   - loc is scheduling time zone for durations 24 h or greater eg. time.Local or time.UTC
+//   - the timer thread is cancelled via g0.Context
 //   - OnTimedThread uses g0.Done to provide thread error and to be waited-upon
 //   - period must be greater than zero or panic
+//   - if the send callback panics, that is a g0 fatal error
 //
 // Usage:
 //
@@ -25,10 +28,11 @@ import (
 //	defer gc.Cancel()
 //	go ptime.OnTimedThread(someFunc, time.Second, time.Local, gc.Add(parl.EcSharedChan, parl.ExCancelOnExit).Go())
 //	…
-func OnTimedThread(send func(at time.Time), period time.Duration, loc *time.Location, g0 parl.Go) {
+func OnTimedThread(send func(at time.Time), period time.Duration, loc *time.Location, g0 recover.Go) {
 	var err error
-	defer g0.Register().Done(&err)
-	defer parl.Recover(parl.Annotation(), &err, parl.NoOnError)
+	g0.AddError(nil)
+	defer g0.Done(&err)
+	defer recover.Recover(recover.Annotation(), &err, recover.NoOnError)
 
 	// timer is a time.Timer delaying until the first trig point
 	timer := OnTimer(period, time.Now().In(loc))

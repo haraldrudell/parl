@@ -192,7 +192,7 @@ func (st *Stack) SetFrames(frames []parl.Frame) {
 }
 
 func (st *Stack) String() (s string) {
-	sL := make([]string, 2*len(st.frames))
+	sL := make([]string, len(st.frames))
 	for i, frame := range st.frames {
 		sL[i] = frame.String()
 	}

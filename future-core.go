@@ -16,6 +16,11 @@ import (
 //   - Wait waits for fn to complete and returns its value and error
 //   - IsDone checks whether the value is present
 //   - FutureValue is in a separate type so that it can be sent on a channel
+//
+// Note: because the future value is computed in a new thread, tracing the sequence of events
+// may prove difficult would the future cause partial deadlock by the resolver being blocked.
+// The difficulty is that there is no continuous stack trace or thread ID showing what initiated the future.
+// Consider using WinOrWaiter mechanic.
 type FutureCore[T any] struct {
 	valueWait   WaitGroup
 	futureValue FutureValue[T]
@@ -31,6 +36,7 @@ type FutureValue[T any] struct {
 type Resolver[T any] func() (value T, err error)
 
 // NewFutureCore executes fn and returns a future for its result.
+// Consider using WInOrWaiter mechanic instead.
 // Usage:
 //
 //	f := NewFutureCore(computeTfunc)

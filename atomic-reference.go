@@ -10,21 +10,21 @@ import (
 	"unsafe"
 )
 
-type AtomicReferece[T any] struct {
+type AtomicReference[T any] struct {
 	reference *T
 }
 
-func MakeAtomicReferece[T any]() (reference AtomicReferece[T]) {
-	return AtomicReferece[T]{}
+func MakeAtomicReference[T any]() (reference AtomicReference[T]) {
+	return AtomicReference[T]{}
 }
 
-func (ref *AtomicReferece[T]) Get() (reference *T) {
+func (ref *AtomicReference[T]) Get() (reference *T) {
 	return (*T)(atomic.LoadPointer(
 		(*unsafe.Pointer)(unsafe.Pointer(&ref.reference)),
 	))
 }
 
-func (ref *AtomicReferece[T]) Put(reference *T) {
+func (ref *AtomicReference[T]) Put(reference *T) {
 	atomic.StorePointer(
 		(*unsafe.Pointer)(unsafe.Pointer(&ref.reference)),
 		unsafe.Pointer(reference),

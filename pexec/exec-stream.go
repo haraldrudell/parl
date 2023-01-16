@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"sync"
@@ -47,6 +48,10 @@ var ErrArgsListEmpty = errors.New("args list empty")
 //     have completed and streams may be closed as the case may be
 //   - ctx is used to kill the process (by calling os.Process.Kill) if the context becomes
 //     done before the command completes on its own
+//   - use ExecStream with parl.EchoModerator
+//   - if system commands slow down or lock-up, too many (dozens) invoking goroutines
+//     may cause increased memory consumption, thrashing or exhaust of file handles, ie.
+//     an uncontrollable host state
 func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
 	ctx context.Context, args ...string) (statusCode int, isCancel bool, err error) {
 	return ExecStreamFull(stdin, stdout, stderr, nil, ctx, nil, nil, args...)
@@ -81,6 +86,10 @@ func ExecStream(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
 //   - startCallback is invoked immediately after cmd.Exec.Start returns with
 //     its result. To not use a callback, set startCallback to nil
 //   - If env is nil, the new process uses the current process’ environment
+//   - use ExecStreamFull with parl.EchoModerator
+//   - if system commands slow down or lock-up, too many (dozens) invoking goroutines
+//     may cause increased memory consumption, thrashing or exhaust of file handles, ie.
+//     an uncontrollable host state
 func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteCloser,
 	env []string, ctx context.Context, startCallback func(err error), extraFiles []*os.File,
 	args ...string) (statusCode int, isCancel bool, err error) {
@@ -111,15 +120,13 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 		}
 		for _, c := range closers {
 			if e := c.Close(); e != nil {
-				err = perrors.AppendError(err, perrors.Errorf("stream Close %w", e))
+				err = perrors.AppendError(err, perrors.ErrorfPF("stream Close %w", e))
 			}
 		}
 	}()
 
 	// get Cmd structure, possibly resolve args[0] using environment PATH
-	var execCmd *exec.Cmd
-	_ = execCmd
-	execCmd = exec.CommandContext(execCtx, args[0], args[1:]...)
+	var execCmd *exec.Cmd = exec.CommandContext(execCtx, args[0], args[1:]...)
 
 	// possibly replace current process's environment os.Environ()
 	if env != nil {
@@ -177,45 +184,42 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 
 	// execute
 	parl.Debug("Start")
-	err = execCmd.Start()
+	if err = execCmd.Start(); err != nil {
+		err = perrors.ErrorfPF("execCmd.Start %w", err)
+	}
 	isStart = true
 	if startCallback != nil {
-		parl.RecoverInvocationPanic(func() {
+		var e error
+		if parl.RecoverInvocationPanic(func() {
 			startCallback(err)
-		}, &err)
+		}, &e); e != nil {
+			err = perrors.AppendError(err, perrors.ErrorfPF("startCallback %w", e))
+		}
 	}
 	if err != nil {
-		err = perrors.Errorf("execCmd.Start %w", err)
 		return // command Start error return
 	}
 
 	parl.Debug("Wait")
-	err = execCmd.Wait()
+	if err = execCmd.Wait(); err != nil {
+		err = perrors.ErrorfPF("execCmd.Wait %w", err)
+	}
 	parl.Debug("Wait complete")
 	if err != nil {
-
-		// get special exec.ExitError
-		var exitError *exec.ExitError
-		errors.As(err, &exitError)
-
-		// get status code
-		if exitError != nil {
-			statusCode = exitError.ExitCode()
-		}
+		var hasStatusCode bool
+		var signal syscall.Signal
+		hasStatusCode, statusCode, signal = ExitError(err)
 
 		// was the context canceled?
-		if execCtx.Err() != nil {
-			// if the command did not complete successfully, it’s exec.ExitError
-			if exitError != nil {
-				// if it was SIGKILL, ignore it: it was cuased by context cancelation
-				if waitStatus, ok := exitError.ProcessState.Sys().(syscall.WaitStatus); ok {
-					if waitStatus.Signal() == unix.SIGKILL {
-						err = nil // ignore the error
-						isCancel = true
-					}
-				}
-			}
+		if execCtx.Err() != nil &&
+			hasStatusCode && // there was an exec.ExitError
+			statusCode == TerminatedBySignal && // the process was terminated by a signal
+			signal == unix.SIGKILL { // in fact SIGKILL
+			// if it was SIGKILL, ignore it: it was cuased by context cancelation
+			err = nil // ignore the error
+			isCancel = true
 		}
+
 		return // Wait() error return
 	}
 	return // command completed successfully return
@@ -236,5 +240,14 @@ func copyThread(label string,
 	defer parl.CancelOnError(&err, execCtx) // cancel the command if copyThread failes
 	defer parl.Recover("copy command i/o "+label, &err, addError)
 
-	_, err = io.Copy(writer, reader)
+	if _, err = io.Copy(writer, reader); perrors.Is(&err, "%s io.Copy %w", label, err) {
+
+		// if the process terminates quickly, exec.Command might have already closed
+		// stdout stderr before the copyThread is scheduled to start
+		if errors.Is(err, fs.ErrClosed) {
+			err = nil // ignore quickly closed errors
+		}
+
+		return
+	}
 }

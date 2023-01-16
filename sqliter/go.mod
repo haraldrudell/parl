@@ -6,7 +6,7 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/haraldrudell/parl v0.4.39
+	github.com/haraldrudell/parl v0.4.40
 	modernc.org/sqlite v1.20.2
 )
 

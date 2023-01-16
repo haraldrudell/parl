@@ -8,7 +8,7 @@ ISC License
 package pmaps
 
 import (
-	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/ids"
 	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/pslices"
 	"golang.org/x/exp/constraints"
@@ -20,7 +20,7 @@ type AggregatingPriorityQueue[V any, P constraints.Ordered] struct {
 	// m provides O(1) access to priority data-nodes via the value-pointer
 	m map[*V]parli.AggregatePriority[V, P]
 	// indexGenerator provides IDs for insertion-ordering
-	indexGenerator parl.UniqueIDint
+	indexGenerator ids.UniqueIDint
 }
 
 // NewRanking returns a map of updatable values traversable by rank

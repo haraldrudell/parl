@@ -8,6 +8,7 @@ package errorglue
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -18,23 +19,32 @@ const (
 // ChainString() gets a string representation of a single error chain
 // TODO 220319 finish comment
 func ChainString(err error, format CSFormat) (s string) {
+
+	// no error case
 	if err == nil {
-		return csNilString
+		return csNilString // no error return "OK"
 	}
+
+	// DefaultFormat is teh string produced by the Error method
 	if format == DefaultFormat {
 		return err.Error() // the first error in the chain has our error message
 	}
+
 	if format == ShortFormat {
 		// append the top frame of the oldest, innermost stack trace code location
-		for _, e := range ErrorsWithStack(err) { // list with oldest first
-			if e2, ok := e.(ChainStringer); ok {
-				loc := e2.ChainString(ShortSuffix)
-				if loc != "" {
-					return err.Error() + atStringChain + loc
-				}
+		s = shortFormat(err)
+
+		// add appended errors at the end 2[…]
+		list := ErrorList(err)
+		if len(list) > 1 {
+			list = list[1:] // skip err itself
+			sList := make([]string, len(list))
+			for i, e := range list {
+				sList[i] = shortFormat(e)
 			}
+			s += fmt.Sprintf(" %d[%s]", len(list), strings.Join(sList, ", "))
 		}
-		return err.Error() // no stack had a location available
+		return
 	}
 
 	// isIgnore: avoid cyclic traversal
@@ -96,6 +106,22 @@ func ChainString(err error, format CSFormat) (s string) {
 			}
 			isFirst = false
 		}
+	}
+	return
+}
+
+func shortFormat(err error) (message string) {
+	for _, e := range ErrorsWithStack(err) { // list with oldest first
+		if e2, ok := e.(ChainStringer); ok {
+			loc := e2.ChainString(ShortSuffix)
+			if loc != "" {
+				message = err.Error() + atStringChain + loc
+				break
+			}
+		}
+	}
+	if message == "" {
+		message = err.Error() // no stack had a location available
 	}
 	return
 }
