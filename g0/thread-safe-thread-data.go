@@ -29,11 +29,11 @@ func (tw *ThreadSafeThreadData) HaveThreadID() (haveThreadID bool) {
 }
 
 // Update populates the wrapped ThreadData from the stack trace.
-func (tw *ThreadSafeThreadData) Update(stack parl.Stack) {
+func (tw *ThreadSafeThreadData) Update(stack parl.Stack, label string) {
 	tw.lock.Lock()
 	defer tw.lock.Unlock()
 
-	tw.td.Update(stack)
+	tw.td.Update(stack, label)
 	if stack.ID().IsValid() {
 		tw.haveThreadID.Set() // if we know have a vald ThreadID
 	}

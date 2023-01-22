@@ -41,7 +41,7 @@ type Set[T comparable] interface {
 
 // Element represents an element of a set that has a unique value and is printable.
 // set element values are unique but not necessarily ordered.
-// set.Element is an implementation.
+// set.SetElement is an implementation.
 type Element[T comparable] interface {
 	Value() (value T)
 	fmt.Stringer

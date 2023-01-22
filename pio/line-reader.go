@@ -169,7 +169,6 @@ func (rr *LineReader) ReadLine(p []byte) (line []byte, isEOF bool, err error) {
 func (rr *LineReader) readToByts(lengthP int) (n int, err error) {
 	lengthByts := len(rr.byts)
 	defer func() {
-		parl.D("lengthByts %d cap(rr.byts): %d n: %d err: %s lengthP %d", lengthByts, cap(rr.byts), n, perrors.Short(err), lengthP)
 		rr.byts = rr.byts[:lengthByts+n]
 	}()
 

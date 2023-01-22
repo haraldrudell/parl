@@ -140,8 +140,8 @@ func (nb *NBChan[T]) Get(n ...int) (allItems []T) {
 	}
 	nq := len(nb.sendQueue)
 	// cap n to set n0
-	if n0 != 0 && nq > n0 {
-		nq = n0
+	if n0 != 0 && nq+itemLength > n0 {
+		nq = n0 - itemLength
 	}
 	allItems = make([]T, nq+itemLength)
 	if itemValid {

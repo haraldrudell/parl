@@ -60,6 +60,12 @@ func (wg *WaitGroup) DoneBool() (isExit bool) {
 	return wg.dones == wg.adds
 }
 
+func (wg *WaitGroup) Count() (remaining int) {
+	adds, dones := wg.Counters()
+	remaining = adds - dones
+	return
+}
+
 func (wg *WaitGroup) Counters() (adds int, dones int) {
 	wg.lock.Lock()
 	defer wg.lock.Unlock()

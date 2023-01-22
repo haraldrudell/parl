@@ -15,6 +15,7 @@ var goErrorMap = map[GoErrorContext]string{
 	GeNonFatal:    "GeNonFatal",
 	GePreDoneExit: "GePreDoneExit",
 	GeLocalChan:   "GeLocalChan",
+	GeTerminate:   "GeTerminate",
 	GeExit:        "GeExit",
 }
 

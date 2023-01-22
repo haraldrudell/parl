@@ -30,6 +30,11 @@ func (ab *AtomicBool) IsTrue() (isTrue bool) {
 	return atomic.LoadInt32(&ab.value) == abTrue
 }
 
+// IsFalse returns the flag’s current bool value. thread-safe
+func (ab *AtomicBool) IsFalse() (isFalse bool) {
+	return atomic.LoadInt32(&ab.value) == abFalse
+}
+
 // Set sets the flag to true and returns true if the flag was not already true.
 // thread-safe
 func (ab *AtomicBool) Set() (wasNotSet bool) {

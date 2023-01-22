@@ -54,7 +54,7 @@ func newGo(parent goParentArg, goInvocation *pruntime.CodeLocation) (
 	return
 }
 
-func (g0 *Go) Register() (g00 parl.Go) { g0.checkState(false); return g0 }
+func (g0 *Go) Register(label ...string) (g00 parl.Go) { g0.checkState(false, label...); return g0 }
 
 // SubGo returns a thread-group without its own error channel but
 // with FirstFatal mechanic
@@ -115,22 +115,15 @@ func (g0 *Go) Cancel() {
 	g0.goParent.Cancel()
 }
 
-func (g0 *Go) ThreadInfo() (
-	threadID parl.ThreadID,
-	createLocation *pruntime.CodeLocation,
-	funcLocation *pruntime.CodeLocation,
-) {
-	var threadData *ThreadData = g0.thread.Get() // a copy of data extracted from behind lock
-	threadID = threadData.threadID
-	createLocation = &threadData.createLocation
-	funcLocation = &threadData.funcLocation
+func (g0 *Go) ThreadInfo() (threadData parl.ThreadData) {
+	threadData = g0.thread.Get() // a copy of data extracted from behind lock
 	return
 }
 
 // checkState is invoked by all public methods ensuring that terminated
 // objects are not being used
 //   - checkState also collects data on the new thread
-func (g0 *Go) checkState(skipTerminated bool) {
+func (g0 *Go) checkState(skipTerminated bool, label ...string) {
 	if !skipTerminated && g0.isTerminated.IsTrue() {
 		panic(perrors.NewPF("operation on terminated Go thread object"))
 	}
@@ -141,7 +134,11 @@ func (g0 *Go) checkState(skipTerminated bool) {
 	}
 
 	// update thread information
-	g0.thread.Update(pdebug.NewStack(grCheckThreadFrames))
+	var label0 string
+	if len(label) > 0 {
+		label0 = label[0]
+	}
+	g0.thread.Update(pdebug.NewStack(grCheckThreadFrames), label0)
 
 	// propagate thread information
 	threadData := g0.thread.Get()

@@ -25,7 +25,8 @@ import (
 type Go interface {
 	// Register performs no function but allows the Go object to collect
 	// information on the new thread.
-	Register() (g0 Go)
+	// - label is an optional name that can be assigned to a Go goroutine thread
+	Register(label ...string) (g0 Go)
 	// AddError emits a non-fatal error.
 	AddError(err error)
 	// Go returns a Go object to be provided as a go-statement function-argument
@@ -70,11 +71,7 @@ type Go interface {
 	//	or Cancel is invoked on this Go object.
 	// Subordinate thread-groups do not Cancel the context of the Go thread.
 	Context() (ctx context.Context)
-	ThreadInfo() (
-		threadID ThreadID, // small-integer numeric string, .IsValid determines if present
-		createLocation *pruntime.CodeLocation, // where go statement was
-		funcLocation *pruntime.CodeLocation, // the goroutine function with values
-	)
+	ThreadInfo() (threadData ThreadData)
 	fmt.Stringer
 }
 
@@ -153,6 +150,12 @@ type GoGroup interface {
 	// Context will Cancel when the parent context Cancels.
 	// Subordinate thread-groups do not Cancel this context.
 	Context() (ctx context.Context)
+	// the available data for all threads
+	Threads() (threads []ThreadData)
+	// threads that have been named ordered by name
+	NamedThreads() (threads []ThreadData)
+	// SetDebug enables debug logging on this particular instance
+	SetDebug(debug bool)
 	fmt.Stringer
 }
 
@@ -175,11 +178,21 @@ type SubGo interface {
 	SubGroup(onFirstFatal ...GoFatalCallback) (subGroup SubGroup)
 	// Wait waits for all threads of this thread-group to terminate.
 	Wait()
+	// EnableTermination false prevents the SubGo or GoGroup from terminating
+	// even if the number of threads is zero
+	EnableTermination(allowTermination bool)
+	IsEnableTermination() (mayTerminate bool)
 	// Cancel terminates the threads in this and subordinate thread-groups.
 	Cancel()
 	// Context will Cancel when the parent context Cancels.
 	// Subordinate thread-groups do not Cancel this context.
 	Context() (ctx context.Context)
+	// the available data for all threads
+	Threads() (threads []ThreadData)
+	// threads that have been named ordered by name
+	NamedThreads() (threads []ThreadData)
+	// SetDebug enables debug logging on this particular instance
+	SetDebug(debug bool)
 	fmt.Stringer
 }
 
@@ -230,6 +243,24 @@ type GoError interface {
 	fmt.Stringer
 }
 
+type ThreadData interface {
+	// threadID is the ID of the running thread
+	// - use IsValid method to check if value is present
+	ThreadID() (threadID ThreadID)
+	// createLocation is the code line of the go-statement function-call
+	// invocation launching the thread
+	// - use Is
+	Create() (createLocation *pruntime.CodeLocation)
+	// funcLocation is the code line of the function of the running thread.
+	Func() (funcLocation *pruntime.CodeLocation)
+	// optional thread-name assigned by consumer
+	Name() (label string)
+	// "label:threadID" or fmt.Stringer
+	Short() (short string)
+	// all non-empty fields or "[empty]"
+	fmt.Stringer
+}
+
 const (
 	// GeNonFatal indicates a non-fatal error ocurring during processing.
 	// err is non-nil
@@ -238,7 +269,12 @@ const (
 	// other than the final exit of the last running goroutine.
 	// err may be nil
 	GePreDoneExit
+	// A SubGroup with its own error channel is sending a
+	// locally fatal error nopt intended to terminate the app
 	GeLocalChan
+	// A thread is requesting app termination withtout a fatal error.
+	//	- this could be a callback
+	GeTerminate
 	// GeExit indicates exit of the last goroutine.
 	// err may be nil.
 	// The error channel may close after GeExit.

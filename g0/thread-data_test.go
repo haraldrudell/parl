@@ -19,11 +19,11 @@ func TestThreadData(t *testing.T) {
 
 	threadData = ThreadData{}
 
-	threadData.Update(stack)
+	threadData.Update(stack, "")
 	if threadData.ThreadID() != stack.ID() {
 		t.Errorf("bad ID %q exp %q", threadData.ThreadID(), stack.ID())
 	}
-	threadID, createLocation, funcLocation := threadData.Get()
+	threadID, createLocation, funcLocation, _ := threadData.Get()
 	if threadID != stack.ID() {
 		t.Errorf("bad ID2 %q exp %q", threadID, stack.ID())
 	}

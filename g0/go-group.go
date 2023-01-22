@@ -15,6 +15,7 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pmaps"
 	"github.com/haraldrudell/parl/pruntime"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -40,6 +41,9 @@ type GoGroup struct {
 	goWaitGroup     // Go() SubGroup() Wait()
 	ch              parl.NBChan[parl.GoError]
 	doneLock        sync.Mutex // for GoDone method
+	noTermination   parl.AtomicBool
+	fakeGo          parl.AtomicReference[Go]
+	isDebug         parl.AtomicBool
 
 	owLock     sync.Mutex
 	onceWaiter *parl.OnceWaiter
@@ -88,10 +92,6 @@ func (g0 *GoGroup) Go() (g1 parl.Go) {
 
 	// count the running thread in this thread-group and its parents
 	g0.Add(goEntityID, threadData)
-
-	if parl.IsThisDebug() {
-		parl.Debug("Go#%s(%s)", goEntityID.String(), g0.goGroupState())
-	}
 
 	return
 }
@@ -144,6 +144,9 @@ func new(
 		gos:         pmaps.NewRWMap[GoEntityID, *ThreadData](),
 		goWaitGroup: *newGoWaitGroup(ctx),
 	}
+	if parl.IsThisDebug() {
+		g.isDebug.Set()
+	}
 	if len(onFirstFatal) > 0 {
 		g.onFirstFatal = onFirstFatal[0]
 	}
@@ -153,21 +156,27 @@ func new(
 	if isSubGroup {
 		g.isSubGroup.Set()
 	}
-	if parl.IsThisDebug() {
+	if g.isDebug.IsTrue() {
 		s := "new:" + g.typeString()
 		if parent != nil {
 			if p, ok := parent.(*GoGroup); ok {
 				s += "(" + p.typeString() + ")"
 			}
 		}
-		parl.Debug(s)
+		parl.Log(s)
 	}
 	return &g
 }
 
 // Add processes a thread from this or a subordinate thread-group
 func (g0 *GoGroup) Add(goEntityID GoEntityID, threadData *ThreadData) {
+	g0.doneLock.Lock()
+	defer g0.doneLock.Unlock()
+
 	g0.wg.Add(1)
+	if g0.isDebug.IsTrue() {
+		parl.Log("goGroup#%s:Add(id%s:%s)#%d", g0.G0ID(), goEntityID, threadData.Short(), g0.goWaitGroup.wg.Count())
+	}
 	g0.gos.Put(goEntityID, threadData)
 	if g0.parent != nil {
 		g0.parent.Add(goEntityID, threadData)
@@ -210,21 +219,22 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 	g0.doneLock.Lock()
 	defer g0.doneLock.Unlock()
 
+	if g0.isDebug.IsTrue() {
+		var threadData parl.ThreadData
+		var id string
+		if thread != nil {
+			threadData = thread.ThreadInfo()
+			id = thread.(*Go).G0ID().String()
+		}
+		parl.Log("goGroup#%s:GoDone(%sid%s,%s)after#:%d", g0.G0ID(), threadData.Short(), id, perrors.Short(err), g0.goWaitGroup.wg.Count()-1)
+	}
+
 	// process thread-exit
 	isTermination := g0.goWaitGroup.wg.DoneBool()
 	var threadGo goImpl
 	var ok bool
 	if threadGo, ok = thread.(*Go); !ok {
 		panic(perrors.NewPF("type assertion failed"))
-	}
-	if parl.IsThisDebug() {
-		var s string
-		if err == nil {
-			s = "OK"
-		} else {
-			s = "Err"
-		}
-		parl.Debug("GoX#%s:%s(%s)", threadGo.G0ID().String(), s, g0.goGroupState())
 	}
 	g0.gos.Delete(threadGo.G0ID())
 	if g0.isSubGroup.IsTrue() {
@@ -254,6 +264,16 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 
 		// SubGo case: all forwarded to parent
 		g0.parent.GoDone(thread, err)
+	}
+
+	if g0.isDebug.IsTrue() {
+		s := "goGroup#" + g0.G0ID().String() + ":"
+		if isTermination {
+			s += "Terminated"
+		} else {
+			s += Shorts(g0.Threads())
+		}
+		parl.Log(s)
 	}
 
 	if !isTermination {
@@ -305,6 +325,76 @@ func (g0 *GoGroup) FirstFatal() (firstFatal *parl.OnceWaiterRO) {
 		}
 	}
 	return parl.NewOnceWaiterRO(g0.onceWaiter)
+}
+
+func (g0 *GoGroup) EnableTermination(allowTermination bool) {
+	if g0.isDebug.IsTrue() {
+		parl.Log("goGroup%s#:EnableTermination:%t", g0.G0ID(), allowTermination)
+	}
+	if g0.isWaitGroupDone.IsTrue() {
+		return // GoGroup is already shutdown return
+	} else if allowTermination {
+		if g0.noTermination.Clear() {
+			// termination now allowed, it was previously blocked: remove fake Go
+			g0.GoDone(g0.fakeGo.Get(), nil)
+			g0.fakeGo.Put(nil)
+		}
+	} else if g0.noTermination.Set() {
+		// termination now prevented, it was previously allowed
+		// to prevent termination, add a fake thread
+		g0.fakeGo.Put(g0.Go().(*Go))
+	}
+}
+
+func (g0 *GoGroup) IsEnableTermination() (mayTerminate bool) {
+	mayTerminate = !g0.noTermination.IsTrue()
+	return
+}
+
+func (g0 *GoGroup) Threads() (threads []parl.ThreadData) {
+	// the pointer can be updated at any time, but the value does not change
+	list := g0.gos.List()
+	threads = make([]parl.ThreadData, len(list))
+	for i, tp := range list {
+		threads[i] = tp
+	}
+	return
+}
+
+func (g0 *GoGroup) NamedThreads() (threads []parl.ThreadData) {
+	// the pointer can be updated at any time, but the value does not change
+	list := g0.gos.List()
+
+	// remove unnamed threads
+	for i := 0; i < len(list); {
+		if list[i].label == "" {
+			list = slices.Delete(list, i, i+1)
+		} else {
+			i++
+		}
+	}
+
+	// sort pointers
+	slices.SortFunc(list, g0.cmpNames)
+
+	// return slice of values
+	threads = make([]parl.ThreadData, len(list))
+	for i, tp := range list {
+		threads[i] = tp
+	}
+	return
+}
+
+func (g0 *GoGroup) SetDebug(debug bool) {
+	if debug {
+		g0.isDebug.Set()
+	} else {
+		g0.isDebug.Clear()
+	}
+}
+
+func (g0 *GoGroup) cmpNames(a *ThreadData, b *ThreadData) (result bool) {
+	return a.label < b.label
 }
 
 func (g0 *GoGroup) setFirstFatal() {
