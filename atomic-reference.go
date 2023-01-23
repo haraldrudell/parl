@@ -10,6 +10,7 @@ import (
 	"unsafe"
 )
 
+// AtomicReference holds a typed reference that is accessed atomically.
 type AtomicReference[T any] struct {
 	reference *T
 }
@@ -24,9 +25,10 @@ func (ref *AtomicReference[T]) Get() (reference *T) {
 	))
 }
 
-func (ref *AtomicReference[T]) Put(reference *T) {
-	atomic.StorePointer(
+func (ref *AtomicReference[T]) Put(reference *T) (r0 *T) {
+	r0 = (*T)(atomic.SwapPointer(
 		(*unsafe.Pointer)(unsafe.Pointer(&ref.reference)),
 		unsafe.Pointer(reference),
-	)
+	))
+	return
 }

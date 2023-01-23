@@ -79,8 +79,9 @@ func (em *InvokeTimer) Do(fn func()) {
 		em.invoTimes.Delete(emID)
 		em.maybeCancelTimer()
 		if duration := time.Since(invocation.t0); em.latency.Value(duration) {
+			max, _ := em.parallelism.Max()
 			// callback for slowness of completed task
-			em.callback(ITLatency, em.parallelism.Max(), duration, invocation.threadID)
+			em.callback(ITLatency, max, duration, invocation.threadID)
 		}
 	}()
 
@@ -88,8 +89,9 @@ func (em *InvokeTimer) Do(fn func()) {
 	em.ensureTimer()
 	invos := em.invos.Value()
 	if em.parallelism.Value(invos) {
+		max, _ := em.latency.Max()
 		// callback for high parallelism warning
-		em.callback(ITParallelism, invos, em.latency.Max(), invocation.threadID)
+		em.callback(ITParallelism, invos, max, invocation.threadID)
 	}
 
 	// execute
@@ -104,7 +106,7 @@ func (em *InvokeTimer) Oldest() (age time.Duration, threadID ThreadID) {
 	invocation := list[0]
 
 	age = time.Since(invocation.t0)
-	if age2 := em.latency.Max(); age2 > age {
+	if age2, _ := em.latency.Max(); age2 > age {
 		age = age2
 	}
 	threadID = invocation.threadID
@@ -158,8 +160,9 @@ func (em *InvokeTimer) timerLatencyCheck(at time.Time) {
 
 	// print if slowest yet
 	if em.latency.Value(age) {
+		max, _ := em.parallelism.Max()
 		// callback for high latency of task in progress
-		em.callback(ITLatency, em.parallelism.Max(), age, threadID)
+		em.callback(ITLatency, max, age, threadID)
 	}
 }
 

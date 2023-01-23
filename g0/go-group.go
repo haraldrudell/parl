@@ -269,7 +269,7 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 	if g0.isDebug.IsTrue() {
 		s := "goGroup#" + g0.G0ID().String() + ":"
 		if isTermination {
-			s += "Terminated"
+			s += parl.Sprintf("Terminated:isSubGroup:%t:hasEc:%t", g0.isSubGroup.IsTrue(), g0.hasErrorChannel.IsTrue())
 		} else {
 			s += Shorts(g0.Threads())
 		}

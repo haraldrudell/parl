@@ -23,7 +23,8 @@ func TestAtomicMax(t *testing.T) {
 	if !max.Value(value3) {
 		t.Error("value3: not max")
 	}
-	if max.Max() != value3 {
-		t.Errorf("max %d exp %d", max.Max(), value3)
+	v, _ := max.Max()
+	if v != value3 {
+		t.Errorf("max %d exp %d", v, value3)
 	}
 }
