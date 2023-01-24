@@ -52,6 +52,10 @@ func NewSlowDetector(label string, slowTyp slowType, printf PrintfFunc, goGen Go
 	return &sd
 }
 
+func (sd *SlowDetector) Start0() (slowInvocation SlowInvocation) {
+	return sd.Start("")
+}
+
 func (sd *SlowDetector) Start(label string, value ...time.Time) (slowInvocation SlowInvocation) {
 	if label == "" {
 		label = pruntime.NewCodeLocation(ensureFrames).Short()

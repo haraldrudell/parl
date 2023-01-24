@@ -126,6 +126,12 @@ func (sdt *SlowDetectorThread) thread(g0 Go) {
 		for _, sdi := range sdt.slowMap.List() {
 			// duration is how long the invocation has been in progress
 			duration := t.Sub(sdi.t0)
+			if duration < 0 {
+				// if t coming from the ticker was delayed,
+				// then t may be a time in the past,
+				// so early that sdi.t0 is after t
+				continue // ignore negative durations
+			}
 			sd := sdi.sd
 			if sd.max.Value(duration) {
 				// it is a new max, check whether nonReturnPeriod has elapsed

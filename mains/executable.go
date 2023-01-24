@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/errorglue"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/plogger"
 	"github.com/haraldrudell/parl/pos"
@@ -402,20 +403,8 @@ func (ex *Executable) AddErr(err error) (x *Executable) {
 	// if the first error, immediately print it
 	if ex.err == nil {
 
-		// check if this first error is caused by panic
-		var panicString string
-		if isPanic, stack, recoveryIndex, panicIndex := perrors.IsPanic(err); isPanic {
-			panicString = parl.Sprintf(
-				"\nPANIC detected at %s\n"+
-					"A Go panic may indicate a software problem\n"+
-					"recovery was made at %s\n",
-				stack[panicIndex].Short(),
-				stack[recoveryIndex].Short(),
-			)
-		}
-
 		// print and store the first error
-		ex.PrintErr(err, panicString)
+		ex.PrintErr(err, checkForPanic(err))
 		ex.err = err
 		return // first error stored return
 	}
@@ -443,6 +432,19 @@ func (ex *Executable) PrintErr(err error, panicString ...string) {
 		s = err.Error()
 	}
 	parl.Log(s)
+}
+
+func checkForPanic(err error) (panicString string) {
+	if isPanic, stack, recoveryIndex, panicIndex := perrors.IsPanic(err); isPanic {
+		panicString = parl.Sprintf(
+			"\nPANIC detected at %s\n"+
+				"A Go panic may indicate a software problem\n"+
+				"recovery was made at %s\n",
+			stack[panicIndex].Short(),
+			stack[recoveryIndex].Short(),
+		)
+	}
+	return
 }
 
 // Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
@@ -473,20 +475,23 @@ func (ex *Executable) Exit(stausCode ...int) {
 		pos.Exit0()
 	}
 
-	// determine how many errors we have
+	// print all errors except the very first
+	// the very first error was already printed when it occurred
 	errorList := perrors.ErrorList(ex.err)
-	isList := len(errorList) > 1
-
-	// print all errors except the first one
-	// the was already printed when  it occurred
-	if isList {
-		for _, e := range errorList[1:] {
-			ex.PrintErr(e)
+	parl.D("errorList: %d", len(errorList))
+	errorCount := 0
+	for _, errorListEntry := range errorList {
+		for _, err := range errorglue.ErrorList(errorListEntry) {
+			errorCount++
+			if errorCount == 1 {
+				continue
+			}
+			ex.PrintErr(err, checkForPanic(err))
 		}
 	}
 
 	// just before exit, print the one-liner message of the first occurring error again
-	if ex.IsLongErrors || isList {
+	if ex.IsLongErrors || errorCount > 1 {
 		fmt.Fprintln(os.Stderr, ex.err)
 	}
 
