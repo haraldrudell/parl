@@ -3,7 +3,7 @@
 ISC License
 */
 
-package set
+package sets
 
 // SetElementFull is an value or flag-value item of an enumeration container.
 //   - K is the type of a unique key mapping one-to-one to an enumeration value

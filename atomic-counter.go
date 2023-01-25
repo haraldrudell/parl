@@ -27,6 +27,11 @@ func (max *AtomicCounter) Add(value uint64) (newValue uint64) {
 	return
 }
 
+func (max *AtomicCounter) Set(value uint64) (oldValue uint64) {
+	oldValue = atomic.SwapUint64((*uint64)(max), value)
+	return
+}
+
 func (max *AtomicCounter) Value() (value uint64) {
 	value = atomic.LoadUint64((*uint64)(max))
 	return

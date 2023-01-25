@@ -3,12 +3,14 @@
 ISC License
 */
 
-package set
+package sets
 
 type SetElement[T comparable] struct {
 	ValueV T
 	Name   string
 }
+
+var _ Element[int] = &SetElement[int]{}
 
 func (pv *SetElement[T]) Value() (value T) {
 	return pv.ValueV

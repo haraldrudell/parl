@@ -11,8 +11,7 @@ import (
 
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pmaps"
-	"github.com/haraldrudell/parl/pslice"
-	"github.com/haraldrudell/parl/set"
+	"github.com/haraldrudell/parl/sets"
 )
 
 const (
@@ -152,11 +151,9 @@ func (st slowType) String() (s string) {
 	return slowTypeSet.StringT(st)
 }
 
-var slowTypeSet = set.NewSet(pslice.ConvertSliceToInterface[
-	set.SetElement[slowType],
-	set.Element[slowType],
-]([]set.SetElement[slowType]{
-	{ValueV: SlowDefault, Name: "sharedThread"},
-	{ValueV: SlowOwnThread, Name: "ownThread"},
-	{ValueV: SlowShutdownThread, Name: "shutdownThread"},
-}))
+var slowTypeSet = sets.NewSet(sets.NewElements[slowType](
+	[]sets.SetElement[slowType]{
+		{ValueV: SlowDefault, Name: "sharedThread"},
+		{ValueV: SlowOwnThread, Name: "ownThread"},
+		{ValueV: SlowShutdownThread, Name: "shutdownThread"},
+	}))

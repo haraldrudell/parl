@@ -3,7 +3,7 @@
 ISC License
 */
 
-package set
+package sets
 
 import "testing"
 

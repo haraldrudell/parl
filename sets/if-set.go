@@ -3,13 +3,20 @@
 ISC License
 */
 
-package set
+// Set provides a collection of unique elements of a particular type T that are printable,
+// type convertible and have verifiable validity.
+// Element represents an element of a set that has a unique value and is printable.
+// SetElements provides an iterator for all elements of a set intended for SetFactory.NewSet.
+package sets
 
 import (
 	"fmt"
+
+	"github.com/haraldrudell/parl/iters"
 )
 
-// Set contains unique set elements of a particular type T that are printable.
+// Set provides a collection of unique elements of a particular type T that are printable,
+// type convertible and have verifiable validity.
 // A set stores unique values without any particular order.
 // The reasons for using a set over const are:
 //   - set memberhip enforcement
@@ -24,7 +31,7 @@ import (
 //	func (na NextAction) String() (s string) {return nextActionSet.StringT(na)}
 //	var nextActionSet = set.NewSet(yslices.ConvertSliceToInterface[
 //	  set.Element[NextAction],
-//	  parly.Element[NextAction],
+//	  parli.Element[NextAction],
 //	]([]set.Element[NextAction]{{ValueV: IsSame, Name: "IsSame"}}))
 type Set[T comparable] interface {
 	// IsValid returns whether value is part of this set
@@ -47,6 +54,11 @@ type Element[T comparable] interface {
 	fmt.Stringer
 }
 
+// ElementIterator provides an iterator for all elements of a set intended for SetFactory.NewSet.
+type ElementIterator[T comparable] interface {
+	Elements() iters.Iterator[*Element[T]]
+}
+
 type ElementFull[T comparable] interface {
 	Element[T]
 	Description() (full string)
@@ -61,7 +73,7 @@ type SetFactory[T comparable] interface {
 	//	func (na NextAction) String() (s string) {return nextActionSet.StringT(na)}
 	//	var nextActionSet = set.NewSet(yslices.ConvertSliceToInterface[
 	//	  set.Element[NextAction],
-	//	  parly.Element[NextAction],
+	//	  parli.Element[NextAction],
 	//	]([]set.Element[NextAction]{{ValueV: IsSame, Name: "IsSame"}}))
 	NewSet(elements []Element[T]) (interfaceSet Set[T])
 }

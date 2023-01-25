@@ -11,9 +11,8 @@ import (
 
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pmaps"
-	"github.com/haraldrudell/parl/pslice"
 	"github.com/haraldrudell/parl/ptime"
-	"github.com/haraldrudell/parl/set"
+	"github.com/haraldrudell/parl/sets"
 )
 
 const (
@@ -183,10 +182,8 @@ func (ws CBReason) String() (s string) {
 	return cbReasonSet.StringT(ws)
 }
 
-var cbReasonSet = set.NewSet(pslice.ConvertSliceToInterface[
-	set.SetElement[CBReason],
-	set.Element[CBReason],
-]([]set.SetElement[CBReason]{
-	{ValueV: ITParallelism, Name: "max parallel"},
-	{ValueV: ITLatency, Name: "slowest"},
-}))
+var cbReasonSet = sets.NewSet(sets.NewElements[CBReason](
+	[]sets.SetElement[CBReason]{
+		{ValueV: ITParallelism, Name: "max parallel"},
+		{ValueV: ITLatency, Name: "slowest"},
+	}))

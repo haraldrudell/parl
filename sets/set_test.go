@@ -3,13 +3,12 @@
 ISC License
 */
 
-package set
+package sets
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/haraldrudell/parl/pslice"
 	"github.com/haraldrudell/parl/test"
 )
 
@@ -23,10 +22,10 @@ func TestNewSet(t *testing.T) {
 
 	var actual string
 
-	interfaceSet := NewSet(pslice.ConvertSliceToInterface[
-		SetElement[int],
-		Element[int],
-	]([]SetElement[int]{{value, name}}))
+	interfaceSet := NewSet(NewElements[int](
+		[]SetElement[int]{
+			{value, name},
+		}))
 
 	if interfaceSet == nil {
 		t.Error("NewSet nil")
@@ -44,13 +43,11 @@ func TestNewSet(t *testing.T) {
 
 	var err error
 	test.RecoverInvocationPanic(func() {
-		NewSet(pslice.ConvertSliceToInterface[
-			SetElement[int],
-			Element[int],
-		]([]SetElement[int]{
-			{value, name},
-			{value, name},
-		}))
+		NewSet(NewElements[int](
+			[]SetElement[int]{
+				{value, name},
+				{value, name},
+			}))
 	}, &err)
 	if err == nil {
 		t.Error("set duplicate element missing error")

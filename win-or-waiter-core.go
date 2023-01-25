@@ -11,8 +11,7 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pslice"
-	"github.com/haraldrudell/parl/set"
+	"github.com/haraldrudell/parl/sets"
 )
 
 const (
@@ -163,10 +162,8 @@ func (ws WinOrWaiterStrategy) String() (s string) {
 	return winOrWaiterSet.StringT(ws)
 }
 
-var winOrWaiterSet = set.NewSet(pslice.ConvertSliceToInterface[
-	set.SetElement[WinOrWaiterStrategy],
-	set.Element[WinOrWaiterStrategy],
-]([]set.SetElement[WinOrWaiterStrategy]{
-	{ValueV: WinOrWaiterAnyValue, Name: "anyValue"},
-	{ValueV: WinOrWaiterMustBeLater, Name: "mustBeLater"},
-}))
+var winOrWaiterSet = sets.NewSet(sets.NewElements[WinOrWaiterStrategy](
+	[]sets.SetElement[WinOrWaiterStrategy]{
+		{ValueV: WinOrWaiterAnyValue, Name: "anyValue"},
+		{ValueV: WinOrWaiterMustBeLater, Name: "mustBeLater"},
+	}))

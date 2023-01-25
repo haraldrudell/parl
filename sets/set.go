@@ -3,11 +3,12 @@
 ISC License
 */
 
-package set
+package sets
 
 import (
 	"strings"
 
+	"github.com/haraldrudell/parl/iters"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pfmt"
 )
@@ -21,23 +22,22 @@ type SetImpl[T comparable] struct {
 
 // NewSet returns an enumeration of a printable semantic function argument.
 // elements are the elements that form this set.
-func NewSet[T comparable](elements []Element[T]) (interfaceSet Set[T]) {
-	length := len(elements)
+func NewSet[T comparable](elements iters.Iterator[Element[T]]) (interfaceSet Set[T]) {
 	set := SetImpl[T]{elementMap: map[T]Element[T]{}}
-	for i := 0; i < length; i++ {
-		ep := elements[i]
-		valueT := ep.Value()
+	for ; elements.Has(); elements.Next() {
+		element := elements.SameValue()
+		valueT := element.Value()
 		if existingElement, ok := set.elementMap[valueT]; ok {
 			panic(perrors.ErrorfPF(
 				"duplicate set-element: type T: %T provided value: '%s' "+
 					"provided name: %q existing name: %q "+
 					"number of added values: %d",
-				valueT, pfmt.NoRecurseVPrint(valueT), ep,
+				valueT, pfmt.NoRecurseVPrint(valueT), element,
 				existingElement,
 				len(set.elementMap),
 			))
 		}
-		set.elementMap[valueT] = ep
+		set.elementMap[valueT] = element
 	}
 	interfaceSet = &set
 	return

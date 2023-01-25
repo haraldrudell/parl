@@ -17,6 +17,11 @@ import (
 //   - running: Inc - Dec
 //   - max: the highest value of running
 //   - Counter implements parl.Counter and parl.CounterValues.
+//
+// Note: because Counter uses atomics and not lock, data integrity is not
+// guaranteed or achievable. Methods Clone, Get or the order of
+// Value then Running then Max ensures that data is valid and consistent but
+// possibly of progressing revision.
 type Counter struct {
 	value   uint64 // atomic
 	running uint64 // atomic
