@@ -282,6 +282,7 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 
 	// mark GoGroup terminated
 	g0.isWaitGroupDone.Set()
+	g0.goContext.Cancel()
 }
 
 // ConsumeError receives non-fatal errors from a Go thread.

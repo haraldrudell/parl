@@ -85,16 +85,11 @@ func (cs *Counters) Value(name parl.CounterID) (value uint64) {
 	return
 }
 
-func (cs *Counters) Running(name parl.CounterID) (running uint64) {
-	if counter, ok := cs.getCounter(name).(interface{ Running() (running uint64) }); ok {
-		running = counter.Running()
-	}
-	return
-}
-
-func (cs *Counters) Max(name parl.CounterID) (max uint64) {
-	if counter, ok := cs.getCounter(name).(interface{ Max() (max uint64) }); ok {
-		max = counter.Max()
+func (cs *Counters) Get(name parl.CounterID) (value, running, max uint64) {
+	if counter, ok := cs.getCounter(name).(interface {
+		Get() (value, running, max uint64)
+	}); ok {
+		value, running, max = counter.Get()
 	}
 	return
 }

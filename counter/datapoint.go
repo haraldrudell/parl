@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Datapoint tracks a fluctuating value with average. Thread-safe.
 package counter
 
 import (
@@ -14,8 +15,7 @@ import (
 	"github.com/haraldrudell/parl/ptime"
 )
 
-// Datapoint is TODO 221210
-// Datapoint is thread-safe
+// Datapoint tracks a fluctuating value with average. Thread-safe.
 type Datapoint struct {
 	period time.Duration
 

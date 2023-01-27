@@ -3,6 +3,7 @@
 ISC License
 */
 
+// RateCounter is a value/running/max counter with averaging.
 package counter
 
 import (
@@ -10,8 +11,6 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/ptime"
 	"golang.org/x/exp/maps"
 )
 
@@ -19,8 +18,13 @@ const (
 	averagerSize = 10
 )
 
+// RateCounter is a value/running/max counter with averaging.
+//   - rate of increase, maximum and average rate of increase in value
+//   - rate of increase, maximum increase and decrease rates and average of value
 type RateCounter struct {
-	Counter
+	Counter // value-running-max atomic-access container
+	period  Period
+
 	lock       sync.Mutex
 	hasValues  bool   // indicates that value and running was initialized at start of period
 	value      uint64 // value at beginning of period
@@ -32,16 +36,14 @@ type RateCounter struct {
 
 var _ parl.RateCounterValues = &RateCounter{} // RateCounter is parl.RateCounterValues
 
-func newRateCounter(period time.Duration, cs *Counters) (counter parl.Counter) {
-	if period <= 0 {
-		panic(perrors.ErrorfPF("period must be positive: %s", ptime.Duration(period)))
-	}
+func newRateCounter(interval time.Duration, cs *Counters) (counter parl.Counter) {
 	c := RateCounter{
-		m: map[parl.RateType]int64{},
+		period: *NewPeriod(interval),
+		m:      map[parl.RateType]int64{},
 	}
 	InitAverager(&c.valueAvg, averagerSize)
 	InitAverager(&c.runningAvg, averagerSize)
-	cs.AddTask(period, &c)
+	cs.AddTask(interval, &c)
 	return &c
 }
 
@@ -57,8 +59,7 @@ func (rc *RateCounter) Do() {
 	defer rc.lock.Unlock()
 
 	// get current values
-	value := rc.Counter.Value()
-	running := rc.Counter.Running()
+	value, running, _ := rc.Counter.Get()
 	// for running, average its actual value
 	rc.m[parl.RunningAverage] = int64(rc.runningAvg.Add(running))
 	if !rc.hasValues {

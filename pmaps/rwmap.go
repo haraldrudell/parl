@@ -165,6 +165,11 @@ func (rw *RWMap[K, V]) Clone() (clone parli.ThreadSafeMap[K, V]) {
 	return
 }
 
+// Clone returns a shallow clone of the map
+func (rw *RWMap[K, V]) Clone2() (clone *RWMap[K, V]) {
+	return rw.Clone().(*RWMap[K, V])
+}
+
 // Swap replaces the map with otherMap and returns the current map in previousMap
 //   - if otherMap is not RWMap, no swap takes place and previousMap is nil
 //   - Swap is an atomic, thread-safe operation
@@ -201,6 +206,38 @@ func (rw *RWMap[K, V]) List() (list []V) {
 	for _, v := range rw.m {
 		list[i] = v
 		i++
+	}
+
+	return
+}
+
+// List provides keys, undefined ordering
+//   - O(n)
+func (rw *RWMap[K, V]) Keys(n ...int) (list []K) {
+
+	// get n
+	var n0 int
+	if len(n) > 0 {
+		n0 = n[0]
+	}
+
+	rw.lock.RLock()
+	defer rw.lock.RUnlock()
+
+	// get length
+	var length int = len(rw.m)
+	if n0 > 0 && n0 < length {
+		length = n0
+	}
+
+	list = make([]K, length)
+	i := 0
+	for key := range rw.m {
+		list[i] = key
+		i++
+		if i >= length {
+			break
+		}
 	}
 
 	return

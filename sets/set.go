@@ -22,24 +22,24 @@ type SetImpl[T comparable] struct {
 
 // NewSet returns an enumeration of a printable semantic function argument.
 // elements are the elements that form this set.
-func NewSet[T comparable](elements iters.Iterator[Element[T]]) (interfaceSet Set[T]) {
-	set := SetImpl[T]{elementMap: map[T]Element[T]{}}
+func NewSet[T comparable](elements iters.Iterator[Element[T]]) (set Set[T]) {
+	s := SetImpl[T]{elementMap: map[T]Element[T]{}}
 	for ; elements.Has(); elements.Next() {
 		element := elements.SameValue()
 		valueT := element.Value()
-		if existingElement, ok := set.elementMap[valueT]; ok {
+		if existingElement, ok := s.elementMap[valueT]; ok {
 			panic(perrors.ErrorfPF(
 				"duplicate set-element: type T: %T provided value: '%s' "+
 					"provided name: %q existing name: %q "+
 					"number of added values: %d",
 				valueT, pfmt.NoRecurseVPrint(valueT), element,
 				existingElement,
-				len(set.elementMap),
+				len(s.elementMap),
 			))
 		}
-		set.elementMap[valueT] = element
+		s.elementMap[valueT] = element
 	}
-	interfaceSet = &set
+	set = &s
 	return
 }
 

@@ -47,10 +47,7 @@ type CounterSetData interface {
 	Value(name CounterID) (value uint64)
 	// Running returns the increasing and decreasing running value for a possible plain counter
 	//	- if no such counter exists, 0
-	Running(name CounterID) (running uint64)
-	// Max returns the max seen value of running for a possible plain counter
-	//	- if no such counter exists, 0
-	Max(name CounterID) (max uint64)
+	Get(name CounterID) (value, running, max uint64)
 	// Rates returns the rate values a possible rate counter
 	//	- if no such counter exists or values are not yet available, nil
 	Rates(name CounterID) (rates map[RateType]int64)
@@ -110,8 +107,6 @@ type CounterValues interface {
 	CloneReset(stopRateCounters bool) (counterValues CounterValues) // CloneReset takes a snapshot of a counter state and resets it to its initial state.
 	Get() (value, running, max uint64)
 	Value() (value uint64)
-	Running() (running uint64)
-	Max() (max uint64)
 }
 
 // CounterValues is the consumer interface for a rate counter.

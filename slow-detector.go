@@ -53,7 +53,7 @@ func NewSlowDetector(label string, slowTyp slowType, printf PrintfFunc, goGen Go
 }
 
 func (sd *SlowDetector) Start0() (slowInvocation SlowInvocation) {
-	return sd.Start("")
+	return sd.sd.Start(pruntime.NewCodeLocation(ensureFrames).Short())
 }
 
 func (sd *SlowDetector) Start(label string, value ...time.Time) (slowInvocation SlowInvocation) {
@@ -80,7 +80,10 @@ func (sd *SlowDetector) callback(sdi *SlowDetectorInvocation, didReturn bool, du
 		threadIDStr = " threadID: " + threadID.String()
 	}
 
-	sd.printf("Slowness: %s duration: %s%s%s", sdi.Label(), ptime.Duration(duration),
+	sd.printf("Slowness: %s %s duration: %s%s%s",
+		sd.label, sdi.Label(),
+		ptime.Duration(duration),
 		threadIDStr,
-		inProgressStr)
+		inProgressStr,
+	)
 }

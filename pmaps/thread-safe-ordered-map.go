@@ -36,6 +36,21 @@ func (mp *ThreadSafeOrderedMap[K, V]) Put(key K, value V) {
 	mp.OrderedMap.Put(key, value)
 }
 
+// Put saves or replaces a mapping
+func (mp *ThreadSafeOrderedMap[K, V]) PutIf(key K, value V, putIf func(value V) (doPut bool)) (wasNewKey bool) {
+	mp.lock.Lock()
+	defer mp.lock.Unlock()
+
+	existing, keyExists := mp.m[key]
+	wasNewKey = !keyExists
+	if keyExists && putIf != nil && !putIf(existing) {
+		return // putIf false return: this value should not be updated
+	}
+	mp.m[key] = value
+
+	return
+}
+
 // Delete removes mapping using key K.
 //   - if key K is not mapped, the map is unchanged.
 //   - O(log n)

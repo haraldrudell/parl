@@ -92,6 +92,7 @@ func (g0 *Go) Done(errp *error) {
 		err = perrors.Stack(*errp)
 	}
 
+	g0.goContext.Cancel()
 	g0.goParent.GoDone(g0, err)
 }
 
