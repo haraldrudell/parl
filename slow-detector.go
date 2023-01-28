@@ -65,17 +65,23 @@ func (sd *SlowDetector) Start(label string, value ...time.Time) (slowInvocation 
 	return sd.sd.Start(label, value...)
 }
 
-func (sd *SlowDetector) Max() (max time.Duration, hasValue bool) {
-	max, hasValue = sd.sd.Max()
-	return
+func (sd *SlowDetector) Values() (last, average, max time.Duration, hasValue bool) {
+	return sd.sd.Values()
 }
 
 func (sd *SlowDetector) Status0() (s string) {
-	return sd.sd.Status()
+	last, average, max, hasValue := sd.sd.Values()
+	if !hasValue {
+		return "-/-/-"
+	}
+	s = ptime.Duration(last) + "/" +
+		ptime.Duration(average) + "/" +
+		ptime.Duration(max)
+	return
 }
 
 func (sd *SlowDetector) Status() (s string) {
-	return sd.label + ": " + sd.sd.Status()
+	return sd.label + ": " + sd.Status0()
 }
 
 func (sd *SlowDetector) callback(sdi *SlowDetectorInvocation, didReturn bool, duration time.Duration) {

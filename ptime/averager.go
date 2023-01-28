@@ -56,7 +56,9 @@ func (av *Averager[T]) Average(t ...time.Time) (average float64) {
 		}
 		aPeriod.Aggregate(&count, &average)
 	}
-	average = average / float64(count)
+	if count > 0 {
+		average = average / float64(count)
+	}
 
 	return
 }

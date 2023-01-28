@@ -91,23 +91,13 @@ func (sd *SlowDetectorCore) Start(invoLabel string, value ...time.Time) (invocat
 	return &s
 }
 
-func (sd *SlowDetectorCore) Max() (max time.Duration, hasValue bool) {
-	max, hasValue = sd.max.Max()
-	return
-}
-
-func (sd *SlowDetectorCore) Status() (s string) {
-	if lastDuration := time.Duration(atomic.LoadInt64((*int64)(&sd.last))); lastDuration > 0 {
-		s += ptime.Duration(lastDuration)
-	} else {
-		s += "-"
-	}
-	s += "/" + ptime.Duration(time.Duration(sd.average.Average())) + "/"
-	if max, hasValue := sd.alwaysMax.Max(); hasValue {
-		s += ptime.Duration(max)
-	} else {
-		s += "-"
-	}
+func (sd *SlowDetectorCore) Values() (
+	last, average, max time.Duration,
+	hasValue bool,
+) {
+	last = time.Duration(atomic.LoadInt64((*int64)(&sd.last)))
+	average = time.Duration(sd.average.Average())
+	max, hasValue = sd.alwaysMax.Max()
 	return
 }
 
