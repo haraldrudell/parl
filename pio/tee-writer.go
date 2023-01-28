@@ -59,7 +59,6 @@ func (tw *TeeWriter) Write(p []byte) (n int, err error) {
 }
 
 func (tw *TeeWriter) Close() (err error) {
-	parl.D("TeeWriter.Close")
 
 	// prevent multiple Close invocations
 	if !tw.isClosed.Set() {

@@ -2,7 +2,7 @@
 © 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 ISC License
 */
-package recover
+package cyclebreaker
 
 import (
 	"golang.org/x/text/language"

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/haraldrudell/parl/recover"
+	"github.com/haraldrudell/parl/internal/cyclebreaker"
 )
 
 func TestFunctionIterator(t *testing.T) {
@@ -28,7 +28,7 @@ func TestFunctionIterator(t *testing.T) {
 		}
 		if index >= len(slice) {
 			t.Log("fn ErrEndCallbacks")
-			err = recover.ErrEndCallbacks
+			err = cyclebreaker.ErrEndCallbacks
 			_ = errors.As
 			return
 		}
@@ -86,7 +86,7 @@ func TestNewFunctionIterator(t *testing.T) {
 			return
 		}
 		if index >= len(slice) {
-			err = recover.ErrEndCallbacks
+			err = cyclebreaker.ErrEndCallbacks
 			return
 		}
 		value = slice[index]
@@ -108,7 +108,7 @@ func TestNewFunctionIterator(t *testing.T) {
 	}
 
 	err = nil
-	recover.RecoverInvocationPanic(func() {
+	cyclebreaker.RecoverInvocationPanic(func() {
 		NewFunctionIterator[string](nil)
 	}, &err)
 	if err == nil || !strings.Contains(err.Error(), messageIterpNil) {
@@ -128,7 +128,7 @@ func TestInitFunctionIterator(t *testing.T) {
 			return
 		}
 		if index >= len(slice) {
-			err = recover.ErrEndCallbacks
+			err = cyclebreaker.ErrEndCallbacks
 			return
 		}
 		value = slice[index]
@@ -151,7 +151,7 @@ func TestInitFunctionIterator(t *testing.T) {
 	}
 
 	err = nil
-	recover.RecoverInvocationPanic(func() {
+	cyclebreaker.RecoverInvocationPanic(func() {
 		InitFunctionIterator(iterpNil, fn)
 	}, &err)
 	if err == nil || !strings.Contains(err.Error(), messageIterpNil) {
@@ -159,7 +159,7 @@ func TestInitFunctionIterator(t *testing.T) {
 	}
 
 	err = nil
-	recover.RecoverInvocationPanic(func() {
+	cyclebreaker.RecoverInvocationPanic(func() {
 		InitFunctionIterator(&iter, nil)
 	}, &err)
 	if err == nil || !strings.Contains(err.Error(), messageIterpNil) {

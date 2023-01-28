@@ -10,7 +10,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pslices"
 	"golang.org/x/exp/slices"
@@ -154,8 +153,6 @@ func (rr *LineReader) ReadLine(p []byte) (line []byte, isEOF bool, err error) {
 		} else if cap(line) >= maxLine {
 			return // 1 MiB line return
 		} else if requiredLength := n + minBuffer; requiredLength > cap(line) {
-			parl.D("requiredLength %d cap %d make %d", requiredLength, cap(line),
-				requiredLength+(defaultAllocation-requiredLength%defaultAllocation)%defaultAllocation)
 			newSlice := make([]byte, requiredLength+(defaultAllocation-requiredLength%defaultAllocation)%defaultAllocation)
 			copy(newSlice, line[:n])
 			line = newSlice

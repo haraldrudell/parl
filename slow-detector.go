@@ -6,6 +6,7 @@ ISC License
 package parl
 
 import (
+	"strings"
 	"time"
 
 	"github.com/haraldrudell/parl/pruntime"
@@ -27,6 +28,7 @@ type SlowDetector struct {
 
 type SlowInvocation interface {
 	Stop(value ...time.Time)
+	Interval(label string, t ...time.Time)
 }
 
 // NewSlowDetector returns a Start-Stop variable detecting slowness
@@ -68,6 +70,14 @@ func (sd *SlowDetector) Max() (max time.Duration, hasValue bool) {
 	return
 }
 
+func (sd *SlowDetector) Status0() (s string) {
+	return sd.sd.Status()
+}
+
+func (sd *SlowDetector) Status() (s string) {
+	return sd.label + ": " + sd.sd.Status()
+}
+
 func (sd *SlowDetector) callback(sdi *SlowDetectorInvocation, didReturn bool, duration time.Duration) {
 
 	var inProgressStr string
@@ -80,9 +90,22 @@ func (sd *SlowDetector) callback(sdi *SlowDetectorInvocation, didReturn bool, du
 		threadIDStr = " threadID: " + threadID.String()
 	}
 
-	sd.printf("Slowness: %s %s duration: %s%s%s",
+	var intervalStr string
+	if length := len(sdi.intervals); length > 0 {
+		sList := make([]string, length)
+		t0 := sdi.T0()
+		for i, ivl := range sdi.intervals {
+			t := ivl.t
+			sList[i] = ptime.Duration(t.Sub(t0)) + "\x20" + ivl.label
+			t0 = t
+		}
+		intervalStr = "\x20" + strings.Join(sList, "\x20")
+	}
+
+	sd.printf("Slowness: %s %s duration: %s%s%s%s",
 		sd.label, sdi.Label(),
 		ptime.Duration(duration),
+		intervalStr,
 		threadIDStr,
 		inProgressStr,
 	)

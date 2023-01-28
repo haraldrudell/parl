@@ -132,6 +132,7 @@ func (sdt *SlowDetectorThread) thread(g0 Go) {
 				continue // ignore negative durations
 			}
 			sd := sdi.sd
+			sd.alwaysMax.Value(duration)
 			if sd.max.Value(duration) {
 				// it is a new max, check whether nonReturnPeriod has elapsed
 				if tLast := sdi.Time(time.Time{}); tLast.IsZero() || t.Sub(tLast) >= sdt.nonReturnPeriod {

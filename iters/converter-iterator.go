@@ -9,8 +9,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/haraldrudell/parl/internal/cyclebreaker"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/recover"
 	"golang.org/x/exp/constraints"
 )
 
@@ -110,7 +110,7 @@ func (iter *ConverterIterator[K, T]) Next(isSame NextAction) (value T, hasValue 
 	var err error
 	if value, err = iter.convert(key); err != nil {
 		iter.fnEnded = true
-		if !errors.Is(err, recover.ErrEndCallbacks) {
+		if !errors.Is(err, cyclebreaker.ErrEndCallbacks) {
 			iter.err = perrors.AppendError(iter.err, err)
 		}
 		var zeroValue T
@@ -133,7 +133,7 @@ func (iter *ConverterIterator[K, T]) convert(key K) (value T, err error) {
 	iter.lock.Unlock()
 	defer iter.lock.Lock()
 
-	recover.RecoverInvocationPanic(func() {
+	cyclebreaker.RecoverInvocationPanic(func() {
 		value, err = iter.fn(key, false)
 	}, &err)
 	return
@@ -152,7 +152,7 @@ func (iter *ConverterIterator[K, T]) Cancel() (err error) {
 
 	// ensure fn canceled and have any errors in err
 	if !iter.fnEnded {
-		recover.RecoverInvocationPanic(func() {
+		cyclebreaker.RecoverInvocationPanic(func() {
 			var k K
 			_, err = iter.fn(k, true)
 		}, &err)

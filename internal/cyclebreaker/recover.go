@@ -3,7 +3,7 @@
 ISC License
 */
 
-package recover
+package cyclebreaker
 
 import (
 	"fmt"

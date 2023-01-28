@@ -121,6 +121,10 @@ func (g0 *Go) ThreadInfo() (threadData parl.ThreadData) {
 	return
 }
 
+func (g0 *Go) GoID() (threadID parl.ThreadID) {
+	return g0.thread.ThreadID()
+}
+
 // checkState is invoked by all public methods ensuring that terminated
 // objects are not being used
 //   - checkState also collects data on the new thread

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/ptime"
 	"golang.org/x/exp/maps"
 )
 
@@ -23,7 +24,7 @@ const (
 //   - rate of increase, maximum increase and decrease rates and average of value
 type RateCounter struct {
 	Counter // value-running-max atomic-access container
-	period  Period
+	period  ptime.Period
 
 	lock       sync.Mutex
 	hasValues  bool   // indicates that value and running was initialized at start of period
@@ -38,7 +39,7 @@ var _ parl.RateCounterValues = &RateCounter{} // RateCounter is parl.RateCounter
 
 func newRateCounter(interval time.Duration, cs *Counters) (counter parl.Counter) {
 	c := RateCounter{
-		period: *NewPeriod(interval),
+		period: *ptime.NewPeriod(interval),
 		m:      map[parl.RateType]int64{},
 	}
 	InitAverager(&c.valueAvg, averagerSize)

@@ -9,8 +9,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/haraldrudell/parl/internal/cyclebreaker"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/recover"
 )
 
 const (
@@ -116,7 +116,7 @@ func (iter *FunctionIterator[T]) Next(isSame NextAction) (value T, hasValue bool
 func (iter *FunctionIterator[T]) invokeFn(index int) (value T, hasValue bool, err error) {
 
 	// invoke fn with unlock and panic recovery
-	recover.RecoverInvocationPanic(func() {
+	cyclebreaker.RecoverInvocationPanic(func() {
 		// it is allowed for fn to invoke the iterator
 		iter.lock.Unlock()
 		defer iter.lock.Lock()
@@ -127,7 +127,7 @@ func (iter *FunctionIterator[T]) invokeFn(index int) (value T, hasValue bool, er
 	// update error outcome
 	if err != nil {
 		iter.isEnd = true
-		if !errors.Is(err, recover.ErrEndCallbacks) {
+		if !errors.Is(err, cyclebreaker.ErrEndCallbacks) {
 			iter.err = perrors.AppendError(iter.err, err)
 		}
 		var zeroValue T

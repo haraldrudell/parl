@@ -8,7 +8,7 @@ package ptime
 import (
 	"time"
 
-	"github.com/haraldrudell/parl/recover"
+	"github.com/haraldrudell/parl/internal/cyclebreaker"
 )
 
 // OnTimedThread invokes a callback on period-multiples since zero-time. thread-safe.
@@ -28,11 +28,11 @@ import (
 //	defer gc.Cancel()
 //	go ptime.OnTimedThread(someFunc, time.Second, time.Local, gc.Add(parl.EcSharedChan, parl.ExCancelOnExit).Go())
 //	…
-func OnTimedThread(send func(at time.Time), period time.Duration, loc *time.Location, g0 recover.Go) {
+func OnTimedThread(send func(at time.Time), period time.Duration, loc *time.Location, g0 cyclebreaker.Go) {
 	var err error
 	g0.AddError(nil)
 	defer g0.Done(&err)
-	defer recover.Recover(recover.Annotation(), &err, recover.NoOnError)
+	defer cyclebreaker.Recover(cyclebreaker.Annotation(), &err, cyclebreaker.NoOnError)
 
 	// timer is a time.Timer delaying until the first trig point
 	timer := OnTimer(period, time.Now().In(loc))

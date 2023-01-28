@@ -6,6 +6,7 @@ ISC License
 package parl
 
 import (
+	"strconv"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -20,11 +21,32 @@ type SlowDetectorInvocation struct {
 	stop      func(sdi *SlowDetectorInvocation, value ...time.Time)
 	sd        *SlowDetectorCore
 	tx        AtomicReference[time.Time]
+	intervals []Interval
+}
+
+type Interval struct {
+	label string
+	t     time.Time
 }
 
 // Stop ends an invocation part of SlowDetectorCore
 func (sdi *SlowDetectorInvocation) Stop(value ...time.Time) {
 	sdi.stop(sdi, value...)
+}
+
+// Stop ends an invocation part of SlowDetectorCore
+func (sdi *SlowDetectorInvocation) Interval(label string, t ...time.Time) {
+	if label == "" {
+		label = strconv.Itoa(len(sdi.intervals) + 1)
+	}
+	var t0 time.Time
+	if len(t) > 0 {
+		t0 = t[0]
+	}
+	if t0.IsZero() {
+		t0 = time.Now()
+	}
+	sdi.intervals = append(sdi.intervals, Interval{label: label, t: t0})
 }
 
 // ThreadID returns the thread ID dor the thread invoking Start

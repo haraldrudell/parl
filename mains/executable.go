@@ -478,7 +478,6 @@ func (ex *Executable) Exit(stausCode ...int) {
 	// print all errors except the very first
 	// the very first error was already printed when it occurred
 	errorList := perrors.ErrorList(ex.err)
-	parl.D("errorList: %d", len(errorList))
 	errorCount := 0
 	for _, errorListEntry := range errorList {
 		for _, err := range errorglue.ErrorList(errorListEntry) {

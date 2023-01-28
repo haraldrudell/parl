@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/haraldrudell/parl/internal/cyclebreaker"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/recover"
 )
 
 // ClosingTicker is like time.Ticker but the channel C closes on shutdown.
@@ -48,7 +48,7 @@ func NewClosingTicker(d time.Duration) (t *ClosingTicker) {
 // Shutdown causes the channel C to close and resources to be released
 func (t *ClosingTicker) Shutdown() {
 	t.shutdownOnce.Do(func() {
-		defer recover.Recover2(recover.Annotation(), nil, t.AddErrorProc)
+		defer cyclebreaker.Recover2(cyclebreaker.Annotation(), nil, t.AddErrorProc)
 
 		close(t.isShutdownRequest)
 		<-t.isTickThreadExit
@@ -63,7 +63,7 @@ func (t *ClosingTicker) GetError() (maxDuration time.Duration, err error) {
 
 func (t *ClosingTicker) tick(out chan time.Time, ticker *time.Ticker) {
 	defer close(t.isTickThreadExit)
-	defer recover.Recover2(recover.Annotation(), nil, t.AddErrorProc)
+	defer cyclebreaker.Recover2(cyclebreaker.Annotation(), nil, t.AddErrorProc)
 	defer close(out)
 	defer ticker.Stop()
 

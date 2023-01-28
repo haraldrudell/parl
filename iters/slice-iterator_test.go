@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/haraldrudell/parl/recover"
+	"github.com/haraldrudell/parl/internal/cyclebreaker"
 	"golang.org/x/exp/slices"
 )
 
@@ -92,7 +92,7 @@ func TestInitSliceIterator(t *testing.T) {
 		t.Errorf("Same value %q exp %q", value, slice[0])
 	}
 
-	recover.RecoverInvocationPanic(func() {
+	cyclebreaker.RecoverInvocationPanic(func() {
 		InitSliceIterator(iterpNil, slice)
 	}, &err)
 	if err == nil || !strings.Contains(err.Error(), messageIterpNil) {

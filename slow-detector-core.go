@@ -6,9 +6,11 @@ ISC License
 package parl
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/ptime"
 )
 
 const (
@@ -25,10 +27,13 @@ var slowIDGenerator UniqueIDTypedUint64[slowID]
 //   - Thread-Safe and multi-threaded, parallel invocations
 //   - Separate thread measures time of non-returning, hung invocations
 type SlowDetectorCore struct {
-	ID       slowID
-	callback CbSlowDetector
-	thread   *SlowDetectorThread
-	max      AtomicMax[time.Duration]
+	ID        slowID
+	callback  CbSlowDetector
+	thread    *SlowDetectorThread
+	max       AtomicMax[time.Duration]
+	alwaysMax AtomicMax[time.Duration]
+	last      time.Duration // atomic
+	average   ptime.Averager[time.Duration]
 }
 
 func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen, threshold ...time.Duration) (slowDetector *SlowDetectorCore) {
@@ -57,6 +62,7 @@ func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen,
 		callback: callback,
 		thread:   NewSlowDetectorThread(slowTyp, nonReturnPeriod, goGen),
 		max:      *NewAtomicMax(threshold0),
+		average:  *ptime.NewAverager[time.Duration](),
 	}
 }
 
@@ -90,6 +96,21 @@ func (sd *SlowDetectorCore) Max() (max time.Duration, hasValue bool) {
 	return
 }
 
+func (sd *SlowDetectorCore) Status() (s string) {
+	if lastDuration := time.Duration(atomic.LoadInt64((*int64)(&sd.last))); lastDuration > 0 {
+		s += ptime.Duration(lastDuration)
+	} else {
+		s += "-"
+	}
+	s += "/" + ptime.Duration(time.Duration(sd.average.Average())) + "/"
+	if max, hasValue := sd.alwaysMax.Max(); hasValue {
+		s += ptime.Duration(max)
+	} else {
+		s += "-"
+	}
+	return
+}
+
 // Stop is invoked via SlowDetectorInvocation
 func (sd *SlowDetectorCore) stop(sdi *SlowDetectorInvocation, value ...time.Time) {
 
@@ -104,8 +125,14 @@ func (sd *SlowDetectorCore) stop(sdi *SlowDetectorInvocation, value ...time.Time
 		t1 = time.Now()
 	}
 
+	// store last and average
+	duration := t1.Sub(sdi.t0)
+	atomic.StoreInt64((*int64)(&sd.last), int64(duration))
+	sd.average.Add(duration, t1)
+	sd.alwaysMax.Value(duration)
+
 	// check against max
-	if duration := t1.Sub(sdi.t0); sd.max.Value(duration) {
+	if sd.max.Value(duration) {
 		sd.callback(sdi, true, duration)
 	}
 }

@@ -71,7 +71,10 @@ type Go interface {
 	//	or Cancel is invoked on this Go object.
 	// Subordinate thread-groups do not Cancel the context of the Go thread.
 	Context() (ctx context.Context)
+	// ThreadInfo returns thread data that is partially or fully populated
 	ThreadInfo() (threadData ThreadData)
+	// GoID efficiently returns the goroutine ID that mey be invalid
+	GoID() (threadID ThreadID)
 	fmt.Stringer
 }
 
