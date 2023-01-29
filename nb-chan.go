@@ -108,6 +108,44 @@ func (nb *NBChan[T]) Send(value T) {
 	nb.sendQueue = append(nb.sendQueue, value) // put err in send queue
 }
 
+// Send sends non-blocking on the channel
+func (nb *NBChan[T]) SendMany(values []T) {
+	var length int
+	if length = len(values); length == 0 {
+		return // nothing to do return
+	}
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
+
+	if nb.closeInvoked.IsTrue() {
+		return // no send after Close()
+	}
+
+	nb.unsentCount += length
+
+	// if thread is active, just add to queue
+	if !nb.waitForThread.IsZero() {
+		nb.sendQueue = append(nb.sendQueue, values...)
+		return
+	}
+
+	// send using new thread, append remaining to buffer
+	var value T
+	if len(nb.sendQueue) > 0 {
+		value = nb.sendQueue[0]
+		copy(nb.sendQueue[0:], nb.sendQueue[1:])
+		nb.sendQueue = nb.sendQueue[:len(nb.sendQueue)-1]
+		nb.sendQueue = append(nb.sendQueue, values...)
+	} else {
+		value = values[0]
+		nb.sendQueue = append(nb.sendQueue, values[1:]...)
+	}
+
+	nb.pendingSend.Set()
+	nb.waitForThread.Add(1)
+	go nb.sendThread(value) // send err in new thread
+}
+
 // Get returns a slice of n or default all available items held by the channel.
 func (nb *NBChan[T]) Get(n ...int) (allItems []T) {
 	nb.stateLock.Lock()
@@ -255,7 +293,7 @@ func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	// count the item ust sent
+	// count the item just sent
 	nb.unsentCount--
 
 	// no more values: end thread
