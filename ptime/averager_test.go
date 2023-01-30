@@ -23,7 +23,7 @@ func TestNewAverager(t *testing.T) {
 	a.Add(value1)
 	a.Add(value2)
 
-	b = a.Average()
+	b, _ = a.Average()
 	duration = time.Duration(b)
 	if duration != exp {
 		t.Errorf("average: %s exp %s", duration, exp)

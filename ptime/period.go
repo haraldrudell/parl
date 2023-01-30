@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Period provides real-time based fixed-length interval perioding ordered using a uint64 zero-based index.
 package ptime
 
 import (
@@ -21,12 +22,15 @@ var tPeriodEpoch = time.Now()
 
 type PeriodIndex uint64
 
+// Period provides real-time based fixed-length interval perioding ordered using a uint64 zero-based index.
+//   - Period provides first period index and fractional usage of the first period
 type Period struct {
 	interval  time.Duration
 	period0   PeriodIndex
 	fraction0 uint64
 }
 
+// NewPeriod retuens a new numbered-interval sequence.
 func NewPeriod(interval time.Duration) (period *Period) {
 	t := time.Now()
 	p := Period{interval: interval}

@@ -78,13 +78,14 @@ func NewWinOrWaiterCore(strategy WinOrWaiterStrategy, ctx ...context.Context) (w
 //   - the task is completed on demand, but only by the first thread requesting it
 func (ww *WinOrWaiterCore) WinOrWait() (winnerFunc func(errp *error)) {
 	checkWinOrWaiter(ww)
-	ww.cond.L.Lock()
-	defer ww.cond.L.Unlock()
 
 	// the time this thread arrived
 	var arrivalTime = time.Now()
 	// the data version available when this thread arrived
 	var lastSeenDataVersion = ww.dataVersion.Get().Time()
+
+	ww.cond.L.Lock()
+	defer ww.cond.L.Unlock()
 
 	// wait for a data update
 	for {
@@ -152,14 +153,21 @@ func (ww *WinOrWaiterCore) winnerFunc(errp *error) {
 		ww.dataVersion.Set(ww.calculationStart.Get())
 	}
 
+	// allow for next winner to be picked
+	ww.winnerPicker.Clear()
+
+	// immediate broadcast
+	//	- may happen while threads are in the loop
+	//	- therefore threads can miss this broadcast
+	ww.cond.Broadcast()
+
 	ww.cond.L.Lock()
 	defer ww.cond.L.Unlock()
 
-	// broadcast to wake all waiting threads
+	// broadcast while holding lock
+	//	- all threads are in position ot receive this
 	ww.cond.Broadcast()
 
-	// allow for next winner to be picked
-	ww.winnerPicker.Clear()
 }
 
 func checkWinOrWaiter(ww *WinOrWaiterCore) {

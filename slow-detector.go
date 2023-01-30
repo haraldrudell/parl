@@ -54,6 +54,14 @@ func NewSlowDetector(label string, slowTyp slowType, printf PrintfFunc, goGen Go
 	return &sd
 }
 
+func (sd *SlowDetector) IsValid() (isValid bool) {
+	if sd == nil {
+		return
+	}
+	isValid = sd.printf != nil
+	return
+}
+
 func (sd *SlowDetector) Start0() (slowInvocation SlowInvocation) {
 	return sd.sd.Start(pruntime.NewCodeLocation(ensureFrames).Short())
 }

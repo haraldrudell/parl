@@ -96,7 +96,8 @@ func (sd *SlowDetectorCore) Values() (
 	hasValue bool,
 ) {
 	last = time.Duration(atomic.LoadInt64((*int64)(&sd.last)))
-	average = time.Duration(sd.average.Average())
+	averageFloat, _ := sd.average.Average()
+	average = time.Duration(averageFloat)
 	max, hasValue = sd.alwaysMax.Max()
 	return
 }

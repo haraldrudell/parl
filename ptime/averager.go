@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pslices"
 	"golang.org/x/exp/constraints"
 )
@@ -19,8 +20,6 @@ const (
 )
 
 // Averager is a container for averaging providing perioding and history.
-//   - Period provides uint64 zero-based numbered period of fixed interval length
-//   - Period provides first period index and fractional usage of the first period
 //   - maxCount is the maximum interval over which average is calculated
 type Averager[T constraints.Integer] struct {
 	period   Period
@@ -40,12 +39,38 @@ func NewAverager[T constraints.Integer]() (averager *Averager[T]) {
 	}
 }
 
-func (av *Averager[T]) Add(value T, t ...time.Time) {
-	av.getCurrent(av.period.Index(t...)).Add(float64(value))
+// NewAverager2 returns an object that calculates average over a number of interval periods.
+func NewAverager2[T constraints.Integer](period time.Duration, periodCount int) (averager *Averager[T]) {
+	if period == 0 {
+		period = averagerDefaultPeriod
+	} else if period < 1 {
+		perrors.ErrorfPF("period cannot be less than 1 ns: %s", period)
+	}
+	if periodCount == 0 {
+		periodCount = averagerDefaultCount
+	} else if periodCount < 2 {
+		perrors.ErrorfPF("periodCount cannot be less than 2: %d", periodCount)
+	}
+	return &Averager[T]{
+		period:   *NewPeriod(period),
+		maxCount: periodCount,
+	}
 }
 
-func (av *Averager[T]) Average(t ...time.Time) (average float64) {
-	var count uint64
+// Add adds a new value basis for averaging
+//   - value is the sample value
+//   - t is the sample time, default time.Now()
+func (av *Averager[T]) Add(value T, t ...time.Time) {
+	if interval := av.getCurrent(av.period.Index(t...)); interval != nil {
+		interval.Add(float64(value))
+	}
+}
+
+// Average returns the average
+//   - t is time, default time.Now()
+//   - if sample count is zero, average is zero
+//   - count is number of values making up the average
+func (av *Averager[T]) Average(t ...time.Time) (average float64, count uint64) {
 	av.getCurrent(av.period.Index(t...)) // ensure peiods are updated
 	av.sliceLock.RLock()
 	defer av.sliceLock.RUnlock()
@@ -63,9 +88,14 @@ func (av *Averager[T]) Average(t ...time.Time) (average float64) {
 	return
 }
 
+func (av *Averager[T]) Index(t ...time.Time) (index PeriodIndex) {
+	return av.period.Index(t...)
+}
+
 // getCurrent ensures an interval for the current period exists and returns it
-func (av *Averager[T]) getCurrent(periodIndexNow PeriodIndex) (interval *AverageInterval) {
-	if interval = av.getLastInterval(); interval != nil && interval.index == periodIndexNow {
+//   - interval is nil if periodIndex is too far in the past
+func (av *Averager[T]) getCurrent(periodIndex PeriodIndex) (interval *AverageInterval) {
+	if interval = av.getLastInterval(); interval != nil && interval.index == periodIndex {
 		return // last existing period is the right one return
 	}
 
@@ -73,8 +103,14 @@ func (av *Averager[T]) getCurrent(periodIndexNow PeriodIndex) (interval *Average
 	av.sliceLock.Lock()
 	defer av.sliceLock.Unlock()
 
+	// get last known period
+	lastPeriod := periodIndex
+	if interval != nil && interval.index > lastPeriod {
+		lastPeriod = interval.index
+	}
+
 	// remove obsolete periods at start
-	firstInterval := av.period.Sub(periodIndexNow, av.maxCount)
+	firstInterval := av.period.Sub(lastPeriod, av.maxCount)
 	length := len(av.intervals)
 	if length > 0 {
 		var firstIndex PeriodIndex
@@ -85,7 +121,7 @@ func (av *Averager[T]) getCurrent(periodIndexNow PeriodIndex) (interval *Average
 	}
 
 	// ensure enough intervals
-	numberOfIntervals := av.period.Available(periodIndexNow, av.maxCount)
+	numberOfIntervals := av.period.Available(periodIndex, av.maxCount)
 	if length < numberOfIntervals {
 		pslices.SetLength(&av.intervals, numberOfIntervals)
 		length = numberOfIntervals
@@ -96,12 +132,19 @@ func (av *Averager[T]) getCurrent(periodIndexNow PeriodIndex) (interval *Average
 		av.intervals[0] = NewAverageInterval(firstInterval)
 	}
 
-	// ensure current interval exists
+	// ensure last interval exists
 	lastIndex := length - 1
 	if interval = av.intervals[lastIndex]; interval == nil {
-		interval = NewAverageInterval(periodIndexNow)
+		interval = NewAverageInterval(periodIndex)
 		av.intervals[lastIndex] = interval
 	}
+
+	if periodIndex < firstInterval {
+		interval = nil
+		return // periodIndex too far in the past return
+	}
+
+	interval = av.intervals[periodIndex-firstInterval]
 
 	return
 }
