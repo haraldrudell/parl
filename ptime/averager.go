@@ -110,7 +110,7 @@ func (av *Averager[T]) getCurrent(periodIndex PeriodIndex) (interval *AverageInt
 	}
 
 	// remove obsolete periods at start
-	firstInterval := av.period.Sub(lastPeriod, av.maxCount)
+	firstInterval := av.period.Sub(lastPeriod+1, av.maxCount)
 	length := len(av.intervals)
 	if length > 0 {
 		var firstIndex PeriodIndex
