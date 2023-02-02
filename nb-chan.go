@@ -7,10 +7,10 @@ package parl
 
 import (
 	"sync"
-	"time"
 
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pruntime"
+	"github.com/haraldrudell/parl/pslices"
 )
 
 // NBChan is a non-blocking send channel with trillion-size buffer.
@@ -52,18 +52,18 @@ import (
 //	return
 type NBChan[T any] struct {
 	closableChan ClosableChan[T]
-	pendingSend  AtomicBool
+
+	isRunningThread    AtomicBool
+	closesOnThreadSend chan struct{}
 
 	stateLock               sync.Mutex
 	unsentCount             int  // inside lock
 	sendQueue               []T  // inside lock
 	waitForCloseInitialized bool // inside lock
 
-	closeInvoked AtomicBool
+	isCloseInvoked AtomicBool
 
 	waitForClose sync.WaitGroup // initialization inside lock
-
-	waitForThread WaitGroup // observable waitgroup
 
 	perrors.ParlError // thread panics
 }
@@ -90,16 +90,15 @@ func (nb *NBChan[T]) Send(value T) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	if nb.closeInvoked.IsTrue() {
+	if nb.isCloseInvoked.IsTrue() {
 		return // no send after Close()
 	}
 
 	nb.unsentCount++
 
 	// if no thread, send using new thread
-	if nb.waitForThread.IsZero() {
-		nb.pendingSend.Set()
-		nb.waitForThread.Add(1)
+	if nb.isRunningThread.Set() {
+		nb.closesOnThreadSend = make(chan struct{})
 		go nb.sendThread(value) // send err in new thread
 		return
 	}
@@ -117,14 +116,14 @@ func (nb *NBChan[T]) SendMany(values []T) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	if nb.closeInvoked.IsTrue() {
+	if nb.isCloseInvoked.IsTrue() {
 		return // no send after Close()
 	}
 
 	nb.unsentCount += length
 
 	// if thread is active, just add to queue
-	if !nb.waitForThread.IsZero() {
+	if nb.isRunningThread.IsTrue() {
 		nb.sendQueue = append(nb.sendQueue, values...)
 		return
 	}
@@ -133,20 +132,21 @@ func (nb *NBChan[T]) SendMany(values []T) {
 	var value T
 	if len(nb.sendQueue) > 0 {
 		value = nb.sendQueue[0]
-		copy(nb.sendQueue[0:], nb.sendQueue[1:])
-		nb.sendQueue = nb.sendQueue[:len(nb.sendQueue)-1]
+		pslices.TrimLeft(&nb.sendQueue, 1)
 		nb.sendQueue = append(nb.sendQueue, values...)
 	} else {
 		value = values[0]
 		nb.sendQueue = append(nb.sendQueue, values[1:]...)
 	}
 
-	nb.pendingSend.Set()
-	nb.waitForThread.Add(1)
+	nb.isRunningThread.Set()
+	nb.closesOnThreadSend = make(chan struct{})
 	go nb.sendThread(value) // send err in new thread
 }
 
 // Get returns a slice of n or default all available items held by the channel.
+//   - n > 0: max this many items
+//   - n == 0 (or <0): all items
 func (nb *NBChan[T]) Get(n ...int) (allItems []T) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
@@ -163,11 +163,10 @@ func (nb *NBChan[T]) Get(n ...int) (allItems []T) {
 	// get possible item from send thread
 	var item T
 	var itemValid bool
-	for nb.pendingSend.IsTrue() && !itemValid {
+	if nb.isRunningThread.IsTrue() {
 		select {
+		case <-nb.closesOnThreadSend:
 		case item, itemValid = <-nb.closableChan.ch:
-		default:
-			time.Sleep(time.Millisecond)
 		}
 	}
 
@@ -182,15 +181,14 @@ func (nb *NBChan[T]) Get(n ...int) (allItems []T) {
 		nq = n0 - itemLength
 	}
 	allItems = make([]T, nq+itemLength)
+	// possible item from channel
 	if itemValid {
 		allItems[0] = item
 	}
-
-	// empty the send buffer
+	// items from sendQueue
 	if nq > 0 {
 		copy(allItems[itemLength:], nb.sendQueue)
-		copy(nb.sendQueue, nb.sendQueue[nq:])
-		nb.sendQueue = nb.sendQueue[:len(nb.sendQueue)-nq]
+		pslices.TrimLeft(&nb.sendQueue, nq)
 		nb.unsentCount -= nq
 	}
 
@@ -211,22 +209,20 @@ func (nb *NBChan[T]) Close() (didClose bool) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	if !nb.closeInvoked.Set() {
+	if !nb.isCloseInvoked.Set() {
 		return // Close was already invoked
 	}
 
-	if !nb.waitForThread.IsZero() {
+	if nb.isRunningThread.IsTrue() {
 		return // there is a pending thread that will execute close on exit
 	}
-	var err error
-	if didClose, err = nb.closableChan.Close(); didClose && err != nil { // execute the close now
-		nb.AddError(err) // store posible close error
-	}
+
+	didClose = nb.close()
 	return
 }
 
 func (nb *NBChan[T]) DidClose() (didClose bool) {
-	return nb.closeInvoked.IsTrue()
+	return nb.isCloseInvoked.IsTrue()
 }
 
 // IsClosed indicates whether the channel has actually closed.
@@ -252,7 +248,7 @@ func (nb *NBChan[T]) CloseNow(errp ...*error) (err error, didClose bool) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	nb.closeInvoked.Set()
+	nb.isCloseInvoked.Set()
 
 	// discard pending data
 	if len(nb.sendQueue) > 0 {
@@ -275,18 +271,22 @@ func (nb *NBChan[T]) sendThread(value T) {
 		}
 		nb.AddError(err)
 	})
-	defer nb.pendingSend.Clear()
+	defer nb.isRunningThread.Clear()
 
-	ch := nb.closableChan.Ch()
 	for {
-		ch <- value // may block or panic
-		nb.pendingSend.Clear()
+		nb.threadSend(value)
 
 		var ok bool
 		if value, ok = nb.valueToSend(); !ok {
-			break
+			return
 		}
 	}
+}
+
+func (nb *NBChan[T]) threadSend(value T) {
+	defer close(nb.closesOnThreadSend)
+
+	nb.closableChan.Ch() <- value // may block or panic
 }
 
 func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
@@ -304,18 +304,23 @@ func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
 	// send next value in queue
 	value = nb.sendQueue[0]
 	ok = true
-	copy(nb.sendQueue[0:], nb.sendQueue[1:])
-	nb.sendQueue = nb.sendQueue[:len(nb.sendQueue)-1]
-	nb.pendingSend.Set()
+	pslices.TrimLeft(&nb.sendQueue, 1)
+	nb.closesOnThreadSend = make(chan struct{})
 	return
 }
 
 func (nb *NBChan[T]) sendThreadDefer() {
-	if nb.closeInvoked.IsTrue() { // Close() was invoked after thread started
-		nb.closableChan.Close() // close if Close was invoked. Idempotent
+	if nb.isCloseInvoked.IsTrue() { // Close() was invoked after thread started
+		nb.close()
 	}
+}
 
-	nb.waitForThread.Done() // thread has exit
+func (nb *NBChan[T]) close() (didClose bool) {
+	var err error
+	if didClose, err = nb.closableChan.Close(); didClose && err != nil { // execute the close now
+		nb.AddError(err) // store posible close error
+	}
+	return
 }
 
 func (nb *NBChan[T]) initWaitForClose() {

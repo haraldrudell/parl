@@ -40,8 +40,8 @@ func NewPeriod(interval time.Duration) (period *Period) {
 	// uint64 valid decimal digits is : 64 * log10(2) ≈ 19
 	// use scale factor that is power of 2: 2^63
 	t0 := t.Truncate(interval)
-	activeDuration := t.Sub(t0)
-	p.fraction0 = uint64(float64(activeDuration) / float64(interval) * float64(FractionScale))
+	inactiveDuration := t.Sub(t0)
+	p.fraction0 = FractionScale - uint64(float64(inactiveDuration)/float64(interval)*float64(FractionScale))
 
 	return &p
 }
@@ -66,11 +66,19 @@ func (p *Period) Index(t ...time.Time) (index PeriodIndex) {
 	}
 
 	// get index
-	index = PeriodIndex(t0.Sub(tPeriodEpoch) / p.interval)
+	if index = PeriodIndex(t0.Sub(tPeriodEpoch) / p.interval); index < p.period0 {
+		panic(perrors.ErrorfPF("time before period0: index: %d period0: %d %s epoch: %s",
+			index, p.period0,
+			t0.Format(cyclebreaker.Rfc3339ns), tPeriodEpoch.Format(cyclebreaker.Rfc3339ns)),
+		)
+	}
 	return
 }
 
 // Since returns the number of periods difference that now is greater than before
+//   - periods is >= 0
+//   - now and before must be at least p.period0
+//   - before cannot be greater than now
 func (p *Period) Since(now, before PeriodIndex) (periods int) {
 	if before < p.period0 {
 		panic(perrors.ErrorfPF("Period.Sub with before less than period0: %d now: %d period0: %d",
@@ -86,6 +94,8 @@ func (p *Period) Since(now, before PeriodIndex) (periods int) {
 }
 
 // Sub returns a past period index by n intervals
+//   - periodIndex will not be less than p.period0
+//   - now cannot be less than p.period0
 func (p *Period) Sub(now PeriodIndex, n int) (periodIndex PeriodIndex) {
 	if now < p.period0 {
 		panic(perrors.ErrorfPF("Period.Sub with now less than period0: %d %d", now, p.period0))
@@ -102,9 +112,13 @@ func (p *Period) Sub(now PeriodIndex, n int) (periodIndex PeriodIndex) {
 	return
 }
 
-// Available returns the number of possible periods 1… but no grater than cap
+// Available returns the number of possible periods 1… but no greater than cap
+//   - now cannot be less than period0
 func (p *Period) Available(now PeriodIndex, cap int) (periods int) {
-	if periods = int(now) + 1; periods > cap {
+	if now < p.period0 {
+		panic(perrors.ErrorfPF("Period.Sub with now less than period0: %d %d", now, p.period0))
+	}
+	if periods = int(now-p.period0) + 1; periods > cap {
 		periods = cap
 	}
 	return

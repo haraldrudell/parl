@@ -3,15 +3,17 @@
 ISC License
 */
 
+// Epoch translates a time value to a 64-bit value that can be used atomically.
 package ptime
 
 import "time"
 
 var ptimeEpoch = time.Now()
 
+// Epoch translates a time value to a 64-bit value that can be used atomically.
 type Epoch time.Duration
 
-// Epoch translates a time value to a 64-bit value that can be used atomically
+// EpochNow translates a time value to a 64-bit value that can be used atomically.
 func EpochNow(t ...time.Time) (epoch Epoch) {
 	var t0 time.Time
 	if len(t) > 0 {
@@ -25,6 +27,7 @@ func EpochNow(t ...time.Time) (epoch Epoch) {
 	return Epoch(t0.Sub(ptimeEpoch))
 }
 
+// Time returns the time.Time value corresponding to epoch
 func (epoch Epoch) Time() (t time.Time) {
 	if epoch == 0 {
 		return // epoch zero means time.Time{} ie. time.IsZero()
@@ -32,6 +35,7 @@ func (epoch Epoch) Time() (t time.Time) {
 	return ptimeEpoch.Add(time.Duration(epoch))
 }
 
+// IsValid returns true if epoch is not zero-time, ie. Epoch(0) corredsponding to time.TIME{} and Time.IsZero
 func (epoch Epoch) IsValid() (isValid bool) {
 	return epoch != 0
 }

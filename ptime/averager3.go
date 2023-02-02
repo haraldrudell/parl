@@ -17,7 +17,7 @@ import (
 type Averager3[T constraints.Integer] struct {
 	Averager[T]
 	max   cyclebreaker.AtomicMax[T]
-	index cyclebreaker.AtomicMax[PeriodIndex]
+	index cyclebreaker.AtomicMax[Epoch]
 	last  time.Duration // atomic
 }
 
@@ -56,7 +56,7 @@ func (av *Averager3[T]) Status() (s string) {
 // Add updates last, average and max values
 func (av *Averager3[T]) Add(value T, t ...time.Time) {
 	av.max.Value(value)
-	if av.index.Value(av.period.Index()) {
+	if av.index.Value(EpochNow(t...)) {
 		atomic.StoreInt64((*int64)(&av.last), int64(value))
 	}
 	av.Averager.Add(value, t...)

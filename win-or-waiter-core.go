@@ -62,7 +62,7 @@ func NewWinOrWaiterCore(strategy WinOrWaiterStrategy, ctx ...context.Context) (w
 		ctx0 = ctx[0]
 	}
 	if !strategy.IsValid() {
-		panic(perrors.ErrorfPF("Bad WInOrWaiter strategy: %s", strategy))
+		panic(perrors.ErrorfPF("Bad WinOrWaiter strategy: %s", strategy))
 	}
 	return &WinOrWaiterCore{
 		cond:     *sync.NewCond(&sync.Mutex{}),
