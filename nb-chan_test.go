@@ -31,7 +31,7 @@ func TestNewNBChan(t *testing.T) {
 	if nbChan.IsClosed() {
 		t.Errorf("nbChan.IsClosed: true")
 	}
-	err, didClose := nbChan.CloseNow()
+	didClose, err := nbChan.CloseNow()
 	if err != nil {
 		t.Errorf("nbChan.Close err: %v", err)
 	}

@@ -7,7 +7,6 @@ package parl
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/haraldrudell/parl/perrors"
@@ -15,9 +14,18 @@ import (
 	"github.com/haraldrudell/parl/sets"
 )
 
+var DidOnceReturn AtomicCounter
+var NewCalculationReturn AtomicCounter
+var AfterReturn AtomicCounter
+var WinnerReturn AtomicCounter
+var CancelReturn AtomicCounter
+var Arrival ptime.EpochValue
+var Result ptime.EpochValue
+var Calc AtomicCounter
+
 const (
 	// WinOrWaiterAnyValue causes a thread to accept any calculated value
-	WinOrWaiterAnyValue WinOrWaiterStrategy = iota + 1
+	WinOrWaiterAnyValue WinOrWaiterStrategy = iota
 	// WinOrWaiterMustBeLater forces a calculation after the last arriving thread.
 	// WinOrWaiter caclulations are serialized, ie. a new calculation does not start prior to
 	// the conlusion of the previous calulation
@@ -25,30 +33,33 @@ const (
 )
 
 // WinOrWaiter picks a winner thread to carry out some task used by many threads.
-//   - threads arriving to an idle WinorWaiter are winners that complete the task
-//   - After a winning thread completes the task, it invokes WinnerDone
-//   - threads arriving to a WinOrWait in progress are held waiting until WinnerDone
-//   - the task is completed on demand, but only by the first thread requesting it
+//   - threads in WinOrWait for an idle WinorWaiter may become winners completing the task
+//   - threads in WinOrWait while a calculation is in progress are held waiting using
+//     RWLock and atomics until the calculation completes
+//   - the calculation is completed on demand, but only by the first requesting thread
 type WinOrWaiterCore struct {
-	cond sync.Cond
+	// calculator if the function making the calculation
+	calculator func() (err error)
 	// calculation strategy for this WinOrWaiter
 	//	- WinOrWaiterAnyValue WinOrWaiterMustBeLater
 	strategy WinOrWaiterStrategy
 	// context used for cancellation, may be nil
 	ctx context.Context
 
-	// dataVersion indicates the available data version with atomic access
-	//	- data version is the time scanning of the current valid version of data began
-	//	- zero value if no data version has been completed
-	//	- only updated by the winner on its completion using winnerFunc
-	dataVersion ptime.EpochValue
+	// isCalculationPut indicates that calculation field has value. atomic access
+	isCalculationPut AtomicBool
+	// calculationPut makes threads wait until calculation has value
+	calculationPut Once
+	// calculation allow to wait for the result of a winner calculation
+	//	- winner holds lock.Lock until the calculation is complete
+	//	- loser threads wait for lock.RLock to check the result
+	calculation AtomicReference[AwaitableCalculation[time.Time]]
+
 	// winnerPicker picks winner thread using atomic access
 	//	- winner is the thread that on Set gets wasNotSet true
 	//	- true while a winner calculates next data value
-	//	- set to zero after winnerFunc invoked
+	//	- set to zero when winnerFunc returns
 	winnerPicker AtomicBool
-	// calculationStart is the time of starting the last initiated calculation with atomic access
-	calculationStart ptime.EpochValue
 }
 
 // WinOrWaiter returns a semaphore used for completing an on-demand task by
@@ -56,126 +67,114 @@ type WinOrWaiterCore struct {
 // waiting for the result.
 //   - strategy: WinOrWaiterAnyValue WinOrWaiterMustBeLater
 //   - ctx allows foir cancelation of the WinOrWaiter
-func NewWinOrWaiterCore(strategy WinOrWaiterStrategy, ctx ...context.Context) (winOrWaiter *WinOrWaiterCore) {
+func NewWinOrWaiterCore(strategy WinOrWaiterStrategy, calculator func() (err error), ctx ...context.Context) (winOrWaiter *WinOrWaiterCore) {
+	if !strategy.IsValid() {
+		panic(perrors.ErrorfPF("Bad WinOrWaiter strategy: %s", strategy))
+	}
+	if calculator == nil {
+		panic(perrors.ErrorfPF("calculator function cannot be nil"))
+	}
 	var ctx0 context.Context
 	if len(ctx) > 0 {
 		ctx0 = ctx[0]
 	}
-	if !strategy.IsValid() {
-		panic(perrors.ErrorfPF("Bad WinOrWaiter strategy: %s", strategy))
-	}
 	return &WinOrWaiterCore{
-		cond:     *sync.NewCond(&sync.Mutex{}),
-		strategy: strategy,
-		ctx:      ctx0,
+		strategy:   strategy,
+		calculator: calculator,
+		ctx:        ctx0,
 	}
 }
 
 // WinOrWaiter picks a winner thread to carry out some task used by many threads.
 //   - threads arriving to an idle WinorWaiter are winners that complete the task
-//   - After a winning thread completes the task, it invokes WinnerDone
-//   - threads arriving to a WinOrWait in progress are held waiting until WinnerDone
+//   - threads arriving to a WinOrWait in progress are held waiting at RWMutex
 //   - the task is completed on demand, but only by the first thread requesting it
-func (ww *WinOrWaiterCore) WinOrWait() (winnerFunc func(errp *error)) {
-	checkWinOrWaiter(ww)
+func (ww *WinOrWaiterCore) WinOrWait() (err error) {
 
-	// the time this thread arrived
+	// arrivalTime is the time this thread arrived
 	var arrivalTime = time.Now()
-	// the data version available when this thread arrived
-	var lastSeenDataVersion = ww.dataVersion.Get().Time()
 
-	ww.cond.L.Lock()
-	defer ww.cond.L.Unlock()
+	// ensure WinOrWaiter has calculator function
+	if ww == nil || ww.calculator == nil {
+		err = perrors.NewPF("WinOrWait for nil or uninitialized WinOrWaiter")
+		return
+	}
+	// seenCalculation is the calculation present when this thread arrived.
+	// seenCalculation may be nil
+	var seenCalculation = ww.calculation.Get()
 
-	// wait for a data update
+	// ensure that ww.calculation holds a calculation
+	if ww.isCalculationPut.IsFalse() {
+
+		// invocation prior to first calculation started
+		// start the first calculation, or wait for it to be started if another thread already started it
+		var didOnce bool
+		if didOnce, _, err = ww.calculationPut.DoErr(ww.winnerFunc); didOnce {
+			DidOnceReturn.Inc()
+			return // thread did initial winner calculation return
+		}
+		err = nil // subsequent threads do not report possible error
+	}
+
+	// wait for late-enough data
+	var calculation *AwaitableCalculation[time.Time]
 	for {
 
-		// check context
-		if ww.IsCancel() {
-			return // context canceled return
-		}
-
-		// if there has been a data update since this thread arrived
-		dataVersionNow := ww.dataVersion.Get().Time()
-		// if we have data and it has changed since arrival…
-		if !dataVersionNow.IsZero() && !lastSeenDataVersion.Equal(dataVersionNow) {
+		// check for valid calculation result
+		calculation = ww.calculation.Get()
+		// calculation.Result may block
+		if result, isValid := calculation.Result(); isValid {
 			switch ww.strategy {
 			case WinOrWaiterAnyValue:
-				return // any new valid value accepted return
+				if calculation != seenCalculation {
+					NewCalculationReturn.Inc()
+					return // any new valid value accepted return
+				}
 			case WinOrWaiterMustBeLater:
-				if !arrivalTime.Before(dataVersionNow) {
+				if !result.Before(arrivalTime) {
+					AfterReturn.Inc()
+					Arrival.SetTime(arrivalTime)
+					Result.SetTime(result)
 					// arrival time the same or after dataVersionNow
 					return // must be later and the data version is of a later time than when this thread arrived return
 				}
 			}
 		}
-		lastSeenDataVersion = dataVersionNow // absorb any changes
 
 		// ensure data processing is in progress
 		if isWinner := ww.winnerPicker.Set(); isWinner {
-
-			// this thread is a winner!
-			ww.calculationStart.SetTime()
-			winnerFunc = ww.winnerFunc
-			return // this thread is a winner: do task return
+			WinnerReturn.Inc()
+			return ww.winnerFunc() // this thread completed the task return
 		}
 
-		// wait for any updates
-		ww.cond.Wait()
+		// check context cancelation
+		if ww.IsCancel() {
+			CancelReturn.Inc()
+			return // context canceled return
+		}
 	}
-}
-
-// Invalidate invalidates any completed calculation.
-// A calculation in progress may still be accepted.
-func (ww *WinOrWaiterCore) Invalidate() {
-	checkWinOrWaiter(ww)
-	// invalidate current data version
-	// for performance, important to do outside of lock
-	ww.dataVersion.Set(0)
-
-	ww.cond.L.Lock()
-	defer ww.cond.L.Unlock()
-
-	ww.cond.Broadcast()
 }
 
 func (ww *WinOrWaiterCore) IsCancel() (isCancel bool) {
-	checkWinOrWaiter(ww)
 	return ww.ctx != nil && ww.ctx.Err() != nil
 }
 
-func (ww *WinOrWaiterCore) winnerFunc(errp *error) {
+func (ww *WinOrWaiterCore) winnerFunc() (err error) {
+	ww.winnerPicker.Set()
+	defer ww.winnerPicker.Clear()
 
-	// if successful, update data version
-	// for performance, important to do outside of lock
-	// when dataVersion is updated, waiting threads will begin to return
-	if errp == nil || *errp == nil {
-		ww.dataVersion.Set(ww.calculationStart.Get())
-	}
+	// get calculation
+	var calculation = NewAwaitableCalculation[time.Time]()
+	ww.calculation.Put(calculation)
+	ww.isCalculationPut.Set()
 
-	// allow for next winner to be picked
-	ww.winnerPicker.Clear()
+	// calculate
+	result := time.Now()
+	defer calculation.End(result, &err)
+	Calc.Inc()
+	_, err = RecoverInvocationPanicErr(ww.calculator)
 
-	// immediate broadcast
-	//	- may happen while threads are in the loop
-	//	- therefore threads can miss this broadcast
-	ww.cond.Broadcast()
-
-	ww.cond.L.Lock()
-	defer ww.cond.L.Unlock()
-
-	// broadcast while holding lock
-	//	- all threads are in position ot receive this
-	ww.cond.Broadcast()
-
-}
-
-func checkWinOrWaiter(ww *WinOrWaiterCore) {
-	if ww == nil {
-		panic(perrors.NewPF("use of nil WinOrWaiterCore"))
-	} else if ww.cond.L == nil {
-		panic(perrors.NewPF("use of uninitialized WinOrWaiterCore"))
-	}
+	return
 }
 
 type WinOrWaiterStrategy uint8

@@ -13,30 +13,21 @@ import "sync"
 //   - parl.Once is thread-safe and does not require initialization
 //   - No thread will return from Once.Do or Once.Doerr until once.Do has completed
 type Once struct {
-	once sync.Once
+	once   sync.Once
+	isDone AtomicBool
 
-	// temporary
-
-	f    func()
-	fErr func() (err error)
-
-	// remnant state
-
-	isDone  AtomicBool
-	err     error
-	isPanic bool
+	lock   sync.RWMutex
+	result InvokeResult
 }
 
 // Do calls the function if and only if Do or DoErr is being called for the first time
-// for this instance of Once
+// for this instance of Once. Thread-safe
 func (o *Once) Do(f func()) {
-	defer func() {
-		o.f = nil
-	}()
+	o.once.Do(func() {
+		defer o.isDone.Set()
 
-	o.f = f
-
-	o.once.Do(o.do)
+		f()
+	})
 }
 
 // DoErr calls the function if and only if Do or DoErr is being called for the first time
@@ -45,42 +36,35 @@ func (o *Once) Do(f func()) {
 //   - isPanic is true if f had panic
 //   - err is the return value from f or a possible panic
 func (o *Once) DoErr(f func() (err error)) (didOnce, isPanic bool, err error) {
-	defer func() {
-		isPanic = o.isPanic
-		err = o.err
-		o.fErr = nil
-	}()
+	isPanic, err = o.getPreviousResults()
+	o.once.Do(func() {
+		defer o.isDone.Set()
+		defer o.doErr(&isPanic, &err)
 
-	o.fErr = f
-	didOnce = !o.isDone.IsTrue()
-
-	o.once.Do(o.doErr)
-
+		didOnce = true
+		isPanic, err = RecoverInvocationPanicErr(f)
+	})
 	return
-}
-
-func (o *Once) doErr() {
-	var e error
-	defer func() {
-		o.isDone.Set()
-		if o.isPanic = e != nil; o.isPanic {
-			o.err = e
-		}
-	}()
-
-	RecoverInvocationPanic(o.dofErr, &e)
-}
-
-func (o *Once) dofErr() {
-	o.err = o.fErr()
-}
-
-func (o *Once) do() {
-	defer o.isDone.Set()
-
-	o.f()
 }
 
 func (o *Once) IsDone() (isDone bool) {
 	return o.isDone.IsTrue()
+}
+
+func (o *Once) doErr(isPanicp *bool, errp *error) {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	o.result.IsPanic = *isPanicp
+	o.result.Err = *errp
+}
+
+func (o *Once) getPreviousResults() (isPanic bool, err error) {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	isPanic = o.result.IsPanic
+	err = o.result.Err
+
+	return
 }

@@ -7,13 +7,18 @@ ISC License
 package pmaps
 
 import (
+	"context"
+	"encoding/base64"
+	"math/rand"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/haraldrudell/parl/parli"
 	"golang.org/x/exp/slices"
 )
 
-func TestNewRWMap(t *testing.T) {
+func TestRWMap(t *testing.T) {
 	k1 := "key1"
 	v1 := 1
 	k2 := "key2"
@@ -67,4 +72,72 @@ func TestNewRWMap(t *testing.T) {
 	(NewRWMap[string, int]()).Delete(k1)
 	(NewRWMap[string, int]()).Clear()
 	(NewRWMap[string, int]()).Length()
+}
+
+// ITEST= go test -race -v -run '^TestRWMapRace$' ./pmaps
+func TestRWMapRace(t *testing.T) {
+	randomLength := 16
+	limitedSliceSize := 100
+	lap := 100
+	value := 3
+	duration := time.Second
+
+	// check environment
+	if _, ok := os.LookupEnv("ITEST"); !ok {
+		t.Skip("ITEST not present")
+	}
+
+	var limitedSlice = make([]string, limitedSliceSize)
+	for i := 0; i < limitedSliceSize; i++ {
+		limitedSlice[i] = randomAZ(randomLength)
+	}
+
+	var rwMap RWMap[string, int] = *NewRWMap2[string, int]()
+	var ctx, cancelFunc = context.WithCancel(context.Background())
+	defer cancelFunc()
+	rand.Seed(time.Now().UnixNano())
+
+	// put thread
+	go func() {
+		for ctx.Err() == nil {
+			for _, randomString := range limitedSlice {
+				rwMap.Put(randomString, value)
+			}
+			for i := 0; i < lap; i++ {
+				rwMap.Put(randomAZ(randomLength), value)
+			}
+		}
+	}()
+
+	// get thread
+	go func() {
+		for ctx.Err() == nil {
+			for _, randomString := range limitedSlice {
+				rwMap.Get(randomString)
+			}
+			for i := 0; i < lap; i++ {
+				rwMap.Get(randomAZ(randomLength))
+			}
+		}
+	}()
+
+	time.Sleep(duration)
+}
+
+// randomAZ provides a string of random characters using base64 encoding
+//   - characters: a-zA-Z0-9+/
+//   - use rand.Seed for randomization
+func randomAZ(length int) (s string) {
+	if length < 1 {
+		return
+	}
+	// base64 encodes 64 values per character, ie. 6/8 bits as in 3 bytes into 4 bytes
+	// 1 random byte provides 4/3 characters, ie factor 3/4, and add 1 due to integer truncation
+	p := make([]byte, (length+1)*3/4)
+	rand.Read(p)
+	s = base64.StdEncoding.EncodeToString(p)
+	if len(s) > length {
+		s = s[:length]
+	}
+	return
 }

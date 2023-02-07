@@ -32,3 +32,12 @@ func (ref *AtomicReference[T]) Put(reference *T) (r0 *T) {
 	))
 	return
 }
+
+func (ref *AtomicReference[T]) PutIf(reference *T, expected *T) (swapped bool) {
+	swapped = atomic.CompareAndSwapPointer(
+		(*unsafe.Pointer)(unsafe.Pointer(&ref.reference)),
+		unsafe.Pointer(expected),
+		unsafe.Pointer(reference),
+	)
+	return
+}

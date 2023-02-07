@@ -30,7 +30,7 @@ type RWMap[K comparable, V any] struct {
 
 // NewRWMap returns a thread-safe map implementation
 func NewRWMap[K comparable, V any]() (rwMap parli.ThreadSafeMap[K, V]) {
-	return &RWMap[K, V]{m: map[K]V{}}
+	return NewRWMap2[K, V]()
 }
 
 func NewRWMap2[K comparable, V any]() (rwMap *RWMap[K, V]) {
@@ -154,20 +154,22 @@ func (rw *RWMap[K, V]) Length() (length int) {
 
 // Clone returns a shallow clone of the map
 func (rw *RWMap[K, V]) Clone() (clone parli.ThreadSafeMap[K, V]) {
+	return rw.Clone2()
+}
+
+// Clone returns a shallow clone of the map
+func (rw *RWMap[K, V]) Clone2() (clone *RWMap[K, V]) {
 	var c RWMap[K, V]
 	clone = &c
 
 	rw.lock.RLock()
 	defer rw.lock.RUnlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	c.m = maps.Clone(rw.m)
 
 	return
-}
-
-// Clone returns a shallow clone of the map
-func (rw *RWMap[K, V]) Clone2() (clone *RWMap[K, V]) {
-	return rw.Clone().(*RWMap[K, V])
 }
 
 // Swap replaces the map with otherMap and returns the current map in previousMap
@@ -177,7 +179,7 @@ func (rw *RWMap[K, V]) Swap(otherMap parli.ThreadSafeMap[K, V]) (previousMap par
 
 	// check otherMap
 	replacingRWMap, ok := otherMap.(*RWMap[K, V])
-	if !ok || replacingRWMap == nil || replacingRWMap.m == nil {
+	if !ok || replacingRWMap.m == nil {
 		return // otherMap of bad type
 	}
 

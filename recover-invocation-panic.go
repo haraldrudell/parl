@@ -32,3 +32,13 @@ func RecoverInvocationPanic(fn func(), errp *error) {
 //
 //	if errors.Is(err, parl.ErrNilValue) …
 var ErrErrpNil = NilValueError(errors.New("errp cannot be nil"))
+
+func RecoverInvocationPanicErr(fn func() (err error)) (isPanic bool, err error) {
+	defer Recover(Annotation(), &err, NoOnError)
+
+	isPanic = true
+	err = fn()
+	isPanic = false
+
+	return
+}
