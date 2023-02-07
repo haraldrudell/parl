@@ -10,18 +10,8 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/ptime"
 	"github.com/haraldrudell/parl/sets"
 )
-
-var DidOnceReturn AtomicCounter
-var NewCalculationReturn AtomicCounter
-var AfterReturn AtomicCounter
-var WinnerReturn AtomicCounter
-var CancelReturn AtomicCounter
-var Arrival ptime.EpochValue
-var Result ptime.EpochValue
-var Calc AtomicCounter
 
 const (
 	// WinOrWaiterAnyValue causes a thread to accept any calculated value
@@ -110,7 +100,6 @@ func (ww *WinOrWaiterCore) WinOrWait() (err error) {
 		// start the first calculation, or wait for it to be started if another thread already started it
 		var didOnce bool
 		if didOnce, _, err = ww.calculationPut.DoErr(ww.winnerFunc); didOnce {
-			DidOnceReturn.Inc()
 			return // thread did initial winner calculation return
 		}
 		err = nil // subsequent threads do not report possible error
@@ -127,14 +116,10 @@ func (ww *WinOrWaiterCore) WinOrWait() (err error) {
 			switch ww.strategy {
 			case WinOrWaiterAnyValue:
 				if calculation != seenCalculation {
-					NewCalculationReturn.Inc()
 					return // any new valid value accepted return
 				}
 			case WinOrWaiterMustBeLater:
 				if !result.Before(arrivalTime) {
-					AfterReturn.Inc()
-					Arrival.SetTime(arrivalTime)
-					Result.SetTime(result)
 					// arrival time the same or after dataVersionNow
 					return // must be later and the data version is of a later time than when this thread arrived return
 				}
@@ -143,13 +128,11 @@ func (ww *WinOrWaiterCore) WinOrWait() (err error) {
 
 		// ensure data processing is in progress
 		if isWinner := ww.winnerPicker.Set(); isWinner {
-			WinnerReturn.Inc()
 			return ww.winnerFunc() // this thread completed the task return
 		}
 
 		// check context cancelation
 		if ww.IsCancel() {
-			CancelReturn.Inc()
 			return // context canceled return
 		}
 	}
@@ -171,7 +154,6 @@ func (ww *WinOrWaiterCore) winnerFunc() (err error) {
 	// calculate
 	result := time.Now()
 	defer calculation.End(result, &err)
-	Calc.Inc()
 	_, err = RecoverInvocationPanicErr(ww.calculator)
 
 	return
