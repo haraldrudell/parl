@@ -7,9 +7,13 @@ package parl
 
 import (
 	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
+
+	"github.com/haraldrudell/parl/ptime"
 )
 
 // SlowDetectorInvocation is a container used by SlowDetectorCore
@@ -20,7 +24,9 @@ type SlowDetectorInvocation struct {
 	t0        time.Time
 	stop      func(sdi *SlowDetectorInvocation, value ...time.Time)
 	sd        *SlowDetectorCore
+
 	tx        AtomicReference[time.Time]
+	lock      sync.Mutex
 	intervals []Interval
 }
 
@@ -36,15 +42,19 @@ func (sdi *SlowDetectorInvocation) Stop(value ...time.Time) {
 
 // Stop ends an invocation part of SlowDetectorCore
 func (sdi *SlowDetectorInvocation) Interval(label string, t ...time.Time) {
-	if label == "" {
-		label = strconv.Itoa(len(sdi.intervals) + 1)
-	}
 	var t0 time.Time
 	if len(t) > 0 {
 		t0 = t[0]
 	}
 	if t0.IsZero() {
 		t0 = time.Now()
+	}
+
+	sdi.lock.Lock()
+	defer sdi.lock.Unlock()
+
+	if label == "" {
+		label = strconv.Itoa(len(sdi.intervals) + 1)
 	}
 	sdi.intervals = append(sdi.intervals, Interval{label: label, t: t0})
 }
@@ -75,6 +85,23 @@ func (sdi *SlowDetectorInvocation) Time(t time.Time) (previousT time.Time) {
 	}
 	if tp != nil {
 		previousT = *tp
+	}
+	return
+}
+
+func (sdi *SlowDetectorInvocation) Intervals() (intervalStr string) {
+	sdi.lock.Lock()
+	defer sdi.lock.Unlock()
+
+	if length := len(sdi.intervals); length > 0 {
+		sList := make([]string, length)
+		t0 := sdi.t0
+		for i, ivl := range sdi.intervals {
+			t := ivl.t
+			sList[i] = ptime.Duration(t.Sub(t0)) + "\x20" + ivl.label
+			t0 = t
+		}
+		intervalStr = "\x20" + strings.Join(sList, "\x20")
 	}
 	return
 }

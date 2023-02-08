@@ -6,7 +6,6 @@ ISC License
 package parl
 
 import (
-	"strings"
 	"time"
 
 	"github.com/haraldrudell/parl/pruntime"
@@ -104,17 +103,7 @@ func (sd *SlowDetector) callback(sdi *SlowDetectorInvocation, didReturn bool, du
 		threadIDStr = " threadID: " + threadID.String()
 	}
 
-	var intervalStr string
-	if length := len(sdi.intervals); length > 0 {
-		sList := make([]string, length)
-		t0 := sdi.T0()
-		for i, ivl := range sdi.intervals {
-			t := ivl.t
-			sList[i] = ptime.Duration(t.Sub(t0)) + "\x20" + ivl.label
-			t0 = t
-		}
-		intervalStr = "\x20" + strings.Join(sList, "\x20")
-	}
+	var intervalStr = sdi.Intervals()
 
 	sd.printf("Slowness: %s %s duration: %s%s%s%s",
 		sd.label, sdi.Label(),

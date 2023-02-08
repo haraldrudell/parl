@@ -47,6 +47,22 @@ func AppendError(err error, err2 error) (e error) {
 	return errorglue.NewRelatedError(err, err2)
 }
 
+func AppendErrorDefer(errp, errp2 *error, fn func() (err error)) {
+	if errp == nil {
+		panic(NewPF("errp cannot be nil"))
+	}
+	if errp2 != nil {
+		if err := *errp2; err != nil {
+			*errp = AppendError(*errp, err)
+		}
+	}
+	if fn != nil {
+		if err := fn(); err != nil {
+			*errp = AppendError(*errp, err)
+		}
+	}
+}
+
 func TagErr(e error, tags ...string) (err error) {
 
 	// ensure error has stack

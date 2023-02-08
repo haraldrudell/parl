@@ -27,9 +27,10 @@ var slowIDGenerator UniqueIDTypedUint64[slowID]
 //   - Thread-Safe and multi-threaded, parallel invocations
 //   - Separate thread measures time of non-returning, hung invocations
 type SlowDetectorCore struct {
-	ID        slowID
-	callback  CbSlowDetector
-	thread    *SlowDetectorThread
+	ID       slowID
+	callback CbSlowDetector
+	thread   *SlowDetectorThread
+
 	max       AtomicMax[time.Duration]
 	alwaysMax AtomicMax[time.Duration]
 	last      time.Duration // atomic
