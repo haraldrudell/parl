@@ -9,89 +9,143 @@ import (
 	"fmt"
 	"os"
 	"sync"
-
-	"github.com/haraldrudell/parl/pruntime"
+	"sync/atomic"
 )
 
 // SendNb implements non-blocking send using a thread and buffer up to size of int
 type SendNb struct {
-	SendChannel
+	errCh chan error // may be nil: check using method HasChannel
+
 	sqLock    sync.Mutex
-	sendQueue []error // inside lock
-	hasThread bool    // inside lock
+	sendQueue []error       // inside lock
+	hasThread bool          // inside lock
+	waitCh    chan struct{} // before go statement
+
+	isShutdown atomic.Bool // atomic: check using method: IsShutdown
+}
+
+// NewSendNb returns a buffered Send object using errCh
+//   - errCh may be nil
+func NewSendNb(errCh chan error) (sc *SendNb) {
+	return &SendNb{errCh: errCh}
 }
 
 // Send sends an error on the error channel. Non-blocking. Thread-safe.
-// wg can be used to wait until the thread is near-send
-func (sc *SendNb) Send(err error, wgs ...*sync.WaitGroup) {
-	if err == nil {
-		return // nothing to send
+//   - if err is nil, nothing is done
+//   - if SendNb was not initialized with non-zero channel, nothing is done
+func (sc *SendNb) Send(err error) {
+	if !sc.canSend(err) {
+		return // no-data not-initialized is-shutdown return
 	}
 
-	// get possible WaitGroup
-	var wg *sync.WaitGroup
-	if len(wgs) > 0 {
-		wg = wgs[0]
-	}
-	if sc.errCh == nil {
-		if wg != nil {
-			wg.Done()
-		}
-		return // not initialized to send errors
-	}
-
-	sc.saveOrLaunch(err, wg) // put in slice, launch thread if necessary
-}
-
-func (sc *SendNb) saveOrLaunch(err error, wg *sync.WaitGroup) {
 	sc.sqLock.Lock()
 	defer sc.sqLock.Unlock()
-	sc.sendQueue = append(sc.sendQueue, err) // put err in send queue
-	if sc.hasThread {                        // the thread is already blocked
-		if wg != nil {
-			wg.Done()
-		}
-		return // err put in queue
+
+	if !sc.canSend(err) {
+		return // no-data not-initialized is-shutdown return
+	}
+
+	// put err in send queue
+	sc.sendQueue = append(sc.sendQueue, err)
+	if sc.hasThread {
+		return // thread is already reading from queue
 	}
 
 	// launch thread
 	sc.hasThread = true
-	go sc.sendThread(wg) // send err in new thread
+	sc.waitCh = make(chan struct{})
+	go sc.sendThread() // send err in new thread
 }
 
-func (sc *SendNb) sendThread(wg *sync.WaitGroup) {
-	defer RecoverThread("send on error channel", func(err error) {
-		if pruntime.IsSendOnClosedChannel(err) {
-			return // ignore if the channel was or became closed
-		}
+func (sc *SendNb) HasChannel() (hasChannel bool) {
+	return sc.errCh != nil
+}
 
-		// no other panics should occur — we do not know what this is
-		// This will never happen. This is the best we can do when it does
+func (sc *SendNb) IsShutdown() (isShutdown bool) {
+	return sc.isShutdown.Load()
+}
+
+// Shutdown closes the channel exactly once. Thread-safe
+func (sc *SendNb) Shutdown() {
+	if sc.isShutdown.Load() {
+		return // already shutdown
+	}
+
+	// ensure channel completes send
+	if sc.shutdown() {
+		select {
+		case <-sc.errCh: // release thread from send wait
+			<-sc.waitCh // wait for thread to exit
+		case <-sc.waitCh: // or wait until thread has exited
+		}
+	}
+
+	if sc.errCh != nil {
+		close(sc.errCh)
+	}
+}
+
+func (sc *SendNb) shutdown() (hasThread bool) {
+	sc.sqLock.Lock()
+	defer sc.sqLock.Unlock()
+
+	// block further Send invocation and thread sends
+	if sc.isShutdown.Swap(true) {
+		return // already shutdown
+	}
+
+	hasThread = sc.hasThread
+
+	// drop any send queue
+	sc.sendQueue = nil
+
+	return
+}
+
+func (sc *SendNb) canSend(err error) (canSend bool) {
+	return err != nil && // nothing to send
+		sc.errCh != nil && // not initialized to send errors
+		!sc.isShutdown.Load() // is shutdown
+}
+
+func (sc *SendNb) sendThread() {
+	defer sc.closeWaitCh()
+	defer RecoverThread("send on error channel", func(err error) {
 		fmt.Fprintln(os.Stderr, err)
 	})
 
+	var hasValue bool
+	var err error
 	for {
-		err := sc.getErrFromSendQueue()
-		if err == nil {
-			break // end of queue: shutdown thread
+		if hasValue, err = sc.getErrFromSendQueue(); !hasValue {
+			return // queue empty return: exit thread
 		}
-		if wg != nil {
-			wg.Done() // signal near-send
-			wg = nil
-		}
-		sc.SendChannel.Send(err) // may block and panic
+
+		sc.errCh <- err
 	}
 }
 
-func (sc *SendNb) getErrFromSendQueue() (err error) {
+func (sc *SendNb) getErrFromSendQueue() (hasValue bool, err error) {
 	sc.sqLock.Lock()
 	defer sc.sqLock.Unlock()
-	if len(sc.sendQueue) == 0 {
+
+	if hasValue = len(sc.sendQueue) > 0; !hasValue {
 		sc.hasThread = false
-		return nil
+		return
 	}
+
 	err = sc.sendQueue[0]
-	copy(sc.sendQueue[0:], sc.sendQueue[1:])
-	sc.sendQueue = sc.sendQueue[:len(sc.sendQueue)-1]
+	copy(sc.sendQueue, sc.sendQueue[1:])
+	lastIndex := len(sc.sendQueue) - 1
+	sc.sendQueue[lastIndex] = nil
+	sc.sendQueue = sc.sendQueue[:lastIndex]
 	return
+}
+
+func (sc *SendNb) closeWaitCh() {
+	sc.sqLock.Lock()
+	defer sc.sqLock.Unlock()
+
+	close(sc.waitCh)
+	sc.hasThread = false
 }

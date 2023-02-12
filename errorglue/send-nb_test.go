@@ -7,43 +7,48 @@ package errorglue
 
 import (
 	"errors"
-	"sync"
 	"testing"
-	"time"
 )
 
-const snbShortTime = 10 * time.Microsecond
-
 func TestSendNB(t *testing.T) {
-	err1 := errors.New("err1")
-	err2 := errors.New("err2")
-	errCh := make(chan error)
-	sendNb := SendNb{SendChannel: *NewSendChannel(errCh)}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	sendNb.Send(err1, &wg)
-	sendNb.Send(err2)
+	var err1 = errors.New("err1")
+	var err2 = errors.New("err2")
+	var errCh = make(chan error)
 
-	wg.Wait() // wait until thread is about to send
+	var err error
+	var hasThread bool
+	var queueLen int
+
+	sendNb := NewSendNb(errCh)
+
+	sendNb.Send(err1)
+	sendNb.Send(err2)
+	err = <-errCh
+	if err != err1 {
+		t.Errorf("Got wrong error: %v expected: %v", err, err1)
+	}
 	sendNb.sqLock.Lock()
-	hasThread := sendNb.hasThread
-	queueLen := len(sendNb.sendQueue)
+	hasThread = sendNb.hasThread
 	sendNb.sqLock.Unlock()
 	if !hasThread {
 		t.Error("sendNB no thread")
 	}
-	if queueLen != 1 {
-		t.Errorf("sendNB queue length not 1: %d", queueLen)
-	}
-	err := <-errCh
-	if err != err1 {
-		t.Errorf("Got wrong error: %v expected: %v", err, err1)
-	}
 
-	// cause a send panic
-	close(errCh)
-	// sendNb thread silently terminates
-	// if things are bad, thread will panic…
-	time.Sleep(snbShortTime)
-	// termination is not indicated anywhere
+	if sendNb.IsShutdown() {
+		t.Error("sendNb.IsShutdown")
+	}
+	sendNb.Shutdown()
+	if !sendNb.IsShutdown() {
+		t.Error("sendNb.IsShutdown false")
+	}
+	sendNb.sqLock.Lock()
+	hasThread = sendNb.hasThread
+	queueLen = len(sendNb.sendQueue)
+	sendNb.sqLock.Unlock()
+	if hasThread {
+		t.Error("sendNB has thread")
+	}
+	if queueLen != 0 {
+		t.Errorf("sendNB queue length not 0: %d", queueLen)
+	}
 }

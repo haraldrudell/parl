@@ -77,9 +77,10 @@ func TestByValue(t *testing.T) {
 	g(&ch)
 
 	// sync.Once can be passed by value
-	var o sync.Once
-	fo := func(p sync.Once) {}
-	fo(o)
+	// 230120 sync.Once can no longer be passed by value
+	//var o sync.Once
+	//fo := func(p sync.Once) {}
+	//fo(o)
 
 	// sync.WaitGroup unlike previously by 1.19.3 not be passed by value
 	//var wg sync.WaitGroup

@@ -48,13 +48,20 @@ func TestGoGroup(t *testing.T) {
 	if count != 1 {
 		t.Errorf("bad Ch Count: %d exp 1", count)
 	}
-	goError = <-goGroup.Ch()
+	goError, ok = <-goGroup.Ch()
+	if !ok {
+		t.Error("goGroup.Ch closed")
+	}
 	if goError == nil {
 		t.Error("goError nil")
 		t.FailNow()
 	}
 	if !errors.Is(goError.Err(), errBad) {
 		t.Errorf("wrong error: %q %x exp %q %x", goError.Error(), goError, errBad.Error(), errBad)
+	}
+	_, ok = <-goGroup.Ch()
+	if ok {
+		t.Error("goGroup.Ch did not close")
 	}
 	if !goGroupImpl.isEnd() {
 		t.Error("g1group did not terminate")

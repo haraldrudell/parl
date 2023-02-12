@@ -17,7 +17,11 @@ import (
 
 // Go provides methods for a running goroutione thread to be provided as a function
 // argument in the go statement function call launching the thread.
-//   - Go.Cancel affects this Go thread only.
+//   - Go.CancelGo affects this Go thread only.
+//   - Go.Cancel cancels:
+//   - — this Go thread
+//   - — this Go’s parent thread-group and
+//   - — this Go’s parent thread-group’s subordinate thread-groups
 //   - The Go Context is canceled when
 //   - — the parent GoGroup thread-group’s context is Canceled or
 //   - —a thread in the parent GoGroup thread-group initiates Cancel
@@ -80,14 +84,15 @@ type Go interface {
 
 // GoFatalCallback receives the thread-group on its first fatal thread-exit
 //   - GoFatalCallback is an optional onFirstFatal argument to
-//   - —NewGoGroup
+//   - — NewGoGroup
 //   - — SubGo
 //   - — SubGroup
 type GoFatalCallback func(goGen GoGen)
 
 // GoGen allows for new Go threads, new SubGo and SubGroup thread-groups and
 // cancel of threads in the thread-group and its subordinate thread-groups.
-//   - GoGen can be a GoGroup or a Go object
+//   - GoGen is value from NewGoGroup GoGroup SubGo SubGroup Go,
+//     ie. any Go-interface object
 type GoGen interface {
 	// Go returns a Go object to be provided as a go statement function argument.
 	Go() (g0 Go)
@@ -225,7 +230,10 @@ type GoFactory interface {
 // data types
 
 // GoError is an error or a thread exit associated with a goroutine
-// Goer returns the Goer object handling the goroutine that originated the error
+//   - GoError encapsulates the original unadulterated error
+//   - GoError provides context for taking action on the error
+//   - Go provides the thread associated with the error. All GoErrors are associated with
+//     a Go object
 type GoError interface {
 	error // Error() string
 	// Err retrieves the original error value
@@ -235,7 +243,7 @@ type GoError interface {
 	// IsThreadExit determines if this error is a thread exit
 	//	- thread exits may have err nil
 	//	- fatals are non-nil thread exits that may require specific actions such as
-	//		applicaiton termination
+	//		application termination
 	IsThreadExit() (isThreadExit bool)
 	// IsFatal determines if this error is a fatal thread-exit, ie. a thread exiting with non-nil error
 	IsFatal() (isThreadExit bool)
@@ -246,21 +254,35 @@ type GoError interface {
 	fmt.Stringer
 }
 
+// ThreadData is information about a Go object thread.
+//   - initially, only Create is present
+//   - Name is only present for threads that have been named
 type ThreadData interface {
-	// threadID is the ID of the running thread
-	// - use IsValid method to check if value is present
+	// threadID is the ID of the running thread assigned by the go runtime
+	//	- IsValid method checks if value is present
+	//	- zero value is empty string
+	//	- .ThreadID().String(): "5"
 	ThreadID() (threadID ThreadID)
-	// createLocation is the code line of the go-statement function-call
-	// invocation launching the thread
-	// - use Is
+	// createLocation is the code line of the go statement function-call
+	// creating the goroutine thread
+	// - IsSet method checks if value is present
+	//	- Create().Short(): "g0.(*SomeType).SomeCode()-thread-data_test.go:73"
 	Create() (createLocation *pruntime.CodeLocation)
-	// funcLocation is the code line of the function of the running thread.
+	// Func returns the code line of the function of the running thread.
+	// - IsSet method checks if value is present
+	//	- .Func().Short(): "g0.(*SomeType).SomeFunction()-thread-data_test.go:80"
 	Func() (funcLocation *pruntime.CodeLocation)
 	// optional thread-name assigned by consumer
+	//	- zero-value: empty string "" for threads that have not been named
 	Name() (label string)
-	// "label:threadID" or fmt.Stringer
+	// Short returns a short description of the thread "label:threadID" or fmt.Stringer
+	//	- "myThreadName:4"
+	//	- zero-value: "[empty]" ThreadDataEmpty
+	//	- nil value: "threadData:nil" ThreadDataNil
 	Short() (short string)
-	// all non-empty fields or "[empty]"
+	// all non-empty fields: [label]:[threadID]_func:[Func]_cre:[Create]
+	//	- "myThreadName:5_func:g0.(*SomeType).SomeFunction()-thread-data_test.go:80_cre:g0.(*SomeType).SomeCode()-thread-data_test.go:73"
+	//	- zero-value: "[empty]" ThreadDataEmpty
 	fmt.Stringer
 }
 
@@ -273,9 +295,9 @@ const (
 	// err may be nil
 	GePreDoneExit
 	// A SubGroup with its own error channel is sending a
-	// locally fatal error nopt intended to terminate the app
+	// locally fatal error not intended to terminate the app
 	GeLocalChan
-	// A thread is requesting app termination withtout a fatal error.
+	// A thread is requesting app termination without a fatal error.
 	//	- this could be a callback
 	GeTerminate
 	// GeExit indicates exit of the last goroutine.

@@ -18,12 +18,15 @@ const (
 )
 
 // Go supports a goroutine executing part of a thread-group. Thread-safe.
-//   - a single thread exit is handled by Done, delegated to parent, and is deferrable.
-//   - the Go thread terminates on Done invocation.
-//   - non-fatal errors are processed by AddError delegated to parent
-//   - new Go threads are delegated to parent
-//   - SubGo creates a subordinate thread-group with its own error channel
-//   - SubGroup creates a subordinate thread-group with FirstFatal mechanic
+//   - Register allows to name the thread and collects information on the new thread
+//   - AddError processes non-fatal errors
+//   - Done handles thread termination and fatal errors and is deferrable.
+//     The Go thread terminates on Done invocation.
+//   - Go creates a sibling thread object to be provided in a go statement
+//   - SubGo creates a subordinate thread-group managed by the parent thread group.
+//     The SubGo can be independently terminated or terminated prior to thread exit.
+//   - SubGroup creates a subordinate thread-group with its own error channel.
+//     Fatal-error thread-exits in SubGroup can be recovered locally in that thread-group
 type Go struct {
 	goEntityID
 	isTerminated parl.AtomicBool

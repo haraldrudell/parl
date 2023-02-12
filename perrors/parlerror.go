@@ -20,9 +20,10 @@ const (
 // ParlError is a 2018 construct and is deprecated in favor of parl.NBChan[error].
 // NBChan is both a channel and a store, providing the consumer additional freedoms.
 type ParlError struct {
-	errLock          sync.RWMutex
-	err              error // inside lock
-	errorglue.SendNb       // non-blocking channel for sending errors
+	errLock sync.RWMutex
+	err     error // inside lock
+
+	errorglue.SendNb // non-blocking channel for sending errors Send() Shutdown()
 }
 
 var _ error = &ParlError{}                // ParlError behaves like an error
@@ -50,10 +51,10 @@ When using a channel, The error channel is closed by Shutdown():
 
 A shutdown ParlError is still usable, but will no longer send errors
 */
-func NewParlError(errCh chan<- error) (pe *ParlError) {
+func NewParlError(errCh chan error) (pe *ParlError) {
 	p := ParlError{}
 	if errCh != nil {
-		p.SendNb.SendChannel = *errorglue.NewSendChannel(errCh)
+		p.SendNb = *errorglue.NewSendNb(errCh)
 	}
 	return &p
 }
@@ -88,6 +89,7 @@ func (pe *ParlError) AddErrorProc(err error) {
 func (pe *ParlError) GetError() (err error) {
 	pe.errLock.RLock()
 	defer pe.errLock.RUnlock()
+
 	return pe.err
 }
 

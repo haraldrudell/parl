@@ -12,6 +12,11 @@ import (
 	"github.com/haraldrudell/parl/pruntime"
 )
 
+const (
+	ThreadDataEmpty = "[empty]"
+	ThreadDataNil   = "threadData:nil"
+)
+
 // ThreadData contains identifiable information about a running thread.
 //   - ThreadData does not have initialization
 type ThreadData struct {
@@ -67,10 +72,15 @@ func (td *ThreadData) Get() (threadID parl.ThreadID, createLocation pruntime.Cod
 	return
 }
 
+// "myThreadName:4"
 func (td *ThreadData) Short() (s string) {
+
+	// handle nil case
 	if td == nil {
-		return "threadData:nil"
+		return ThreadDataNil
 	}
+
+	// "[label]:[threadID]"
 	if td.label != "" {
 		s = td.label
 	}
@@ -84,9 +94,12 @@ func (td *ThreadData) Short() (s string) {
 	if s != "" {
 		return
 	}
+
+	// zero-value case
 	return td.String()
 }
 
+// "myThreadName:4_func:testing.tRunner()-testing.go:1446_cre:testing.(*T).Run()-testing.go:1493"
 func (td *ThreadData) String() (s string) {
 	var sList []string
 	var s1 string
@@ -110,7 +123,7 @@ func (td *ThreadData) String() (s string) {
 		sList = append(sList, "cre:"+td.createLocation.Short())
 	}
 	if s = strings.Join(sList, "_"); s == "" {
-		s = "[empty]"
+		s = ThreadDataEmpty
 	}
 	return
 }
