@@ -7,31 +7,33 @@ package parl
 
 import "sync"
 
-/*
-ClosableChan wraps channel close.
-ClosableChan is an initialization-free channel with a deferable, thread-safe,
-idempotent and observable Close method.
-Close closes the channel exactly once, recovering panics.
-IsClosed provides wether the Close method did execute close.
- var errCh parl.ClosableChan[error]
- go thread(&errCh)
- err, ok := <-errCh.Ch()
- if errCh.isClosed() { // can be inspected
- …
- func thread(errCh *parl.ClosableChan[error]) {
-   defer errCh.Close(nil) // will not terminate the process
-   errCh.Ch() <- err
-*/
+// ClosableChan wraps a channel with thread-safe idempotent panic-free observable close.
+//   - ClosableChan is initialization-free
+//   - Close is deferrable
+//   - IsClosed provides wether the channel is closed
+//
+// Usage:
+//
+//	var errCh parl.ClosableChan[error]
+//	go thread(&errCh)
+//	err, ok := <-errCh.Ch()
+//	if errCh.isClosed() { // can be inspected
+//	…
+//
+//	func thread(errCh *parl.ClosableChan[error]) {
+//	  var err error
+//	  …
+//	  defer errCh.Close(&err) // will not terminate the process
+//	  errCh.Ch() <- err
 type ClosableChan[T any] struct {
-	lock sync.Mutex
-	ch   chan T // behind lock
-	err  error  // behind lock
+	hasChannel AtomicBool
+	chLock     sync.Mutex
+	ch         chan T // behind lock
 
-	closeSelector AtomicBool
-	isClosed      AtomicBool
+	closeOnce Once
 }
 
-// NewClosableChan ensures a chan does not throw
+// NewClosableChan returns a channel with thread-safe idempotent panic-free observable close
 func NewClosableChan[T any](ch ...chan T) (cl *ClosableChan[T]) {
 	c := ClosableChan[T]{}
 	c.getCh(ch...) // ch... or make provides the channel
@@ -43,13 +45,11 @@ func (cl *ClosableChan[T]) Ch() (ch chan T) {
 	return cl.getCh()
 }
 
-// Close ensures the channel is closed.
-// Close does not panic.
-// Close is thread-safe.
-// Close does not return until the channel is closed.
-// Upon return, all invocations have a possible close error in err.
-// if errp is non-nil, it is updated with a possible error
-// didClose indicates whether this invocation closed the channel
+// Close ensures the channel is closed
+//   - Close does not return until the channel is closed.
+//   - panic-free thread-safe deferrable observable
+//   - all invocations have close result in err
+//   - didClose indicates whether this invocation closed the channel
 func (cl *ClosableChan[T]) Close(errp ...*error) (didClose bool, err error) {
 
 	// first thread closes the channel
@@ -67,12 +67,23 @@ func (cl *ClosableChan[T]) Close(errp ...*error) (didClose bool, err error) {
 
 // IsClosed indicates whether the Close method has been invoked
 func (cl *ClosableChan[T]) IsClosed() (isClosed bool) {
-	return cl.isClosed.IsTrue()
+	return cl.closeOnce.IsDone()
 }
 
 func (cl *ClosableChan[T]) getCh(ch0 ...chan T) (ch chan T) {
-	cl.lock.Lock()
-	defer cl.lock.Unlock()
+
+	// wrap lock in performance-friendly atomic
+	if cl.hasChannel.IsTrue() {
+		return cl.ch
+	}
+
+	// ensure a channel is present
+	cl.chLock.Lock()
+	defer cl.chLock.Unlock()
+
+	if cl.closeOnce.IsDone() {
+		return // already closed return
+	}
 
 	if ch = cl.ch; ch == nil {
 		if len(ch0) > 0 {
@@ -82,20 +93,30 @@ func (cl *ClosableChan[T]) getCh(ch0 ...chan T) (ch chan T) {
 		}
 		cl.ch = ch
 	}
+	cl.hasChannel.Set()
 	return
 }
 
 func (cl *ClosableChan[T]) close() (didClose bool, err error) {
-	ch := cl.getCh()
-	cl.lock.Lock()
-	defer cl.lock.Unlock()
 
-	// first thread closes the channel
-	if cl.closeSelector.Set() { // this one must be before close
-		Closer(ch, &cl.err)
-		cl.isClosed.Set() // that one is set after close
-		didClose = true
+	// provide result with atomic performance
+	var hasResult bool
+	if _, hasResult, err = cl.closeOnce.Result(); hasResult {
+		return // already closed return
 	}
-	err = cl.err
+
+	didClose, _, err = cl.closeOnce.DoErr(cl.doClose)
+	return
+}
+
+func (cl *ClosableChan[T]) doClose() (err error) {
+	cl.chLock.Lock()
+	defer cl.chLock.Unlock()
+
+	if cl.hasChannel.IsFalse() {
+		return // no channel to close return
+	}
+
+	Closer(cl.ch, &err)
 	return
 }
