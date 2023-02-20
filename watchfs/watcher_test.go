@@ -13,7 +13,22 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pslices"
 )
+
+type eventStore struct {
+	events *pslices.ThreadSafeSlice[*WatchEvent]
+	t      *testing.T
+}
+
+func (e *eventStore) eventFn(watchEvent *WatchEvent) {
+	e.events.Append(watchEvent)
+}
+
+func (e *eventStore) errFn(err error) {
+	e.t.Errorf("FAIL Watcher err: " + perrors.Long(err))
+	e.t.FailNow()
+}
 
 func TestNewDirNewFile(t *testing.T) {
 	//t.Fail()
@@ -26,19 +41,16 @@ func TestNewDirNewFile(t *testing.T) {
 	shortTime := 100 * time.Millisecond
 	t.Logf("Directory: %s", directory)
 
-	var events []*WatchEvent
+	var events = *pslices.NewThreadSafeSlice[*WatchEvent]()
+	var store = eventStore{events: &events, t: t}
+
 	var err error
 	var list []string
 	var op string
 	var abs string
 
 	// create watcher watching the temporary directory
-	watcher := NewWatcher(directory, filter, nil, func(event *WatchEvent) {
-		events = append(events, event)
-	}, func(err error) {
-		t.Errorf("FAIL Watcher err: " + perrors.Long(err))
-		t.FailNow()
-	})
+	watcher := NewWatcher(directory, filter, nil, store.eventFn, store.errFn)
 	defer watcher.Shutdown()
 
 	// check state after create watcher
@@ -69,28 +81,29 @@ func TestNewDirNewFile(t *testing.T) {
 	time.Sleep(shortTime)
 	list = watcher.List()
 	t.Logf("List after dir2: %d[%v]", len(list), strings.Join(list, ",\x20"))
-	t.Logf("event count: %d", len(events))
-	for i, ep := range events {
+	var events1 = events.SliceClone()
+	t.Logf("event count: %d", len(events1))
+	for i, ep := range events1 {
 		t.Logf("%d: %s", i+1, ep.String())
 	}
 	if len(list) != 2 {
 		t.Errorf("FAIL List length after dir2: %d exp %d", len(list), 2)
 	}
-	if len(events) > 0 {
-		op = events[0].Op
-		abs = events[0].AbsName
+	if len(events1) > 0 {
+		op = events1[0].Op
+		abs = events1[0].AbsName
 	} else {
 		op = ""
 		abs = ""
 	}
-	if len(events) != 1 || op != Create.String() || abs != dir2 {
+	if len(events1) != 1 || op != Create.String() || abs != dir2 {
 		t.Errorf("FAIL Event bad after dir2: len: %d—%d op: %s—%s abs:\n%q\n%q",
-			len(events), 1,
+			len(events1), 1,
 			op, Create.String(),
 			abs, dir2,
 		)
 	}
-	events = nil
+	events.Clear()
 
 	// create file2 in dir2
 	t.Log("create file2 in dir2")
@@ -106,28 +119,29 @@ func TestNewDirNewFile(t *testing.T) {
 	time.Sleep(shortTime)
 	list = watcher.List()
 	t.Logf("List after file2: %d[%v]", len(list), strings.Join(list, ",\x20"))
-	t.Logf("event count: %d", len(events))
-	for i, ep := range events {
+	events1 = events.SliceClone()
+	t.Logf("event count: %d", len(events1))
+	for i, ep := range events1 {
 		t.Logf("%d: %s", i+1, ep.String())
 	}
 	if len(list) != 2 {
 		t.Errorf("FAIL List length after file2: %d exp %d", len(list), 2)
 	}
-	if len(events) > 0 {
-		op = events[0].Op
-		abs = events[0].AbsName
+	if len(events1) > 0 {
+		op = events1[0].Op
+		abs = events1[0].AbsName
 	} else {
 		op = ""
 		abs = ""
 	}
-	if len(events) != 1 || op != Create.String() || abs != file2 {
+	if len(events1) != 1 || op != Create.String() || abs != file2 {
 		t.Errorf("FAIL Event bad after file2: len: %d—%d op: %s—%s abs:\n%q\n%q",
-			len(events), 1,
+			len(events1), 1,
 			op, Create.String(),
 			abs, file2,
 		)
 	}
-	events = nil
+	events.Clear()
 
 	// create file in dir
 	t.Log("create file in dir")
@@ -143,28 +157,29 @@ func TestNewDirNewFile(t *testing.T) {
 	time.Sleep(shortTime)
 	list = watcher.List()
 	t.Logf("List after file: %d[%v]", len(list), strings.Join(list, ",\x20"))
-	t.Logf("event count: %d", len(events))
-	for i, ep := range events {
+	events1 = events.SliceClone()
+	t.Logf("event count: %d", len(events1))
+	for i, ep := range events1 {
 		t.Logf("%d: %s", i+1, ep.String())
 	}
 	if len(list) != 2 {
 		t.Errorf("FAIL List length after file: %d exp %d", len(list), 2)
 	}
-	if len(events) > 0 {
-		op = events[0].Op
-		abs = events[0].AbsName
+	if len(events1) > 0 {
+		op = events1[0].Op
+		abs = events1[0].AbsName
 	} else {
 		op = ""
 		abs = ""
 	}
-	if len(events) != 1 || op != Create.String() || abs != file {
+	if len(events1) != 1 || op != Create.String() || abs != file {
 		t.Errorf("FAIL Event bad after file: len: %d—%d op: %s—%s abs:\n%q\n%q",
-			len(events), 1,
+			len(events1), 1,
 			op, Create.String(),
 			abs, file,
 		)
 	}
-	events = nil
+	events.Clear()
 
 	// remove dir2
 	t.Log("remove dir2")
@@ -179,8 +194,8 @@ func TestNewDirNewFile(t *testing.T) {
 	time.Sleep(shortTime)
 	list = watcher.List()
 	t.Logf("List after remove dir2: %d[%v]", len(list), strings.Join(list, ",\x20"))
-	t.Logf("event count: %d", len(events))
-	for i, ep := range events {
+	t.Logf("event count: %d", events.Length())
+	for i, ep := range events.SliceClone() {
 		t.Logf("%d: %s", i+1, ep.String())
 	}
 	if len(list) != 1 {
@@ -188,12 +203,13 @@ func TestNewDirNewFile(t *testing.T) {
 	}
 	// 220506 on macOS 12.3.1 github.com/fsnotify/fsnotify v1.5.4
 	// there is some race condition producing 2 or 3 events unpredictably
-	if len(events) < 2 {
+	if events.Length() < 2 {
 		t.Errorf("FAIL to few events after remove dir2: %d exp >=%d", len(list), 2)
 	}
-	if len(events) > 0 {
-		op = events[0].Op
-		abs = events[0].AbsName
+	if events.Length() > 0 {
+		event0, _ := events.Get(0)
+		op = event0.Op
+		abs = event0.AbsName
 	} else {
 		op = ""
 		abs = ""
@@ -204,7 +220,7 @@ func TestNewDirNewFile(t *testing.T) {
 			abs, file2,
 		)
 	}
-	events = nil
+	events.Clear()
 }
 
 func TestNewFile(t *testing.T) {
@@ -216,19 +232,15 @@ func TestNewFile(t *testing.T) {
 	shortTime := 100 * time.Millisecond
 	t.Logf("Directory: %s", directory)
 
-	var events []*WatchEvent
+	var events = pslices.NewThreadSafeSlice[*WatchEvent]()
+	var store = eventStore{events: events, t: t}
 	var err error
 	var list []string
 	var op string
 	var abs string
 
 	// create watcher
-	watcher := NewWatcher(directory, filter, nil, func(event *WatchEvent) {
-		events = append(events, event)
-	}, func(err error) {
-		t.Errorf("FAIL Watcher err: " + perrors.Long(err))
-		t.FailNow()
-	})
+	watcher := NewWatcher(directory, filter, nil, store.eventFn, store.errFn)
 	defer watcher.Shutdown()
 
 	// create a file
@@ -244,28 +256,29 @@ func TestNewFile(t *testing.T) {
 	time.Sleep(shortTime)
 	list = watcher.List()
 	t.Logf("List after file: %d[%v]", len(list), strings.Join(list, ",\x20"))
-	t.Logf("event count: %d", len(events))
-	for _, ep := range events {
+	t.Logf("event count: %d", events.Length())
+	var rangeCh = pslices.NewRangeCh(events)
+	for ep := range rangeCh.Ch() {
 
 		// 220505_23:24:59-07 uuid: 098c CREATE abs: /var/folders/sq/0x1_9fyn1bv907s7ypfryt1c0000gn/T/TestNewFile2950680646/001/a.txt
 		t.Log(ep.String())
 	}
 
-	if len(events) == 0 {
+	if events.Length() == 0 {
 		t.Error("no events")
-	} else if len(events) > 1 {
+	} else if events.Length() > 1 {
 		t.Error("More than one event")
 	}
-	if len(events) > 0 {
-		op = events[0].Op
-		abs = events[0].AbsName
+	if event0, hasValue := events.Get(0); hasValue {
+		op = event0.Op
+		abs = event0.AbsName
 	} else {
 		op = ""
 		abs = ""
 	}
-	if len(events) != 1 || op != Create.String() || abs != filename {
+	if events.Length() != 1 || op != Create.String() || abs != filename {
 		t.Errorf("FAIL Event bad after file: len: %d—%d op: %s—%s abs:\n%q\n%q",
-			len(events), 1,
+			events.Length(), 1,
 			op, Create.String(),
 			abs, filename,
 		)

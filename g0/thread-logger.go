@@ -21,9 +21,12 @@ type goGroup interface {
 	fmt.Stringer
 }
 
-// ThreadLogger waits for a GoGroup, SubGo or SubGroup while printing
+// ThreadLogger waits for a GoGroup, SubGo or SubGroup to terminate while printing
 // information on threads that have yet to exit.
-//   - ThreadLogger is non-blocking and will invoke Done on wg
+//   - ThreadLogger is non-blocking and will invoke Done on wg on thread0-group termination
+//   - goGen is the thread group and must be a parl.GoGroup SubGo or SubGroup
+//   - wg is a WaitGroup allowing ThreadLogger to be waited upon
+//   - logFn is an optional logging function default parl.Log
 //
 // Usage:
 //
@@ -34,6 +37,10 @@ type goGroup interface {
 //	 debugWait.Add(1)
 //	 ThreadLogger(goGroup, &debugWait)
 func ThreadLogger(goGen parl.GoGen, wg parl.SyncDone, logFn ...func(format string, a ...interface{})) {
+
+	if wg == nil {
+		panic(perrors.NewPF("wg cannot be nil"))
+	}
 
 	// obtain logging function
 	var log parl.PrintfFunc

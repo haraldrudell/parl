@@ -19,19 +19,21 @@ import (
 	"github.com/haraldrudell/parl/punix"
 )
 
-/*
-NewWatcher produces file-system events from a file-system entry and its child directories.
-WatchEvents must be listened for on the .Events() channel until it closes.
-Events that can be listened for are WatchOpAll (default: 0) Create Write Remove Rename Chmod.
-errors must be listened for on the .Errors() channel until it closes.
-Close the watcher by canceling the context or invoking .Shutdown().
-// errFn must be thread-safe.
-// eventFn must be thread-safe.
-
-220505 github.com/fsnotify/fsnotify v1.5.4
-220315 github.com/fsnotify/fsnotify v1.4.9 does not support macOS
-220315 use the old github.com/fsnotify/fsevents v0.1.1
-*/
+// NewWatcher produces file-system events from a file-system entry and its child directories.
+//   - WatchEvents must be listened for on the .Events() channel until it closes.
+//   - Events that can be listened for are WatchOpAll (default: 0) Create Write Remove Rename Chmod.
+//   - errors must be listened for on the .Errors() channel until it closes.
+//   - Close the watcher by canceling the context or invoking .Shutdown().
+//   - errFn must be thread-safe.
+//     This means that any storing and subequent retrieval of the err value
+//     must be thread-safe, protected by go, Mutex or atomic
+//   - eventFn must be thread-safe.
+//     this means that any storing and subsequent retrieval of event
+//     must be thread-safe, protected by go, Mutex or atomic
+//
+// 220505 github.com/fsnotify/fsnotify v1.5.4
+// 220315 github.com/fsnotify/fsnotify v1.4.9 does not support macOS
+// 220315 use the old github.com/fsnotify/fsevents v0.1.1
 func NewWatcher(
 	directory string, filter Op,
 	ignores *regexp.Regexp,

@@ -7,8 +7,6 @@ package ptime
 
 import (
 	"time"
-
-	"github.com/haraldrudell/parl/internal/cyclebreaker"
 )
 
 // OnTimedThread invokes a callback on period-multiples since zero-time. thread-safe.
@@ -28,36 +26,8 @@ import (
 //	defer gc.Cancel()
 //	go ptime.OnTimedThread(someFunc, time.Second, time.Local, gc.Add(parl.EcSharedChan, parl.ExCancelOnExit).Go())
 //	…
-func OnTimedThread(send func(at time.Time), period time.Duration, loc *time.Location, g0 cyclebreaker.Go) {
-	var err error
-	g0.AddError(nil)
-	defer g0.Done(&err)
-	defer cyclebreaker.Recover(cyclebreaker.Annotation(), &err, cyclebreaker.NoOnError)
-
-	// timer is a time.Timer delaying until the first trig point
-	timer := OnTimer(period, time.Now().In(loc))
-	defer timer.Stop()
-
-	// ticker is a time.Ticker that provides subsequent trig events
-	var ticker *time.Ticker
-	defer func() {
-		if ticker != nil {
-			ticker.Stop()
-		}
-	}()
-
-	done := g0.Context().Done()
-	C := timer.C
-	for {
-		select {
-		case <-done:
-			return // g0.Context cancel exit
-		case t := <-C: // period trigged with its time.Time value
-			if ticker == nil {
-				ticker = time.NewTicker(period)
-				C = ticker.C
-			}
-			send(t) // invoke callback
-		}
-	}
+//
+// Deprecated: use NewOnTicker2
+func OnTimedThread(send func(at time.Time), period time.Duration, loc *time.Location, g0 Go) {
+	NewOnTicker2(period, loc, send, g0)
 }

@@ -47,6 +47,14 @@ func AppendError(err error, err2 error) (e error) {
 	return errorglue.NewRelatedError(err, err2)
 }
 
+// AppendErrorDefer aggregates error sources into errp.
+//   - AppendErrorDefer is deferrable
+//   - errp cannot be nil
+//   - errp2 is a pointer to a second error variable used as source.
+//     If errp2 is nil or *errp2 is nil, no action is taken
+//   - fn is a function returning a possible error.
+//     If fn is nil or fn returns nil, no action is taken
+//   - AppendErrorDefer uses AppendError to aggregate error values into *errp
 func AppendErrorDefer(errp, errp2 *error, fn func() (err error)) {
 	if errp == nil {
 		panic(NewPF("errp cannot be nil"))

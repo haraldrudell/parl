@@ -11,10 +11,12 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// OnTimer returns a time.Timer that waits from t to the next period-multiple from zero time.
+// OnTimer returns a time.Timer that waits until the next period-multiple since zero time.
+//   - default starting time until the period multiple is now: time.Now(), optionally the absolute time t
+//   - t contains time zone that matters for periods over 1 hour, typically this is time.Local
+//   - the other time zone for Go is time.UTC
 //   - period must be greater than zero or panic
-//   - t contains time zone that matters for durations 24 h or longer, typicaly this is time.Local
-//   - default t is time.Now()
+//   - time.NewTimer does not offer the period calculation
 func OnTimer(period time.Duration, t ...time.Time) (timer *time.Timer) {
 	var t0 time.Time
 	if len(t) > 0 {
