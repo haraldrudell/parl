@@ -20,7 +20,6 @@ import (
 )
 
 const (
-	version = "gp-start-time-proc 0.06 230225 no debug"
 	// format absolute path into /proc directory
 	filePrintf           = "/proc/%d/stat"
 	rightParenthesisByte = byte(')')
@@ -102,7 +101,7 @@ func systemUptime() (uptime time.Duration, err error) {
 
 	// extract numeric string
 	var fields = bytes.Fields(data)
-	if procUptimeField > len(fields) {
+	if procUptimeField >= len(fields) {
 		err = perrors.ErrorfPF("content too short: %q", procUptime)
 		return
 	}
@@ -136,7 +135,7 @@ func processStartTicks(pid int) (clockTicks int64, err error) {
 		return
 	}
 	var fields = bytes.Fields(data[index+1:])
-	if len(fields) < startTimeIndex {
+	if startTimeIndex >= len(fields) {
 		err = perrors.ErrorfPF("content too short: %q", filename)
 		return
 	}
