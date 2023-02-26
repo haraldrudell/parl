@@ -3,7 +3,7 @@
 ISC License
 */
 
-// OrderedMapAny is a mapping of uncomparable keys whose keys are ordered by a key-order function
+// OrderedMapAny is a mapping whose values are provided in custom order.
 package pmaps
 
 import (
@@ -13,13 +13,15 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-// OrderedMapAny is a mapping of uncomparable keys whose keys are ordered by a key-order function
+// OrderedMapAny is a mapping whose values are provided in custom order.
 type OrderedMapAny[K comparable, O constraints.Ordered, V any] struct {
 	Map[K, V]
 	list           parli.Ordered[V]
 	valueOrderFunc func(value V) (order O)
 }
 
+// NewOrderedMapAny returns a mapping of uncomparable keys whose keys are ordered by a key-order function.
+// Deprecated: use [NeworderedMapFunc]
 func NewOrderedMapAny[K comparable, O constraints.Ordered, V any](
 	valueOrderFunc func(value V) (order O),
 ) (orderedMap *OrderedMapAny[K, O, V]) {

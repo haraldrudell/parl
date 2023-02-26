@@ -17,7 +17,7 @@ import "sync"
 //	var errCh parl.ClosableChan[error]
 //	go thread(&errCh)
 //	err, ok := <-errCh.Ch()
-//	if errCh.isClosed() { // can be inspected
+//	if errCh.IsClosed() { // can be inspected
 //	…
 //
 //	func thread(errCh *parl.ClosableChan[error]) {
@@ -41,6 +41,11 @@ func NewClosableChan[T any](ch ...chan T) (cl *ClosableChan[T]) {
 }
 
 // Ch retrieves the channel
+//   - nil is never returned
+//   - the channel may already be closed
+//   - do not close the channel other than using the Close method
+//   - as or all channel close, if one thread is blocked in channel send
+//     while another thread closes the channel, a data race occurs
 func (cl *ClosableChan[T]) Ch() (ch chan T) {
 	return cl.getCh()
 }
@@ -73,6 +78,7 @@ func (cl *ClosableChan[T]) IsClosed() (isClosed bool) {
 func (cl *ClosableChan[T]) getCh(ch0 ...chan T) (ch chan T) {
 
 	// wrap lock in performance-friendly atomic
+	// channel is still provided when closed
 	if cl.hasChannel.IsTrue() {
 		return cl.ch
 	}
@@ -81,8 +87,9 @@ func (cl *ClosableChan[T]) getCh(ch0 ...chan T) (ch chan T) {
 	cl.chLock.Lock()
 	defer cl.chLock.Unlock()
 
-	if cl.closeOnce.IsDone() {
-		return // already closed return
+	if cl.closeOnce.IsDone() || cl.hasChannel.IsTrue() {
+		ch = cl.ch
+		return // already closed or already present return
 	}
 
 	if ch = cl.ch; ch == nil {
@@ -110,12 +117,12 @@ func (cl *ClosableChan[T]) close() (didClose bool, err error) {
 }
 
 func (cl *ClosableChan[T]) doClose() (err error) {
+
+	// ensure a channel exists
+	cl.getCh()
+
 	cl.chLock.Lock()
 	defer cl.chLock.Unlock()
-
-	if cl.hasChannel.IsFalse() {
-		return // no channel to close return
-	}
 
 	Closer(cl.ch, &err)
 	return

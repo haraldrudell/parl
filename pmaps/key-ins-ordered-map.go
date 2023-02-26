@@ -3,7 +3,7 @@
 ISC License
 */
 
-// KeyOrderedMap is a mapping whose keys are provided in order
+// KeyInsOrderedMap is a mapping whose keys are provided in insertion order.
 package pmaps
 
 import (
@@ -11,13 +11,13 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// KeyInsOrderedMap is a mapping whose keys are provided in insertion order
+// KeyInsOrderedMap is a mapping whose keys are provided in insertion order.
 type KeyInsOrderedMap[K constraints.Ordered, V any] struct {
 	Map[K, V]
 	list []K
 }
 
-// NewKeyInsOrderedMap is a mapping whose keys are provided in insertion order
+// NewKeyInsOrderedMap is a mapping whose keys are provided in insertion order.
 func NewKeyInsOrderedMap[K constraints.Ordered, V any]() (orderedMap *KeyInsOrderedMap[K, V]) {
 	return &KeyInsOrderedMap[K, V]{Map: *NewMap[K, V]()}
 }

@@ -21,7 +21,7 @@ func NewThreadSafeOrderedMapAny[K comparable, O constraints.Ordered, V any](
 	valueOrderFunc func(value V) (order O),
 ) (orderedMap *ThreadSafeOrderedMapAny[K, O, V]) {
 	return &ThreadSafeOrderedMapAny[K, O, V]{
-		OrderedMapAny: *NewOrderedMapAny[K, O, V](valueOrderFunc)}
+		OrderedMapAny: *NewOrderedMapAny[K](valueOrderFunc)}
 }
 
 func (mp *ThreadSafeOrderedMapAny[K, O, V]) Get(key K) (value V, ok bool) {

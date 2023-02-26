@@ -21,7 +21,7 @@ func TestNewWinOrWaiterCore(t *testing.T) {
 		completeCalculation.Wait()
 		return
 	}
-	var calculationReference *AwaitableCalculation[time.Time]
+	var calculationReference *Future[time.Time]
 	var result time.Time
 	var isValid bool
 

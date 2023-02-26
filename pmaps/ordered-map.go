@@ -3,7 +3,7 @@
 ISC License
 */
 
-// OrderedMap is a mapping whose values are provided in order
+// OrderedMap is a mapping whose values are provided in order.
 package pmaps
 
 import (
@@ -12,13 +12,13 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-// OrderedMap is a mapping whose values are provided in order
+// OrderedMap is a mapping whose values are provided in order.
 type OrderedMap[K comparable, V constraints.Ordered] struct {
 	Map[K, V]
 	list parli.Ordered[V]
 }
 
-// NewOrderedMap returns a mapping whose values are provided in order
+// NewOrderedMap returns a mapping whose values are provided in order.
 func NewOrderedMap[K comparable, V constraints.Ordered]() (orderedMap *OrderedMap[K, V]) {
 	return &OrderedMap[K, V]{Map: *NewMap[K, V](), list: pslices.NewOrdered[V]()}
 }

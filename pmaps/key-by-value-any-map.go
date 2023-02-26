@@ -3,6 +3,7 @@
 ISC License
 */
 
+// KeyByValueAnyMap is a mapping whose keys are provided in custom value order.
 package pmaps
 
 import (
@@ -12,14 +13,14 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-// KeyByValueAnyMap is a mapping whose values are provided in order
+// KeyByValueAnyMap is a mapping whose keys are provided in custom value order.
 type KeyByValueAnyMap[K comparable, O constraints.Ordered, V any] struct {
 	Map[K, V]
 	list           parli.Ordered[K]
 	valueOrderFunc func(value V) (order O)
 }
 
-// NewOrderedMap returns a mapping whose values are provided in order
+// NewKeyByValueAnyMap returns a mapping whose keys are provided in custom value order.
 func NewKeyByValueAnyMap[K comparable, O constraints.Ordered, V any](
 	valueOrderFunc func(value V) (order O),
 ) (m *KeyByValueAnyMap[K, O, V]) {

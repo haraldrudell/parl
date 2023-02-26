@@ -43,7 +43,7 @@ type WinOrWaiterCore struct {
 	// calculation allow to wait for the result of a winner calculation
 	//	- winner holds lock.Lock until the calculation is complete
 	//	- loser threads wait for lock.RLock to check the result
-	calculation AtomicReference[AwaitableCalculation[time.Time]]
+	calculation AtomicReference[Future[time.Time]]
 
 	// winnerPicker picks winner thread using atomic access
 	//	- winner is the thread that on Set gets wasNotSet true
@@ -106,7 +106,7 @@ func (ww *WinOrWaiterCore) WinOrWait() (err error) {
 	}
 
 	// wait for late-enough data
-	var calculation *AwaitableCalculation[time.Time]
+	var calculation *Future[time.Time]
 	for {
 
 		// check for valid calculation result
@@ -147,13 +147,13 @@ func (ww *WinOrWaiterCore) winnerFunc() (err error) {
 	defer ww.winnerPicker.Clear()
 
 	// get calculation
-	var calculation = NewAwaitableCalculation[time.Time]()
+	var calculation = NewFuture[time.Time]()
 	ww.calculation.Put(calculation)
 	ww.isCalculationPut.Set()
 
 	// calculate
 	result := time.Now()
-	defer calculation.End(result, &err)
+	defer calculation.End(&result, &err)
 	_, err = RecoverInvocationPanicErr(ww.calculator)
 
 	return

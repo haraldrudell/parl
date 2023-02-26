@@ -41,12 +41,12 @@ func (mp *ThreadSafeOrderedMap[K, V]) PutIf(key K, value V, putIf func(value V) 
 	mp.lock.Lock()
 	defer mp.lock.Unlock()
 
-	existing, keyExists := mp.m[key]
+	existing, keyExists := mp.OrderedMap.Get(key)
 	wasNewKey = !keyExists
 	if keyExists && putIf != nil && !putIf(existing) {
 		return // putIf false return: this value should not be updated
 	}
-	mp.m[key] = value
+	mp.OrderedMap.Put(key, value)
 
 	return
 }

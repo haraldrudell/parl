@@ -13,11 +13,11 @@ import (
 func TestAwaitableCalculation(t *testing.T) {
 	value := 1
 
-	var calculation *AwaitableCalculation[int]
+	var calculation *Future[int]
 	var result int
 	var isValid bool
 
-	calculation = NewAwaitableCalculation[int]()
+	calculation = NewFuture[int]()
 
 	var wgStart sync.WaitGroup
 	wgStart.Add(1)
@@ -34,7 +34,7 @@ func TestAwaitableCalculation(t *testing.T) {
 		t.Error("calculation.IsCompleted true")
 	}
 
-	calculation.End(value, nil)
+	calculation.End(&value, nil)
 	if !calculation.IsCompleted() {
 		t.Error("calculation.IsCompleted false")
 	}

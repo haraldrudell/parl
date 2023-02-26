@@ -9,9 +9,9 @@ import (
 	"sync"
 )
 
-// AwaitableCalculation contains an awaitable calculation using performant
+// Future contains an awaitable calculation using performant
 // sync.RWMutex and atomics. Thread-safe
-type AwaitableCalculation[T any] struct {
+type Future[T any] struct {
 	// isCompleted makes lock atomic-access observable
 	isCompleted AtomicBool
 
@@ -27,22 +27,22 @@ type AwaitableCalculation[T any] struct {
 	result T // behind lock
 }
 
-// NewAwaitableCalculation returns an awaitable calculation using performant
+// NewFuture returns an awaitable calculation using performant
 // sync.RWMutex and atomics. Thread-safe
-func NewAwaitableCalculation[T any]() (calculation *AwaitableCalculation[T]) {
-	c := AwaitableCalculation[T]{}
+func NewFuture[T any]() (calculation *Future[T]) {
+	c := Future[T]{}
 	c.lock.Lock()
 	return &c
 }
 
 // IsCompleted returns whether the calculation is complete. Thread-safe
-func (cn *AwaitableCalculation[T]) IsCompleted() (isCompleted bool) {
+func (cn *Future[T]) IsCompleted() (isCompleted bool) {
 	return cn.isCompleted.IsTrue()
 }
 
 // Result retrieves the calculation’s result. May block. Thread-safe
-func (cn *AwaitableCalculation[T]) Result() (result T, isValid bool) {
-	cn.lock.RLock()
+func (cn *Future[T]) Result() (result T, isValid bool) {
+	cn.lock.RLock() // invokers block here
 	defer cn.lock.RUnlock()
 
 	result = cn.result
@@ -50,14 +50,14 @@ func (cn *AwaitableCalculation[T]) Result() (result T, isValid bool) {
 	return
 }
 
-// End provides the result of the calculation
+// End writes the result of the calculation, deferrable
 //   - result is considered valid if errp is nil or *errp is nil
-func (cn *AwaitableCalculation[T]) End(result T, errp *error) {
+func (cn *Future[T]) End(result *T, errp *error) {
 	defer cn.lock.Unlock()
 	defer cn.isCompleted.Set()
 
 	// store value if calculation successful
 	if cn.isValid = errp == nil || *errp == nil; cn.isValid {
-		cn.result = result
+		cn.result = *result
 	}
 }
