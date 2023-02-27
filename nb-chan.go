@@ -14,25 +14,28 @@ import (
 )
 
 // NBChan is a non-blocking send channel with trillion-size buffer.
-//
-//   - NBChan can be used as an error channel where the thread does not
+//   - NBChan behaves both like a channel and a thread-safe slice
+//   - NBChan has non-blocking, thread-safe, error-free and panic-free Send and SendMany
+//   - NBChan has deferrable, panic-free, idempotent close
+//   - NBChan is initialization-free, thread-safe, panic-free, idempotent, deferrable and observable.
+//   - NBChan can be used as an error channel where the sending thread does not
 //     block from a delayed or missing reader.
 //   - errors can be read from the channel or fetched all at once using GetAll
-//   - NBChan is initialization-free, thread-safe, idempotent, deferrable and observable.
 //   - Ch(), Send(), Close() CloseNow() IsClosed() Count() are not blocked by channel send
 //     and are panic-free.
-//   - Close() CloseNow() are deferrable.
-//   - WaitForClose() waits until the underlying channel has been closed.
+//   - values are sent using Send or SendMany methods
+//   - values are read from Ch channel or using Get method
+//   - Close, CloseNow and WaitForClose are deferrable.
+//   - WaitForClose waits until the underlying channel has been closed.
 //   - NBChan implements a thread-safe error store perrors.ParlError.
 //   - NBChan.GetError() returns thread panics and close errors.
 //   - No errors are added to the error store after the channel has closed.
-//   - NBChan does not generate errors. When it does, errors are thread panics
-//     or a close error. Neither is expected to occur
+//   - NBChan’s only errors are thread panics and close errors.
+//     Neither are expected to occur
 //   - the underlying channel is closed after Close is invoked and the channel is emptied
-//   - cautious consumers may collect errors using the GetError method when:
-//   - — the Ch receive-only channel is detected as being closed or
-//   - — await using WaitForClose returns or
-//   - — IsClosed method returns true
+//   - cautious consumers may collect errors via:
+//   - — CloseNow or WaitForClose
+//   - — GetError method preferrably after CloseNow, WaitForClose or IsClosed returns true
 //
 // Usage:
 //
@@ -67,12 +70,14 @@ type NBChan[T any] struct {
 
 	waitForClose sync.WaitGroup // valid when isWaitForCloseInitialized is true
 
-	perrors.ParlError // thread panics
+	perrors.ParlError // thread panics and close errors
 }
 
-// NewNBChan instantiates a non-blocking trillion-size buffer channel.
-// NewNBChan allows initialization based on an existing channel.
-// NewNBChan does not need initialization and can be used like:
+// NewNBChan returns a non-blocking trillion-size buffer channel.
+//   - NewNBChan allows initialization based on an existing channel.
+//   - NBChan does not need initialization and can be used like:
+//
+// Usage:
 //
 //	var nbChan NBChan[error]
 //	go thread(&nbChan)
@@ -89,7 +94,7 @@ func (nb *NBChan[T]) Ch() (ch <-chan T) {
 	return nb.closableChan.Ch()
 }
 
-// Send sends non-blocking on the channel
+// Send sends a single value non-blocking, thread-safe, panic-free and error-free on the channel
 func (nb *NBChan[T]) Send(value T) {
 	if nb.isCloseInvoked.IsTrue() {
 		return // no send after Close(), atomic performance
@@ -113,7 +118,7 @@ func (nb *NBChan[T]) Send(value T) {
 	nb.startThread(value)
 }
 
-// Send sends non-blocking on the channel
+// Send sends many values non-blocking, thread-safe, panic-free and error-free on the channel
 func (nb *NBChan[T]) SendMany(values []T) {
 	if nb.isCloseInvoked.IsTrue() {
 		return // no send after Close(), atomic performance
@@ -156,6 +161,7 @@ func (nb *NBChan[T]) SendMany(values []T) {
 //   - Get is non-blocking
 //   - n > 0: max this many items
 //   - n == 0 (or <0): all items
+//   - Get is panic-free non-blocking error-free thread-safe
 func (nb *NBChan[T]) Get(n ...int) (allItems []T) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
@@ -213,7 +219,7 @@ func (nb *NBChan[T]) Count() (unsentCount int) {
 }
 
 // Close orders the channel to close once pending sends complete.
-// Close is thread-safe, non-blocking and panic-free.
+// Close is thread-safe, non-blocking, error-free and panic-free.
 func (nb *NBChan[T]) Close() (didClose bool) {
 	if nb.isCloseInvoked.IsTrue() {
 		return // Close was already invoked atomic performance
@@ -245,11 +251,18 @@ func (nb *NBChan[T]) IsClosed() (isClosed bool) {
 	return nb.closableChan.IsClosed()
 }
 
-// WaitForClose block if until the channel is closed and empty
-//   - if Close is not invoked, WaitForClose blocks indefinitely
-func (nb *NBChan[T]) WaitForClose() {
+// WaitForClose blocks until the channel is closed and empty
+//   - if Close is not invoked or the channel is not read to end,
+//     WaitForClose blocks indefinitely
+//   - if CloseNow is invoked, WaitForClose is unblocked
+//   - if errp is non-nil, any thread and close errors are appended to it
+//   - a close error will already have been returned by Close
+//   - WaitForClose is thread-safe and panic-free
+func (nb *NBChan[T]) WaitForClose(errp ...*error) {
+	defer nb.appendErrors(nil, nb.GetError, errp...)
+
 	if nb.closableChan.IsClosed() {
-		return
+		return // channel is closed no wait required return
 	}
 	if !nb.isWaitForCloseInitialized.IsTrue() {
 		nb.initWaitForClose() // ensure waitForClose state is valid
@@ -258,11 +271,10 @@ func (nb *NBChan[T]) WaitForClose() {
 }
 
 // CloseNow closes without waiting for sends to complete.
-// Close does not panic.
-// Close is thread-safe.
-// Close does not return until the channel is closed.
-// Upon return, all invocations have a possible close error in err.
-// if errp is non-nil, it is updated with error status
+//   - CloseNow is thread-safe, non-blocking, error-free and panic-free
+//   - CloseNow does not return until the channel is closed.
+//   - Upon return, all invocations have a possible close error in err.
+//   - if errp is non-nil, it is updated with error status
 func (nb *NBChan[T]) CloseNow(errp ...*error) (didClose bool, err error) {
 	if nb.closableChan.IsClosed() {
 		return // channel is already closed
@@ -288,13 +300,25 @@ func (nb *NBChan[T]) CloseNow(errp ...*error) (didClose bool, err error) {
 	}
 
 	didClose, err = nb.close()
-	if len(errp) > 0 {
-		if errp0 := errp[0]; errp0 != nil {
-			*errp0 = err
-		}
-	}
+
+	// save close error in possible error pointer
+	nb.appendErrors(err, nil, errp...)
 
 	return
+}
+
+func (nb *NBChan[T]) appendErrors(err error, getError func() (err error), errp ...*error) {
+
+	// obtain error pointer
+	var errp0 *error
+	if len(errp) > 0 {
+		errp0 = errp[0]
+	}
+	if errp0 == nil {
+		return // no error pointer nowhere to store return
+	}
+
+	perrors.AppendErrorDefer(errp0, &err, getError)
 }
 
 // startThread launches the send thread

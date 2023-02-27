@@ -8,8 +8,6 @@ package parl
 import (
 	"fmt"
 	"sync"
-
-	"github.com/haraldrudell/parl/perrors"
 )
 
 /*
@@ -29,14 +27,8 @@ type WaitGroup struct {
 	dones          int
 }
 
-func InitWaitGroup(wgp *WaitGroup) {
-	if wgp == nil {
-		panic(perrors.NewPF("wgp cannot be nil"))
-	}
-	wgp.WaitGroup = sync.WaitGroup{}
-	wgp.lock = sync.Mutex{}
-	wgp.adds = 0
-	wgp.dones = 0
+func NewWaitGroup() (waitGroup *WaitGroup) {
+	return &WaitGroup{}
 }
 
 func (wg *WaitGroup) Add(delta int) {
