@@ -153,6 +153,10 @@ type GoGroup interface {
 	Ch() (ch <-chan GoError)
 	// Wait waits for all threads of this thread-group to terminate.
 	Wait()
+	// EnableTermination false prevents the SubGo or GoGroup from terminating
+	// even if the number of threads is zero
+	EnableTermination(allowTermination bool)
+	IsEnableTermination() (mayTerminate bool)
 	// Cancel terminates the threads in this and subordinate thread-groups.
 	Cancel()
 	// Context will Cancel when the parent context Cancels.
