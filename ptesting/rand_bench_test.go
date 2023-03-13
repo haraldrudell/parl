@@ -12,20 +12,18 @@ import (
 	"unsafe"
 )
 
-// go test -run=^# -bench=BenchmarkRand ./ptesting
-// 8 s
+// go test -run=^# -bench=BenchmarkRand32 ./ptesting
+// 5 s
 //
 // goversion: go1.20.1
 // osversion: macOS 13.2.1
 // goos: darwin
 // goarch: arm64
 // pkg: github.com/haraldrudell/parl/ptesting
-// BenchmarkRand/math/rand.Uint32-10         	83335266	        13.93 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkRand/crypto/rand.Read_32-bit-10  	 3675235	       322.7 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkRand/runtime.fastrand_32-bit-10  	581979490	         2.085 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkRand/rand.Uint64-10              	88990515	        13.84 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkRand/FastRand.Uint64-10          	283184782	         4.234 ns/op	       0 B/op	       0 allocs/op
-func BenchmarkRand(b *testing.B) {
+// BenchmarkRand32/math/rand.Uint32-10         	84712857	        14.19 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkRand32/crypto/rand.Read_32-bit-10  	 3601936	       329.7 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkRand32/ptesting.Uint32-10          	566568112	         2.162 ns/op	       0 B/op	       0 allocs/op
+func BenchmarkRand32(b *testing.B) {
 
 	println(Versions())
 
@@ -46,25 +44,50 @@ func BenchmarkRand(b *testing.B) {
 		}
 	})
 
-	// runtime.fastrand: not thread-safe
-	b.Run("runtime.fastrand 32-bit", func(b *testing.B) {
+	// runtime.fastrand 32-bit: thread-safe
+	b.Run("ptesting.Uint32", func(b *testing.B) {
 		for iteration := 0; iteration < b.N; iteration++ {
-			fastrand()
+			Uint32()
 		}
 	})
+}
+
+// go test -run=^# -bench=BenchmarkRand64 ./ptesting
+// 5 s
+//
+// goversion: go1.20.1
+// osversion: macOS 13.2.1
+// goos: darwin
+// goarch: arm64
+// pkg: github.com/haraldrudell/parl/ptesting
+// BenchmarkRand64/math/rand.Uint64-10         	84433459	        14.01 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkRand64/crypto/rand.Read_64-bit-10  	 3783060	       323.8 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkRand64/ptesting.Uint64-10          	277811217	         4.289 ns/op	       0 B/op	       0 allocs/op
+func BenchmarkRand64(b *testing.B) {
+
+	println(Versions())
 
 	// math/rand.Uint64: thread-safe
-	b.Run("rand.Uint64", func(b *testing.B) {
+	b.Run("math/rand.Uint64", func(b *testing.B) {
 		for iteration := 0; iteration < b.N; iteration++ {
 			rand.Uint64()
 		}
 	})
 
-	// FastRand: not thread-safe
-	b.Run("FastRand.Uint64", func(b *testing.B) {
-		f := NewFastRand()
+	// crypto/rand.Read: thread-safe
+	b.Run("crypto/rand.Read 64-bit", func(b *testing.B) {
+		var length = unsafe.Sizeof(uint64(1))
+		var byts = make([]byte, length)
+		b.ResetTimer()
 		for iteration := 0; iteration < b.N; iteration++ {
-			f.Uint64()
+			cryptorand.Read(byts)
+		}
+	})
+
+	// runtime.fastrand 64-bit: thread-safe
+	b.Run("ptesting.Uint64", func(b *testing.B) {
+		for iteration := 0; iteration < b.N; iteration++ {
+			Uint64()
 		}
 	})
 }
