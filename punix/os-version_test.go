@@ -15,9 +15,9 @@ import (
 
 // go test -run=^TestOsVersion$ -v ./punix
 //
-//   - go version: go1.20.1
-//   - os version: macOS 13.2.1
-//   - or: Linux 5.15.0-56-generic
+//   - goversion: go1.20.1
+//   - osversion: macOS 13.2.1
+//   - osversion: Linux 5.15.0-56-generic
 func TestOsVersion(t *testing.T) {
 	fmt.Println("goversion: " + runtime.Version())
 	var version string
