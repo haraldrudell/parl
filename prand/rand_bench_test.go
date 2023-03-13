@@ -3,13 +3,15 @@
 ISC License
 */
 
-package ptesting
+package prand
 
 import (
 	cryptorand "crypto/rand"
 	"math/rand"
 	"testing"
 	"unsafe"
+
+	"github.com/haraldrudell/parl/ptesting"
 )
 
 // go test -run=^# -bench=BenchmarkRand32 ./ptesting
@@ -25,7 +27,7 @@ import (
 // BenchmarkRand32/ptesting.Uint32-10          	566568112	         2.162 ns/op	       0 B/op	       0 allocs/op
 func BenchmarkRand32(b *testing.B) {
 
-	println(Versions())
+	println(ptesting.Versions())
 
 	// math/rand.Uint32: thread-safe
 	b.Run("math/rand.Uint32", func(b *testing.B) {
@@ -65,7 +67,7 @@ func BenchmarkRand32(b *testing.B) {
 // BenchmarkRand64/ptesting.Uint64-10          	277811217	         4.289 ns/op	       0 B/op	       0 allocs/op
 func BenchmarkRand64(b *testing.B) {
 
-	println(Versions())
+	println(ptesting.Versions())
 
 	// math/rand.Uint64: thread-safe
 	b.Run("math/rand.Uint64", func(b *testing.B) {

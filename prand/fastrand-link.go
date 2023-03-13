@@ -3,7 +3,7 @@
 ISC License
 */
 
-package ptesting
+package prand
 
 import _ "unsafe"
 
