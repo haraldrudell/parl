@@ -54,7 +54,7 @@ func TestGoGroup(t *testing.T) {
 	if count = goGroupImpl.ch.Count(); count != 1 {
 		t.Errorf("bad Ch Count: %d exp 1", count)
 	}
-	goError, ok = <-goGroup.Ch()
+	goError, ok = <-goGroup.Ch() // receive errBad
 	if !ok {
 		t.Error("goGroup.Ch closed")
 	}
@@ -66,7 +66,7 @@ func TestGoGroup(t *testing.T) {
 		t.Errorf("wrong error: %q %x exp %q %x", goError.Error(), goError, errBad.Error(), errBad)
 	}
 	// verify GoGroup termination
-	_, ok = <-goGroup.Ch()
+	_, ok = <-goGroup.Ch() // check that channel is now closed
 	if ok {
 		t.Error("goGroup.Ch did not close")
 	}
@@ -74,7 +74,7 @@ func TestGoGroup(t *testing.T) {
 		t.Error("goGroup did not terminate")
 	}
 
-	// ConsumeError() EnableTermination()
+	// ConsumeError() EnableTermination() CascadeEnableTermination()
 	goGroup = NewGoGroup(context.Background())
 	goGroupImpl = goGroup.(*GoGroup)
 	g0 = goGroup.Go()
@@ -94,7 +94,6 @@ func TestGoGroup(t *testing.T) {
 		t.Error("2 GoGroup terminated")
 	}
 	goGroup.EnableTermination(true)
-	<-goGroup.Ch() // allow error channel to close
 	if !goGroupImpl.isEnd() {
 		t.Error("GoGroup did not terminate")
 	}
@@ -118,9 +117,123 @@ func TestGoGroup(t *testing.T) {
 		t.Error("SubGroup does not have error channel")
 	}
 
-	// Add() UpdateThread() FirstFatal()
+	// Add() UpdateThread() FirstFatal() Wait() G0ID() SetDebug()
 
-	//	String
-	t.Log(goGroup.String())
+	// String()
+	// "goGroup#5_threads:0(0)_New:g0.NewGoGroup()-go-group.go:69"
+	//t.Log(goGroup.String())
 	//t.Fail()
+}
+
+func TestSubGo(t *testing.T) {
+	var err = errors.New("bad")
+
+	var goGroup parl.GoGroup
+	var goGroupImpl, subGoImpl *GoGroup
+	var subGo parl.SubGo
+	var goError, goError2 parl.GoError
+	var parlGo parl.Go
+	var ok bool
+
+	// non-fatal error
+	goGroup = NewGoGroup(context.Background())
+	goGroupImpl = goGroup.(*GoGroup)
+	subGo = goGroup.SubGo()
+	subGoImpl = subGo.(*GoGroup)
+	goError = NewGoError(err, parl.GeNonFatal, nil)
+	subGoImpl.ConsumeError(goError)
+	goError2 = <-goGroup.Ch()
+	if goError2 != goError {
+		t.Errorf("bad non-fatal subgo error")
+	}
+
+	// fatal error: top gogroup
+	parlGo = subGo.Go()
+	parlGo.Done(&err)
+	goError2 = <-goGroup.Ch()
+	if !errors.Is(goError2.Err(), err) {
+		t.Error("bad fatal subgo error")
+	}
+
+	// subgo should not have exited
+	if !subGoImpl.isEnd() {
+		t.Error("subGo did not terminate")
+	}
+
+	// gogroup should now have exited
+	goError2, ok = <-goGroup.Ch() // wait for subGroup channel to close
+	if ok {
+		t.Errorf("goGroup channel did not close: %s", goError2)
+	}
+	if !goGroupImpl.isEnd() {
+		t.Error("goGroup did not terminate")
+	}
+}
+
+func TestSubGroup(t *testing.T) {
+	var err = errors.New("bad")
+
+	var goGroup parl.GoGroup
+	var goGroupImpl, subGroupImpl *GoGroup
+	var subGroup parl.SubGroup
+	var goError, goError2 parl.GoError
+	var parlGo parl.Go
+	var ok bool
+
+	// non-fatal error: sent to gogroup
+	goGroup = NewGoGroup(context.Background())
+	goGroupImpl = goGroup.(*GoGroup)
+	subGroup = goGroup.SubGroup()
+	subGroupImpl = subGroup.(*GoGroup)
+	goError = NewGoError(err, parl.GeNonFatal, nil)
+	subGroupImpl.ConsumeError(goError)
+	goError2 = <-goGroup.Ch()
+	if goError2 != goError {
+		t.Errorf("bad non-fatal subgroup error")
+	}
+
+	// fatal error:
+	//	- gogroup returns GoLocalChan error and GeExit nil
+	//	- subgroup receives GeExit
+	parlGo = subGroupImpl.Go()
+	parlGo.Done(&err)
+	// goGroup GeLocalChan
+	goError2 = <-goGroup.Ch()
+	if !errors.Is(goError2.Err(), err) {
+		t.Error("bad gogroup error")
+	}
+	if goError2.ErrContext() != parl.GeLocalChan {
+		t.Errorf("bad gogroup error context: %s", goError2.ErrContext())
+	}
+	// goGroup good thread exit
+	goError2 = <-goGroup.Ch()
+	if goError2.Err() != nil {
+		t.Errorf("bad gogroup error: %s", goError2.String())
+	}
+	if goError2.ErrContext() != parl.GeExit {
+		t.Errorf("bad gogroup error context: %s", goError2.ErrContext())
+	}
+	// SubGroup: GeExit fatal error
+	goError2 = <-subGroup.Ch()
+	if !errors.Is(goError2.Err(), err) {
+		t.Error("bad fatal subgroup error")
+	}
+
+	// subgroup should now exit:
+	goError2, ok = <-subGroup.Ch() // wait for subGroup channel to close
+	if ok {
+		t.Errorf("subGroup channel did not close: %s", goError2)
+	}
+	if !subGroupImpl.isEnd() {
+		t.Error("subGroup did not terminate")
+	}
+
+	// gogroup exits
+	goError2, ok = <-goGroup.Ch() // wait for subGroup channel to close
+	if ok {
+		t.Errorf("goGroup channel did not close: %s", goError2)
+	}
+	if !goGroupImpl.isEnd() {
+		t.Error("goGroup did not terminate")
+	}
 }

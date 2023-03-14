@@ -7,7 +7,6 @@ package g0
 
 import (
 	"context"
-	"strconv"
 	"sync"
 
 	"github.com/haraldrudell/parl"
@@ -42,7 +41,6 @@ type GoGroup struct {
 	ch              parl.NBChan[parl.GoError]
 	doneLock        sync.Mutex // for GoDone method
 	noTermination   parl.AtomicBool
-	fakeGo          parl.AtomicReference[Go]
 	isDebug         parl.AtomicBool
 
 	owLock     sync.Mutex
@@ -307,6 +305,7 @@ func (g0 *GoGroup) ConsumeError(goError parl.GoError) {
 	// if we have a parent GoGroup, send it there
 	if g0.parent != nil {
 		g0.parent.ConsumeError(goError)
+		return
 	}
 
 	// send the error to the channel of this stand-alone G1Group
@@ -334,22 +333,47 @@ func (g0 *GoGroup) EnableTermination(allowTermination bool) {
 	}
 	if g0.isWaitGroupDone.IsTrue() {
 		return // GoGroup is already shutdown return
-	} else if allowTermination {
-		if g0.noTermination.Clear() {
-			// termination now allowed, it was previously blocked: remove fake Go
-			g0.GoDone(g0.fakeGo.Get(), nil)
-			g0.fakeGo.Put(nil)
+	} else if !allowTermination {
+		if g0.noTermination.Set() { // prevent termination, it was previously allowed
+			g0.CascadeEnableTermination(1)
 		}
-	} else if g0.noTermination.Set() {
-		// termination now prevented, it was previously allowed
-		// to prevent termination, add a fake thread
-		g0.fakeGo.Put(g0.Go().(*Go))
+		return // prevent termination complete
 	}
+
+	// now allow termination
+	if !g0.noTermination.Clear() {
+		return // termination allowed already
+	}
+
+	// atomic operation: DoneBool and g0.ch.Close
+	g0.doneLock.Lock()
+	defer g0.doneLock.Unlock()
+
+	g0.CascadeEnableTermination(-1)
+	if !g0.wg.IsZero() {
+		return // GoGroup did not terminate
+	}
+
+	if g0.hasErrorChannel.IsTrue() {
+		g0.ch.Close() // close local error channel
+	}
+	// mark GoGroup terminated
+	g0.isWaitGroupDone.Set()
+	g0.goContext.Cancel()
 }
 
 func (g0 *GoGroup) IsEnableTermination() (mayTerminate bool) {
 	mayTerminate = !g0.noTermination.IsTrue()
 	return
+}
+
+// CascadeEnableTermination manipulates wait groups of this goGroup and
+// those of its parents to allow or prevent termination
+func (g0 *GoGroup) CascadeEnableTermination(delta int) {
+	g0.wg.Add(delta)
+	if g0.parent != nil {
+		g0.parent.CascadeEnableTermination(delta)
+	}
 }
 
 func (g0 *GoGroup) Threads() (threads []parl.ThreadData) {
@@ -411,10 +435,11 @@ func (g0 *GoGroup) setFirstFatal() {
 
 // isEnd determines if this goGroup has ended
 //   - if goGroup has error channel, the goGroup ends when its error channel closes
-//   - — this is true for goGroups without a parent
-//   - — this is true for sub-goGroups only collecting fatal errors
-//   - — for subGo, it ends when all threads have exited
-//   - if goGroup otherwise has
+//   - — goGroups without a parent
+//   - — subGroups with error channel
+//   - — a subGo, having no error channel, ends when all threads have exited
+//   - if the GoGroup or any of its subordinate thread-groups have EnableTermination false
+//     GoGroups will not end until EnableTermination true
 func (g0 *GoGroup) isEnd() (isEnd bool) {
 
 	// SubGo termination flag
@@ -442,11 +467,12 @@ func (g0 *GoGroup) typeString() (s string) {
 	return s + "#" + g0.goEntityID.G0ID().String()
 }
 
+// TODO 230313 delete maybe
 // "goGroup#1:2" "subGroup#2:1" "subGo#3:0"
-func (g0 *GoGroup) goGroupState() (s string) {
-	adds, dones := g0.goWaitGroup.wg.Counters()
-	return g0.typeString() + ":" + strconv.Itoa(adds-dones)
-}
+// func (g0 *GoGroup) goGroupState() (s string) {
+// 	adds, dones := g0.goWaitGroup.wg.Counters()
+// 	return g0.typeString() + ":" + strconv.Itoa(adds-dones)
+// }
 
 // g1Group#3threads:1(1)g0.TestNewG1Group-g1-group_test.go:60
 func (g0 *GoGroup) String() (s string) {

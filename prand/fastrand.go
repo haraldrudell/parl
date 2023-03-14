@@ -3,11 +3,16 @@
 ISC License
 */
 
+// Package prand provides a fast and thread-safe random number generation.
+//   - prand.Uint32: 2 ns ±0.5
+//   - math/rand.Uint32: 14 ns ±0.5
+//   - /crypto/rand.Read: 330 ns ±0.5
+//   - same methods as math/rand package
+//   - based on runtime.fastrand
 package prand
 
 import (
 	"encoding/binary"
-	"math/rand"
 	"unsafe"
 )
 
@@ -58,13 +63,13 @@ func Read(p []byte) (n int, err error) {
 	}
 
 	// odd bytes at end
-
 	v := Uint32()
 	for index < n {
 		p[index] = byte(v)
 		index++
 		v >>= bitsPerByte
 	}
+
 	return
 }
 
@@ -73,5 +78,3 @@ func Int63() (random int64) { return int64(Uint64() >> 1) }
 
 // Int31 returns a non-negative pseudo-random 31-bit integer as an int32.
 func Int31() int32 { return int32(Uint32() >> 1) }
-
-var _ = rand.Perm

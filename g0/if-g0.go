@@ -13,6 +13,7 @@ import (
 
 type goGroupParent interface {
 	Add(id GoEntityID, threadData *ThreadData)
+	CascadeEnableTermination(delta int)
 	ConsumeError(goError parl.GoError)
 	GoDone(g0 parl.Go, err error)
 	UpdateThread(goEntityID GoEntityID, threadData *ThreadData)

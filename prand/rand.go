@@ -1,6 +1,9 @@
 /*
-© 2023–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+2023–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 ISC License
+
+these functions are largely copied from math/rand package in order to be compatible
+while relying on fast and thread-safe fastrand methods provided by this package
 */
 
 package prand
@@ -13,7 +16,7 @@ const (
 )
 
 // these functions are largely copied from math/rand package in order to be compatible
-//while relying on fast and thread-safe fastrand methods provided by this package
+// while relying on fast and thread-safe fastrand methods provided by this package
 
 // Shuffle pseudo-randomizes the order of elements.
 // n is the number of elements. Shuffle panics if n < 0.
@@ -42,7 +45,6 @@ func Shuffle(n int, swap func(i, j int)) {
 
 // Int63n returns, as an int64, a non-negative pseudo-random number in [0,n).
 // It panics if n <= 0. Thread-safe.
-//   - from: math/rand.Int63n
 func Int63n(n int64) int64 {
 	if n <= 0 {
 		panic("invalid argument to Int63n")
@@ -53,7 +55,6 @@ func Int63n(n int64) int64 {
 // Uint64n returns, as a uint64, a pseudo-random number in [0,n).
 // It is guaranteed more uniform than taking a Source value mod n
 // for any n that is not a power of 2. Thread-safe.
-//   - from: math/rand.Rand.Uint64n
 func Uint64n(n uint64) uint64 {
 	if n&(n-1) == 0 { // n is power of two, can mask
 		if n == 0 {
@@ -81,7 +82,6 @@ func Uint64n(n uint64) uint64 {
 // callers can adjust the output using:
 //
 //	sample = ExpFloat64() / desiredRateParameter
-//	- from math/rand.ExpFloat64-
 func ExpFloat64() float64 {
 	for {
 		j := Uint32()
