@@ -193,8 +193,10 @@ func TestSubGroup(t *testing.T) {
 	}
 
 	// fatal error:
-	//	- gogroup returns GoLocalChan error and GeExit nil
-	//	- subgroup receives GeExit
+	//	- a thread exits with g0.Done having error
+	//	- the subGroup hides the fatal error from the parent
+	//	- the parent receives non-fatal GeLocalChan of the error and a GeExit with no error
+	//	- subgroup emits fatal error on its error channel
 	parlGo = subGroupImpl.Go()
 	parlGo.Done(&err)
 	// goGroup GeLocalChan
