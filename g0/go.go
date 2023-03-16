@@ -94,6 +94,7 @@ func (g0 *Go) Done(errp *error) {
 	}
 
 	g0.goParent.GoDone(g0, err)
+	g0.wg.Done()
 }
 
 func (g0 *Go) ThreadData() (threadData *ThreadData) {

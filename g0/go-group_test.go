@@ -16,6 +16,7 @@ import (
 func TestGoGroup(t *testing.T) {
 	messageBad := "bad"
 	errBad := errors.New(messageBad)
+	var label = "label"
 
 	var goGroup parl.GoGroup
 	var goGroupImpl *GoGroup
@@ -27,6 +28,11 @@ func TestGoGroup(t *testing.T) {
 	var count int
 	var subGo parl.SubGo
 	var subGroup parl.SubGroup
+	var ctx0, ctx context.Context
+	var threads []parl.ThreadData
+	var fatals int
+	var onFirstFatal = func(goGen parl.GoGen) { fatals++ }
+	var expectG0ID uint64
 
 	// g0.NewGoGroup returns *g0.GoGroup: NewGoGroup()
 	goGroup = NewGoGroup(context.Background())
@@ -36,7 +42,7 @@ func TestGoGroup(t *testing.T) {
 	}
 	goGroup.SetDebug(parl.AggregateThread)
 
-	// fail thread exit: Go() GoDone() Ch() Threads() NamedThreads() IsEnd()
+	// fail thread exit: Go() GoDone() Ch() Threads() NamedThreads() IsEnd() Wait()
 	g0 = goGroup.Go()
 	if goImpl, ok = g0.(*Go); !ok {
 		t.Error("GoGroup.Go() did not return *g0.Go")
@@ -74,8 +80,14 @@ func TestGoGroup(t *testing.T) {
 	if !goGroupImpl.isEnd() {
 		t.Error("goGroup did not terminate")
 	}
+	if !goGroupImpl.wg.IsZero() {
+		t.Error("goGroup wg not zero")
+		t.FailNow()
+	}
+	goGroup.Wait()
 
 	// ConsumeError() EnableTermination() CascadeEnableTermination()
+	// IsEnableTermination()
 	goGroup = NewGoGroup(context.Background())
 	goGroupImpl = goGroup.(*GoGroup)
 	g0 = goGroup.Go()
@@ -88,7 +100,13 @@ func TestGoGroup(t *testing.T) {
 	if goGroupImpl.isEnd() {
 		t.Error("1 GoGroup terminated")
 	}
+	if !goGroup.IsEnableTermination() {
+		t.Error("IsEnableTermination false")
+	}
 	goGroup.EnableTermination(false)
+	if goGroup.IsEnableTermination() {
+		t.Error("IsEnableTermination true")
+	}
 	goGroupImpl.GoDone(g0, nil)
 	<-goGroup.Ch() // GoError from GoDone
 	if goGroupImpl.isEnd() {
@@ -118,7 +136,59 @@ func TestGoGroup(t *testing.T) {
 		t.Error("SubGroup does not have error channel")
 	}
 
-	// Add() UpdateThread() FirstFatal() Wait() G0ID() SetDebug()
+	// Context()
+	ctx0 = parl.NewCancelContext(context.Background())
+	goGroup = NewGoGroup(ctx0)
+	parl.InvokeCancel(ctx0)
+	ctx = goGroup.Context()
+	if ctx.Err() == nil {
+		t.Error("goGroup context did not cancel from parent context")
+	}
+
+	// Cancel()
+	goGroup = NewGoGroup(context.Background())
+	goGroup.Cancel()
+	if ctx = goGroup.Context(); ctx.Err() == nil {
+		t.Error("goGroup cancel did not cancel context")
+	}
+
+	// Add() UpdateThread() SetDebug() Threads() NamedThreads() G0ID()
+	goGroup = NewGoGroup(context.Background())
+	goGroupImpl = goGroup.(*GoGroup)
+	expectG0ID = uint64(goGroupImpl.goEntityID.id)
+	if expectG0ID != uint64(goGroupImpl.G0ID()) {
+		t.Error("goGroupImpl.G0ID bad")
+	}
+	goGroup.Go().Register()
+	if goGroupImpl.wg.Count() != 1 {
+		t.Errorf("goGroupImpl.wg.Count not 1: %d", goGroupImpl.wg.Count())
+	}
+	if len(goGroup.Threads()) > 0 {
+		t.Error("goGroup no-debug collects threads")
+	}
+	goGroup.SetDebug(parl.DebugPrint)
+	if goGroupImpl.isDebug.IsFalse() {
+		t.Error("goGroup.SetDebug DebugPrint failed")
+	}
+	goGroup.SetDebug(parl.AggregateThread)
+	if goGroupImpl.isDebug.IsTrue() {
+		t.Error("goGroup.SetDebug AggregateThread failed")
+	}
+	goGroup.Go().Register(label)
+	if len(goGroup.Threads()) != 1 {
+		t.Errorf("goGroup.Threads not 1: %d", len(goGroup.Threads()))
+	}
+	threads = goGroup.NamedThreads()
+	if len(threads) != 1 || threads[0].Name() != label {
+		t.Error("goGroup.NamedThreads bad")
+	}
+
+	// FirstFatal()
+	goGroup = NewGoGroup(context.Background(), onFirstFatal)
+	goGroup.Go().Done(&errBad)
+	if fatals == 0 {
+		t.Error("onFirstFatal bad")
+	}
 
 	// String()
 	// "goGroup#5_threads:0(0)_New:g0.NewGoGroup()-go-group.go:69"
