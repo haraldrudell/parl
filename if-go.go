@@ -66,8 +66,6 @@ type Go interface {
 	Done(errp *error)
 	// Wait awaits exit of this Go thread.
 	Wait()
-	// CancelGo signals to this Go thread to exit.
-	CancelGo()
 	// Cancel signals for the threads in this Go thread’s parent GoGroup thread-group
 	// and any subordinate thread-groups to exit.
 	Cancel()
@@ -167,7 +165,7 @@ type GoGroup interface {
 	// threads that have been named ordered by name
 	NamedThreads() (threads []ThreadData)
 	// SetDebug enables debug logging on this particular instance
-	SetDebug(debug bool)
+	SetDebug(debug GoDebug)
 	fmt.Stringer
 }
 
@@ -204,7 +202,7 @@ type SubGo interface {
 	// threads that have been named ordered by name
 	NamedThreads() (threads []ThreadData)
 	// SetDebug enables debug logging on this particular instance
-	SetDebug(debug bool)
+	SetDebug(debug GoDebug)
 	fmt.Stringer
 }
 
@@ -309,3 +307,11 @@ const (
 	// The error channel may close after GeExit.
 	GeExit
 )
+
+const (
+	NoDebug GoDebug = iota
+	DebugPrint
+	AggregateThread
+)
+
+type GoDebug uint8

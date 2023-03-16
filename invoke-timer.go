@@ -124,8 +124,9 @@ func (em *InvokeTimer) ensureTimer() {
 	}
 
 	// launch timer
-	g0 := em.g0.Go()
-	em.cancelGo = g0.CancelGo // save the cancel function for the goroutine
+	subGo := em.g0.SubGo()
+	g0 := subGo.Go()
+	em.cancelGo = subGo.Cancel // save the cancel function for the goroutine
 	go ptime.OnTimedThread(em.timerLatencyCheck, em.timerPeriod, time.Local, g0)
 }
 

@@ -28,15 +28,14 @@ const (
 //   - SubGroup creates a subordinate thread-group with its own error channel.
 //     Fatal-error thread-exits in SubGroup can be recovered locally in that thread-group
 type Go struct {
-	goEntityID
+	goEntityID   // G0ID() Wait()
 	isTerminated parl.AtomicBool
 	goParent     // ConsumeError() Go() Cancel() Context()
 	thread       ThreadSafeThreadData
-	goWaitGroup
 }
 
 // newGo returns a Go object for a thread operating in a Go thread-group. Thread-safe.
-func newGo(parent goParentArg, goInvocation *pruntime.CodeLocation) (
+func newGo(parent goParent, goInvocation *pruntime.CodeLocation) (
 	g0 parl.Go,
 	goEntityID GoEntityID,
 	threadData *ThreadData) {
@@ -44,9 +43,8 @@ func newGo(parent goParentArg, goInvocation *pruntime.CodeLocation) (
 		panic(perrors.NewPF("parent cannot be nil"))
 	}
 	g := Go{
-		goEntityID:  *newGoEntityID(goFrames),
-		goParent:    parent,
-		goWaitGroup: *newGoWaitGroup(parent.Context()),
+		goEntityID: *newGoEntityID(),
+		goParent:   parent,
 	}
 	g.wg.Add(1)
 	g.thread.SetCreator(goInvocation)
@@ -95,7 +93,6 @@ func (g0 *Go) Done(errp *error) {
 		err = perrors.Stack(*errp)
 	}
 
-	g0.goContext.Cancel()
 	g0.goParent.GoDone(g0, err)
 }
 
@@ -107,11 +104,6 @@ func (g0 *Go) ThreadData() (threadData *ThreadData) {
 // Wait awaits exit of this Go thread
 func (g0 *Go) Wait() {
 	g0.wg.Wait()
-}
-
-// CancelGo signals to this Go thread to exit.
-func (g0 *Go) CancelGo() {
-	g0.goWaitGroup.Cancel()
 }
 
 // Cancel cancels the GoGroup

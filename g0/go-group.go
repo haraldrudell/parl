@@ -18,7 +18,9 @@ import (
 )
 
 const (
-	goGroupExtraFrames = 0
+	goGroupExtraFrames     = 0
+	goidCreatorFrames      = 1 // 1 for thread-group constructor
+	g1Gropupg0StackFranmes = 1
 )
 
 // GoGroup is a Go thread-group. Thread-safe.
@@ -29,19 +31,21 @@ const (
 //   - new Go threads are handled by the g1WaitGroup
 //   - SubGroup creates a subordinate thread-group using this threadgroup’s error channel
 type GoGroup struct {
-	goEntityID
-	parent          goGroupParent
-	hasErrorChannel parl.AtomicBool // this GoGroup uses its error channel: NewGoGroup() or SubGroup()
-	isSubGroup      parl.AtomicBool // is SubGroup(): not NewGoGroup() or SubGo()
-	isWaitGroupDone parl.AtomicBool
-	hadFatal        parl.AtomicBool
-	onFirstFatal    parl.GoFatalCallback
-	gos             parli.ThreadSafeMap[GoEntityID, *ThreadData]
-	goWaitGroup     // Go() SubGroup() Wait()
-	ch              parl.NBChan[parl.GoError]
-	doneLock        sync.Mutex // for GoDone method
-	noTermination   parl.AtomicBool
-	isDebug         parl.AtomicBool
+	goEntityID       // G0ID() Wait()
+	creator          pruntime.CodeLocation
+	parent           goGroupParent
+	hasErrorChannel  parl.AtomicBool // this GoGroup uses its error channel: NewGoGroup() or SubGroup()
+	isSubGroup       parl.AtomicBool // is SubGroup(): not NewGoGroup() or SubGo()
+	isWaitGroupDone  parl.AtomicBool
+	hadFatal         parl.AtomicBool
+	onFirstFatal     parl.GoFatalCallback
+	gos              parli.ThreadSafeMap[GoEntityID, *ThreadData]
+	goContext        // Cancel() Context()
+	ch               parl.NBChan[parl.GoError]
+	doneLock         sync.Mutex // for GoDone method
+	noTermination    parl.AtomicBool
+	isDebug          parl.AtomicBool
+	aggregateThreads parl.AtomicBool
 
 	owLock     sync.Mutex
 	onceWaiter *parl.OnceWaiter
@@ -137,10 +141,11 @@ func new(
 		ctx = parent.Context()
 	}
 	g := GoGroup{
-		goEntityID:  *newGoEntityID(goGroupExtraFrames),
-		parent:      parent,
-		gos:         pmaps.NewRWMap[GoEntityID, *ThreadData](),
-		goWaitGroup: *newGoWaitGroup(ctx),
+		goEntityID: *newGoEntityID(),
+		creator:    *pruntime.NewCodeLocation(goidCreatorFrames + goGroupExtraFrames),
+		parent:     parent,
+		goContext:  *newGoContext(ctx),
+		gos:        pmaps.NewRWMap[GoEntityID, *ThreadData](),
 	}
 	if parl.IsThisDebug() {
 		g.isDebug.Set()
@@ -173,16 +178,20 @@ func (g0 *GoGroup) Add(goEntityID GoEntityID, threadData *ThreadData) {
 
 	g0.wg.Add(1)
 	if g0.isDebug.IsTrue() {
-		parl.Log("goGroup#%s:Add(id%s:%s)#%d", g0.G0ID(), goEntityID, threadData.Short(), g0.goWaitGroup.wg.Count())
+		parl.Log("goGroup#%s:Add(id%s:%s)#%d", g0.G0ID(), goEntityID, threadData.Short(), g0.goEntityID.wg.Count())
 	}
-	g0.gos.Put(goEntityID, threadData)
+	if g0.aggregateThreads.IsTrue() {
+		g0.gos.Put(goEntityID, threadData)
+	}
 	if g0.parent != nil {
 		g0.parent.Add(goEntityID, threadData)
 	}
 }
 
 func (g0 *GoGroup) UpdateThread(goEntityID GoEntityID, threadData *ThreadData) {
-	g0.gos.Put(goEntityID, threadData)
+	if g0.aggregateThreads.IsTrue() {
+		g0.gos.Put(goEntityID, threadData)
+	}
 	if g0.parent != nil {
 		g0.parent.UpdateThread(goEntityID, threadData)
 	}
@@ -224,11 +233,11 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 			threadData = thread.ThreadInfo()
 			id = thread.(*Go).G0ID().String()
 		}
-		parl.Log("goGroup#%s:GoDone(%sid%s,%s)after#:%d", g0.G0ID(), threadData.Short(), id, perrors.Short(err), g0.goWaitGroup.wg.Count()-1)
+		parl.Log("goGroup#%s:GoDone(%sid%s,%s)after#:%d", g0.G0ID(), threadData.Short(), id, perrors.Short(err), g0.goEntityID.wg.Count()-1)
 	}
 
 	// process thread-exit
-	isTermination := g0.goWaitGroup.wg.DoneBool()
+	isTermination := g0.goEntityID.wg.DoneBool()
 	var threadGo goImpl
 	var ok bool
 	if threadGo, ok = thread.(*Go); !ok {
@@ -410,12 +419,20 @@ func (g0 *GoGroup) NamedThreads() (threads []parl.ThreadData) {
 	return
 }
 
-func (g0 *GoGroup) SetDebug(debug bool) {
-	if debug {
+func (g0 *GoGroup) SetDebug(debug parl.GoDebug) {
+	if debug == parl.DebugPrint {
 		g0.isDebug.Set()
-	} else {
-		g0.isDebug.Clear()
+		g0.aggregateThreads.Set()
+		return
 	}
+	g0.isDebug.Clear()
+
+	if debug == parl.AggregateThread {
+		g0.aggregateThreads.Set()
+		return
+	}
+
+	g0.aggregateThreads.Clear()
 }
 
 func (g0 *GoGroup) cmpNames(a *ThreadData, b *ThreadData) (result bool) {
@@ -477,7 +494,7 @@ func (g0 *GoGroup) typeString() (s string) {
 // g1Group#3threads:1(1)g0.TestNewG1Group-g1-group_test.go:60
 func (g0 *GoGroup) String() (s string) {
 	return g0.typeString() + parl.Sprintf("_threads:%s_New:%s",
-		g0.goWaitGroup.wg.String(),
-		g0.goEntityID.creator.Short(),
+		g0.goEntityID.wg.String(),
+		g0.creator.Short(),
 	)
 }

@@ -34,6 +34,7 @@ func TestGoGroup(t *testing.T) {
 		t.Error("NewGoGroup did not return *g0.GoGroup")
 		t.FailNow()
 	}
+	goGroup.SetDebug(parl.AggregateThread)
 
 	// fail thread exit: Go() GoDone() Ch() Threads() NamedThreads() IsEnd()
 	g0 = goGroup.Go()

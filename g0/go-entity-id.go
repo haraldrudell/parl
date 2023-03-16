@@ -7,14 +7,8 @@ package g0
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/pruntime"
-)
-
-const (
-	goidCreatorFrames = 2 // 1 for g1ID init, 1 for thread-group constructor
 )
 
 // GoEntityID is a unique named type for Go objects
@@ -25,30 +19,20 @@ var GoEntityIDs parl.UniqueIDTypedUint64[GoEntityID]
 
 // goEntityID provides name, ID and creation time for Go objects
 type goEntityID struct {
-	id      GoEntityID
-	t       time.Time
-	creator pruntime.CodeLocation
-}
-
-type GoEntityIDer interface {
-	G0ID() (id GoEntityID)
+	id GoEntityID
+	wg parl.WaitGroup // Wait()
 }
 
 // newGoEntityID initiates an embedded g1ID
-func newGoEntityID(extraFrames int) (g0EntityID *goEntityID) {
-	if extraFrames < 0 {
-		extraFrames = 0
-	}
-	return &goEntityID{
-		id:      GoEntityIDs.ID(),
-		t:       time.Now(),
-		creator: *pruntime.NewCodeLocation(goidCreatorFrames + extraFrames),
-	}
+func newGoEntityID() (g0EntityID *goEntityID) {
+	return &goEntityID{id: GoEntityIDs.ID()}
 }
 
 func (gi *goEntityID) G0ID() (id GoEntityID) {
 	return gi.id
 }
+
+func (gi *goEntityID) Wait() { gi.wg.Wait() }
 
 func (gi GoEntityID) String() (s string) {
 	return strconv.FormatUint(uint64(gi), 10)

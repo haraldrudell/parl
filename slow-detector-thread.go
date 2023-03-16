@@ -78,7 +78,8 @@ func (sdt *SlowDetectorThread) Start(sdi *SlowDetectorInvocation) {
 	}
 
 	// launch thread
-	g0 := sdt.goGen.Go()
+	subGo := sdt.goGen.SubGo()
+	g0 := subGo.Go()
 	go sdt.thread(g0)
 	if sdt.slowTyp != SlowShutdownThread {
 		return // thread is not to be shutdown return
@@ -88,7 +89,7 @@ func (sdt *SlowDetectorThread) Start(sdi *SlowDetectorInvocation) {
 	sdt.slowLock.Lock()
 	defer sdt.slowLock.Unlock()
 
-	sdt.cancelGo = g0.CancelGo
+	sdt.cancelGo = subGo.Cancel
 }
 
 func (sdt *SlowDetectorThread) Stop(sdi *SlowDetectorInvocation) {

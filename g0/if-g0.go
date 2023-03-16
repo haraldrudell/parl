@@ -29,14 +29,10 @@ type goParent interface {
 	GoDone(g0 parl.Go, err error)
 	UpdateThread(goEntityID GoEntityID, threadData *ThreadData)
 	Cancel()
+	Context() (ctx context.Context)
 }
 
 type goImpl interface {
 	G0ID() (id GoEntityID)
 	ThreadData() (threadData *ThreadData)
-}
-
-type goParentArg interface {
-	goParent
-	Context() (ctx context.Context)
 }
