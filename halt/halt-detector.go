@@ -21,8 +21,6 @@ const (
 )
 
 // HaltDetector sends detected Go runtime execution halts on channel ch.
-//   - HaltDetector takes average 50 μs max 100 μs to shut down
-//     since time.Sleep cannot be aborted.
 type HaltDetector struct {
 	reportingThreshold time.Duration
 	ch                 parl.NBChan[*HaltReport]
@@ -53,17 +51,25 @@ func (h *HaltDetector) Thread(g0 parl.Go) {
 	defer g0.Register().Done(&err)
 	defer parl.Recover(parl.Annotation(), &err, parl.NoOnError)
 
-	var contextErr = g0.Context().Err
+	timeTicker := time.NewTicker(time.Millisecond)
+	defer timeTicker.Stop()
+
+	var done = g0.Context().Done()
 	var elapsed time.Duration
 	var t0 time.Time
 	var t1 = time.Now()
 	var reportingThreshold = h.reportingThreshold
 	var n int
+	var C = timeTicker.C
 	for {
 
 		// sleep
 		t0 = t1
-		time.Sleep(timeSleepDuration)
+		select {
+		case <-done:
+			return // g0 context cancel return
+		case <-C:
+		}
 		t1 = time.Now()
 		elapsed = t1.Sub(t0)
 
@@ -71,11 +77,6 @@ func (h *HaltDetector) Thread(g0 parl.Go) {
 		if elapsed >= reportingThreshold {
 			n++
 			h.ch.Send(&HaltReport{N: n, T: t0, D: elapsed})
-		}
-
-		// check for cancel
-		if contextErr() != nil {
-			return // g0 context cancel return
 		}
 	}
 }
