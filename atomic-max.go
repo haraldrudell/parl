@@ -26,7 +26,7 @@ func NewAtomicMax[T constraints.Integer](value T) (atomicMax *AtomicMax[T]) {
 func (max *AtomicMax[T]) Value(value T) (isNewMax bool) {
 
 	// check if value is a new max
-	valueU64, err := ints.ConvertU64(value, "")
+	valueU64, err := ints.Unsigned[T, uint64](value, "")
 	if err != nil {
 		panic(err) // value out of range, ie. negative
 	}

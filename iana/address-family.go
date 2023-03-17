@@ -83,7 +83,7 @@ func NewAddressFamily[T constraints.Integer](integer T) (addressFamily AddressFa
 
 	// convert to uint16
 	var u16 uint16
-	if u16, err = ints.ConvertU16(integer, perrors.PackFunc()); err != nil {
+	if u16, err = ints.Unsigned[T, uint16](integer, perrors.PackFunc()); err != nil {
 		return
 	}
 

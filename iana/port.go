@@ -26,7 +26,7 @@ func NewPort[T constraints.Integer](integer T) (port Port, err error) {
 
 	// convert to uint16
 	var u16 uint16
-	if u16, err = ints.ConvertU16(integer, perrors.PackFunc()); err != nil {
+	if u16, err = ints.Unsigned[T, uint16](integer, perrors.PackFunc()); err != nil {
 		return
 	}
 
