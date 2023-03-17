@@ -12,6 +12,8 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
+// Shorts retruns a string of Short descriptions of all threads in the slice
+//   - string is never empty
 func Shorts(threads []parl.ThreadData) (s string) {
 	length := len(threads)
 	s = "threads:" + strconv.Itoa(length)

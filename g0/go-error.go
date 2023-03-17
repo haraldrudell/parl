@@ -13,13 +13,16 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
+// GoError is a wrapper around an error associating it with a Go goroutine
+// and the situation in which this error occurred
 type GoError struct {
-	err        error
+	err        error // err is the underlying unadulteraded error. It is nil for non-fatal Go exits
 	t          time.Time
-	errContext parl.GoErrorContext
-	g0         parl.Go
+	errContext parl.GoErrorContext // errContext describes in what situation the error occured
+	g0         parl.Go             // all errors are associated with a Go.
 }
 
+// NewGoError creates a GoError based on an error
 func NewGoError(err error, errContext parl.GoErrorContext, g0 parl.Go) (goError parl.GoError) {
 	return &GoError{
 		err:        perrors.Stack(err),
@@ -29,6 +32,8 @@ func NewGoError(err error, errContext parl.GoErrorContext, g0 parl.Go) (goError 
 	}
 }
 
+// Error returns a human-readable error message making GoError implement error
+//   - for nil errors, empty string is returned
 func (ge *GoError) Error() (message string) {
 	if ge.err != nil {
 		message = ge.err.Error()
@@ -36,10 +41,12 @@ func (ge *GoError) Error() (message string) {
 	return
 }
 
+// Time returns when the GoError was created
 func (ge *GoError) Time() (when time.Time) {
 	return ge.t
 }
 
+// Err returns the unbderlying error
 func (ge *GoError) Err() (err error) {
 	return ge.err
 }
