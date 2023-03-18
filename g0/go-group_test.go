@@ -206,32 +206,34 @@ func TestSubGo(t *testing.T) {
 	var parlGo parl.Go
 	var ok bool
 
-	// non-fatal error
+	// SubGo non-fatal error
 	goGroup = NewGoGroup(context.Background())
 	goGroupImpl = goGroup.(*GoGroup)
 	subGo = goGroup.SubGo()
 	subGoImpl = subGo.(*GoGroup)
 	goError = NewGoError(err, parl.GeNonFatal, nil)
 	subGoImpl.ConsumeError(goError)
+	// the non-fatal subGo error should be recevied on GoGroup error channel
 	goError2 = <-goGroup.Ch()
 	if goError2 != goError {
 		t.Errorf("bad non-fatal subgo error")
 	}
 
-	// fatal error: top gogroup
+	// SubGo fatal thread termination
 	parlGo = subGo.Go()
 	parlGo.Done(&err)
+	// the SubGo fatal error should be recevied on GoGroup error channel
 	goError2 = <-goGroup.Ch()
 	if !errors.Is(goError2.Err(), err) {
 		t.Error("bad fatal subgo error")
 	}
-
-	// subgo should not have exited
+	// subgo should now terminate after its only thread exited
 	if !subGoImpl.isEnd() {
 		t.Error("subGo did not terminate")
 	}
 
-	// gogroup should now have exited
+	// gogroup should now have terminated and closed its error channel
+	//	- its only thread did exit
 	goError2, ok = <-goGroup.Ch() // wait for subGroup channel to close
 	if ok {
 		t.Errorf("goGroup channel did not close: %s", goError2)

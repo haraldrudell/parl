@@ -5,7 +5,11 @@ ISC License
 
 package pmaps
 
-import "unsafe"
+import (
+	"unsafe"
+
+	"github.com/haraldrudell/parl/perrors"
+)
 
 const (
 	hmapFakeSizeInBytes = 10 // sizeof(int) is max 8, then there are two more uint8
@@ -14,7 +18,8 @@ const (
 
 // GoMapSize returns the current size of the bucket array of Go map m
 //   - size is 0 for a nil map
-//   - size is 1 if the hash-table is unallocated
+//   - size is 1 for an unallocated hash-table — rare case
+//   - otherwise size is a power of 2
 //
 // About Go map:
 //   - Go map is a hash map
@@ -35,20 +40,24 @@ const (
 //   - — on macOS homebrew similar to: …/homebrew/Cellar/go/1.20.2/libexec/src
 func GoMapSize[K comparable, V any](m map[K]V) (size uint64) {
 
-	// hmapp is a pointer to runtime.hmap struct
-	//	- hmap begins with an int which is count of elements in map
-	//	- then there is uint8 which is flags
-	//	- then there is uint8 B wich is 2log(hash-table size)
-	var hmapp *[hmapFakeSizeInBytes]uint8 = *(**[hmapFakeSizeInBytes]uint8)(unsafe.Pointer(&m))
-	if hmapp == nil {
+	if m == nil {
 		return // nil map return
 	}
+
+	// hmapp is a pointer to runtime.hmap struct
+	//	- hmap begins with an int which is count of elements in map 4/8/bytes
+	//	- then there is uint8 which is flags
+	//	- then there is uint8 B wich is 2log(hash-table size)
+	var hmapp = *(**[hmapFakeSizeInBytes]uint8)(unsafe.Pointer(&m))
 
 	// B is log2(hash-table size), uint8: 0…255
 	//	- 2^255 ≈ 5e76, 1 GiB ≈ 1e9
 	var B = (*hmapp)[hmapBOffset]
+	if B > 63 { // B will not fit uint64
+		panic(perrors.ErrorfPF("hash table size corrupt: 2^%d", B))
+	}
 
-	size = 1 << B // size = 2^B
+	size = uint64(1) << B // size = 2^B
 
 	return
 }
