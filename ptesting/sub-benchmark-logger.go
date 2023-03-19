@@ -17,6 +17,10 @@ import (
 	"github.com/haraldrudell/parl/ptime"
 )
 
+const (
+	OperationsPerSecond = "op/s"
+)
+
 type SubBenchLogger struct {
 	b            *testing.B
 	m            map[string]*SubBench

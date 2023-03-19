@@ -17,13 +17,25 @@ const (
 	cpuModelKey  = "cpu"
 )
 
-// Versions returns an up to three=line string of observations like:
-//   - "goversion: go1.20.1"
-//   - "osversion: macOS 13.2.1"
-//   - "osversion: Linux 5.19.0-32-generic"
-//   - "cpu: Apple M1 Max"
-//   - "cpu: Intel(R) Core(TM) i5-6267U CPU @ 2.90GHz""
-//   - Go Benchmark-file key-value pair configurations
+// Versions returns printable key-value pairs for the Benchmark environment:
+//
+// macOS:
+//
+//	goversion: go1.20.1
+//	osversion: macOS 13.2.1
+//	cpu: Apple M1 Max
+//
+// Linux:
+//
+//	goversion: go1.20.1
+//	osversion: Linux 5.19.0-32-generic
+//	cpu: Intel(R) Core(TM) i5-6267U CPU @ 2.90GHz
+//
+// Usage:
+//
+//	func BenchmarkXxx(b *testing.B) {
+//	  println(ptesting.Versions)
+//	  …
 func Versions() (keyValueLines string) {
 
 	// "goversion: go1.20.1"
