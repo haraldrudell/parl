@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	goGroupExtraFrames     = 0
-	goidCreatorFrames      = 1 // 1 for thread-group constructor
-	g1Gropupg0StackFranmes = 1
+	goGroupExtraFrames = 0
+	goidCreatorFrames  = 1 // 1 for thread-group constructor
+	goGroupStackFrames = 1
 )
 
 // GoGroup is a Go thread-group. Thread-safe.
@@ -31,21 +31,29 @@ const (
 //   - new Go threads are handled by the g1WaitGroup
 //   - SubGroup creates a subordinate thread-group using this threadgroup’s error channel
 type GoGroup struct {
-	goEntityID       // G0ID() Wait()
+	goEntityID       // Wait()
 	creator          pruntime.CodeLocation
 	parent           goGroupParent
 	hasErrorChannel  parl.AtomicBool // this GoGroup uses its error channel: NewGoGroup() or SubGroup()
 	isSubGroup       parl.AtomicBool // is SubGroup(): not NewGoGroup() or SubGo()
-	isWaitGroupDone  parl.AtomicBool
 	hadFatal         parl.AtomicBool
 	onFirstFatal     parl.GoFatalCallback
 	gos              parli.ThreadSafeMap[GoEntityID, *ThreadData]
 	goContext        // Cancel() Context()
 	ch               parl.NBChan[parl.GoError]
-	doneLock         sync.Mutex // for GoDone method
 	noTermination    parl.AtomicBool
 	isDebug          parl.AtomicBool
 	aggregateThreads parl.AtomicBool
+	// doneLock ensures:
+	//	- consistency of data during GoDone
+	//	- change in isWaitGroupDone and g0.goEntityID.wg.DoneBool is atomic
+	//	- order of emitted termination goErrors
+	//	- therefore, doneLock is used in GoDone Add EnableTermination
+	doneLock sync.Mutex // for GoDone method
+	// isWaitGroupDone indicates that waitgroup made a non-zero to zero transition
+	//	- not merely that waitgroup is zero
+	//	- isWaitGroupDone is only updated inside doneLock
+	isWaitGroupDone parl.AtomicBool
 
 	owLock     sync.Mutex
 	onceWaiter *parl.OnceWaiter
@@ -85,7 +93,7 @@ func (g0 *GoGroup) Go() (g1 parl.Go) {
 	// At this point, Go invocation is accessible so retrieve it
 	// the goroutine has not been created yet, so there is no creator
 	// instead, use top of the stack, the invocation location for the Go() function call
-	goInvocation := pruntime.NewCodeLocation(g1Gropupg0StackFranmes)
+	goInvocation := pruntime.NewCodeLocation(goGroupStackFrames)
 
 	// the only location creating Go objects
 	var threadData *ThreadData
@@ -238,12 +246,12 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 
 	// process thread-exit
 	isTermination := g0.goEntityID.wg.DoneBool()
-	var threadGo goImpl
+	var goImpl *Go
 	var ok bool
-	if threadGo, ok = thread.(*Go); !ok {
+	if goImpl, ok = thread.(*Go); !ok {
 		panic(perrors.NewPF("type assertion failed"))
 	}
-	g0.gos.Delete(threadGo.G0ID())
+	g0.gos.Delete(goImpl.G0ID())
 	if g0.isSubGroup.IsTrue() {
 
 		// SubGroup with its own error channel with fatals not affecting parent
@@ -371,10 +379,7 @@ func (g0 *GoGroup) EnableTermination(allowTermination bool) {
 	g0.goContext.Cancel()
 }
 
-func (g0 *GoGroup) IsEnableTermination() (mayTerminate bool) {
-	mayTerminate = !g0.noTermination.IsTrue()
-	return
-}
+func (g0 *GoGroup) IsEnableTermination() (mayTerminate bool) { return !g0.noTermination.IsTrue() }
 
 // CascadeEnableTermination manipulates wait groups of this goGroup and
 // those of its parents to allow or prevent termination
@@ -468,9 +473,7 @@ func (g0 *GoGroup) isEnd() (isEnd bool) {
 	return g0.ch.IsClosed()
 }
 
-func (g0 *GoGroup) listThreads() (threads []*ThreadData) {
-	return g0.gos.List()
-}
+func (g0 *GoGroup) listThreads() (threads []*ThreadData) { return g0.gos.List() }
 
 // "goGroup#1" "subGroup#2" "subGo#3"
 func (g0 *GoGroup) typeString() (s string) {
@@ -484,16 +487,10 @@ func (g0 *GoGroup) typeString() (s string) {
 	return s + "#" + g0.goEntityID.G0ID().String()
 }
 
-// TODO 230313 delete maybe
-// "goGroup#1:2" "subGroup#2:1" "subGo#3:0"
-// func (g0 *GoGroup) goGroupState() (s string) {
-// 	adds, dones := g0.goWaitGroup.wg.Counters()
-// 	return g0.typeString() + ":" + strconv.Itoa(adds-dones)
-// }
-
 // g1Group#3threads:1(1)g0.TestNewG1Group-g1-group_test.go:60
 func (g0 *GoGroup) String() (s string) {
-	return g0.typeString() + parl.Sprintf("_threads:%s_New:%s",
+	return parl.Sprintf("%s_threads:%s_New:%s",
+		g0.typeString(),
 		g0.goEntityID.wg.String(),
 		g0.creator.Short(),
 	)

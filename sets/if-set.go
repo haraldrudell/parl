@@ -39,6 +39,8 @@ type Set[T comparable] interface {
 	// Element returns the element representation for value or
 	// nil if value is not an element of the set.
 	Element(value T) (element Element[T])
+	Iterator() (iterator iters.Iterator[T])
+	Elements() (elements []T)
 	// StringT returns a string representation for an element of this set.
 	// if value is not a valid element, a fmt.Printf value is output like ?'%v'
 	StringT(value T) (s string)

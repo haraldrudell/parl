@@ -31,8 +31,3 @@ type goParent interface {
 	Cancel()
 	Context() (ctx context.Context)
 }
-
-type goImpl interface {
-	G0ID() (id GoEntityID)
-	ThreadData() (threadData *ThreadData)
-}

@@ -19,6 +19,8 @@ import (
 
 const (
 	OperationsPerSecond = "op/s"
+	NanosecondsPerOp    = "ns/op"
+	SecondsPerOp        = "sec/op"
 )
 
 type SubBenchLogger struct {

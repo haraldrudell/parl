@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	goFrames            = 1 // newG1 is invoked from interrnal Go() function
 	grCheckThreadFrames = 0
 )
 
@@ -28,9 +27,11 @@ const (
 //   - SubGroup creates a subordinate thread-group with its own error channel.
 //     Fatal-error thread-exits in SubGroup can be recovered locally in that thread-group
 type Go struct {
-	goEntityID   // G0ID() Wait()
+	goEntityID // Wait()
+	// isTerminated indicates that this Go thread is terminated
+	//	- an atomic is requires since wg.Done and wg.IsZero are separate operations
 	isTerminated parl.AtomicBool
-	goParent     // ConsumeError() Go() Cancel() Context()
+	goParent     // Cancel() Context()
 	thread       ThreadSafeThreadData
 }
 
@@ -49,25 +50,19 @@ func newGo(parent goParent, goInvocation *pruntime.CodeLocation) (
 	g.wg.Add(1)
 	g.thread.SetCreator(goInvocation)
 
+	g0 = &g
 	goEntityID = g.G0ID()
 	threadData = g.thread.Get()
-	g0 = &g
 	return
 }
 
-func (g0 *Go) Register(label ...string) (g00 parl.Go) { g0.checkState(false, label...); return g0 }
-
-// SubGo returns a thread-group without its own error channel but
-// with FirstFatal mechanic
+func (g0 *Go) Register(label ...string) (g00 parl.Go) { return g0.checkState(false, label...) }
+func (g0 *Go) Go() (g00 parl.Go)                      { return g0.checkState(false).goParent.Go() }
 func (g0 *Go) SubGo(onFirstFatal ...parl.GoFatalCallback) (subGo parl.SubGo) {
-	g0.checkState(false)
-	return g0.goParent.SubGo(onFirstFatal...)
+	return g0.checkState(false).goParent.SubGo(onFirstFatal...)
 }
-
-// SubGroup returns a thread-group with its own error channel.
 func (g0 *Go) SubGroup(onFirstFatal ...parl.GoFatalCallback) (subGroup parl.SubGroup) {
-	g0.checkState(false)
-	return g0.goParent.SubGroup(onFirstFatal...)
+	return g0.checkState(false).goParent.SubGroup(onFirstFatal...)
 }
 
 func (g0 *Go) AddError(err error) {
@@ -97,34 +92,14 @@ func (g0 *Go) Done(errp *error) {
 	g0.wg.Done()
 }
 
-func (g0 *Go) ThreadData() (threadData *ThreadData) {
-	threadData = g0.thread.Get()
-	return
-}
+func (g0 *Go) ThreadInfo() (threadData parl.ThreadData) { return g0.thread.Get() }
+func (g0 *Go) GoID() (threadID parl.ThreadID)           { return g0.thread.ThreadID() }
 
-// Wait awaits exit of this Go thread
-func (g0 *Go) Wait() {
-	g0.wg.Wait()
-}
-
-// Cancel cancels the GoGroup
-func (g0 *Go) Cancel() {
-	g0.goParent.Cancel()
-}
-
-func (g0 *Go) ThreadInfo() (threadData parl.ThreadData) {
-	threadData = g0.thread.Get() // a copy of data extracted from behind lock
-	return
-}
-
-func (g0 *Go) GoID() (threadID parl.ThreadID) {
-	return g0.thread.ThreadID()
-}
-
-// checkState is invoked by all public methods ensuring that terminated
+// checkState is invoked by public methods ensuring that terminated
 // objects are not being used
 //   - checkState also collects data on the new thread
-func (g0 *Go) checkState(skipTerminated bool, label ...string) {
+func (g0 *Go) checkState(skipTerminated bool, label ...string) (g *Go) {
+	g = g0
 	if !skipTerminated && g0.isTerminated.IsTrue() {
 		panic(perrors.NewPF("operation on terminated Go thread object"))
 	}
@@ -144,6 +119,7 @@ func (g0 *Go) checkState(skipTerminated bool, label ...string) {
 	// propagate thread information
 	threadData := g0.thread.Get()
 	g0.UpdateThread(g0.G0ID(), threadData)
+	return
 }
 
 // g1ID:4:g0.(*g1WaitGroup).Go-g1-thread-group.go:63

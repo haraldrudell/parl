@@ -11,6 +11,7 @@ import (
 	"github.com/haraldrudell/parl/iters"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pfmt"
+	"golang.org/x/exp/slices"
 )
 
 // SetImpl holds a multiple-selection function argument that has printable representation.
@@ -18,6 +19,7 @@ import (
 // those names printable.
 type SetImpl[T comparable] struct {
 	elementMap map[T]Element[T]
+	elements   []T
 }
 
 // NewSet returns an enumeration of a printable semantic function argument.
@@ -38,6 +40,7 @@ func NewSet[T comparable](elements iters.Iterator[Element[T]]) (set Set[T]) {
 			))
 		}
 		s.elementMap[valueT] = element
+		s.elements = append(s.elements, element.Value())
 	}
 	set = &s
 	return
@@ -61,6 +64,14 @@ func (st *SetImpl[T]) Description(value T) (full string) {
 		full = e.Description()
 	}
 	return
+}
+
+func (st *SetImpl[T]) Iterator() (iterator iters.Iterator[T]) {
+	return iters.NewSliceIterator(st.elements)
+}
+
+func (st *SetImpl[T]) Elements() (elements []T) {
+	return slices.Clone(st.elements)
 }
 
 func PrintAsString(value any) (s string) {
