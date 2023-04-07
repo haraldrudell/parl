@@ -17,10 +17,12 @@ var ErrTooLarge = errors.New("value too large")
 var ErrNegative = errors.New("negative value")
 
 // Unsigned converts integer of type T to an unsigned value that fits the size of unsigned integer U
+//   - U is the unsigned integer returned
+//   - T is the input integer
 //   - integer T is of any integer size and may be signed
 //   - unsigned U is any size unsigned integer
 //   - error: if integer is negative or too large to be held in type U
-func Unsigned[T constraints.Integer, U constraints.Unsigned](integer T, label string) (unsigned U, err error) {
+func Unsigned[U constraints.Unsigned, T constraints.Integer](integer T, label string) (unsigned U, err error) {
 
 	// check for negative value
 	if isSigned, _, _, _ := IntProperties[T](); isSigned {

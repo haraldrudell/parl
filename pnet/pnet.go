@@ -8,6 +8,7 @@ package pnet
 
 import (
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 )
@@ -47,18 +48,10 @@ func IsZeros(p net.IP) bool {
 }
 
 // IsDirect determines if the route is direct
-func IsDirect(IP net.IP, mask *net.IPMask) bool {
-	suffixLength, _ := mask.Size()
-	return IsIPv4(IP) && suffixLength == net.IPv4len ||
-		len(IP) == net.IPv6len && suffixLength == net.IPv6len
-}
-
-// IsDirectIPNet determines if the IPNET represents a direct route
-func IsDirectIPNet(IPNet *net.IPNet) bool {
-	if IPNet == nil {
-		return false
-	}
-	return IsDirect(IPNet.IP, &IPNet.Mask)
+//   - a direct route has mask 32 or 128 bit length /32 /128
+func IsDirect(route netip.Prefix) bool {
+	return route.Addr().Is4() && route.Bits() == 32 ||
+		route.Addr().Is6() && route.Bits() == 128
 }
 
 // IsIPv4 determines if net.IP value is IPv4
@@ -78,14 +71,19 @@ func IsNzIP(ip net.IP) bool {
 	return ip != nil && !ip.IsUnspecified()
 }
 
-// IsBroadcast determines IP is the last address for Mask
-// for 1.2.3.4/24 the network address 1.2.3.255 returns true
-func IsBroadcast(IP net.IP, IPMask net.IPMask) (isBroadcast bool) {
-	if len(IP) != net.IPv4len && len(IP) != net.IPv6len {
+// IsBroadcast determines whether addr is the last address for Mask
+//   - the last address is typically broadcast
+//   - for 1.2.3.4/24 the network address 1.2.3.255 returns true
+func IsBroadcast(addr netip.Addr, IPMask net.IPMask) (isBroadcast bool) {
+	if !addr.IsValid() {
 		return
 	}
+
+	// convert to net,.IP to use Mask
+	var netIP = net.IP(addr.AsSlice())
+
 	invertedMask := InvertMask(IPMask)
-	isBroadcast = IP.Mask(invertedMask).Equal(net.IP(invertedMask))
+	isBroadcast = netIP.Mask(invertedMask).Equal(net.IP(invertedMask))
 	return
 }
 

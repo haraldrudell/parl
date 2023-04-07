@@ -182,7 +182,7 @@ func NewProtocol[T constraints.Integer](integer T) (protocol Protocol, err error
 
 	// convert to uint8
 	var u8 uint8
-	if u8, err = ints.Unsigned[T, uint8](integer, perrors.PackFunc()); err != nil {
+	if u8, err = ints.Unsigned[uint8](integer, perrors.PackFunc()); err != nil {
 		return
 	}
 

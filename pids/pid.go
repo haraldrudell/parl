@@ -22,7 +22,7 @@ type Pid uint32
 // NewPid returns a typed value process identifier
 func NewPid[T constraints.Integer](pid T) (typedPid Pid, err error) {
 	var u32 uint32
-	if u32, err = ints.Unsigned[T, uint32](pid, perrors.PackFunc()); err != nil {
+	if u32, err = ints.Unsigned[uint32](pid, perrors.PackFunc()); err != nil {
 		return
 	}
 

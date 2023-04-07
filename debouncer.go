@@ -11,6 +11,15 @@ import (
 	"time"
 )
 
+// Debouncer debounces event stream values.
+// T values are received from the in channel.
+// once d time has elapsed with no further incoming Ts,
+// a slice of read Ts are provided to the send function.
+//   - the debouncer may be held up indefinitely for an uninterrupted stream of Ts
+//   - one thread is launched per debouncer
+//   - errFn receives any panics in the thread
+//   - sender and errFb functions must be thread-safe.
+//   - Debouncer is shutdown by in channel close or via context.
 type Debouncer[T any] struct {
 	d      time.Duration
 	in     <-chan T
@@ -20,47 +29,56 @@ type Debouncer[T any] struct {
 	ctx    context.Context
 }
 
-// Debouncer debounces event stream values.
-// sender and errFb functions must be thread-safe.
-// Debouncer is shutdown by in channel close or via context.
-func NewDebouncer[T any](d time.Duration, in <-chan T,
-	sender func([]T),
+// NewDebouncer returns a channel debouncer
+func NewDebouncer[T any](d time.Duration, in <-chan T, sender func([]T),
 	errFn func(err error), ctx context.Context) (db *Debouncer[T]) {
-	db0 := Debouncer[T]{d: d, in: in, sender: sender, ctx: ctx}
-	db0.wg.Add(1)
-	go db0.debouncerThread()
-	return &db0
+	return &Debouncer[T]{
+		d:      d,
+		in:     in,
+		sender: sender,
+		errFn:  errFn,
+		ctx:    ctx,
+	}
 }
 
+// Go launches the debouncer thread
+func (d *Debouncer[T]) Go() {
+	d.wg.Add(1)
+	go d.debouncerThread()
+}
+
+// Wait blocks until the debouncer exits
+//   - the debouncer exits from in channel close or context cancel
 func (db *Debouncer[T]) Wait() {
 	db.wg.Wait()
 }
 
-func (db *Debouncer[T]) debouncerThread() {
-	defer db.wg.Done()
-	Recover(Annotation(), nil, db.errFn)
+// debouncerThread debounces the in channel until it closes or context cancel
+func (d *Debouncer[T]) debouncerThread() {
+	defer d.wg.Done()
+	Recover(Annotation(), nil, d.errFn)
 
 	timer := time.NewTimer(time.Second)
 	timer.Stop()
 	defer timer.Stop()
 
-	done := db.ctx.Done()
+	done := d.ctx.Done()
 	var values []T
 	for {
 		select {
-		case value, ok := <-db.in:
+		case value, ok := <-d.in:
 			if !ok {
 				if len(values) > 0 {
-					db.sender(values)
+					d.sender(values)
 				}
 				return // in closed return
 			}
 			values = append(values, value)
-			timer.Reset(db.d)
+			timer.Reset(d.d)
 		case <-done:
 			return // ctx shutdown return
 		case <-timer.C:
-			db.sender(values)
+			d.sender(values)
 			values = nil
 		}
 	}

@@ -18,7 +18,7 @@ func TestUnsigned(t *testing.T) {
 	var u64 uint64
 	var err error
 
-	if u64, err = Unsigned[uint64, uint64](value, ""); err != nil {
+	if u64, err = Unsigned[uint64](value, ""); err != nil {
 		t.Errorf("err: %s", perrors.Short(err))
 	}
 	if u64 != value {
