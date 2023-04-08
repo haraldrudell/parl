@@ -18,5 +18,3 @@ func onCancelThread(fn func(), done <-chan struct{}) {
 	<-done
 	fn()
 }
-
-var _ context.Context

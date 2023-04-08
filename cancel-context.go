@@ -55,9 +55,12 @@ func AddNotifier(ctx context.Context, notifierFn func(slice pruntime.StackSlice)
 // NewCancelContext creates a context that can be provided to InvokeCancel.
 // the return value encapsulates a cancel function.
 //
-//	ctx := NewCancelContext(context.Background())
-//	…
-//	InvokeCancel(ctx)
+//   - NewCancelContext is like [context.WithCancel] but with the CancelFunc embedded
+//     instead, [InvokeCancel] is used  with cancelCtx as argument.
+//
+//     ctx := NewCancelContext(context.Background())
+//     …
+//     InvokeCancel(ctx)
 func NewCancelContext(ctx context.Context) (cancelCtx context.Context) {
 	return NewCancelContextFunc(context.WithCancel(ctx))
 }
