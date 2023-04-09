@@ -21,8 +21,8 @@ const (
 	EraseEndOfLine         = "\x1b[K"
 	EraseEndOfDisplay      = "\x1b[J"
 	MoveCursorToColumnZero = "\r"
-	CursorUp               = "\x1b[A"
-	NewLine                = "\n"
+	CursorUp               = "\x1b[A" // at top line does nothing
+	NewLine                = "\n"     // on last line, causes the view to scroll
 	Space                  = "\x20"
 )
 

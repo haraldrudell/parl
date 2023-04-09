@@ -15,27 +15,29 @@ import (
 
 // NBChan is a non-blocking send channel with trillion-size buffer.
 //   - NBChan behaves both like a channel and a thread-safe slice
-//   - NBChan has non-blocking, thread-safe, error-free and panic-free Send and SendMany
-//   - NBChan has deferrable, panic-free, idempotent close
 //   - NBChan is initialization-free, thread-safe, panic-free, idempotent, deferrable and observable.
-//   - NBChan can be used as an error channel where the sending thread does not
-//     block from a delayed or missing reader.
-//   - errors can be read from the channel or fetched all at once using GetAll
-//   - Ch(), Send(), Close() CloseNow() IsClosed() Count() are not blocked by channel send
-//     and are panic-free.
-//   - values are sent using Send or SendMany methods
-//   - values are read from Ch channel or using Get method
-//   - Close, CloseNow and WaitForClose are deferrable.
-//   - WaitForClose waits until the underlying channel has been closed.
-//   - NBChan implements a thread-safe error store perrors.ParlError.
-//   - NBChan.GetError() returns thread panics and close errors.
-//   - No errors are added to the error store after the channel has closed.
-//   - NBChan’s only errors are thread panics and close errors.
-//     Neither are expected to occur
-//   - the underlying channel is closed after Close is invoked and the channel is emptied
+//   - values are sent using non-blocking, thread-safe, error-free and panic-free Send and SendMany
+//   - values are received from the channel or fetched all or many at once using Get
+//   - NBChan has deferrable, panic-free, idempotent close:
+//     Close, CloseNow
+//   - the underlying channel is closed when:
+//   - — Close is invoked and the channel is read to end
+//   - — CloseNow is invoked
+//   - NBChan is observable:
+//   - — DidClose indicates whether Close or CloseNow has been invoked
+//   - — IsClosed indicates whether the underlying channel has closed
+//   - — deferrable, panic-free WaitForClose waits until the underlying channel has been closed.
 //   - cautious consumers may collect errors via:
 //   - — CloseNow or WaitForClose
 //   - — GetError method preferrably after CloseNow, WaitForClose or IsClosed returns true
+//   - NBChan.GetError() returns thread panics and close errors.
+//     Neither are expected to occur
+//   - — NBChan implements a thread-safe error store perrors.ParlError.
+//   - — No errors are added to the error store after the channel has closed.
+//   - Ch(), Send(), SendMany() Close() CloseNow() IsClosed() DidClose() Count() GetError() are not blocked by channel send
+//     and are panic-free.
+//   - NBChan can be used as an error channel where the sending thread does not
+//     block from a delayed or missing reader.
 //
 // Usage:
 //
@@ -142,7 +144,7 @@ func (nb *NBChan[T]) SendMany(values []T) {
 		return
 	}
 
-	// get next value to send, append remainign to send queue
+	// get next value to send, append remaining to send queue
 	var value T
 	if len(nb.sendQueue) > 0 {
 		value = nb.sendQueue[0]
