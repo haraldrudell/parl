@@ -55,3 +55,21 @@ func TestNewSet(t *testing.T) {
 		t.Errorf("NewSet2 err: %q exp %q", err.Error(), messageDup)
 	}
 }
+
+func TestSetDescription(t *testing.T) {
+	var value = 1
+	var name = "nname"
+	var full = "Full"
+
+	var actual string
+
+	var set = NewSet(NewElements[int](
+		[]SetElementFull[int]{
+			{ValueV: value, Name: name, Full: full},
+		}))
+
+	actual = set.Description(value)
+	if actual != full {
+		t.Errorf("set.Description: %q exp %s", actual, full)
+	}
+}

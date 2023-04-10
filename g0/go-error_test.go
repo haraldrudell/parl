@@ -7,12 +7,13 @@ package g0
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/haraldrudell/parl"
 )
 
-func TestNewG1Error(t *testing.T) {
+func TestGoError(t *testing.T) {
 	err := errors.New("x")
 	errContext := parl.GePreDoneExit
 
@@ -47,4 +48,23 @@ func TestNewG1Error(t *testing.T) {
 
 	goError = NewGoError(nil, errContext, g0)
 	_ = goError.String()
+}
+
+func TestGoErrorString(t *testing.T) {
+	var f = "is "
+
+	var goErrorImpl = GoError{}
+	var goErrorp = &goErrorImpl
+	var goError parl.GoError = goErrorp
+
+	var isStringer bool
+	_, isStringer = goError.(fmt.Stringer)
+	t.Logf("isStringer: %t", isStringer)
+
+	var s = fmt.Sprintf(f+"%s", goError.String())
+	t.Logf("resulting s: %q", s)
+	if s == f {
+		t.Error("s empty")
+	}
+	//t.Fail()
 }

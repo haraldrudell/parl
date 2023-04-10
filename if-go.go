@@ -236,6 +236,9 @@ type GoFactory interface {
 //   - GoError provides context for taking action on the error
 //   - Go provides the thread associated with the error. All GoErrors are associated with
 //     a Go object
+//   - because GoError is both error and fmt.Stringer, to print its string representation
+//     requires using the String() method, otherwise fmt.Printf defaults to the Error()
+//     method
 type GoError interface {
 	error // Error() string
 	// Err retrieves the original error value

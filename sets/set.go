@@ -59,10 +59,22 @@ func (st *SetImpl[T]) Element(value T) (element Element[T]) {
 }
 
 func (st *SetImpl[T]) Description(value T) (full string) {
-	var v any = value
-	if e, ok := v.(ElementFull[T]); ok {
-		full = e.Description()
+
+	// get a pointer to the Element struct
+	var element Element[T] // interface
+	var ok bool
+	if element, ok = st.elementMap[value]; !ok {
+		return // invalid T return
 	}
+
+	// type assert to Element with Description method
+	var elementFull ElementFull[T]
+	if elementFull, ok = element.(ElementFull[T]); !ok {
+		return // not a full element return
+	}
+
+	full = elementFull.Description()
+
 	return
 }
 
