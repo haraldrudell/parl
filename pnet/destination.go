@@ -44,6 +44,19 @@ func (d Destination) Key() (key netip.Prefix) {
 	return d.Prefix
 }
 
+// IsDefaultRoute returns whether Destination is a default route:
+//   - IPv4: 0/0 or 0.0.0.0/0
+//   - IPv6: ::
+func (d Destination) IsDefaultRoute() (isDefault bool) {
+	var addr = d.Addr()
+	if !addr.IsValid() || d.Bits() != 0 {
+		return // address not valid or not /0
+	}
+	isDefault = addr.IsUnspecified()
+
+	return
+}
+
 func (d Destination) String() (s string) {
 
 	// abbreviate IPv4: 0.0.0.0/0 → 0/0 127.0.0.0/8 → 127/8

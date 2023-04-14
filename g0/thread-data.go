@@ -77,7 +77,7 @@ func (td *ThreadData) Short() (s string) {
 
 	// handle nil case
 	if td == nil {
-		return ThreadDataNil
+		return ThreadDataNil // "threadData:nil"
 	}
 
 	// "[label]:[threadID]"

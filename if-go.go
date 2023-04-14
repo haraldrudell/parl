@@ -245,7 +245,7 @@ type GoError interface {
 	Err() (err error)
 	// Time provides when this error occurred
 	Time() time.Time
-	// IsThreadExit determines if this error is a thread exit
+	// IsThreadExit determines if this error is a thread exit, ie. GeExit GePreDoneExit
 	//	- thread exits may have err nil
 	//	- fatals are non-nil thread exits that may require specific actions such as
 	//		application termination
