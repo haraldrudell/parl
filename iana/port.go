@@ -7,6 +7,8 @@ ISC License
 package iana
 
 import (
+	"strconv"
+
 	"github.com/haraldrudell/parl/ints"
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/exp/constraints"
@@ -73,4 +75,8 @@ func (port Port) Uint16() (portUint16 uint16) {
 
 func (port Port) Int() (portInt int) {
 	return int(port)
+}
+
+func (port Port) String() (numericString string) {
+	return strconv.Itoa(int(port))
 }
