@@ -7,6 +7,10 @@ ISC License
 package pmaps
 
 import (
+	"fmt"
+	"strconv"
+
+	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/exp/slices"
 )
 
@@ -35,7 +39,7 @@ func (mp *InsOrderedMap[K, V]) Put(key K, value V) {
 func (mp *InsOrderedMap[K, V]) Delete(key K) {
 	if _, ok := mp.Map.Get(key); ok {
 		if i := slices.Index(mp.list, key); i != -1 {
-			slices.Delete(mp.list, i, i+1)
+			mp.list = slices.Delete(mp.list, i, i+1)
 		}
 	}
 	mp.Map.Delete(key)
@@ -62,8 +66,24 @@ func (mp *InsOrderedMap[K, V]) List(n ...int) (list []V) {
 
 	list = make([]V, requestedLength)
 	for i := 0; i < requestedLength; i++ {
-		list[i], _ = mp.Map.Get(mp.list[i])
+		var ok bool
+		if list[i], ok = mp.Map.Get(mp.list[i]); !ok {
+			panic(perrors.ErrorfPF("failed to find key: %#v", mp.list[i]))
+		}
 	}
 
+	return
+}
+
+func (mp *InsOrderedMap[K, V]) Dump() (s string) {
+	s = "list" + strconv.Itoa(len(mp.list)) + ":"
+	for i, v := range mp.list {
+		s += fmt.Sprintf("key#%d:%#v-", i, v)
+	}
+	s += "map" + strconv.Itoa(len(mp.m)) + ":"
+	for k, v := range mp.m {
+		s += fmt.Sprintf("key:%#v-value:%#v-", k, v)
+	}
+	s += "END"
 	return
 }

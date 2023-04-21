@@ -36,7 +36,7 @@ func (mp *KeyInsOrderedMap[K, V]) Put(key K, value V) {
 func (mp *KeyInsOrderedMap[K, V]) Delete(key K) {
 	mp.Map.Delete(key)
 	if i := slices.Index(mp.list, key); i != -1 {
-		slices.Delete(mp.list, i, i+1)
+		mp.list = slices.Delete(mp.list, i, i+1)
 	}
 }
 
