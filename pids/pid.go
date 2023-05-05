@@ -19,8 +19,12 @@ import (
 //   - Pid has IsNonZero Int Uint32 methods
 type Pid uint32
 
-// NewPid returns a typed value process identifier
-func NewPid[T constraints.Integer](pid T) (typedPid Pid, err error) {
+func NewPid(u32 uint32) (pid Pid) {
+	return Pid(u32)
+}
+
+// NewPidInteger returns a typed value process identifier
+func NewPidInteger[T constraints.Integer](pid T) (typedPid Pid, err error) {
 	var u32 uint32
 	if u32, err = ints.Unsigned[uint32](pid, perrors.PackFunc()); err != nil {
 		return
@@ -32,7 +36,7 @@ func NewPid[T constraints.Integer](pid T) (typedPid Pid, err error) {
 
 func NewPid1[T constraints.Integer](pid T) (typedPid Pid) {
 	var err error
-	if typedPid, err = NewPid(pid); err != nil {
+	if typedPid, err = NewPidInteger(pid); err != nil {
 		panic(err)
 	}
 	return

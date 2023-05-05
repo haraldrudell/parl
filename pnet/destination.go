@@ -27,15 +27,15 @@ type Destination struct {
 // NewDestination instantiates Destination.
 // addr is IPv4 address or IPv6 address with Zone.
 // prefix is number of bits actually used 0…32 for IPv4, 0…128 for IPv6
-func NewDestination(prefix netip.Prefix) (d *Destination, err error) {
-	if !prefix.IsValid() {
-		err = perrors.ErrorfPF("invalid prefix: %#v", prefix)
+func NewDestination(prefix netip.Prefix) (d *Destination) {
+	return &Destination{Prefix: prefix}
+}
+
+func (d Destination) IsValid() (err error) {
+	if !d.Prefix.IsValid() {
+		err = perrors.ErrorfPF("invalid prefix: %#v", d.Prefix)
 		return
 	}
-	d0 := Destination{
-		Prefix: prefix,
-	}
-	d = &d0
 	return
 }
 
@@ -57,6 +57,10 @@ func (d Destination) IsDefaultRoute() (isDefault bool) {
 	return
 }
 
+// "1.2.3.4/24" or "2000::/3"
+// - abbreviate IPv4: "127.0.0.0/8" → "127/8"
+// - IPv4 default route: "0.0.0.0/0" → "0/0"
+//   - IPv6 default route stays "::/0"
 func (d Destination) String() (s string) {
 
 	// abbreviate IPv4: 0.0.0.0/0 → 0/0 127.0.0.0/8 → 127/8

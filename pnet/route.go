@@ -22,7 +22,10 @@ func NewRoute(d *Destination, nextHop *NextHop) *Route {
 	}
 	return &r
 }
+func (r *Route) Dump() (s string) {
+	return "rt_" + r.Destination.String() + "_" + r.NextHop.Dump()
+}
 
-func (rt *Route) String() (s string) {
-	return rt.Destination.String() + " via " + rt.NextHop.String()
+func (r *Route) String() (s string) {
+	return r.Destination.String() + " via " + r.NextHop.String()
 }

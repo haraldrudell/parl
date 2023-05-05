@@ -9,9 +9,8 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"strings"
 
-	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl"
 )
 
 // NextHop describes a route target
@@ -50,60 +49,49 @@ func NewNextHop(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr) (nextHop
 	return
 }
 
+// NewNextHopCounts returns NextHop with current IP address counts
+//   - if input LinkAddr does not have interface name, interface name is added to output nextHop
+//   - 6in4 are converted to IPv4
 func NewNextHopCounts(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr) (nextHop *NextHop, err error) {
 
-	// obatin interface by index
-	var netInterface *net.Interface
-	if linkAddr.IfIndex != 0 {
-		if netInterface, err = net.InterfaceByIndex(int(linkAddr.IfIndex)); perrors.IsPF(&err, "net.InterfaceByIndex(%d) %w", linkAddr.IfIndex, err) {
-			// on delete of interface, this ill fail
-			// route ip+net: no such network interface
-			// *net.OpError *errors.errorString
-			// &net.OpError{Op:"route", Net:"ip+net", Source:net.Addr(nil), Addr:net.Addr(nil), Err:(*errors.errorString)(0x1400011a490)}
-			err = nil // best effort
-		}
-	}
-	if netInterface == nil {
+	// valid interface index
+	var ifIndex = linkAddr.IfIndex
+	if !ifIndex.IsValid() {
 		nextHop = NewNextHop(gateway, linkAddr, src)
-		return // no interface return
-	}
-
-	// interface name is typically missing, populate it
-	linkAddr2 := linkAddr
-	if linkAddr.Name == "" {
-		if linkAddr2, err = NewLinkAddr(linkAddr.IfIndex, netInterface.Name, linkAddr.HardwareAddr); err != nil {
-			return
-		}
-	}
-
-	nextHop0 := NewNextHop(gateway, linkAddr2, src)
-
-	// we need to find how many IP addresses the interface has
-	var netAddrSlice []net.Addr
-	if netAddrSlice, err = netInterface.Addrs(); perrors.IsPF(&err, "netInterface.Addrs %w", err) {
 		return
 	}
-	var ipv4 int
-	var ipv6 int
-	for _, a := range netAddrSlice {
-		ipString := a.String()
-		if index := strings.Index(ipString, "/"); index != -1 {
-			ipString = ipString[:index]
-		}
-		var ip netip.Addr
-		if ip, err = netip.ParseAddr(ipString); perrors.IsPF(&err, "netip.ParseAddr %w", err) {
+
+	// net.Interface struct for ifIndex
+	var name string
+	var i4, i6 []netip.Prefix
+	if name, i4, i6, err = ifIndex.InterfaceAddrs(); err != nil {
+		return
+	}
+	// macOS lo0 has address:
+	// for i := 0; i < len(i6); {
+	// 	addr := i6[i].Addr()
+	// 	if addr.Is4In6() {
+
+	// 		i4 = append(i4, netip.PrefixFrom(addr.As4(), )
+	// 		i6 = slices.Delete[](i6, i, i+1)
+	// 		continue
+	// 	}
+	// 	i++
+	// }
+
+	// interface name is typically missing, populate it
+	var linkAddr2 = linkAddr
+	if linkAddr.Name == "" {
+		linkAddr2 = NewLinkAddr(linkAddr.IfIndex, name)
+		if linkAddr2.SetHw(linkAddr.HardwareAddr); err != nil {
 			return
 		}
-		if ip.Is4() {
-			ipv4++
-		} else {
-			ipv6++
-		}
 	}
-	nextHop0.nIPv4 = ipv4
-	nextHop0.nIPv6 = ipv6
 
-	nextHop = nextHop0
+	nextHop = NewNextHop(gateway, linkAddr2, src)
+	nextHop.nIPv4 = len(i4)
+	nextHop.nIPv6 = len(i6)
+
 	return
 }
 
@@ -111,12 +99,17 @@ func NewNextHopCounts(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr) (n
 func NewNextHop2(index IfIndex, gateway netip.Addr, src netip.Addr) (next *NextHop, err error) {
 	var linkAddr *LinkAddr
 	if index.IsValid() {
-		linkAddr, _ = NewLinkAddr(index, "", nil)
+		linkAddr = NewLinkAddr(index, "")
 		if linkAddr, err = linkAddr.UpdateName(); err != nil {
 			return
 		}
 	}
 	return NewNextHop(gateway, linkAddr, src), err
+}
+
+// EmptyNextHop provides empty NextHop
+func EmptyNextHop() *NextHop {
+	return &NextHop{}
 }
 
 // HasGateway determines if next hop uses a remote gateway
@@ -129,9 +122,12 @@ func (nh *NextHop) HasSrc() bool {
 	return nh.Src.IsValid() && !nh.Src.IsUnspecified()
 }
 
-// EmptyNextHop provides empty NextHop
-func EmptyNextHop() *NextHop {
-	return &NextHop{}
+func (n *NextHop) IsZeroValue() (isZeroValue bool) {
+	return !n.Gateway.IsValid() &&
+		n.LinkAddr.IsZeroValue() &&
+		!n.Src.IsValid() &&
+		n.nIPv4 == 0 &&
+		n.nIPv6 == 0
 }
 
 // Target describes the detination for this next hop
@@ -182,15 +178,40 @@ func (nh *NextHop) Target() (gateway netip.Addr, s string) {
 	return
 }
 
+func (n *NextHop) Dump() (s string) {
+	return parl.Sprintf("nextHop_gwIP_%s_%s_src_%s_4:%d_6:%d",
+		n.Gateway.String(),
+		n.LinkAddr.Dump(),
+		n.Src,
+		n.nIPv4, n.nIPv6,
+	)
+}
+
 func (nextHop *NextHop) String() (s string) {
+
+	// addr and hasNameZone
+	var hasNameZone bool
 	if nextHop.HasGateway() {
-		s = nextHop.Gateway.String() + "\x20"
+		s = nextHop.Gateway.String()
+		gatewayAddr := nextHop.Gateway
+		hasZone, isNumeric := Zone(gatewayAddr)
+		hasNameZone = hasZone && !isNumeric
 	}
-	s += nextHop.LinkAddr.OneString()
+
+	// interface name
+	if !hasNameZone && !nextHop.LinkAddr.IsZeroValue() {
+		if s != "" {
+			s += "\x20"
+		}
+		s += nextHop.LinkAddr.OneString() // name or mac or if-index
+	}
+
+	// src 1.2.3.4
 	if nextHop.Src.IsValid() &&
-		((nextHop.Src.Is4() && nextHop.nIPv4 != 1) ||
-			(nextHop.Src.Is6() && nextHop.nIPv6 != 1)) {
+		((nextHop.Src.Is4() && nextHop.nIPv4 > 1) ||
+			(nextHop.Src.Is6() && nextHop.nIPv6 > 1)) {
 		s += " src " + nextHop.Src.String()
 	}
+
 	return
 }

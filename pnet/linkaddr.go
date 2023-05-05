@@ -8,7 +8,9 @@ package pnet
 import (
 	"net"
 	"strconv"
+	"strings"
 
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/exp/slices"
 )
@@ -34,81 +36,121 @@ type LinkAddr struct {
 }
 
 // NewLinkAddr instantiates LinkAddr
-func NewLinkAddr(index IfIndex, name string, hw net.HardwareAddr) (linkAddr *LinkAddr, err error) {
+func NewLinkAddr(index IfIndex, name string) (linkAddr *LinkAddr) {
+	return &LinkAddr{
+		IfIndex: index,
+		Name:    name,
+	}
+}
 
-	// check hw
-	var hardwareAddr net.HardwareAddr
+func (a *LinkAddr) SetHw(hw net.HardwareAddr) (err error) {
 	if !slices.Contains(HardwareAddrLengthsWithZero, len(hw)) {
-		err = perrors.ErrorfPF("hardware address bad length: %d allowed: [%v]", hardwareAddr)
+		err = perrors.ErrorfPF("hardware address bad length: %d allowed: [%v]", hw)
 		return
 	} else if len(hw) > 0 {
-		hardwareAddr = hw
+		a.HardwareAddr = hw
 	}
-
-	linkAddr = &LinkAddr{
-		IfIndex:      index,
-		Name:         name,
-		HardwareAddr: hardwareAddr,
-	}
-
 	return
 }
 
 // UpdateName attempts to populate interface name if not already present
-func (linkA *LinkAddr) UpdateName() (linkAddr *LinkAddr, err error) {
-	linkAddr = linkA
-	if linkA.Name != "" {
+func (a *LinkAddr) UpdateName() (linkAddr *LinkAddr, err error) {
+	linkAddr = a
+	if a.Name != "" {
 		return // name already present return
 	}
 	var name string
-	if name, err = linkA.IfIndex.Zone(); err != nil {
+	if name, _, err = a.IfIndex.Zone(); err != nil {
 		return // error while getting interface data return
 	}
 	if name == "" {
 		return // no new name obtained return
 	}
 	linkAddr = &LinkAddr{
-		IfIndex:      linkA.IfIndex,
+		IfIndex:      a.IfIndex,
 		Name:         name,
-		HardwareAddr: linkA.HardwareAddr,
+		HardwareAddr: a.HardwareAddr,
 	}
 	return // name updated return
 }
 
 // ZoneID is the IPv6 ZoneID for this interface
-func (linkA *LinkAddr) ZoneID() string {
-	if linkA != nil {
-		if linkA.Name != "" {
-			return linkA.Name
-		} else if linkA.IfIndex > 0 {
-			return strconv.Itoa(int(linkA.IfIndex))
+func (a *LinkAddr) ZoneID() string {
+	if a != nil {
+		if a.Name != "" {
+			return a.Name
+		} else if a.IfIndex > 0 {
+			return strconv.Itoa(int(a.IfIndex))
 		}
 	}
 	return "0"
 }
 
 // OneString picks the most meaningful value
-func (linkA *LinkAddr) OneString() string {
-	if linkA != nil {
-		if linkA.Name != "" {
-			return linkA.Name
-		} else if len(linkA.HardwareAddr) > 0 {
-			return linkA.HardwareAddr.String()
-		} else if linkA.IfIndex > 0 {
-			return "#" + strconv.Itoa(int(linkA.IfIndex))
+//   - interface name or hardware address or #interface index or "0"
+func (a *LinkAddr) OneString() string {
+	if a != nil {
+		if a.Name != "" {
+			return a.Name
+		} else if len(a.HardwareAddr) > 0 {
+			return a.HardwareAddr.String()
+		} else if a.IfIndex > 0 {
+			return "#" + strconv.Itoa(int(a.IfIndex))
 		}
 	}
 	return "0"
 }
 
+func (a *LinkAddr) IsValid() (isValid bool) {
+	return a.IfIndex != 0 ||
+		a.Name != "" ||
+		len(a.HardwareAddr) > 0
+}
+
+func (a *LinkAddr) IsZeroValue() (isZeroValue bool) {
+	return a.IfIndex == 0 &&
+		a.Name == "" &&
+		a.HardwareAddr == nil
+}
+
+// "#13_en5_00:00:5e:00:53:01"
+//   - zero-values are skipped
+//   - zero-value: "zero-value"
+func (a *LinkAddr) NonZero() (s string) {
+	var sL []string
+	if a.IfIndex != 0 {
+		sL = append(sL, a.IfIndex.String()) // "#13"
+	}
+	if a.Name != "" {
+		sL = append(sL, a.Name)
+	}
+	if len(a.HardwareAddr) > 0 {
+		sL = append(sL, a.HardwareAddr.String()) // "00:00:5e:00:53:01"
+	}
+	if len(sL) > 0 {
+		s = strings.Join(sL, "_")
+	} else {
+		s = "zero-value"
+	}
+	return
+}
+
+func (a *LinkAddr) Dump() (s string) {
+	return parl.Sprintf("linkAddr#%d%q_hw%s",
+		a.IfIndex,
+		a.Name,
+		a.HardwareAddr.String(),
+	)
+}
+
 // "en8(28)00:11:22:33:44:55:66"
-func (linkA *LinkAddr) String() (s string) {
-	if len(linkA.Name) > 0 {
-		s += linkA.Name
+func (a *LinkAddr) String() (s string) {
+	if len(a.Name) > 0 {
+		s += a.Name
 	}
-	if linkA.IfIndex > 0 {
-		s += "(" + strconv.Itoa(int(linkA.IfIndex)) + ")"
+	if a.IfIndex > 0 {
+		s += "(" + strconv.Itoa(int(a.IfIndex)) + ")"
 	}
-	s += linkA.HardwareAddr.String()
+	s += a.HardwareAddr.String()
 	return
 }

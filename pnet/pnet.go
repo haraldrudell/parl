@@ -115,19 +115,6 @@ func shorten(IP net.IP) (s string) {
 	return
 }
 
-// IPAddr returns IPAddr from IP and IfIndex to IPAddr
-func IPAddr(IP net.IP, index IfIndex, zone string) (ipa *net.IPAddr, err error) {
-	ipa = &net.IPAddr{IP: IP}
-	if IsIPv6(IP) {
-		if zone != "" {
-			ipa.Zone = zone
-		} else {
-			ipa.Zone, err = index.Zone()
-		}
-	}
-	return
-}
-
 func IsErrClosed(err error) (isErrNetClosing bool) {
 	// if err is nil, ok is false
 	if netOpError, ok := err.(*net.OpError); ok { // error occured during the operation

@@ -7,6 +7,8 @@ ISC License
 package iana
 
 import (
+	"strconv"
+
 	"github.com/haraldrudell/parl/ints"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/sets"
@@ -123,6 +125,10 @@ func NewAddressFamily1[T constraints.Integer](integer T) (addressFamily AddressF
 
 func (af AddressFamily) String() (s string) {
 	return addressFamilySet.StringT(af)
+}
+
+func (af AddressFamily) StringInt() (s string) {
+	return addressFamilySet.StringT(af) + "-0x" + strconv.FormatUint(uint64(af), 16)
 }
 
 func (af AddressFamily) Int() (addressFamilyInt int) {

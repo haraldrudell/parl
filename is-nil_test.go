@@ -8,6 +8,10 @@ package parl
 import "testing"
 
 func TestIsNil(t *testing.T) {
+	// t.Logf("is nil: %t", (any)((*int)(nil)) == nil)
+	// t.Logf("IsNil: %t", IsNil((*int)(nil)))
+	// t.Fail()
+
 	var p *int
 	var i int
 	type args struct {

@@ -8,8 +8,10 @@ package punix
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -122,5 +124,60 @@ func TestErrno(t *testing.T) {
 	}
 	if errno != unix.ENOENT {
 		t.Errorf("punix.Errno returned wrong value: %#v", errno)
+	}
+
+}
+
+func TestErrnoValue(t *testing.T) {
+	var epermInt = 1
+	var epermString = "operation not permitted"
+	var epermName = "EPERM"
+
+	var isError bool
+	var errnoValue int
+	var actual string
+
+	isError = unix.EPERM != 0
+	if !isError {
+		t.Error("isError false")
+	}
+	errnoValue = int(unix.EPERM)
+	if errnoValue != epermInt {
+		t.Errorf("errnoValue %d exp %d", errnoValue, epermInt)
+	}
+	actual = fmt.Sprintf("%d", unix.EPERM)
+	if actual != strconv.Itoa(epermInt) {
+		t.Errorf("%%d: %q exp %q", actual, strconv.Itoa(epermInt))
+	}
+	actual = fmt.Sprintf("%v", unix.EPERM)
+	if actual != epermString {
+		t.Errorf("%%v: %q exp %q", actual, epermString)
+	}
+	actual = unix.ErrnoName(unix.EPERM)
+	if actual != epermName {
+		t.Errorf("ErrnoName: %q exp %q", actual, epermName)
+	}
+}
+
+func TestErrorNumberString(t *testing.T) {
+	type args struct {
+		label string
+		err   error
+	}
+	tests := []struct {
+		name                   string
+		args                   args
+		wantErrnoNumericString string
+	}{
+		{"no error", args{"abc", nil}, ""},
+		{"EPERM", args{"errno", unix.EPERM}, "errno: EPERM 1 0x1"},
+		{"-1", args{"", unix.Errno(math.MaxUint)}, "-1 -0x1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotErrnoNumericString := ErrnoString(tt.args.label, tt.args.err); gotErrnoNumericString != tt.wantErrnoNumericString {
+				t.Errorf("ErrorNumberString() = %v, want %v", gotErrnoNumericString, tt.wantErrnoNumericString)
+			}
+		})
 	}
 }

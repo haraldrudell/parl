@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/haraldrudell/parl/errorglue"
+	"golang.org/x/sys/unix"
 )
 
 func TestDumpChain(t *testing.T) {
@@ -173,3 +174,29 @@ func (er valueError) Error() string { return er.s }
 type pointerError struct{ s string }
 
 func (er *pointerError) Error() string { return er.s }
+
+func TestIsError(t *testing.T) {
+
+	// err nil
+	var err error
+	if IsError(err) {
+		t.Error("error(nil): true")
+	}
+
+	// err non-nil
+	if !IsError(errors.New("x")) {
+		t.Error("errors.New: false")
+	}
+
+	// Errno 0
+	if IsError(unix.Errno(0)) {
+		t.Error("unix.Errno(0): true")
+	}
+
+	// Errno non-0
+	if !IsError(unix.EPERM) {
+		t.Error("unix.EPERM: false")
+	}
+
+	//t.Fail()
+}

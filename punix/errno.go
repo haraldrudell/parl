@@ -28,16 +28,28 @@ func IsConnectionRefused(err error) (isConnectionRefused bool) {
 }
 
 // Errno scans an error chain for a unix.Errno type.
-// Errno returns unix.Errno 0x0 if none exists.
+//   - if no errno value exists, unix.Errno 0x0 is returned
+//   - unlike most error implementations, unix.Errno type is uintptr
+//   - to check for error condition of a unix.Errno error: if errno != 0 {…
+//   - to obtain errno number: int(errno)
+//   - to print errno number: fmt.Sprintf("%d", errno) → "1"
+//   - to print errno message: fmt.Sprintf("%v", unix.EPERM) → "operation not permitted"
+//   - to obtain errno name: unix.ErrnoName(unix.EPERM) → "EPERM"
+//   - to print hexadecimal errno:
+//
 // Note: unix.Errno.Error has value receiver.
 // Errno checks:
 //
 //	Errno(nil) == 0 → true.
 //	if errno != 0 {…
-//	int(errno) provides the numeric value.
+//	int(errno) // numeric value
 //	 if errno == unix.ENOENT…
-//	 fmt.Printf("%v", errno) → state not recoverable
-//	 fmt.Printf("0x%x", int(errno)) → 0x68
+//	 fmt.Sprintf("%d", unix.EPERM) → "1"
+//	 fmt.Printf("%v", errno) → "state not recoverable"
+//	 unix.ErrnoName(unix.EPERM) → "EPERM"
+//	 var i, s = int(errno), ""
+//	 if i < 0 { i = -i; s = "-" }
+//	 fmt.Printf("%s0x%x", s, i) → 0x68
 func Errno(err error) (errnoValue unix.Errno) {
 	for ; err != nil; err = errors.Unwrap(err) {
 		var ok bool
@@ -48,18 +60,38 @@ func Errno(err error) (errnoValue unix.Errno) {
 	return // no match return
 }
 
-// ErrorNumberString returns the errno number as a string if
+// ErrnoString returns the errno number as a string if
 // the err error chain has a non-zero syscall.Errno error.
-//   - returned string is similar to: "label: 5 0x5"
 //   - if label is empty string, no label is returned
 //   - if no syscall.Errno is found or it is zero, the empty string is returned
-func ErrorNumberString(err error, label string) (errnoNumericString string) {
-	if syscallErrno := Errno(err); syscallErrno != 0 {
-		if label != "" {
-			label += ": "
-		}
-		errnoNumericString = label + strconv.Itoa(int(syscallErrno)) + " 0x" + strconv.FormatInt(int64(syscallErrno), 16)
+//   - ErrnoString("errno", nil) → ""
+//   - ErrnoString("errno", unix.EPERM) → "errno: EPERM 1 0x1"
+//   - ErrnoString("errno", unix.Errno(math.MaxUint)) → "-1 -0x1"
+func ErrnoString(label string, err error) (errnoNumericString string) {
+	var unixErrno = Errno(err)
+	if unixErrno == 0 {
+		return // no errno error return: ""
 	}
+
+	if label != "" {
+		errnoNumericString = label + ":\x20"
+	}
+
+	if name := unix.ErrnoName(unixErrno); name != "" {
+		errnoNumericString += name + "\x20"
+	}
+
+	var errno = int(unixErrno)
+	errnoNumericString += strconv.Itoa(errno) + "\x20"
+
+	var hexErrno = int64(errno)
+	var sign string
+	if hexErrno < 0 {
+		sign = "-"
+		hexErrno = -hexErrno
+	}
+	errnoNumericString += sign + "0x" + strconv.FormatInt(hexErrno, 16)
+
 	return
 }
 
