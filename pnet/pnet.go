@@ -115,6 +115,8 @@ func shorten(IP net.IP) (s string) {
 	return
 }
 
+// IsErrClosed returns true if err is when waiting for accept and the socket is closed
+//   - can be used with net.Conn.Accept
 func IsErrClosed(err error) (isErrNetClosing bool) {
 	// if err is nil, ok is false
 	if netOpError, ok := err.(*net.OpError); ok { // error occured during the operation

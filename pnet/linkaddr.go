@@ -6,6 +6,7 @@ ISC License
 package pnet
 
 import (
+	"errors"
 	"net"
 	"strconv"
 	"strings"
@@ -20,6 +21,21 @@ const (
 	HardwareAddrEui64  = 8
 	HardwareAddrInfini = 20
 )
+
+// ErrNoSuchInterface is the value net.errNoSuchInterface
+//
+// Usage:
+//
+//	if errors.Is(err, pnet.ErrNoSuchInterface) { …
+var ErrNoSuchInterface = func() (err error) {
+	for _, e := net.InterfaceByName("a b"); e != nil; e = errors.Unwrap(e) {
+		err = e
+	}
+	if err == nil {
+		panic(perrors.NewPF("failed to obtain NoSuchInterface from InterfaceByName"))
+	}
+	return
+}()
 
 var HardwareAddrLengths = []int{HardwareAddrMac48, HardwareAddrEui64, HardwareAddrInfini}
 var HardwareAddrLengthsWithZero = append([]int{0}, HardwareAddrLengths...)
@@ -72,6 +88,24 @@ func (a *LinkAddr) UpdateName() (linkAddr *LinkAddr, err error) {
 		HardwareAddr: a.HardwareAddr,
 	}
 	return // name updated return
+}
+
+// Interface returns net.Interface associated with LinkAddr
+//   - order is index, name, mac
+//   - if LinkAddr is zero-value, nil is returned
+func (a *LinkAddr) Interface() (netInterface *net.Interface, isNoSuchInterface bool, err error) {
+	if a.IfIndex.IsValid() {
+		return a.IfIndex.Interface()
+	} else if a.Name != "" {
+		if netInterface, err = net.InterfaceByName(a.Name); err != nil {
+			isNoSuchInterface = errors.Is(err, ErrNoSuchInterface)
+			err = perrors.Errorf("net.InterfaceByName %w", err)
+		}
+		return
+	} else if len(a.HardwareAddr) > 0 {
+		return HardwareAddrInterface(a.HardwareAddr)
+	}
+	return // zero-value: netInterface nil return
 }
 
 // ZoneID is the IPv6 ZoneID for this interface

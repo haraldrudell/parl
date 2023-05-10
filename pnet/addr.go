@@ -8,7 +8,6 @@ package pnet
 import (
 	"net"
 	"net/netip"
-	"regexp"
 	"strconv"
 
 	"github.com/haraldrudell/parl/perrors"
@@ -132,18 +131,20 @@ func EnsureZone(addr netip.Addr, ifName string, ifIndex IfIndex, acceptNumeric .
 	return
 }
 
-var isDigits = regexp.MustCompile(`^[0-9]+$`).MatchString
+//var isDigits = regexp.MustCompile(`^[0-9]+$`).MatchString
 
 // Zone examines the zone included in addr
 //   - no zone: hasZone, isNumeric false
 //   - numeric zone "1": hasZone true, isNumeric false
 //   - interface-name zone "eth0": hasZone, isNumeric true
-func Zone(addr netip.Addr) (hasZone, isNumeric bool) {
-	var zone = addr.Zone()
+func Zone(addr netip.Addr) (zone string, znum int, hasZone, isNumeric bool) {
+	zone = addr.Zone()
 	if hasZone = zone != ""; !hasZone {
 		return
 	}
-	isNumeric = isDigits(zone)
+	var err error
+	znum, err = strconv.Atoi(zone)
+	isNumeric = err == nil
 	return
 }
 
@@ -158,4 +159,12 @@ func IPAddr(IP net.IP, index IfIndex, zone string) (ipa *net.IPAddr, err error) 
 		}
 	}
 	return
+}
+
+// AddrToIPAddr: Network() "ip", no port number
+func AddrToIPAddr(addr netip.Addr) (addrInterface net.Addr) {
+	if !addr.IsValid() {
+		panic(perrors.NewPF("invalid netip.Addr"))
+	}
+	return &net.IPAddr{IP: addr.AsSlice(), Zone: addr.Zone()}
 }

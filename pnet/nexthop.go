@@ -13,6 +13,10 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
+const (
+	UseInterfaceNameCache = true
+)
+
 // NextHop describes a route target
 type NextHop struct {
 	/*
@@ -52,21 +56,61 @@ func NewNextHop(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr) (nextHop
 // NewNextHopCounts returns NextHop with current IP address counts
 //   - if input LinkAddr does not have interface name, interface name is added to output nextHop
 //   - 6in4 are converted to IPv4
-func NewNextHopCounts(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr) (nextHop *NextHop, err error) {
-
-	// valid interface index
-	var ifIndex = linkAddr.IfIndex
-	if !ifIndex.IsValid() {
-		nextHop = NewNextHop(gateway, linkAddr, src)
-		return
+func NewNextHopCounts(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr,
+	useNameCache ...nameCacher,
+) (nextHop *NextHop, err error) {
+	var doCache = NoCache
+	if len(useNameCache) > 0 {
+		doCache = useNameCache[0]
 	}
 
-	// net.Interface struct for ifIndex
-	var name string
+	// tentative NextHop value based on input arguments
+	var nh = NewNextHop(gateway, linkAddr, src)
+
+	// interface from LinkAddr is required to get IP addresses assigned to the network interface
+	var netInterface *net.Interface
+	var interfaceName string
+	var unknownInterface bool
+	// obtain interface using index, name or mac
+	if netInterface, unknownInterface, err = nh.LinkAddr.Interface(); err != nil {
+		// for netlink packets of deleted interface, the index is already invalid
+		//	- use the cache to obtain the interface name
+		if unknownInterface && doCache != NoCache && linkAddr.IfIndex.IsValid() {
+			if interfaceName, err = networkInterfaceNameCache.CachedName(linkAddr.IfIndex, doCache); err == nil {
+				if nh.LinkAddr.Name == "" && interfaceName != "" {
+					nh.LinkAddr.Name = interfaceName // update interface name if not already set
+				}
+			}
+		}
+		if err != nil {
+			return // error in LinkAddr.Interface or CachedName
+		}
+	}
+	if netInterface == nil {
+		nextHop = nh
+		return // Linkaddr interface did not exist
+	}
+
+	// update nh.Linkaddr from netInterface
+	if !nh.LinkAddr.IfIndex.IsValid() {
+		if nh.LinkAddr.IfIndex, err = NewIfIndexInt(netInterface.Index); err != nil {
+			return
+		}
+	}
+	if nh.LinkAddr.Name == "" {
+		nh.LinkAddr.Name = netInterface.Name // update interface name if not already set
+	}
+	if len(nh.LinkAddr.HardwareAddr) == 0 {
+		nh.LinkAddr.HardwareAddr = netInterface.HardwareAddr
+	}
+
+	// get IP address counts from interface
 	var i4, i6 []netip.Prefix
-	if name, i4, i6, err = ifIndex.InterfaceAddrs(); err != nil {
+	if i4, i6, err = InterfaceAddrs(netInterface); err != nil {
 		return
 	}
+	nh.nIPv4 = len(i4)
+	nh.nIPv6 = len(i6)
 	// macOS lo0 has address:
 	// for i := 0; i < len(i6); {
 	// 	addr := i6[i].Addr()
@@ -78,20 +122,7 @@ func NewNextHopCounts(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr) (n
 	// 	}
 	// 	i++
 	// }
-
-	// interface name is typically missing, populate it
-	var linkAddr2 = linkAddr
-	if linkAddr.Name == "" {
-		linkAddr2 = NewLinkAddr(linkAddr.IfIndex, name)
-		if linkAddr2.SetHw(linkAddr.HardwareAddr); err != nil {
-			return
-		}
-	}
-
-	nextHop = NewNextHop(gateway, linkAddr2, src)
-	nextHop.nIPv4 = len(i4)
-	nextHop.nIPv6 = len(i6)
-
+	nextHop = nh
 	return
 }
 
@@ -128,6 +159,109 @@ func (n *NextHop) IsZeroValue() (isZeroValue bool) {
 		!n.Src.IsValid() &&
 		n.nIPv4 == 0 &&
 		n.nIPv6 == 0
+}
+
+// Name returns nextHop interface name
+//   - name can be returned empty
+//   - name of Linkaddr, then interface from index, name, mac
+func (n *NextHop) Name(useNameCache ...nameCacher) (name string, err error) {
+	var doCache = NoCache
+	if len(useNameCache) > 0 {
+		doCache = useNameCache[0]
+	}
+
+	if name = n.LinkAddr.Name; name != "" {
+		return // nexthop had interface name available return
+	}
+
+	var netInterface *net.Interface
+	var noSuchInterface bool
+	if netInterface, noSuchInterface, err = n.LinkAddr.Interface(); err != nil {
+		if noSuchInterface {
+			err = nil
+		} else {
+			return // interface retrieval error return
+		}
+	}
+	if netInterface != nil {
+		name = netInterface.Name
+		return // name from interface return
+	}
+
+	// try using IP address
+	var a = n.Gateway
+	if !a.IsValid() {
+		a = n.Src
+	}
+	if !a.IsValid() {
+		return // no IP available return
+	}
+	zone, znum, hasZone, isNumeric := Zone(a)
+	if hasZone && !isNumeric {
+		name = zone
+		return // interface name from zone
+	}
+
+	// interface IP assignments
+	var ifs []net.Interface
+	if ifs, err = Interfaces(); err != nil {
+		return
+	}
+	for i := 0; i < len(ifs); i++ {
+		ifp := &ifs[i]
+		var i4, i6 []netip.Prefix
+		if i4, i6, err = InterfaceAddrs(ifp); err != nil {
+			return
+		}
+		if a.Is4() {
+			for _, i4p := range i4 {
+				if i4p.Contains(a) {
+					name = ifp.Name
+					return // interface name by finding assigned IP
+				}
+			}
+			var a6 = netip.AddrFrom16(a.As16())
+			for _, i6p := range i6 {
+				if i6p.Contains(a6) {
+					name = ifp.Name
+					return // interface name by finding assigned IP
+				}
+			}
+		} else {
+			for _, i6p := range i6 {
+				if i6p.Contains(a) {
+					name = ifp.Name
+					return // interface name by finding assigned IP
+				}
+			}
+		}
+	}
+
+	// use cache
+	if doCache == NoCache {
+		return
+	}
+	var ixs []IfIndex
+	if n.LinkAddr.IfIndex.IsValid() {
+		ixs = append(ixs, n.LinkAddr.IfIndex)
+	}
+	if isNumeric {
+		var ifIndex IfIndex
+		if ifIndex, err = NewIfIndexInt(znum); err != nil {
+			return
+		}
+		if ifIndex.IsValid() && ifIndex != n.LinkAddr.IfIndex {
+			ixs = append(ixs, ifIndex)
+		}
+	}
+	for _, ifi := range ixs {
+		if name, err = networkInterfaceNameCache.CachedName(ifi, doCache); err != nil {
+			return
+		} else if name != "" {
+			return
+		}
+	}
+	return
 }
 
 // Target describes the detination for this next hop
@@ -194,7 +328,7 @@ func (nextHop *NextHop) String() (s string) {
 	if nextHop.HasGateway() {
 		s = nextHop.Gateway.String()
 		gatewayAddr := nextHop.Gateway
-		hasZone, isNumeric := Zone(gatewayAddr)
+		_, _, hasZone, isNumeric := Zone(gatewayAddr)
 		hasNameZone = hasZone && !isNumeric
 	}
 
