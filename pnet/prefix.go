@@ -12,10 +12,8 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// ComparePrefixIsEqual returns true if two netip.Prefix values are equal
-func ComparePrefixIsEqual(prefix0, prefix1 netip.Prefix) (isEqual bool) {
-	return prefix0.Addr().Compare(prefix1.Addr()) == 0 && prefix0.Bits() == prefix1.Bits()
-}
+var IPv4DefaultNetwork = netip.MustParsePrefix("0.0.0.0/0")
+var IPv6DefaultNetwork = netip.MustParsePrefix("::/0")
 
 // MaskToBits returns number of leading 1-bits in byts
 //   - convert from net.IPMask to netip.Prefix

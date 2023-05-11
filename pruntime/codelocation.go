@@ -99,6 +99,11 @@ func (cl *CodeLocation) PackFunc() (packageDotFunction string) {
 	return packageName + "." + funcName
 }
 
+func (cl *CodeLocation) FuncIdentifier() (funcIdentifier string) {
+	_, _, _, funcIdentifier = SplitAbsoluteFunctionName(cl.FuncName)
+	return
+}
+
 // Base returns base package name, an optional type name and the function name:
 //
 //	mains.(*Executable).AddErr
@@ -106,6 +111,7 @@ func (cl *CodeLocation) Base() (baseName string) {
 	return filepath.Base(cl.FuncName)
 }
 
+// "github.com/haraldrudell/parl/mains.(*Executable).AddErr:43"
 func (cl *CodeLocation) FuncLine() (funcLine string) {
 	return cl.FuncName + ":" + strconv.Itoa(cl.Line)
 }

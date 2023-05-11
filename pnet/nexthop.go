@@ -170,10 +170,12 @@ func (n *NextHop) Name(useNameCache ...nameCacher) (name string, err error) {
 		doCache = useNameCache[0]
 	}
 
+	// is name already present?
 	if name = n.LinkAddr.Name; name != "" {
 		return // nexthop had interface name available return
 	}
 
+	// interface from LinkAddr
 	var netInterface *net.Interface
 	var noSuchInterface bool
 	if netInterface, noSuchInterface, err = n.LinkAddr.Interface(); err != nil {
@@ -188,7 +190,7 @@ func (n *NextHop) Name(useNameCache ...nameCacher) (name string, err error) {
 		return // name from interface return
 	}
 
-	// try using IP address
+	// interface from IP address
 	var a = n.Gateway
 	if !a.IsValid() {
 		a = n.Src
@@ -196,51 +198,25 @@ func (n *NextHop) Name(useNameCache ...nameCacher) (name string, err error) {
 	if !a.IsValid() {
 		return // no IP available return
 	}
+	if netInterface, _, _, err = InterfaceFromAddr(a); err != nil {
+		return
+	} else if netInterface != nil {
+		name = netInterface.Name
+		return
+	}
+
 	zone, znum, hasZone, isNumeric := Zone(a)
 	if hasZone && !isNumeric {
 		name = zone
 		return // interface name from zone
 	}
 
-	// interface IP assignments
-	var ifs []net.Interface
-	if ifs, err = Interfaces(); err != nil {
-		return
-	}
-	for i := 0; i < len(ifs); i++ {
-		ifp := &ifs[i]
-		var i4, i6 []netip.Prefix
-		if i4, i6, err = InterfaceAddrs(ifp); err != nil {
-			return
-		}
-		if a.Is4() {
-			for _, i4p := range i4 {
-				if i4p.Contains(a) {
-					name = ifp.Name
-					return // interface name by finding assigned IP
-				}
-			}
-			var a6 = netip.AddrFrom16(a.As16())
-			for _, i6p := range i6 {
-				if i6p.Contains(a6) {
-					name = ifp.Name
-					return // interface name by finding assigned IP
-				}
-			}
-		} else {
-			for _, i6p := range i6 {
-				if i6p.Contains(a) {
-					name = ifp.Name
-					return // interface name by finding assigned IP
-				}
-			}
-		}
-	}
-
-	// use cache
+	// should cache be used?
 	if doCache == NoCache {
 		return
 	}
+
+	// get indexes that can be used with cache
 	var ixs []IfIndex
 	if n.LinkAddr.IfIndex.IsValid() {
 		ixs = append(ixs, n.LinkAddr.IfIndex)
@@ -254,6 +230,8 @@ func (n *NextHop) Name(useNameCache ...nameCacher) (name string, err error) {
 			ixs = append(ixs, ifIndex)
 		}
 	}
+
+	// search cache
 	for _, ifi := range ixs {
 		if name, err = networkInterfaceNameCache.CachedName(ifi, doCache); err != nil {
 			return

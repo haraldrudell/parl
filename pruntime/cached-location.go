@@ -7,6 +7,7 @@ package pruntime
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -22,35 +23,55 @@ const (
 //	func f() {
 //	  println(mycl.PackFunc())
 type CachedLocation struct {
-	initializeOnce            sync.Once
-	packFunc, short, funcName string
+	initLock                                  sync.Mutex
+	isReady                                   atomic.Bool // written inside lock, read provides thread-safety
+	packFunc, short, funcName, funcIdentifier string      // written inside lock
 }
 
 // init returns a cached provider of code location in string formats
 func (c *CachedLocation) init() {
+	c.initLock.Lock()
+	defer c.initLock.Unlock()
+
+	if c.isReady.Load() {
+		return // was already set
+	}
 	var codeLocation = NewCodeLocation(cachedLocationFrames)
 	c.packFunc = codeLocation.PackFunc()
 	c.short = codeLocation.Short()
 	c.funcName = codeLocation.FuncName
+	c.funcIdentifier = codeLocation.FuncIdentifier()
+	c.isReady.Store(true) // last write to avoid race condition
 }
 
 // "mains.AddErr" Thread-safe
 //   - similar to [perrors.NewPF] or [perrors.ErrorfPF]
 func (c *CachedLocation) PackFunc() (packFunc string) {
-	c.initializeOnce.Do(c.init)
+	if !c.isReady.Load() {
+		c.init()
+	}
 	return c.packFunc
+}
+
+// "myFunc"
+func (c *CachedLocation) FuncIdentifier() (funcIdentifier string) {
+	return c.funcIdentifier
 }
 
 // "mains.(*Executable).AddErr-executable.go:25" Thread-safe
 //   - similar to [perrors.Short] location
 func (c *CachedLocation) Short() (location string) {
-	c.initializeOnce.Do(c.init)
+	if !c.isReady.Load() {
+		c.init()
+	}
 	return c.short
 }
 
 // "github.com/haraldrudell/parl/mains.(*Executable).AddErr" Thread-safe
 //   - FuncName is the value compared to by [parl.SetRegexp]
 func (c *CachedLocation) FuncName() (location string) {
-	c.initializeOnce.Do(c.init)
+	if !c.isReady.Load() {
+		c.init()
+	}
 	return c.funcName
 }

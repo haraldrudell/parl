@@ -12,7 +12,6 @@ import (
 	"net/netip"
 	"strconv"
 
-	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -60,7 +59,6 @@ func (ifIndex IfIndex) InterfaceAddrs(useNameCache ...nameCacher) (name string, 
 	var netInterface *net.Interface
 	var isErrNoSuchInterface bool
 	if netInterface, isErrNoSuchInterface, err = ifIndex.Interface(); err != nil {
-		parl.D("\nisErrNoSuchInterface %t %s", isErrNoSuchInterface, perrors.Short(err))
 		if isErrNoSuchInterface && doCache != NoCache {
 			name, err = networkInterfaceNameCache.CachedName(ifIndex, doCache)
 		}

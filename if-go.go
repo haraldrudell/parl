@@ -165,6 +165,9 @@ type GoGroup interface {
 	// threads that have been named ordered by name
 	NamedThreads() (threads []ThreadData)
 	// SetDebug enables debug logging on this particular instance
+	//	- parl.NoDebug
+	//	- parl.DebugPrint
+	//	- parl.AggregateThread
 	SetDebug(debug GoDebug)
 	fmt.Stringer
 }
