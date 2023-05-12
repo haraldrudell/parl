@@ -14,8 +14,9 @@ const (
 	cachedLocationFrames = 2
 )
 
-// CachedLocation caches the code location and performantly provides it in string formats
+// CachedLocation caches the code location and performantly provides it in string formats. Thread-safe
 //   - one top-level CachedLocation variable is required for each code location
+//   - code line provided is the location of first getter method
 //
 // usage:
 //
@@ -28,22 +29,6 @@ type CachedLocation struct {
 	packFunc, short, funcName, funcIdentifier string      // written inside lock
 }
 
-// init returns a cached provider of code location in string formats
-func (c *CachedLocation) init() {
-	c.initLock.Lock()
-	defer c.initLock.Unlock()
-
-	if c.isReady.Load() {
-		return // was already set
-	}
-	var codeLocation = NewCodeLocation(cachedLocationFrames)
-	c.packFunc = codeLocation.PackFunc()
-	c.short = codeLocation.Short()
-	c.funcName = codeLocation.FuncName
-	c.funcIdentifier = codeLocation.FuncIdentifier()
-	c.isReady.Store(true) // last write to avoid race condition
-}
-
 // "mains.AddErr" Thread-safe
 //   - similar to [perrors.NewPF] or [perrors.ErrorfPF]
 func (c *CachedLocation) PackFunc() (packFunc string) {
@@ -53,8 +38,11 @@ func (c *CachedLocation) PackFunc() (packFunc string) {
 	return c.packFunc
 }
 
-// "myFunc"
+// "myFunc" Thread-safe
 func (c *CachedLocation) FuncIdentifier() (funcIdentifier string) {
+	if !c.isReady.Load() {
+		c.init()
+	}
 	return c.funcIdentifier
 }
 
@@ -74,4 +62,20 @@ func (c *CachedLocation) FuncName() (location string) {
 		c.init()
 	}
 	return c.funcName
+}
+
+// init returns a cached provider of code location in string formats
+func (c *CachedLocation) init() {
+	c.initLock.Lock()
+	defer c.initLock.Unlock()
+
+	if c.isReady.Load() {
+		return // was already set
+	}
+	var codeLocation = NewCodeLocation(cachedLocationFrames)
+	c.packFunc = codeLocation.PackFunc()
+	c.short = codeLocation.Short()
+	c.funcName = codeLocation.FuncName
+	c.funcIdentifier = codeLocation.FuncIdentifier()
+	c.isReady.Store(true) // last write to avoid race condition
 }
