@@ -5,10 +5,16 @@ ISC License
 
 package pnet
 
+import "sync/atomic"
+
 var networkInterfaceNameCache = NewInterfaceCache().Init()
+var updateDisabled atomic.Bool
 
 func UpdateNameCache() (err error) {
-	return networkInterfaceNameCache.Update()
+	if !updateDisabled.Load() {
+		_, err = networkInterfaceNameCache.Update()
+	}
+	return
 }
 
 func CachedName(ifIndex IfIndex) (name string) {
@@ -17,4 +23,9 @@ func CachedName(ifIndex IfIndex) (name string) {
 
 func NameCache() (m map[IfIndex]string) {
 	return networkInterfaceNameCache.Map()
+}
+
+func SetTestMap(testMap map[IfIndex]string, disableUpdate bool) (oldMap map[IfIndex]string) {
+	updateDisabled.Store(disableUpdate)
+	return networkInterfaceNameCache.SetMap(testMap)
 }

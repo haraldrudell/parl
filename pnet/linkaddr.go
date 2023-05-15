@@ -59,6 +59,19 @@ func NewLinkAddr(index IfIndex, name string) (linkAddr *LinkAddr) {
 	}
 }
 
+func (a *LinkAddr) UpdateFrom(b *LinkAddr) (isComplete bool) {
+	if !a.IfIndex.IsValid() && b.IfIndex.IsValid() {
+		a.IfIndex = b.IfIndex
+	}
+	if a.Name == "" && b.Name != "" {
+		a.Name = b.Name
+	}
+	if len(a.HardwareAddr) == 0 && len(b.HardwareAddr) > 0 {
+		a.HardwareAddr = b.HardwareAddr
+	}
+	return a.IsComplete()
+}
+
 func (a *LinkAddr) SetHw(hw net.HardwareAddr) (err error) {
 	if !slices.Contains(HardwareAddrLengthsWithZero, len(hw)) {
 		err = perrors.ErrorfPF("hardware address bad length: %d allowed: [%v]", hw)
@@ -67,6 +80,10 @@ func (a *LinkAddr) SetHw(hw net.HardwareAddr) (err error) {
 		a.HardwareAddr = hw
 	}
 	return
+}
+
+func (a *LinkAddr) SetName(name string) {
+	a.Name = name
 }
 
 // UpdateName attempts to populate interface name if not already present
@@ -142,9 +159,15 @@ func (a *LinkAddr) IsValid() (isValid bool) {
 }
 
 func (a *LinkAddr) IsZeroValue() (isZeroValue bool) {
-	return a.IfIndex == 0 &&
+	return !a.IfIndex.IsValid() &&
 		a.Name == "" &&
 		a.HardwareAddr == nil
+}
+
+func (a *LinkAddr) IsComplete() (isComplete bool) {
+	return a.IfIndex.IsValid() &&
+		a.Name != "" &&
+		len(a.HardwareAddr) > 0
 }
 
 // "#13_en5_00:00:5e:00:53:01"

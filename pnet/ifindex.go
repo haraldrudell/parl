@@ -50,7 +50,7 @@ func (ifIndex IfIndex) Interface() (netInterface *net.Interface, isErrNoSuchInte
 // InterfaceAddrs gets Addresses for interface
 //   - netInterface.Name is interface name "eth0"
 //   - netInterface.Addr() returns assigned IP addresses
-func (ifIndex IfIndex) InterfaceAddrs(useNameCache ...nameCacher) (name string, i4, i6 []netip.Prefix, err error) {
+func (ifIndex IfIndex) InterfaceAddrs(useNameCache ...NameCacher) (name string, i4, i6 []netip.Prefix, err error) {
 	var doCache = NoCache
 	if len(useNameCache) > 0 {
 		doCache = useNameCache[0]

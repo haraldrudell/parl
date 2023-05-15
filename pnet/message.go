@@ -10,6 +10,7 @@ import "fmt"
 // Message is a portable routing message emitted by the netlink socket or obtain via sysctl
 type Message interface {
 	Action() (action Action)
+	Dump() (dump string)
 	fmt.Stringer
 }
 

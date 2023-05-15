@@ -29,6 +29,11 @@ func (a Action) Description() (s string) {
 	return actionSet.Description(a)
 }
 
+func (a Action) IsValid() (isValid bool) {
+	var invalidAction Action
+	return a != invalidAction
+}
+
 func (a Action) String() (s string) {
 	return actionSet.StringT(a)
 }

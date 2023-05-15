@@ -57,7 +57,7 @@ func NewNextHop(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr) (nextHop
 //   - if input LinkAddr does not have interface name, interface name is added to output nextHop
 //   - 6in4 are converted to IPv4
 func NewNextHopCounts(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr,
-	useNameCache ...nameCacher,
+	useNameCache ...NameCacher,
 ) (nextHop *NextHop, err error) {
 	var doCache = NoCache
 	if len(useNameCache) > 0 {
@@ -138,9 +138,13 @@ func NewNextHop2(index IfIndex, gateway netip.Addr, src netip.Addr) (next *NextH
 	return NewNextHop(gateway, linkAddr, src), err
 }
 
-// EmptyNextHop provides empty NextHop
-func EmptyNextHop() *NextHop {
-	return &NextHop{}
+func NewNextHop3(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr, nIPv4, nIPv6 int) (nextHop *NextHop) {
+	return &NextHop{Gateway: gateway,
+		LinkAddr: *linkAddr,
+		Src:      src,
+		nIPv4:    nIPv4,
+		nIPv6:    nIPv6,
+	}
 }
 
 // HasGateway determines if next hop uses a remote gateway
@@ -164,7 +168,7 @@ func (n *NextHop) IsZeroValue() (isZeroValue bool) {
 // Name returns nextHop interface name
 //   - name can be returned empty
 //   - name of Linkaddr, then interface from index, name, mac
-func (n *NextHop) Name(useNameCache ...nameCacher) (name string, err error) {
+func (n *NextHop) Name(useNameCache ...NameCacher) (name string, err error) {
 	var doCache = NoCache
 	if len(useNameCache) > 0 {
 		doCache = useNameCache[0]
