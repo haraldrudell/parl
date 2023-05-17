@@ -20,6 +20,9 @@ const (
 )
 
 // OptionData contain options data for the flag package
+//   - OptionData is used for command-line options to be declarative
+//   - instead of flag.BoolVar and similar invocations scattered about the codebase
+//     all options are in a single OptionData slice that is iterated so that AddOption is invoked for each element
 type OptionData struct {
 	P     interface{}
 	Name  string

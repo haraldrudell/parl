@@ -18,6 +18,11 @@ func AddrPortToUDPAddr(addrPort netip.AddrPort) (addrInterface net.Addr) {
 	return &net.UDPAddr{IP: IP, Port: port, Zone: zone}
 }
 
+func AddrPortToUDPAddr2(addrPort netip.AddrPort) (addr *net.UDPAddr) {
+	IP, port, zone := SplitAddrPort(addrPort)
+	return &net.UDPAddr{IP: IP, Port: port, Zone: zone}
+}
+
 // AddrPortToTCPAddr: Network() "tcp"
 func AddrPortToTCPAddr(addrPort netip.AddrPort) (addrInterface net.Addr) {
 	IP, port, zone := SplitAddrPort(addrPort)

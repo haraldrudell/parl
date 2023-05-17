@@ -158,7 +158,7 @@ Options and yaml is configured likeso:
 	}
 	var y YamlData
 */
-func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executable) {
+func (ex *Executable) PrintBannerAndParseOptions(optionsList []OptionData) (ex1 *Executable) {
 	ex1 = ex
 	// print program name and populated details
 	banner := pstrings.FilteredJoin([]string{
@@ -175,13 +175,7 @@ func (ex *Executable) PrintBannerAndParseOptions(om []OptionData) (ex1 *Executab
 		parl.Info(banner)
 	}
 
-	// parse options
-	flag.Usage = ex.usage
-	omLen := len(om)
-	for i := 0; i < omLen; i++ {
-		(&om[i]).AddOption()
-	}
-	flag.Parse()
+	NewArgParser(optionsList, ex.usage).Parse()
 
 	// parse arguments
 	args := flag.Args() // command-line arguments not part of flags
