@@ -7,13 +7,16 @@ package g0
 
 import (
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/goid"
 	"github.com/haraldrudell/parl/pdebug"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
-	grCheckThreadFrames = 0
+	// 1 is Go.Register/Go/SubGo/SubGroup/AddError/Done
+	// 1 is checkState
+	grCheckThreadFrames = 2
 )
 
 // Go supports a goroutine executing part of a thread-group. Thread-safe.
@@ -30,9 +33,10 @@ type Go struct {
 	goEntityID // Wait()
 	// isTerminated indicates that this Go thread is terminated
 	//	- an atomic is requires since wg.Done and wg.IsZero are separate operations
-	isTerminated parl.AtomicBool
-	goParent     // Cancel() Context()
-	thread       ThreadSafeThreadData
+	isTerminated    parl.AtomicBool
+	goParent        // Cancel() Context()
+	creatorThreadId parl.ThreadID
+	thread          ThreadSafeThreadData
 }
 
 // newGo returns a Go object for a thread operating in a Go thread-group. Thread-safe.
@@ -48,6 +52,7 @@ func newGo(parent goParent, goInvocation *pruntime.CodeLocation) (
 		goParent:   parent,
 	}
 	g.wg.Add(1)
+	g.creatorThreadId = goid.GoID()
 	g.thread.SetCreator(goInvocation)
 
 	g0 = &g
@@ -57,12 +62,12 @@ func newGo(parent goParent, goInvocation *pruntime.CodeLocation) (
 }
 
 func (g0 *Go) Register(label ...string) (g00 parl.Go) { return g0.checkState(false, label...) }
-func (g0 *Go) Go() (g00 parl.Go)                      { return g0.checkState(false).goParent.Go() }
+func (g0 *Go) Go() (g00 parl.Go)                      { return g0.checkState(false).goParent.FromGoGo() }
 func (g0 *Go) SubGo(onFirstFatal ...parl.GoFatalCallback) (subGo parl.SubGo) {
-	return g0.checkState(false).goParent.SubGo(onFirstFatal...)
+	return g0.checkState(false).goParent.FromGoSubGo(onFirstFatal...)
 }
 func (g0 *Go) SubGroup(onFirstFatal ...parl.GoFatalCallback) (subGroup parl.SubGroup) {
-	return g0.checkState(false).goParent.SubGroup(onFirstFatal...)
+	return g0.checkState(false).goParent.FromGoSubGroup(onFirstFatal...)
 }
 
 func (g0 *Go) AddError(err error) {
@@ -94,6 +99,18 @@ func (g0 *Go) Done(errp *error) {
 
 func (g0 *Go) ThreadInfo() (threadData parl.ThreadData) { return g0.thread.Get() }
 func (g0 *Go) GoID() (threadID parl.ThreadID)           { return g0.thread.ThreadID() }
+func (g0 *Go) Creator() (threadID parl.ThreadID, createLocation *pruntime.CodeLocation) {
+	threadID = g0.creatorThreadId
+	var threadData = g0.thread.Get()
+	createLocation = &threadData.createLocation
+	return
+}
+func (g0 *Go) GoRoutine() (threadID parl.ThreadID, goFunction *pruntime.CodeLocation) {
+	var threadData = g0.thread.Get()
+	threadID = threadData.threadID
+	goFunction = &threadData.funcLocation
+	return
+}
 
 // checkState is invoked by public methods ensuring that terminated
 // objects are not being used
@@ -114,7 +131,12 @@ func (g0 *Go) checkState(skipTerminated bool, label ...string) (g *Go) {
 	if len(label) > 0 {
 		label0 = label[0]
 	}
-	g0.thread.Update(pdebug.NewStack(grCheckThreadFrames), label0)
+	var stack = pdebug.NewStack(grCheckThreadFrames)
+	if stack.IsMain() {
+		return // this should not happen, called by Main
+	}
+	// creator has already been set
+	g0.thread.Update(stack.ID(), nil, stack.GoFunction(), label0)
 
 	// propagate thread information
 	threadData := g0.thread.Get()

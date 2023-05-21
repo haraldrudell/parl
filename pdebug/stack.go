@@ -31,17 +31,23 @@ const (
 type Stack struct {
 	// ThreadID is a unqique ID associated with this thread.
 	// typically numeric string “1”…
-	// it can be used as a map key or converted to string
+	//	- Ordered so can be used as map key
+	//	- .String converts o string value
+	//	- .IsValid determines if not zero-value
 	threadID parl.ThreadID
 	// Status is typically word “running”
 	status parl.ThreadStatus
 	// isMainThread indicates if this is the thread that launched main.main
+	//	- if false, the stack trace is for a gorotuine
 	isMainThread bool
 	// Frames is a list of code locations for this thread.
-	// [0] is the invoker of goid.NewStack().
-	// last is the function starting this thread.
-	// Frame.Args is invocation values like "(0x14000113040)".
+	//	- [0] is the most recent code location, typically the invoker of goid.NewStack().
+	//	- last is the function starting this thread.
+	//	- Frame.Args is invocation values like "(0x14000113040)".
 	frames []parl.Frame
+	// goFunction is the funciton that a goroutine launched
+	//	- is isMain is true, it ios the zero-value
+	goFunction pruntime.CodeLocation
 	// Creator is the code location of the go statement launching
 	// this thread.
 	// FuncName is "main.main()" for main thread
@@ -70,12 +76,16 @@ func NewStack(skipFrames int) (stack parl.Stack) {
 	// line 1 is status line
 	// line 2 is debug.Stack frame
 	// created by is 2 optional lines at end
+	//	- convert to string
+	//	- remove final newline
+	//	- split into lines
 	trace := strings.Split(strings.TrimSuffix(string(debug.Stack()), "\n"), "\n")
 	traceLen := len(trace)
 	skipAtStart := runtStatusLines + runtDebugStackLines + runtNewStackLines
 	skipAtEnd := 0
 
 	// parse possible "created by"
+	//	- gogorutine creator may be in the two last text lines of the stack trace
 	if traceLen >= runtCreatorLines {
 		// populate s.IsMainThread s.Creator
 		// last 2 lines
@@ -86,24 +96,31 @@ func NewStack(skipFrames int) (stack parl.Stack) {
 			creator.File, creator.Line = ParseFileLine(trace[traceLen-1])
 		}
 		s.SetCreator(&creator, isMainThread)
+
+		if !isMainThread && traceLen >= 5 {
+			s.goFunction.FuncName, _ = ParseFuncLine(trace[traceLen-4])
+			s.goFunction.File, s.goFunction.Line = ParseFileLine(trace[traceLen-3])
+		}
 	}
 
 	// check trace length: must be at least one frame available
 	minLines := skipAtStart + skipAtEnd + // skip lines at beginning and end
 		runtLinesPerFrame // one frame available
 	if traceLen < minLines || traceLen&1 == 0 {
-		panic(fmt.Errorf("pruntime.Stack trace less than %d[%d–%d] lines or even: %d\nTRACE: %s\n",
+		panic(fmt.Errorf("pdebug.Stack trace less than %d[%d–%d] lines or even: %d\nTRACE: %s%s",
 			minLines, skipAtStart, skipAtEnd, len(trace),
 			strings.Join(trace, "\n"),
+			"\n",
 		))
 	}
 
 	// check skipFrames
 	maxSkipFrames := (traceLen - minLines) / runtLinesPerFrame
 	if skipFrames > maxSkipFrames {
-		panic(fmt.Errorf("pruntime.Stack bad skipFrames: %d trace-length: %d[%d–%d] max-skipFrames: %d\nTRACE: %s\n",
+		panic(fmt.Errorf("pruntime.Stack bad skipFrames: %d trace-length: %d[%d–%d] max-skipFrames: %d\nTRACE: %s%s",
 			skipFrames, traceLen, skipAtStart, skipAtEnd, maxSkipFrames,
 			strings.Join(trace, "\n"),
+			"\n",
 		))
 	}
 	skipAtStart += skipFrames * runtLinesPerFrame // remove frames from skipFrames
@@ -156,6 +173,10 @@ func (s *Stack) Status() (status parl.ThreadStatus) {
 	return s.status
 }
 
+func (s *Stack) GoFunction() (goFunction *pruntime.CodeLocation) {
+	return &s.goFunction
+}
+
 func (s *Stack) Creator() (creator *pruntime.CodeLocation) {
 	return &s.creator
 }
@@ -164,7 +185,20 @@ func (s *Stack) Frames() (frames []parl.Frame) {
 	return s.frames
 }
 
+func (s *Stack) MostRecentFrame() (frame parl.Frame) {
+	var f Frame
+	if len(s.frames) > 0 {
+		fp := s.frames[0].(*Frame)
+		f = *fp
+	}
+	frame = &f
+	return
+}
+
 func (st *Stack) Shorts(prepend string) (s string) {
+	if prepend != "" {
+		prepend += "\x20"
+	}
 	sL := []string{
 		prepend + "Thread ID: " + st.threadID.String(),
 	}

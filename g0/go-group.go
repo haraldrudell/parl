@@ -18,9 +18,17 @@ import (
 )
 
 const (
-	goGroupExtraFrames = 0
-	goidCreatorFrames  = 1 // 1 for thread-group constructor
-	goGroupStackFrames = 1
+	// 1 is for NewGoGroup/.SubGo/.SubGroup
+	//	1 is for new
+	goGroupNewObjectFrames = 2
+	// 1 is for .Go
+	// 1 is for newGo
+	goGroupStackFrames  = 2
+	goFromGoStackFrames = goGroupStackFrames + 1
+	// 1 is for Go method
+	// 1 is for NewGoGroup/.SubGo/.SubGroup/.Go
+	//	1 is for new
+	fromGoNewFrames = goGroupNewObjectFrames + 1
 )
 
 // GoGroup is a Go thread-group. Thread-safe.
@@ -78,7 +86,7 @@ var _ goParent = &GoGroup{}
 //   - the GoGroup terminates when its error channel closes from all threads in its own
 //     thread-group and that of any subordinate thread-groups have exited.
 func NewGoGroup(ctx context.Context, onFirstFatal ...parl.GoFatalCallback) (g0 parl.GoGroup) {
-	return new(nil, ctx, true, false, onFirstFatal...)
+	return new(nil, ctx, true, false, goGroupNewObjectFrames, onFirstFatal...)
 }
 
 // Go returns a parl.Go thread-features object
@@ -86,6 +94,14 @@ func NewGoGroup(ctx context.Context, onFirstFatal ...parl.GoFatalCallback) (g0 p
 //   - the Go return value is to be used as a function argument in a go-statement
 //     function-call launching a goroutine thread
 func (g0 *GoGroup) Go() (g1 parl.Go) {
+	return g0.newGo(goGroupStackFrames)
+}
+
+func (g0 *GoGroup) FromGoGo() (g1 parl.Go) {
+	return g0.newGo(goFromGoStackFrames)
+}
+
+func (g0 *GoGroup) newGo(frames int) (g1 parl.Go) {
 	if g0.isEnd() {
 		panic(perrors.NewPF("after GoGroup termination"))
 	}
@@ -93,7 +109,7 @@ func (g0 *GoGroup) Go() (g1 parl.Go) {
 	// At this point, Go invocation is accessible so retrieve it
 	// the goroutine has not been created yet, so there is no creator
 	// instead, use top of the stack, the invocation location for the Go() function call
-	goInvocation := pruntime.NewCodeLocation(goGroupStackFrames)
+	goInvocation := pruntime.NewCodeLocation(frames)
 
 	// the only location creating Go objects
 	var threadData *ThreadData
@@ -119,7 +135,11 @@ func (g0 *GoGroup) Go() (g1 parl.Go) {
 //   - the SubGo thread-group terminates when all threads in its own thread-group and
 //     that of any subordinate thread-groups have exited.
 func (g0 *GoGroup) SubGo(onFirstFatal ...parl.GoFatalCallback) (g1 parl.SubGo) {
-	return new(g0, nil, false, false, onFirstFatal...)
+	return new(g0, nil, false, false, goGroupNewObjectFrames, onFirstFatal...)
+}
+
+func (g0 *GoGroup) FromGoSubGo(onFirstFatal ...parl.GoFatalCallback) (g1 parl.SubGo) {
+	return new(g0, nil, false, false, fromGoNewFrames, onFirstFatal...)
 }
 
 // newSubGroup returns a subordinate thread-group with an error channel handling fatal
@@ -136,13 +156,18 @@ func (g0 *GoGroup) SubGo(onFirstFatal ...parl.GoFatalCallback) (g1 parl.SubGo) {
 //   - SubGroup thread-group terminates when its error channel closes after all of its threads
 //     and threads of its subordinate thread-groups have exited.
 func (g0 *GoGroup) SubGroup(onFirstFatal ...parl.GoFatalCallback) (g1 parl.SubGroup) {
-	return new(g0, nil, true, true, onFirstFatal...)
+	return new(g0, nil, true, true, goGroupNewObjectFrames, onFirstFatal...)
+}
+
+func (g0 *GoGroup) FromGoSubGroup(onFirstFatal ...parl.GoFatalCallback) (g1 parl.SubGroup) {
+	return new(g0, nil, true, true, fromGoNewFrames, onFirstFatal...)
 }
 
 // new returns a new GoGroup as parl.GoGroup
 func new(
 	parent goGroupParent, ctx context.Context,
 	hasErrorChannel, isSubGroup bool,
+	stackOffset int,
 	onFirstFatal ...parl.GoFatalCallback,
 ) (g0 *GoGroup) {
 	if ctx == nil && parent != nil {
@@ -150,7 +175,7 @@ func new(
 	}
 	g := GoGroup{
 		goEntityID: *newGoEntityID(),
-		creator:    *pruntime.NewCodeLocation(goidCreatorFrames + goGroupExtraFrames),
+		creator:    *pruntime.NewCodeLocation(stackOffset),
 		parent:     parent,
 		goContext:  *newGoContext(ctx),
 		gos:        pmaps.NewRWMap[GoEntityID, *ThreadData](),
@@ -473,8 +498,6 @@ func (g0 *GoGroup) isEnd() (isEnd bool) {
 	return g0.ch.IsClosed()
 }
 
-func (g0 *GoGroup) listThreads() (threads []*ThreadData) { return g0.gos.List() }
-
 // "goGroup#1" "subGroup#2" "subGo#3"
 func (g0 *GoGroup) typeString() (s string) {
 	if g0.parent == nil {
@@ -490,7 +513,7 @@ func (g0 *GoGroup) typeString() (s string) {
 // g1Group#3threads:1(1)g0.TestNewG1Group-g1-group_test.go:60
 func (g0 *GoGroup) String() (s string) {
 	return parl.Sprintf("%s_threads:%s_New:%s",
-		g0.typeString(),
+		g0.typeString(), // "goGroup#1"
 		g0.goEntityID.wg.String(),
 		g0.creator.Short(),
 	)

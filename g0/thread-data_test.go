@@ -128,5 +128,9 @@ func (st *SomeType) SomeFunction(threadData *ThreadData) {
 }
 func (st *SomeType) SomeMethod(threadData *ThreadData) {
 	st.stack = pdebug.NewStack(0)
-	threadData.Update(st.stack, threadDataLabel)
+	threadData.Update(
+		st.stack.ID(),
+		st.stack.Creator(),
+		st.stack.GoFunction(),
+		threadDataLabel)
 }

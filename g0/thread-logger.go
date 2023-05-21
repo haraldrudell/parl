@@ -6,8 +6,10 @@ ISC License
 package g0
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/haraldrudell/parl"
@@ -16,31 +18,40 @@ import (
 
 type goGroup interface {
 	isEnd() (isEnd bool)
-	listThreads() (threads []*ThreadData)
-	Wait()
+	Threads() (threads []parl.ThreadData)
+	Context() (ctx context.Context)
 	fmt.Stringer
 }
 
 // ThreadLogger waits for a GoGroup, SubGo or SubGroup to terminate while printing
-// information on threads that have yet to exit.
-//   - ThreadLogger is non-blocking and will invoke Done on wg on thread0-group termination
-//   - goGen is the thread group and must be a parl.GoGroup SubGo or SubGroup
-//   - wg is a WaitGroup allowing ThreadLogger to be waited upon
-//   - logFn is an optional logging function default parl.Log
+// information on threads that have yet to exit every second.
+//   - invoke ThreadLogger after goGroup.Cancel and ThreadLogger will list information
+//     on goroutines that has yet to exit
+//   - goGen is the thread group and is a parl.GoGroup SubGo or SubGroup
+//   - — goGen should have SetDebug(parl.AggregateThread) causing it to aggregate
+//     information on live threads
+//   - logFn is an optional logging function, default parl.Log to stderr
+//   - ThreadLogger returns pointer to sync.WaitGroup so it can be waited upon
+//   - —
+//   - Because the GoGroup owner needs to continue consuming the GoGroup’s error channel,
+//     ThreadLogger has built-in threading
+//   - the returned sync.WaitGroup pointer should be used to ensure main does
+//     not exit prematurely. The WaitGroup ends when the GoGroup ends and ThreadLogger
+//     ceases output
 //
 // Usage:
 //
 //	main() {
-//	  var debugWait sync.WaitGroup
-//	  defer debugWait.Wait()
+//	  var wg = &sync.WaitGroup{}
+//	  defer func() { wg.Wait() }()
+//	  var goGroup = g0.NewGoGroup(context.Background())
+//	  goGroup.SetDebug(parl.AggregateThread)
 //	 …
-//	 debugWait.Add(1)
-//	 ThreadLogger(goGroup, &debugWait)
-func ThreadLogger(goGen parl.GoGen, wg parl.SyncDone, logFn ...func(format string, a ...interface{})) {
-
-	if wg == nil {
-		panic(perrors.NewPF("wg cannot be nil"))
-	}
+//	 goGroup.Cancel()
+//	 wg = ThreadLogger(goGroup)
+func ThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interface{})) (
+	wg *sync.WaitGroup) {
+	wg = &sync.WaitGroup{}
 
 	// obtain logging function
 	var log parl.PrintfFunc
@@ -58,68 +69,44 @@ func ThreadLogger(goGen parl.GoGen, wg parl.SyncDone, logFn ...func(format strin
 		panic(perrors.ErrorfPF("type assertion failed, need GoGroup SubGo or SubGroup, received: %T", goGen))
 	}
 
+	// wait for g0 to end with logging to log
 	if g0.isEnd() {
 		log("ThreadLogger: IsEnd true")
-		wg.Done()
 		return // thread-group already ended
 	}
-
+	wg.Add(1)
 	go printThread(wg, log, g0)
+	return
 }
 
+// printThread prints goroutines that have yet to exit every second
 func printThread(wg parl.SyncDone, log parl.PrintfFunc, g0 goGroup) {
-	wg.Done()
+	defer wg.Done()
 	defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
-
-	// channel indicating Wait complete
-	waitCh := make(chan struct{})
-	go threadLoggerThread(g0, waitCh)
+	defer func() { log("%s %s", parl.ShortSpace(), "thread-group ended") }()
 
 	// ticker for periodic printing
-	ticker := time.NewTicker(time.Second)
+	var ticker = time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	defer func() {
-		log("%s %s", parl.ShortSpace(), "thread-group ended")
-	}()
 	for {
-		threads := g0.listThreads()
+		threads := g0.Threads()
 		ts := make([]string, len(threads))
 		for i, t := range threads {
-			ts[i] = ThreadInfo(t)
+			ts[i] = t.(*ThreadData).LabeledString()
 		}
-		s := strings.Join(ts, "\n")
-		log("%s %s\n%s", parl.ShortSpace(), g0.String(), s)
+		threadLines := strings.Join(ts, "\n")
+		log("%s ThreadLogger: GoGen: %s threads: %d\n%s",
+			parl.ShortSpace(),
+			g0,
+			len(threadLines), threadLines,
+		)
+
+		// blocks here
 		select {
-		case <-waitCh:
+		case <-g0.Context().Done():
 			return
 		case <-ticker.C:
 		}
 	}
-}
-
-func ThreadInfo(t *ThreadData) (s string) {
-	var sList []string
-	if t.threadID.IsValid() {
-		sList = append(sList, "threadID: "+t.threadID.String())
-	}
-	if t.funcLocation.IsSet() {
-		sList = append(sList, "func: "+t.funcLocation.Short())
-	}
-	if t.createLocation.IsSet() {
-		sList = append(sList, "go: "+t.createLocation.Short())
-	}
-	if len(sList) != 0 {
-		s = strings.Join(sList, "\x20")
-	} else {
-		s = "[no data]"
-	}
-	return
-}
-
-func threadLoggerThread(g0 goGroup, waitCh chan struct{}) {
-	defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
-
-	g0.Wait()
-	close(waitCh)
 }

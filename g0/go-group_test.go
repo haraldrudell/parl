@@ -8,9 +8,11 @@ package g0
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 func TestGoGroup(t *testing.T) {
@@ -189,11 +191,41 @@ func TestGoGroup(t *testing.T) {
 	if fatals == 0 {
 		t.Error("onFirstFatal bad")
 	}
+}
 
-	// String()
-	// "goGroup#5_threads:0(0)_New:g0.NewGoGroup()-go-group.go:69"
-	//t.Log(goGroup.String())
-	//t.Fail()
+func TestGoGroup_Frames(t *testing.T) {
+	// goGroup and cL on same line
+	var goGroup parl.GoGroup
+	var subGo parl.SubGo
+	var subGroup parl.SubGroup
+	var g0 parl.Go
+	var cL *pruntime.CodeLocation
+
+	// NewGoGroup: GoGroup.String() includes NewGoGroup caller location
+	goGroup, cL = NewGoGroup(context.Background()), pruntime.NewCodeLocation(0)
+	if !strings.HasSuffix(goGroup.String(), cL.Short()) {
+		t.Errorf("GoGroup.String BAD: %q exp suffix: %q", goGroup.String(), cL.Short())
+	}
+
+	// GoGroup.SubGo includes caller location
+	subGo, cL = goGroup.SubGo(), pruntime.NewCodeLocation(0)
+	if !strings.HasSuffix(subGo.String(), cL.Short()) {
+		t.Errorf("SubGo.String: %q exp suffix: %q", subGo.String(), cL.Short())
+	}
+
+	// GoGroup.SubGroup includes caller location
+	subGroup, cL = goGroup.SubGroup(), pruntime.NewCodeLocation(0)
+	if !strings.HasSuffix(subGroup.String(), cL.Short()) {
+		t.Errorf("SubGroup.String: %q exp suffix: %q", subGroup.String(), cL.Short())
+	}
+
+	// GoGroup.Go includes caller location
+	g0, cL = goGroup.Go(), pruntime.NewCodeLocation(0)
+	if !strings.HasSuffix(g0.String(), cL.Short()) {
+		var _ = (&GoGroup{}).Go
+		// Go.String: "subGroup#3_threads:0(0)_New:g0.TestGoGroup_Frames()-go-group_test.go:217" exp suffix: "g0.TestGoGroup_Frames()-go-group_test.go:223"
+		t.Errorf("Go.String: %q exp suffix: %q", subGroup.String(), cL.Short())
+	}
 }
 
 func TestSubGo(t *testing.T) {

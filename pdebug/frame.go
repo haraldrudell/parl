@@ -31,5 +31,5 @@ func (f *Frame) Args() (args string) {
 
 func (f *Frame) String() (s string) {
 	return f.CodeLocation.FuncName + f.args + "\n" +
-		filepath.Base(f.CodeLocation.File) + ":" + strconv.Itoa(f.CodeLocation.Line)
+		"\x20\x20" + filepath.Base(f.CodeLocation.File) + ":" + strconv.Itoa(f.CodeLocation.Line)
 }

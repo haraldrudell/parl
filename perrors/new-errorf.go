@@ -49,13 +49,9 @@ func Errorf(format string, a ...interface{}) (err error) {
 }
 
 func ErrorfPF(format string, a ...interface{}) (err error) {
-	packFunc := pruntime.NewCodeLocation(perrNewFrames).PackFunc()
-	if format == "" {
-		format = "%s"
-	} else {
-		format = "%s " + format
-	}
-	a = append([]interface{}{packFunc}, a...)
+	// format may include %w directives, meaning fmt.Errorf must be used
+	// format may include numeric indices like %[1]s, meaning values cannot be prepended to a
+	format = pruntime.NewCodeLocation(perrNewFrames).PackFunc() + "\x20" + format
 	err = fmt.Errorf(format, a...)
 	if HasStack(err) {
 		return

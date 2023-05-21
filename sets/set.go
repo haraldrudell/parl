@@ -22,8 +22,19 @@ type SetImpl[T comparable] struct {
 	elements   []T
 }
 
-// NewSet returns an enumeration of a printable semantic function argument.
-// elements are the elements that form this set.
+// NewSet returns an enumeration of printable semantic elements.
+//   - elements implement the sets.Element[E] interface
+//   - — ValueV type is the element type E
+//   - — Name is the string value displayed for ValueV
+//   - [sets.SetElement] or [set.SetElementFull] are sample element implementations
+//
+// usage:
+//
+//	sets.NewSet(sets.NewElements[int](
+//		[]sets.SetElement[int]{
+//			{ValueV: unix.AF_INET, Name: "IPv4"},
+//			{ValueV: unix.AF_INET6, Name: "IPv6"},
+//		}))
 func NewSet[T comparable](elements iters.Iterator[Element[T]]) (set Set[T]) {
 	s := SetImpl[T]{elementMap: map[T]Element[T]{}}
 	for ; elements.Has(); elements.Next() {

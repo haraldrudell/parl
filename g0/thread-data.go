@@ -34,11 +34,22 @@ type ThreadData struct {
 var _ parl.ThreadData = &ThreadData{}
 
 // Update populates this object from a stack trace.
-func (td *ThreadData) Update(stack parl.Stack, label string) {
-	td.threadID = stack.ID()
-	td.createLocation = *stack.Creator()
-	td.funcLocation = *stack.Frames()[len(stack.Frames())-1].Loc()
-	td.label = label
+func (td *ThreadData) Update(
+	threadID parl.ThreadID,
+	createInvocation, goFunction *pruntime.CodeLocation,
+	label string) {
+	if !td.threadID.IsValid() && threadID.IsValid() {
+		td.threadID = threadID
+	}
+	if createInvocation != nil && !td.createLocation.IsSet() && createInvocation.IsSet() {
+		td.createLocation = *createInvocation
+	}
+	if goFunction != nil && !td.funcLocation.IsSet() && goFunction.IsSet() {
+		td.funcLocation = *goFunction
+	}
+	if td.label == "" && label != "" {
+		td.label = label
+	}
 }
 
 // SetCreator gets preliminary Go identifier: the line invoking Go()
@@ -99,28 +110,50 @@ func (td *ThreadData) Short() (s string) {
 	return td.String()
 }
 
+func (t *ThreadData) LabeledString() (s string) {
+	var sL []string
+	if t.label != "" {
+		sL = append(sL, "label: "+t.label)
+	}
+	if t.threadID.IsValid() {
+		sL = append(sL, "threadID: "+t.threadID.String())
+	}
+	if t.funcLocation.IsSet() {
+		sL = append(sL, "go-function: "+t.funcLocation.Short())
+	}
+	if t.createLocation.IsSet() {
+		sL = append(sL, "go-statement: "+t.createLocation.Short())
+	}
+	if len(sL) > 0 {
+		s = strings.Join(sL, "\x20")
+	} else {
+		s = "[no data]"
+	}
+	return
+}
+
 // "myThreadName:4_func:testing.tRunner()-testing.go:1446_cre:testing.(*T).Run()-testing.go:1493"
-func (td *ThreadData) String() (s string) {
+func (t *ThreadData) String() (s string) {
 	var sList []string
 	var s1 string
-	if td.label != "" {
-		s1 = td.label
+	if t.label != "" {
+		s1 = t.label
 	}
-	if td.threadID.IsValid() {
+	if t.threadID.IsValid() {
 		if s1 != "" {
-			s1 += ":" + td.threadID.String()
+			s1 += ":" + t.threadID.String()
 		} else {
-			s1 = td.threadID.String()
+			s1 = t.threadID.String()
 		}
 	}
 	if s1 != "" {
 		sList = append(sList, s1)
 	}
-	if td.funcLocation.IsSet() {
-		sList = append(sList, "func:"+td.funcLocation.Short())
+	if t.funcLocation.IsSet() {
+		sList = append(sList, "func:"+t.funcLocation.Short())
 	}
-	if td.createLocation.IsSet() {
-		sList = append(sList, "cre:"+td.createLocation.Short())
+	if t.createLocation.IsSet() {
+		sList = append(sList, "cre:"+t.createLocation.Short())
 	}
 	if s = strings.Join(sList, "_"); s == "" {
 		s = ThreadDataEmpty

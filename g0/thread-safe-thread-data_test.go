@@ -22,7 +22,12 @@ func TestThreadDataWrap(t *testing.T) {
 		t.Error("haveThreadID true")
 	}
 
-	threadDataWrap.Update(stack, "")
+	threadDataWrap.Update(
+		stack.ID(),
+		stack.Creator(),
+		stack.GoFunction(),
+		"",
+	)
 	if threadDataWrap.ThreadID() != stack.ID() {
 		t.Errorf("bad ID %q exp %q", threadDataWrap.ThreadID(), stack.ID())
 	}

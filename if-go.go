@@ -75,6 +75,11 @@ type Go interface {
 	Context() (ctx context.Context)
 	// ThreadInfo returns thread data that is partially or fully populated
 	ThreadInfo() (threadData ThreadData)
+	// values always present
+	Creator() (threadID ThreadID, createLocation *pruntime.CodeLocation)
+	// ThreadID may be invalid: threadID.IsValid.
+	// goFunction may be zero-value: goFunction.IsSet
+	GoRoutine() (threadID ThreadID, goFunction *pruntime.CodeLocation)
 	// GoID efficiently returns the goroutine ID that mey be invalid
 	GoID() (threadID ThreadID)
 	fmt.Stringer

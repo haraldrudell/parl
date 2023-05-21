@@ -23,9 +23,9 @@ type goGroupParent interface {
 // goParent are the methods provided to a Go thread by its parent GoGroup thread-group
 type goParent interface {
 	ConsumeError(goError parl.GoError)
-	Go() (g1 parl.Go)
-	SubGo(onFirstFatal ...parl.GoFatalCallback) (g0 parl.SubGo)
-	SubGroup(onFirstFatal ...parl.GoFatalCallback) (g0 parl.SubGroup)
+	FromGoGo() (g1 parl.Go)
+	FromGoSubGo(onFirstFatal ...parl.GoFatalCallback) (g0 parl.SubGo)
+	FromGoSubGroup(onFirstFatal ...parl.GoFatalCallback) (g0 parl.SubGroup)
 	GoDone(g0 parl.Go, err error)
 	UpdateThread(goEntityID GoEntityID, threadData *ThreadData)
 	Cancel()
