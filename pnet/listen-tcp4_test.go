@@ -21,7 +21,6 @@ import (
 
 func TestSocket(t *testing.T) {
 	var socketString = "127.0.0.1:0" // 0 means ephemeral port
-	var dummyHandler = func(net.Conn) {}
 
 	var colonPos int
 	var socket *TCPListener
@@ -31,17 +30,18 @@ func TestSocket(t *testing.T) {
 
 	// check socketString
 	if colonPos = strings.Index(socketString, ":"); colonPos == -1 {
-		t.Errorf("Bad socketString fixture: %q", socketString)
-		t.FailNow()
+		t.Fatalf("Bad socketString fixture: %q", socketString)
 	}
 
-	if socket, err = NewListenTCP4(socketString, dummyHandler); err != nil {
-		t.Errorf("ListenTCP4 error: %+v", err)
-		t.FailNow()
+	// create listening socket
+	socket = NewListenTCP4()
+	if err = socket.Listen(socketString); err != nil {
+		t.Fatalf("ListenTCP4 error: %+v", err)
 	}
+
+	// Addr() Close()
 	if addr = socket.Addr().String(); !strings.HasPrefix(addr, socketString[:colonPos+1]) {
-		t.Errorf("Bad socket adress: %q", addr)
-		t.FailNow()
+		t.Fatalf("Bad socket adress: %q", addr)
 	}
 	if port, err = strconv.Atoi(strings.TrimPrefix(addr, socketString[:colonPos+1])); err != nil {
 		t.Errorf("Bad port number: %q", addr)
@@ -53,34 +53,41 @@ func TestSocket(t *testing.T) {
 	}
 }
 
-type con struct {
+type connectionHandlerFixture struct {
 	count int64
 }
 
-func (c *con) connFunc(conn net.Conn) {
+func (c *connectionHandlerFixture) connFunc(conn net.Conn) {
 	if err := conn.Close(); err != nil {
 		panic(perrors.Errorf("conn.Close: '%w'", err))
 	}
 	atomic.AddInt64(&c.count, 1)
 }
 
-func (c *con) errListenThread(ch <-chan error, wg *sync.WaitGroup, t *testing.T) {
+func (c *connectionHandlerFixture) errorListenerThread(
+	socketErrCh <-chan error,
+	socketCloseCh <-chan struct{},
+	wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	var err error
 	var ok bool
 	for {
-		if err, ok = <-ch; !ok {
+		select {
+		case <-socketCloseCh:
 			return
+		case err, ok = <-socketErrCh:
+			if !ok {
+				panic(perrors.New("socket error channel closed"))
+			}
+			panic(err)
 		}
-
-		t.Errorf("errCh: %+v", err)
 	}
 }
 
 func TestAcceptThread(t *testing.T) {
 	var socketString = "127.0.0.1:0" // 0 means ephemeral port
-	var c con
+	var fixture connectionHandlerFixture
 
 	var socket *TCPListener
 	var err error
@@ -88,34 +95,32 @@ func TestAcceptThread(t *testing.T) {
 	var addr net.Addr
 	var tcpClient net.Dialer
 	var netConn net.Conn
+	var threadWait sync.WaitGroup
 
 	// set-up socket
-	if socket, err = NewListenTCP4(socketString, c.connFunc); err != nil {
-		t.Errorf("ListenTCP4 error: %+v", err)
-		t.FailNow()
+	socket = NewListenTCP4()
+	if err = socket.Listen(socketString); err != nil {
+		t.Fatalf("ListenTCP4 error: %+v", err)
 	}
 
-	// error listener
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go c.errListenThread(socket.Ch(), &wg, t)
+	// error listener thread
+	threadWait.Add(1)
+	go fixture.errorListenerThread(socket.Ch(), socket.WaitCh(), &threadWait)
 
-	// launch accept thread
+	// invoke AcceptConnections
 	t.Log("socket.AcceptThread…")
-	go socket.AcceptThread()
+	go socket.AcceptConnections(fixture.connFunc)
 
 	// connect to socket
-	addr = socket.Addr()
 	t.Log("tcpClient.DialContext…")
+	addr = socket.Addr()
 	if netConn, err = tcpClient.DialContext(ctx, addr.Network(), addr.String()); err != nil {
-		t.Errorf("tcpClient.DialContext: '%v'", err)
-		t.FailNow()
+		t.Fatalf("tcpClient.DialContext: '%v'", err)
 	}
 
 	// read from socket
-	bytes := make([]byte, 1)
-
 	t.Log("netConn.Read…")
+	bytes := make([]byte, 1)
 	for {
 		var n int
 		n, err = netConn.Read(bytes)
@@ -124,13 +129,11 @@ func TestAcceptThread(t *testing.T) {
 				err = nil
 				break
 			} else {
-				t.Errorf("conn.Read: '%v'", err)
-				t.FailNow()
+				t.Fatalf("conn.Read: '%v'", err)
 			}
 		}
 		if n != 0 {
-			t.Errorf("conn.Read unexpected bytes: %d", n)
-			t.FailNow()
+			t.Fatalf("conn.Read unexpected bytes: %d", n)
 		}
 	}
 
@@ -146,11 +149,11 @@ func TestAcceptThread(t *testing.T) {
 		t.Errorf("client Close: '%v'", err)
 	}
 
-	t.Logf("socket.Wait… %d", atomic.LoadInt64(&c.count))
-	socket.Wait()
+	t.Logf("socket.Wait… %d", atomic.LoadInt64(&fixture.count))
+	<-socket.WaitCh()
 
 	t.Log("error listener Wait…")
-	wg.Wait()
+	threadWait.Wait()
 
 	t.Log("Completed")
 }

@@ -153,6 +153,18 @@ func (rw *RWMap[K, V]) Length() (length int) {
 }
 
 // Clone returns a shallow clone of the map
+func (rw *RWMap[K, V]) Range(rangeFn func(key K, value V) (keepGoing bool)) {
+	rw.lock.RLock()
+	defer rw.lock.RUnlock()
+
+	for k, v := range rw.m {
+		if !rangeFn(k, v) {
+			return
+		}
+	}
+}
+
+// Clone returns a shallow clone of the map
 func (rw *RWMap[K, V]) Clone() (clone parli.ThreadSafeMap[K, V]) {
 	return rw.Clone2()
 }

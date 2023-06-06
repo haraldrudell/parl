@@ -415,6 +415,16 @@ func (g0 *GoGroup) CascadeEnableTermination(delta int) {
 	}
 }
 
+func (g0 *GoGroup) ThreadsInternal() (orderedMap pmaps.KeyOrderedMap[GoEntityID, parl.ThreadData]) {
+	orderedMap = *pmaps.NewKeyOrderedMap[GoEntityID, parl.ThreadData]()
+	var rwm = g0.gos.(*pmaps.RWMap[GoEntityID, *ThreadData])
+	rwm.Range(func(key GoEntityID, value *ThreadData) (kepGoing bool) {
+		orderedMap.Put(key, value)
+		return true
+	})
+	return
+}
+
 func (g0 *GoGroup) Threads() (threads []parl.ThreadData) {
 	// the pointer can be updated at any time, but the value does not change
 	list := g0.gos.List()

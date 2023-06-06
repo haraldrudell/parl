@@ -14,14 +14,18 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pmaps"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 type goGroup interface {
 	isEnd() (isEnd bool)
-	Threads() (threads []parl.ThreadData)
+	ThreadsInternal() (orderedMap pmaps.KeyOrderedMap[GoEntityID, parl.ThreadData])
 	Context() (ctx context.Context)
 	fmt.Stringer
 }
+
+var c0 pruntime.CachedLocation
 
 // ThreadLogger waits for a GoGroup, SubGo or SubGroup to terminate while printing
 // information on threads that have yet to exit every second.
@@ -71,33 +75,36 @@ func ThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interface{
 
 	// wait for g0 to end with logging to log
 	if g0.isEnd() {
-		log("ThreadLogger: IsEnd true")
+		log("%s: IsEnd true", c0.FuncIdentifier())
 		return // thread-group already ended
 	}
 	wg.Add(1)
-	go printThread(wg, log, g0)
+	go printThread(wg, log, c0.FuncIdentifier(), g0)
 	return
 }
 
 // printThread prints goroutines that have yet to exit every second
-func printThread(wg parl.SyncDone, log parl.PrintfFunc, g0 goGroup) {
+func printThread(wg parl.SyncDone, log parl.PrintfFunc, label string, g0 goGroup) {
 	defer wg.Done()
 	defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
-	defer func() { log("%s %s", parl.ShortSpace(), "thread-group ended") }()
+	defer func() { log("%s %s: %s", parl.ShortSpace(), label, "thread-group ended") }()
 
 	// ticker for periodic printing
 	var ticker = time.NewTicker(time.Second)
 	defer ticker.Stop()
 
 	for {
-		threads := g0.Threads()
-		ts := make([]string, len(threads))
-		for i, t := range threads {
-			ts[i] = t.(*ThreadData).LabeledString()
+		var orderedMap = g0.ThreadsInternal()
+		ts := make([]string, orderedMap.Length())
+		for i, goEntityId := range orderedMap.List() {
+			var threadData, _ = orderedMap.Get(goEntityId)
+			var _ parl.ThreadData
+			ts[i] = threadData.(*ThreadData).LabeledString() + " G" + goEntityId.String()
 		}
 		threadLines := strings.Join(ts, "\n")
-		log("%s ThreadLogger: GoGen: %s threads: %d\n%s",
+		log("%s %s: GoGen: %s threads: %d\n%s",
 			parl.ShortSpace(),
+			label,
 			g0,
 			len(threadLines), threadLines,
 		)
