@@ -14,6 +14,7 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/sets"
 )
 
 const (
@@ -33,13 +34,16 @@ const (
 //   - panic-handled connection threads
 //   - Ch: real-time error channel or collecting errors after close: Err
 //   - WaitCh: idempotent waitable thread-terminating Close
-type TCPListener struct {
-	net.TCPListener // the IPv4 listening socket
+//   - C is net.Conn, *net.TCPConn, …
+type SocketListener[C net.Conn] struct {
+	netListener net.Listener
+	network     Network         // network for listening tcp tcp4 tcp6…
+	transport   SocketTransport // transport udp/tcp/ip/unix
 
 	stateLock sync.Mutex
 	state     tcpState
 
-	handler    func(net.Conn)
+	handler    func(C)
 	connWait   sync.WaitGroup     // allows waiting for all pending connections
 	acceptWait sync.WaitGroup     // allows waiting for accept thread to exit
 	closeWait  chan struct{}      // allows waiting for close complete
@@ -47,21 +51,36 @@ type TCPListener struct {
 	errCh      parl.NBChan[error] // the channel never closes
 }
 
-const (
-	tcp4 = "tcp4" // net network tcp ipv4
-)
-
-// NewListenTCP4 returns object for receiving IPv4 tcp connections
+// NewSocketListener returns object for receiving IPv4 tcp connections
 //   - handler must invoke net.Conn.Close
-func NewListenTCP4() (socket *TCPListener) { return &TCPListener{closeWait: make(chan struct{})} }
+func NewSocketListener[C net.Conn](
+	listener net.Listener,
+	network Network,
+	transport SocketTransport,
+) (socket *SocketListener[C]) {
+	if listener == nil {
+		panic(perrors.NewPF("listener cannot be nil"))
+	} else if !network.IsValid() {
+		panic(perrors.ErrorfPF("invalid network: %s", network))
+	} else if !transport.IsValid() {
+		panic(perrors.ErrorfPF("invalid transport: %s", transport))
+	}
+	return &SocketListener[C]{
+		netListener: listener,
+		network:     network,
+		transport:   transport,
+		closeWait:   make(chan struct{}),
+	}
+}
 
-// Listen binds listening to a tcp socket
-//   - socketString is host:port "1.2.3.4:80"
-//   - — host must be literal IPv4 address 1.2.3.4
-//   - — port must be literal port number 0…65534 where 0 means a temporary port
-//   - network is always "tcp4"
+// Listen binds listening to a near socket
+//   - socketString is host:port "1.2.3.4:80" "wikipedia.com:443" "/some/unix/socket"
+//   - — for TCP UDP IP host must resolve to an assigned near IP address
+//   - — — if host is blank, it is for localhost
+//   - — — to avoid DNS resolution host should be blank or literal IP address "1.2.3.4:0"
+//   - — for TCP UDP port must be literal port number 0…65534 where 0 means a temporary port
 //   - Listen can be repeatedly invoked until it succeeds
-func (s *TCPListener) Listen(socketString string) (err error) {
+func (s *SocketListener[C]) Listen(socketString string) (err error) {
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 	switch tcpState(atomic.LoadUint32((*uint32)(&s.state))) {
@@ -73,20 +92,29 @@ func (s *TCPListener) Listen(socketString string) (err error) {
 		return
 	}
 
-	// resolve near socket address
-	var tcpAddr *net.TCPAddr
-	if tcpAddr, err = net.ResolveTCPAddr(tcp4, socketString); perrors.Is(&err, "ResolveTCPAddr: '%w'", err) {
-		return
-	}
+	switch s.transport {
+	case TransportTCP:
+		// resolve near socket address
+		var tcpAddr *net.TCPAddr
+		if tcpAddr, err = net.ResolveTCPAddr(s.network.String(), socketString); perrors.Is(&err, "ResolveTCPAddr: '%w'", err) {
+			return
+		}
 
-	// attempt to listen
-	var netTCPListener *net.TCPListener
-	if netTCPListener, err = net.ListenTCP(tcp4, tcpAddr); perrors.Is(&err, "ListenTCP: %w", err) {
+		// attempt to listen
+		var netTCPListener *net.TCPListener
+		if netTCPListener, err = net.ListenTCP(s.network.String(), tcpAddr); perrors.Is(&err, "ListenTCP: %w", err) {
+			return
+		}
+
+		// copy socket to TCPListener storage
+		var listenerp = s.netListener.(*net.TCPListener)
+		*listenerp = *netTCPListener
+	default:
+		err = perrors.ErrorfPF("unimplemented transport: %s", s.transport)
 		return
 	}
 
 	// update state to listening
-	s.TCPListener = *netTCPListener
 	atomic.StoreUint32((*uint32)(&s.state), uint32(tcpListening))
 
 	return
@@ -94,14 +122,15 @@ func (s *TCPListener) Listen(socketString string) (err error) {
 
 // Ch returns a real-time error channel
 //   - unread errors can also be collected using [TCPListener.Err]
-func (s *TCPListener) Ch() (ch <-chan error) {
+func (s *SocketListener[C]) Ch() (ch <-chan error) {
 	return s.errCh.Ch()
 }
 
 // AcceptConnections is a blocking function handling inbound connections
 //   - AcceptConnections can only be invoked once
 //   - accept of connections continues until Close is invoked
-func (s *TCPListener) AcceptConnections(handler func(net.Conn)) {
+//   - handler must invoke net.Conn.Close
+func (s *SocketListener[C]) AcceptConnections(handler func(C)) {
 	defer s.close(sendErrorOnChannel)
 	if handler == nil {
 		s.errCh.Send(perrors.NewPF("handler cannot be nil"))
@@ -121,7 +150,7 @@ func (s *TCPListener) AcceptConnections(handler func(net.Conn)) {
 	for {
 
 		// block waiting for incoming connection
-		if conn, err = s.Accept(); err != nil { // blocking: either a connection or an error
+		if conn, err = s.netListener.Accept(); err != nil { // blocking: either a connection or an error
 			if opError, ok := err.(*net.OpError); ok {
 				if errors.Is(opError.Err, net.ErrClosed) {
 					return // use of closed: assume shutdown: ListenTCP4 is closed
@@ -139,25 +168,41 @@ func (s *TCPListener) AcceptConnections(handler func(net.Conn)) {
 
 // IsAccept indicates whether the listener is functional and
 // accepting incoming connections
-func (s *TCPListener) IsAccept() (isAcceptThread bool) {
+func (s *SocketListener[C]) IsAccept() (isAcceptThread bool) {
 	return tcpState(atomic.LoadUint32((*uint32)(&s.state))) == tcpAccepting
 }
 
 // WaitCh returns a channel that closes when [] completes
 //   - ListenTCP4.Close needs to have been invoked for the channel to close
-func (s *TCPListener) WaitCh() (closeWait chan struct{}) {
+func (s *SocketListener[C]) WaitCh() (closeWait chan struct{}) {
 	return s.closeWait
 }
 
-func (s *TCPListener) AddrPort() (addrPort netip.AddrPort, err error) {
-	addrPort, err = netip.ParseAddrPort(s.Addr().String())
-	perrors.IsPF(&err, "netip.ParseAddrPort %w", err)
+func (s *SocketListener[C]) AddrPort() (addrPort netip.AddrPort, err error) {
+	var netAddr = s.netListener.Addr()
+	switch a := netAddr.(type) {
+	case *net.TCPAddr:
+		addrPort = a.AddrPort()
+	case *net.UDPAddr:
+		addrPort = a.AddrPort()
+	case *net.UnixAddr:
+		return // unix sockets do not have address or port
+	case *net.IPAddr:
+		var addr netip.Addr
+		if addr, err = netip.ParseAddr(a.String()); perrors.IsPF(&err, "netip.ParseAddr %w", err) {
+			return
+		}
+		addrPort = netip.AddrPortFrom(addr, 0)
+	default:
+		addrPort, err = netip.ParseAddrPort(netAddr.String())
+		perrors.IsPF(&err, "netip.ParseAddrPort %w", err)
+	}
 	return
 }
 
 // Err returns all unread errors
 //   - errors can also be read using [TCPListener.Ch]
-func (s *TCPListener) Err(errp *error) {
+func (s *SocketListener[C]) Err(errp *error) {
 	if errp == nil {
 		panic(perrors.NewPF("errp cannot be nil"))
 	}
@@ -166,12 +211,12 @@ func (s *TCPListener) Err(errp *error) {
 	}
 }
 
-func (s *TCPListener) Close() (err error) {
+func (s *SocketListener[C]) Close() (err error) {
 	_, err = s.close(false)
 	return
 }
 
-func (s *TCPListener) setAcceptState() (err error) {
+func (s *SocketListener[C]) setAcceptState() (err error) {
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
@@ -189,7 +234,7 @@ func (s *TCPListener) setAcceptState() (err error) {
 	return
 }
 
-func (s *TCPListener) close(sendError bool) (didClose bool, err error) {
+func (s *SocketListener[C]) close(sendError bool) (didClose bool, err error) {
 	if tcpState(atomic.LoadUint32((*uint32)(&s.state))) == tcpClosed {
 		err = s.closeErr
 		return // already closed return
@@ -208,7 +253,7 @@ func (s *TCPListener) close(sendError bool) (didClose bool, err error) {
 	defer close(s.closeWait)
 	defer atomic.StoreUint32((*uint32)(&s.state), uint32(tcpClosed))
 	defer s.acceptWait.Wait()
-	if err = s.TCPListener.Close(); perrors.Is(&err, "TCPListener.Close %w", err) {
+	if parl.Close(s.netListener, &err); perrors.Is(&err, "TCPListener.Close %w", err) {
 		s.closeErr = err
 		if sendError {
 			s.errCh.Send(err)
@@ -220,9 +265,61 @@ func (s *TCPListener) close(sendError bool) (didClose bool, err error) {
 
 // invokeHandler is a goroutine executing the handler function for a new connection
 //   - invokeHandler recovers panics in handler function
-func (s *TCPListener) invokeHandler(conn net.Conn) {
+func (s *SocketListener[C]) invokeHandler(conn net.Conn) {
 	defer s.connWait.Done()
 	defer parl.Recover2(parl.Annotation(), nil, s.errCh.AddErrorProc)
 
-	s.handler(conn)
+	var c C
+	var ok bool
+	if c, ok = conn.(C); !ok {
+		s.errCh.Send(perrors.ErrorfPF("connection assertion to %T failed for type %T", c, conn))
+		return
+	}
+
+	s.handler(c)
 }
+
+const (
+	NetworkTCP  = "tcp"
+	NetworkTCP4 = "tcp4" // net network tcp ipv4
+	NetworkTCP6 = "tcp6"
+)
+
+type Network string
+
+func (t Network) String() (s string) {
+	return networkSet.StringT(t)
+}
+
+func (t Network) IsValid() (isValid bool) {
+	return networkSet.IsValid(t)
+}
+
+var networkSet = sets.NewSet(sets.NewElements[Network](
+	[]sets.SetElement[Network]{
+		{ValueV: NetworkTCP, Name: "tcp"},
+		{ValueV: NetworkTCP4, Name: "tcp4"},
+		{ValueV: NetworkTCP6, Name: "tcp6"},
+	}))
+
+const (
+	TransportTCP = iota + 1
+	TransportUDP
+	TransportIP
+	TransportUnix
+)
+
+type SocketTransport uint8
+
+func (t SocketTransport) String() (s string) {
+	return transportSet.StringT(t)
+}
+
+func (t SocketTransport) IsValid() (isValid bool) {
+	return transportSet.IsValid(t)
+}
+
+var transportSet = sets.NewSet(sets.NewElements[SocketTransport](
+	[]sets.SetElement[SocketTransport]{
+		{ValueV: TransportTCP, Name: "tcp"},
+	}))

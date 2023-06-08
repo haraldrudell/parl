@@ -55,5 +55,5 @@ func (o *Ordered[E]) Index(element E) (index int) {
 }
 
 func (o *Ordered[E]) Clone() (o2 parli.Ordered[E]) {
-	return &Ordered[E]{Slice: Slice[E]{list: slices.Clone(o.list)}}
+	return &Ordered[E]{Slice: *o.Slice.Clone()}
 }

@@ -8,11 +8,8 @@ ISC License
 package pmaps
 
 import (
-	"sync"
-
 	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
-	"golang.org/x/exp/maps"
 )
 
 // RWMap is a one-liner thread-safe mapping.
@@ -22,10 +19,10 @@ import (
 //   - Swap and PutIf are atomic, thread-safe operations
 //   - V is copied so if size of V is large or V contains locks, use pointer
 //   - RWMap uses reader/writer mutual exclusion lock for slightly higher performance.
+//   - RWMap must be in same package as PMap
 //   - Get methods are O(1)
 type RWMap[K comparable, V any] struct {
-	lock sync.RWMutex
-	m    map[K]V
+	ThreadSafeMap[K, V]
 }
 
 // NewRWMap returns a thread-safe map implementation
@@ -33,20 +30,9 @@ func NewRWMap[K comparable, V any]() (rwMap parli.ThreadSafeMap[K, V]) {
 	return NewRWMap2[K, V]()
 }
 
+// NewRWMap2 returns a thread-safe map implementation
 func NewRWMap2[K comparable, V any]() (rwMap *RWMap[K, V]) {
-	return &RWMap[K, V]{m: map[K]V{}}
-}
-
-// Get returns the value mapped by key or the V zero-value otherwise.
-//   - the ok return value is true if a mapping was found.
-//   - O(1)
-func (rw *RWMap[K, V]) Get(key K) (value V, ok bool) {
-	rw.lock.RLock()
-	defer rw.lock.RUnlock()
-
-	value, ok = rw.m[key]
-
-	return
+	return &RWMap[K, V]{ThreadSafeMap: *NewThreadSafeMap[K, V]()}
 }
 
 // GetOrCreate returns an item from the map if it exists otherwise creates it.
@@ -98,14 +84,6 @@ func (rw *RWMap[K, V]) GetOrCreate(
 	return // no key, no newV or makeV: nil return
 }
 
-// Put saves or replaces a mapping
-func (rw *RWMap[K, V]) Put(key K, value V) {
-	rw.lock.Lock()
-	defer rw.lock.Unlock()
-
-	rw.m[key] = value
-}
-
 // Putif is conditional Put depending on the return value from the putIf function.
 //   - if key does not exist in the map, the put is carried out and wasNewKey is true
 //   - if key exists and putIf is nil or returns true, the put is carried out and wasNewKey is false
@@ -126,44 +104,6 @@ func (rw *RWMap[K, V]) PutIf(key K, value V, putIf func(value V) (doPut bool)) (
 	return
 }
 
-// Delete removes mapping using key K.
-//   - if key K is not mapped, the map is unchanged.
-//   - O(log n)
-func (rw *RWMap[K, V]) Delete(key K) {
-	rw.lock.Lock()
-	defer rw.lock.Unlock()
-
-	delete(rw.m, key)
-}
-
-// Clear empties the map
-func (rw *RWMap[K, V]) Clear() {
-	rw.lock.Lock()
-	defer rw.lock.Unlock()
-
-	maps.Clear(rw.m)
-}
-
-// Length returns the number of mappings
-func (rw *RWMap[K, V]) Length() (length int) {
-	rw.lock.RLock()
-	defer rw.lock.RUnlock()
-
-	return len(rw.m)
-}
-
-// Clone returns a shallow clone of the map
-func (rw *RWMap[K, V]) Range(rangeFn func(key K, value V) (keepGoing bool)) {
-	rw.lock.RLock()
-	defer rw.lock.RUnlock()
-
-	for k, v := range rw.m {
-		if !rangeFn(k, v) {
-			return
-		}
-	}
-}
-
 // Clone returns a shallow clone of the map
 func (rw *RWMap[K, V]) Clone() (clone parli.ThreadSafeMap[K, V]) {
 	return rw.Clone2()
@@ -171,17 +111,7 @@ func (rw *RWMap[K, V]) Clone() (clone parli.ThreadSafeMap[K, V]) {
 
 // Clone returns a shallow clone of the map
 func (rw *RWMap[K, V]) Clone2() (clone *RWMap[K, V]) {
-	var c RWMap[K, V]
-	clone = &c
-
-	rw.lock.RLock()
-	defer rw.lock.RUnlock()
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.m = maps.Clone(rw.m)
-
-	return
+	return &RWMap[K, V]{ThreadSafeMap: *rw.ThreadSafeMap.Clone()}
 }
 
 // Swap replaces the map with otherMap and returns the current map in previousMap

@@ -7,30 +7,52 @@ ISC License
 package pmaps
 
 import (
-	"sync"
-
+	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pslices"
+	"golang.org/x/exp/constraints"
 )
 
 // ThreadSafeOrderedMapFunc is a mapping whose values are provided in custom order. Thread-safe.
 type ThreadSafeOrderedMapFunc[K comparable, V any] struct {
-	lock sync.RWMutex
-	OrderedMapFunc[K, V]
+	ThreadSafeMap[K, V]
+	list parli.Ordered[V]
+	cmp  func(a, b V) (result int)
 }
 
 func NewThreadSafeOrderedMapFunc[K comparable, V any](
 	cmp func(a, b V) (result int),
 ) (orderedMap *ThreadSafeOrderedMapFunc[K, V]) {
 	return &ThreadSafeOrderedMapFunc[K, V]{
-		OrderedMapFunc: *NewOrderedMapFunc[K](cmp),
+		ThreadSafeMap: *NewThreadSafeMap[K, V](),
+		list:          pslices.NewOrderedAny(cmp),
+		cmp:           cmp,
 	}
 }
 
-func (mp *ThreadSafeOrderedMapFunc[K, V]) Get(key K) (value V, ok bool) {
-	mp.lock.RLock()
-	defer mp.lock.RUnlock()
+// NewThreadSafeOrderedMapFunc2 returns a mapping whose values are provided in custom order.
+func NewThreadSafeOrderedMapFunc2[K comparable, V constraints.Ordered](
+	list parli.Ordered[V],
+) (orderedMap *ThreadSafeOrderedMapFunc[K, V]) {
+	if list == nil {
+		panic(perrors.NewPF("list cannot be nil"))
+	} else if list.Length() > 0 {
+		list.Clear()
+	}
+	return &ThreadSafeOrderedMapFunc[K, V]{
+		ThreadSafeMap: *NewThreadSafeMap[K, V](),
+		list:          list,
+		cmp:           compare[V],
+	}
+}
 
-	return mp.OrderedMapFunc.Get(key)
+func compare[V constraints.Ordered](a, b V) (result int) {
+	if a < b {
+		return -1
+	} else if a > b {
+		return 1
+	}
+	return 0
 }
 
 // GetOrCreate returns an item from the map if it exists otherwise creates it.
@@ -46,16 +68,18 @@ func (mp *ThreadSafeOrderedMapFunc[K, V]) Get(key K) (value V, ok bool) {
 //     The map’s write lock is held during their execution
 //   - GetOrCreate is an atomic, thread-safe operation
 //   - value insert is O(log n)
-func (rw *ThreadSafeOrderedMapFunc[K, V]) GetOrCreate(
+func (m *ThreadSafeOrderedMapFunc[K, V]) GetOrCreate(
 	key K,
 	newV func() (value *V),
 	makeV func() (value V),
 ) (value V, ok bool) {
-	rw.lock.Lock()
-	defer rw.lock.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	mp := m.ThreadSafeMap.m
 
 	// try existing mapping
-	if value, ok = rw.OrderedMapFunc.Get(key); ok {
+	if value, ok = mp[key]; ok {
 		return // mapping exists return
 	}
 
@@ -66,7 +90,7 @@ func (rw *ThreadSafeOrderedMapFunc[K, V]) GetOrCreate(
 			panic(perrors.NewPF("newV returned nil"))
 		}
 		value = *pt
-		rw.OrderedMapFunc.Put(key, value)
+		mp[key] = value
 		ok = true
 		return // created using newV return
 	}
@@ -74,7 +98,7 @@ func (rw *ThreadSafeOrderedMapFunc[K, V]) GetOrCreate(
 	// create using makeV
 	if makeV != nil {
 		value = makeV()
-		rw.OrderedMapFunc.Put(key, value)
+		mp[key] = value
 		ok = true
 		return // created using makeV return
 	}
@@ -83,24 +107,36 @@ func (rw *ThreadSafeOrderedMapFunc[K, V]) GetOrCreate(
 }
 
 // Put saves or replaces a mapping
-func (mp *ThreadSafeOrderedMapFunc[K, V]) Put(key K, value V) {
-	mp.lock.Lock()
-	defer mp.lock.Unlock()
+func (m *ThreadSafeOrderedMapFunc[K, V]) Put(key K, value V) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	mp.OrderedMapFunc.Put(key, value)
+	length0 := len(m.ThreadSafeMap.m)
+	m.ThreadSafeMap.m[key] = value
+	if length0 == len(m.ThreadSafeMap.m) {
+		return
+	}
+	m.list.Insert(value)
 }
 
 // Put saves or replaces a mapping
-func (mp *ThreadSafeOrderedMapFunc[K, V]) PutIf(key K, value V, putIf func(value V) (doPut bool)) (wasNewKey bool) {
-	mp.lock.Lock()
-	defer mp.lock.Unlock()
+//   - if mapping exists and poutif i non-nil, puIf function is invoked
+//   - put is only carried out if mapping is new or putIf is non-nil and returns true
+func (m *ThreadSafeOrderedMapFunc[K, V]) PutIf(key K, value V, putIf func(value V) (doPut bool)) (wasNewKey bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	existing, keyExists := mp.OrderedMapFunc.Get(key)
-	wasNewKey = !keyExists
-	if keyExists && putIf != nil && !putIf(existing) {
-		return // putIf false return: this value should not be updated
+	value0, ok := m.ThreadSafeMap.m[key]
+	if wasNewKey = !ok; !wasNewKey {
+		if putIf == nil || !putIf(value0) {
+			return // existing key, putIf nil or returning false: do nothing
+		}
+		if m.cmp(value0, value) != 0 {
+			m.list.Delete(value0)
+			m.list.Insert(value)
+		}
 	}
-	mp.OrderedMapFunc.Put(key, value)
+	m.ThreadSafeMap.m[key] = value
 
 	return
 }
@@ -108,55 +144,45 @@ func (mp *ThreadSafeOrderedMapFunc[K, V]) PutIf(key K, value V, putIf func(value
 // Delete removes mapping using key K.
 //   - if key K is not mapped, the map is unchanged.
 //   - O(log n)
-func (mp *ThreadSafeOrderedMapFunc[K, V]) Delete(key K) {
-	mp.lock.Lock()
-	defer mp.lock.Unlock()
+func (m *ThreadSafeOrderedMapFunc[K, V]) Delete(key K) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	mp.OrderedMapFunc.Delete(key)
+	var v V
+	var ok bool
+	if v, ok = m.ThreadSafeMap.m[key]; !ok {
+		return
+	}
+	delete(m.ThreadSafeMap.m, key)
+	m.list.Delete(v)
 }
 
 // Clear empties the map
-func (mp *ThreadSafeOrderedMapFunc[K, V]) Clear() {
-	mp.lock.Lock()
-	defer mp.lock.Unlock()
+func (m *ThreadSafeOrderedMapFunc[K, V]) Clear() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	mp.OrderedMapFunc.Clear()
-}
-
-func (mp *ThreadSafeOrderedMapFunc[K, V]) Length() (length int) {
-	mp.lock.RLock()
-	defer mp.lock.RUnlock()
-
-	return mp.OrderedMapFunc.Length()
+	m.ThreadSafeMap.m = make(map[K]V)
+	m.list.Clear()
 }
 
 // Clone returns a shallow clone of the map
-func (mp *ThreadSafeOrderedMapFunc[K, V]) Clone() (clone *ThreadSafeOrderedMapFunc[K, V]) {
+func (m *ThreadSafeOrderedMapFunc[K, V]) Clone() (clone *ThreadSafeOrderedMapFunc[K, V]) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
-	// there is no access to cmp, so create an empty clone that has a lock
-	//	- any write to clone must happen while its lock is held
-	c := ThreadSafeOrderedMapFunc[K, V]{}
-	clone = &c
-
-	// get write lock for clone
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	// get read lock for mp
-	mp.lock.RLock()
-	defer mp.lock.RUnlock()
-
-	// clone map and list, including cmp
-	c.OrderedMapFunc = *mp.OrderedMapFunc.Clone()
-
-	return
+	return &ThreadSafeOrderedMapFunc[K, V]{
+		ThreadSafeMap: *m.ThreadSafeMap.Clone(),
+		list:          m.list.Clone(),
+		cmp:           m.cmp,
+	}
 }
 
 // List provides the mapped values in order
 //   - O(n)
-func (mp *ThreadSafeOrderedMapFunc[K, V]) List(n ...int) (list []V) {
-	mp.lock.RLock()
-	defer mp.lock.RUnlock()
+func (m *ThreadSafeOrderedMapFunc[K, V]) List(n ...int) (list []V) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
-	return mp.OrderedMapFunc.List(n...)
+	return m.list.List(n...)
 }

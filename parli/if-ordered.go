@@ -28,7 +28,7 @@ type Ordered[E any] interface {
 	// Insert adds an element to the ordered slice.
 	// The implementation may allow duplicates.
 	Insert(element E)
-	// Delete removes an element to the ordered slice.
+	// Delete removes an element from the ordered slice.
 	// If the ordered slice does not contain element, the slice is not changed.
 	Delete(element E)
 	// Index returns index of the first occurrence of element in the ordered slice
@@ -38,13 +38,28 @@ type Ordered[E any] interface {
 	Clone() (ordered Ordered[E])
 }
 
-// Slice is an embedded interface for slice interface types
+// Slice is a reusable unordered slice
+//   - functions by index that apply to unordered slice
+//   - embedded interface for slice interface types
 type Slice[E any] interface {
 	// Element returns element by index.
 	// if index is negative or the length of the slice or larger, the E zero-value is returned.
 	Element(index int) (element E)
+	// SubSlice returns a multiple-element sub-slice, not a clone
+	//	index0 and index1 aree adjusted to legal values
+	SubSlice(index0, index1 int) (elements []E)
+	// SetElement updates single element by index
+	//	- slice is extended if too short
+	SetElement(index int, element E)
+	// Append adds element at end
+	Append(slice []E)
+	// DeleteIndex removes elements by index
+	//	- index1 default is slice length
+	DeleteIndex(index0 int, index1 ...int)
 	// Length returns number of elements in the slice
 	Length() (length int)
+	// Cap returns slice capacity
+	Cap() (capacity int)
 	// Clear empties the ordered slice
 	Clear()
 	// List returns a clone of the internal slice

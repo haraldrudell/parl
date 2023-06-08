@@ -58,6 +58,9 @@ type AggregatePriority[V any, P constraints.Ordered] interface {
 	// Priority returns the effective cached priority
 	//	- Priority is used by consumers of the AggregatingPriorityQueue
 	CachedPriority() (priority P)
+	// Index indicates insertion order
+	//	- used for ordering elements of equal priority
+	Index() (index int)
 }
 
 // Aggregator aggregates, snapshots and assigns priority to an associated value.

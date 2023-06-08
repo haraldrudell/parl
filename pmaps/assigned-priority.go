@@ -12,11 +12,12 @@ import (
 // AssignedPriority contains the assigned priority for a priority-queue element
 //   - V is the element value type whose pointer-value provides identity
 //   - P is the priority, a descending-ordered type
-//   - Index is insertion order, lowest-value first
+//   - SetPriority updates the priority
+//   - Cmp makes AssignedPriority ordered
 type AssignedPriority[V any, P constraints.Ordered] struct {
-	Priority P
-	Index    int
-	Value    *V
+	Priority P   // the main sort value, ordered high to low
+	Index    int // insertion order: lowest/earliest value first: distinguishes between equal priorities
+	Value    *V  // the pointer provides identity for this priority
 }
 
 func NewAssignedPriority[V any, P constraints.Ordered](priority P, index int, value *V) (assignedPriority *AssignedPriority[V, P]) {

@@ -23,18 +23,28 @@ const (
 	defaultTimer           = 10 * time.Second
 )
 
+// CBReason explains to consumer why the callback was invoked
+//   - ITParallelism ITLatency
 type CBReason uint8
 
+// emid is a unique ordered ID for invocations usable as map key
 type emid uint64
 
+// emidGenerator.ID produces a unique echo moderator invocation ID
 var emidGenerator UniqueIDTypedUint64[emid]
 
+// CBFunc is a thread-safe function invoked on
+//   - parallelism exceeding parallelismWarningPoint
+//   - latency of an ongoing invocation exceeds latencyWarningPoint
 type CBFunc func(reason CBReason, maxParallelism uint64, maxLatency time.Duration, threadID ThreadID)
 
+// InvokeTimer monitors funtion invocations for parallelism and latency
+//   - callback is invoked on exceeding thresholds and reaching a new max
 type InvokeTimer struct {
 	callback    CBFunc
 	timerPeriod time.Duration
-	invoTimes   pmaps.ThreadSafeOrderedMapAny[emid, uint64, *invocationX]
+	// map of invocations with value order oldest first
+	invoTimes   pmaps.ThreadSafeOrderedMapFunc[emid, *invokeTimerInvo]
 	invos       AtomicCounter
 	latency     AtomicMax[time.Duration]
 	parallelism AtomicMax[uint64]
@@ -45,6 +55,8 @@ type InvokeTimer struct {
 	g0 GoGen
 }
 
+// NewInvokeTimer returnds an object alerting of max latency and parallelism
+//   - Do is used for new invocations
 func NewInvokeTimer(
 	callback CBFunc,
 	latencyWarningPoint time.Duration,
@@ -56,11 +68,11 @@ func NewInvokeTimer(
 	if timerPeriod < defaultTimer {
 		timerPeriod = defaultTimer
 	}
-	var ix invocationX
+	var ix *invokeTimerInvo
 	i := InvokeTimer{
 		callback:    callback,
 		timerPeriod: timerPeriod,
-		invoTimes:   *pmaps.NewThreadSafeOrderedMapAny[emid](ix.order),
+		invoTimes:   *pmaps.NewThreadSafeOrderedMapFunc[emid](ix.oldestFirst),
 		g0:          g0,
 	}
 	i.latency.Value(latencyWarningPoint)
@@ -68,30 +80,10 @@ func NewInvokeTimer(
 	return &i
 }
 
-func (em *InvokeTimer) Do(fn func()) {
-	emID := emidGenerator.ID()
-	invocation := invocationX{
-		t0:       time.Now(),
-		threadID: goID(),
-	}
-	defer func() {
-		em.invoTimes.Delete(emID)
-		em.maybeCancelTimer()
-		if duration := time.Since(invocation.t0); em.latency.Value(duration) {
-			max, _ := em.parallelism.Max()
-			// callback for slowness of completed task
-			em.callback(ITLatency, max, duration, invocation.threadID)
-		}
-	}()
-
-	em.invoTimes.Put(emID, &invocation)
-	em.ensureTimer()
-	invos := em.invos.Value()
-	if em.parallelism.Value(invos) {
-		max, _ := em.latency.Max()
-		// callback for high parallelism warning
-		em.callback(ITParallelism, invos, max, invocation.threadID)
-	}
+// Do invokes fn with alerts on latency and parallelism
+//   - Do is invoked in the goroutine to execute fn
+func (i *InvokeTimer) Do(fn func()) {
+	defer newInvokeTimerInvo(i).init().deferFunc()
 
 	// execute
 	fn()
@@ -164,19 +156,6 @@ func (em *InvokeTimer) timerLatencyCheck(at time.Time) {
 		// callback for high latency of task in progress
 		em.callback(ITLatency, max, age, threadID)
 	}
-}
-
-type invocationX struct {
-	t0       time.Time
-	threadID ThreadID
-}
-
-func (ix *invocationX) order(a *invocationX) (result uint64) {
-	if a.t0.IsZero() {
-		return // zero-time: 0
-	}
-	result = uint64(a.t0.UnixNano())
-	return
 }
 
 func (ws CBReason) String() (s string) {

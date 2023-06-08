@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,26 +21,37 @@ import (
 )
 
 func TestSocket(t *testing.T) {
-	var socketString = "127.0.0.1:0" // 0 means ephemeral port
+	var expAddr = netip.MustParseAddr("127.0.0.1") // localhost: ensure IPv4
+	var socketString = expAddr.String() + ":0"     // 0 means ephemeral port
 
 	var colonPos int
 	var socket *TCPListener
 	var err error
 	var addr string
 	var port int
+	var addrPort netip.AddrPort
 
 	// check socketString
 	if colonPos = strings.Index(socketString, ":"); colonPos == -1 {
 		t.Fatalf("Bad socketString fixture: %q", socketString)
 	}
 
-	// create listening socket
-	socket = NewListenTCP4()
+	// NewTCPListener()
+	socket = NewTCPListener()
+	if socket == nil {
+		t.Fatalf("NewTCPListener nil")
+	} else if socket.TCPListener == nil {
+		t.Fatalf("socket.TCPListener nil")
+	} else if socket.SocketListener.netListener != socket.TCPListener {
+		t.Fatalf("socket.TCPListener and socket.SocketListener.netListener different")
+	}
+
+	// Listen()
 	if err = socket.Listen(socketString); err != nil {
 		t.Fatalf("ListenTCP4 error: %+v", err)
 	}
 
-	// Addr() Close()
+	// Addr()
 	if addr = socket.Addr().String(); !strings.HasPrefix(addr, socketString[:colonPos+1]) {
 		t.Fatalf("Bad socket adress: %q", addr)
 	}
@@ -48,6 +60,16 @@ func TestSocket(t *testing.T) {
 	} else if port < 1 || port > 65535 {
 		t.Errorf("Bad port numeric: %v", port)
 	}
+
+	// AddrPort()
+	if addrPort, err = socket.AddrPort(); err != nil {
+		t.Errorf("AddrPort err: %s", perrors.Short(err))
+	}
+	if addrPort.Addr() != expAddr {
+		t.Errorf("bad AddrPort addr: %q exp %q", addrPort.Addr(), expAddr)
+	}
+
+	// Close()
 	if err = socket.Close(); err != nil {
 		t.Errorf("socket.Close: '%v'", err)
 	}
@@ -57,7 +79,7 @@ type connectionHandlerFixture struct {
 	count int64
 }
 
-func (c *connectionHandlerFixture) connFunc(conn net.Conn) {
+func (c *connectionHandlerFixture) connFunc(conn *net.TCPConn) {
 	if err := conn.Close(); err != nil {
 		panic(perrors.Errorf("conn.Close: '%w'", err))
 	}
@@ -98,7 +120,7 @@ func TestAcceptThread(t *testing.T) {
 	var threadWait sync.WaitGroup
 
 	// set-up socket
-	socket = NewListenTCP4()
+	socket = NewTCPListener()
 	if err = socket.Listen(socketString); err != nil {
 		t.Fatalf("ListenTCP4 error: %+v", err)
 	}
