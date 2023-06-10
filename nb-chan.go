@@ -221,7 +221,8 @@ func (nb *NBChan[T]) Count() (unsentCount int) {
 }
 
 // Close orders the channel to close once pending sends complete.
-// Close is thread-safe, non-blocking, error-free and panic-free.
+//   - Close is thread-safe, non-blocking, error-free and panic-free.
+//   - when Close returns, the channel may still be open and have items
 func (nb *NBChan[T]) Close() (didClose bool) {
 	if nb.isCloseInvoked.IsTrue() {
 		return // Close was already invoked atomic performance

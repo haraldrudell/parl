@@ -79,6 +79,20 @@ func TestGoGroup(t *testing.T) {
 	if ok {
 		t.Error("goGroup.Ch did not close")
 	}
+	// the channel managed by NBChan goGroup.ch is closed
+	//	- the channel is goGroup.NBChan.ClosableChan.ch
+	//	- that means NBChan.sendThreadDefer did NBChan.Close
+	//
+	// - goGroup.isEnd does NBChan.IsClosed delegating to:
+	//	- ClosableChan.IsClosed which returns
+	//	- parl.Once.IsDone.IsTrue()
+	//	- there is a race condition between closing the channel
+	//	- and setting isDone true
+	//	- during which isEnd will indicate not ended
+	//
+	// therefore wait for the known pending close here:
+	goGroupImpl.ch.WaitForClose()
+
 	if !goGroupImpl.isEnd() {
 		t.Error("goGroup did not terminate")
 	}
