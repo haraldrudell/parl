@@ -46,13 +46,13 @@ var c0 pruntime.CachedLocation
 // Usage:
 //
 //	main() {
-//	  var wg = &sync.WaitGroup{}
-//	  defer func() { wg.Wait() }()
 //	  var goGroup = g0.NewGoGroup(context.Background())
+//	  defer goGroup.Wait()
+//
 //	  goGroup.SetDebug(parl.AggregateThread)
-//	 …
-//	 goGroup.Cancel()
-//	 wg = ThreadLogger(goGroup)
+//	  defer func() { g0.ThreadLogger(goGroup).Wait() }()
+//
+//	 defer goGroup.Cancel()
 func ThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interface{})) (
 	wg *sync.WaitGroup) {
 	wg = &sync.WaitGroup{}

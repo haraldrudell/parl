@@ -21,7 +21,7 @@ func DumpHardwareAddr(a net.HardwareAddr) (s string) {
 
 func HardwareAddrInterface(a net.HardwareAddr) (netInterface *net.Interface, isErrNoSuchInterface bool, err error) {
 	if len(a) == 0 {
-		err = perrors.NewPF("HarwareAddr cannot be empty")
+		err = perrors.NewPF("HardwareAddr cannot be empty")
 		return
 	}
 	var interfaces []net.Interface

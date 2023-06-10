@@ -33,17 +33,17 @@ func NewReadWriteCloserSlice() (readWriteCloser *ReadWriteCloserSlice) {
 }
 
 // Write saves data in slice and returns all bytes written or ErrFileAlreadyClosed
-func (wc *ReadWriteCloserSlice) Write(p []byte) (n int, err error) {
-	wc.dataLock.Lock()
-	defer wc.dataLock.Unlock()
+func (r *ReadWriteCloserSlice) Write(p []byte) (n int, err error) {
+	r.dataLock.Lock()
+	defer r.dataLock.Unlock()
 
-	if wc.isClosed {
+	if r.isClosed {
 		err = perrors.ErrorfPF("%w", ErrFileAlreadyClosed)
 		return // closed return
 	}
 
 	// consume data
-	wc.data = append(wc.data, p...)
+	r.data = append(r.data, p...)
 	n = len(p)
 
 	return // good write return
@@ -53,31 +53,35 @@ func (wc *ReadWriteCloserSlice) Write(p []byte) (n int, err error) {
 //   - Read is blocking
 //   - n may be less than len(p)
 //   - if len(p) > 0, non-error return will have n > 0
-func (wc *ReadWriteCloserSlice) Read(p []byte) (n int, err error) {
-	wc.readerCond.L.Lock()
-	defer wc.readerCond.L.Unlock()
+func (r *ReadWriteCloserSlice) Read(p []byte) (n int, err error) {
+	r.readerCond.L.Lock()
+	defer r.readerCond.L.Unlock()
 
 	for {
 
 		var haveData bool
-		if haveData, n, err = wc.read(p); haveData || err != nil {
+		if haveData, n, err = r.read(p); haveData || err != nil {
 			return // data read or or error return
 		}
 
 		// wait for write or close
-		wc.readerCond.Wait()
+		r.readerCond.Wait()
 	}
 }
 
-func (wc *ReadWriteCloserSlice) read(p []byte) (haveData bool, n int, err error) {
-	wc.dataLock.Lock()
-	defer wc.dataLock.Unlock()
+func (r *ReadWriteCloserSlice) Buffer() (buffer []byte) {
+	return r.data
+}
+
+func (r *ReadWriteCloserSlice) read(p []byte) (haveData bool, n int, err error) {
+	r.dataLock.Lock()
+	defer r.dataLock.Unlock()
 
 	// check for EOF or no data
-	data := wc.data
+	data := r.data
 	d := len(data)
 	if haveData = d > 0; !haveData {
-		if wc.isClosed {
+		if r.isClosed {
 			err = io.EOF
 			return // eof return: haveData false, err io.EOF
 		}
@@ -92,35 +96,35 @@ func (wc *ReadWriteCloserSlice) read(p []byte) (haveData bool, n int, err error)
 	if d <= n {
 
 		// all data consumed
-		n = d              // N is bytes read
-		wc.data = data[:0] // empty buffer
-		return             // all data submitted return
+		n = d             // N is bytes read
+		r.data = data[:0] // empty buffer
+		return            // all data submitted return
 	}
 
 	// only len(p) bytes of data was consumed
 	// n already has the shorter len(p) value
-	wc.data = data[n:] // remove consumed bytes from data
-	return             // p filled return
+	r.data = data[n:] // remove consumed bytes from data
+	return            // p filled return
 }
 
 // Close closes thw Write part, may return ErrFileAlreadyClosed
-func (wc *ReadWriteCloserSlice) Close() (err error) {
+func (r *ReadWriteCloserSlice) Close() (err error) {
 	var doBroadcast bool
 	defer func() {
 		if doBroadcast {
-			wc.readerCond.Broadcast()
+			r.readerCond.Broadcast()
 		}
 	}()
 
-	wc.dataLock.Lock()
-	defer wc.dataLock.Unlock()
+	r.dataLock.Lock()
+	defer r.dataLock.Unlock()
 
-	if wc.isClosed {
+	if r.isClosed {
 		err = perrors.ErrorfPF("%w", ErrFileAlreadyClosed)
 		return // closed return
 	}
 
-	wc.isClosed = true
+	r.isClosed = true
 	doBroadcast = true
 
 	return
