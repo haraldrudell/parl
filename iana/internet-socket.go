@@ -67,6 +67,10 @@ func NewInternetSocketNoPort(protocol Protocol, addr netip.Addr) (internetSocket
 	return
 }
 
+func (is InternetSocket) IsZeroValue() (isZeroValue bool) {
+	return is == ""
+}
+
 func (is InternetSocket) String() (s string) {
 	return string(is)
 }

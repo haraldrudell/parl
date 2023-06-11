@@ -45,11 +45,11 @@ func NewKeyOrderedMapFunc2[K constraints.Ordered, V any](
 }
 
 // Put saves or replaces a mapping
-func (mp *KeyOrderedMapFunc[K, V]) Put(key K, value V) {
-	length0 := mp.Map.Length()
-	mp.Map.Put(key, value)
-	if length0 < mp.Map.Length() {
-		mp.list.Insert(key)
+func (m *KeyOrderedMapFunc[K, V]) Put(key K, value V) {
+	length0 := m.Map.Length()
+	m.Map.Put(key, value)
+	if length0 < m.Map.Length() {
+		m.list.Insert(key)
 	}
 }
 

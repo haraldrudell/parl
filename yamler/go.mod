@@ -7,8 +7,8 @@ replace github.com/haraldrudell/parl => ../../parl
 replace github.com/haraldrudell/parl/mains => ../mains
 
 require (
-	github.com/haraldrudell/parl v0.4.94
-	github.com/haraldrudell/parl/mains v0.4.94
+	github.com/haraldrudell/parl v0.4.95
+	github.com/haraldrudell/parl/mains v0.4.95
 	gopkg.in/yaml.v3 v3.0.1
 )
 

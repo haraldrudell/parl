@@ -11,6 +11,7 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pslices"
 	"golang.org/x/exp/constraints"
+	"golang.org/x/exp/maps"
 )
 
 // ThreadSafeOrderedMapFunc is a mapping whose values are provided in custom order. Thread-safe.
@@ -168,14 +169,13 @@ func (m *ThreadSafeOrderedMapFunc[K, V]) Clear() {
 
 // Clone returns a shallow clone of the map
 func (m *ThreadSafeOrderedMapFunc[K, V]) Clone() (clone *ThreadSafeOrderedMapFunc[K, V]) {
+	clone = NewThreadSafeOrderedMapFunc[K, V](m.cmp)
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	return &ThreadSafeOrderedMapFunc[K, V]{
-		ThreadSafeMap: *m.ThreadSafeMap.Clone(),
-		list:          m.list.Clone(),
-		cmp:           m.cmp,
-	}
+	clone.ThreadSafeMap.m = maps.Clone(m.ThreadSafeMap.m)
+	clone.list = m.list.Clone()
+	return
 }
 
 // List provides the mapped values in order

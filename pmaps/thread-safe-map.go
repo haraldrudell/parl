@@ -40,7 +40,7 @@ func (m *ThreadSafeMap[K, V]) Get(key K) (value V, ok bool) {
 }
 
 // Put saves or replaces a mapping
-func (m *RWMap[K, V]) Put(key K, value V) {
+func (m *ThreadSafeMap[K, V]) Put(key K, value V) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
