@@ -358,3 +358,34 @@ func TestSubGroup(t *testing.T) {
 		t.Error("goGroup did not terminate")
 	}
 }
+
+func TestCancel(t *testing.T) {
+	var ctx = parl.AddNotifier(context.Background(), func(slice pruntime.StackSlice) {
+		t.Logf("ALLCANCEL %s", slice)
+	})
+
+	var threadGroup = NewGoGroup(ctx)
+	threadGroup.(*GoGroup).AddNotifier(func(slice pruntime.StackSlice) {
+		t.Logf("CANCEL %s %s", GoChain(threadGroup), slice)
+	})
+	var subGroup = threadGroup.SubGroup()
+	subGroup.(*GoGroup).AddNotifier(func(slice pruntime.StackSlice) {
+		t.Logf("CANCEL %s %s", GoChain(subGroup), slice)
+	})
+	t.Logf("STATE0: %t %t", threadGroup.Context().Err() != nil, subGroup.Context().Err() != nil)
+	if threadGroup.Context().Err() != nil {
+		t.Error("threadGroup canceled")
+	}
+	if subGroup.Context().Err() != nil {
+		t.Error("subGroup canceled")
+	}
+	subGroup.Cancel()
+	t.Logf("STATE1: %t %t", threadGroup.Context().Err() != nil, subGroup.Context().Err() != nil)
+	if threadGroup.Context().Err() != nil {
+		t.Error("threadGroup canceled")
+	}
+	if subGroup.Context().Err() == nil {
+		t.Error("subGroup did not cancel")
+	}
+	//t.Fail()
+}

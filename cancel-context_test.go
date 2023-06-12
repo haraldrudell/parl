@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 func TestInvokeCancel(t *testing.T) {
@@ -113,5 +114,75 @@ func TestInvokeCancelBad(t *testing.T) {
 	}()
 	if err == nil || !strings.HasSuffix(err.Error(), message) {
 		t.Errorf("InvokeCancel bad error: %v exp %q", err, message)
+	}
+}
+
+func TestChildCancel(t *testing.T) {
+	var v any
+	var a func()
+	var ok bool
+	a, ok = v.(func())
+	_ = a
+	_ = ok
+	var ctx0 = context.Background()
+	var ctx1 = AddNotifier(ctx0, func(slice pruntime.StackSlice) {
+		t.Log(slice)
+	})
+	var ctx2 = NewCancelContext(ctx1)
+	var ctx3 = NewCancelContext(ctx2)
+	invokeCancel(ctx3)
+	if ctx3.Err() == nil {
+		t.Error("ctx3 not canceled")
+	}
+	if ctx2.Err() != nil {
+		t.Error("ctx2 canceled")
+	}
+	if ctx1.Err() != nil {
+		t.Error("ctx1 canceled")
+	}
+	if ctx0.Err() != nil {
+		t.Error("ctx0 canceled")
+	}
+}
+
+type NotifierCounter struct {
+	count int
+	t     *testing.T
+}
+
+func (c *NotifierCounter) Notifier(slice pruntime.StackSlice) {
+	c.count++
+	var t = c.t
+	t.Logf("TRACE: %s", pruntime.NewStackSlice(0))
+}
+
+func TestCancels(t *testing.T) {
+	var expCount = 3 // 2 notifierAll + notifier1
+
+	var c = NotifierCounter{t: t}
+	var anyValue any
+	var ctx = NewCancelContext(AddNotifier(
+		AddNotifier(
+			AddNotifier1(
+				AddNotifier1(context.Background(), c.Notifier),
+				c.Notifier,
+			),
+			c.Notifier,
+		),
+		c.Notifier,
+	))
+	anyValue = ctx.Value(notifier1Key)
+	if IsNil(anyValue) {
+		t.Errorf("Notifier1 NIL")
+	}
+	t.Logf("ONE: %T", anyValue)
+	anyValue = ctx.Value(notifierKey)
+	if IsNil(anyValue) {
+		t.Errorf("Notifier MANY NIL")
+	}
+	t.Logf("MANY: %T", anyValue)
+	invokeCancel(ctx)
+	if c.count != expCount {
+		t.Errorf("count: %d exp %d", c.count, expCount)
 	}
 }

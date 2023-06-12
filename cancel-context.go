@@ -8,6 +8,7 @@ package parl
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pruntime"
@@ -38,18 +39,49 @@ type cancelNotifier string
 
 var notifierKey cancelNotifier
 
-func AddNotifier(ctx context.Context, notifierFn func(slice pruntime.StackSlice)) (
+type cancel1Notifier string
+
+var notifier1Key cancel1Notifier
+
+type NotifierFunc func(slice pruntime.StackSlice)
+
+type atomicList *atomic.Pointer[[]NotifierFunc]
+
+// AddNotifier adds a function that is invoked when any context is canceled
+func AddNotifier(ctx context.Context, notifier NotifierFunc) (ctx2 context.Context) {
+	return addNotifier(true, ctx, notifier)
+}
+
+// AddNotifier1 adds a function that is invoked when a child context is canceled
+func AddNotifier1(ctx context.Context, notifier NotifierFunc) (ctx2 context.Context) {
+	return addNotifier(false, ctx, notifier)
+}
+
+func addNotifier(allCancels bool, ctx context.Context, notifier NotifierFunc) (
 	ctx2 context.Context) {
 	if ctx == nil {
 		panic(perrors.NewPF("ctx cannot be nil"))
+	} else if notifier == nil {
+		panic(perrors.NewPF("notifier cannot be nil"))
 	}
-	if notifierFn == nil {
-		panic(perrors.NewPF("notifierFn cannot be nil"))
+	if !allCancels {
+		return context.WithValue(ctx, notifier1Key, notifier)
 	}
-	fnsAny := ctx.Value(notifierKey)
-	fns, _ := fnsAny.([]func(slice pruntime.StackSlice))
-	fns = append([]func(slice pruntime.StackSlice){notifierFn}, fns...)
-	return context.WithValue(ctx, notifierKey, fns)
+	atomp, ok := ctx.Value(notifierKey).(atomicList)
+	if ok {
+		for {
+			var notifiersp = (*atomp).Load()
+			var notifiers = append(*notifiersp, notifier)
+			if (*atomp).CompareAndSwap(notifiersp, &notifiers) {
+				return ctx
+			}
+		}
+	}
+	var notifiers = []NotifierFunc{notifier}
+	var atomSlice atomic.Pointer[[]NotifierFunc]
+	atomSlice.Store(&notifiers)
+	atomp = &atomSlice
+	return context.WithValue(ctx, notifierKey, atomp)
 }
 
 // NewCancelContext creates a context that can be provided to InvokeCancel.
@@ -92,21 +124,39 @@ func invokeCancel(ctx context.Context) {
 	if ctx == nil {
 		panic(perrors.NewPF("ctx cannot be nil"))
 	}
-	cancel, ok := ctx.Value(cancelKey).(context.CancelFunc)
-	if !ok {
+
+	// retrieve cancel function from the nearest context.valueCtx
+	var cancel context.CancelFunc
+	var ok bool
+	if cancel, ok = ctx.Value(cancelKey).(context.CancelFunc); !ok {
 		panic(perrors.Errorf("%v", ErrNotCancelContext))
 	}
+	// invoke the function canceling the context.valueCtx parent that is context.cancelCtx
+	//	- and all its child contexts
 	cancel()
 
-	// invoke notifier
-	fnsAny := ctx.Value(notifierKey)
-	fns, _ := fnsAny.([]func(slice pruntime.StackSlice))
-	if len(fns) == 0 {
-		return
+	// fetch the nearest notify1 function
+	var notifier, _ = ctx.Value(notifier1Key).(NotifierFunc)
+
+	// fetch any notifyall list
+	var notifiers []NotifierFunc
+	if atomp, ok := ctx.Value(notifierKey).(atomicList); ok {
+		notifiers = *(*atomp).Load()
 	}
-	cl := pruntime.NewStackSlice(cancelNotifierFrames)
-	for _, fn := range fns {
-		fn(cl)
+
+	if notifier == nil && len(notifiers) == 0 {
+		return // no notifiers return
+	}
+
+	// stack trace for notifiers
+	var cl = pruntime.NewStackSlice(cancelNotifierFrames)
+
+	// invoke all notifier functions
+	if notifier != nil {
+		notifier(cl)
+	}
+	for _, n := range notifiers {
+		n(cl)
 	}
 }
 

@@ -7,16 +7,16 @@ package parl
 
 import "testing"
 
-type T uint64
+type Ttype uint64
 
-var generator UniqueIDTypedUint64[T]
+var generator UniqueIDTypedUint64[Ttype]
 
-func (t T) String() string { return generator.StringT(t) }
+func (t Ttype) String() string { return generator.StringT(t) }
 func TestUniqueIDTypedUint64(t *testing.T) {
-	var v1 T = 1
-	var v2 T = 2
+	var v1 Ttype = 1
+	var v2 Ttype = 2
 
-	var v T
+	var v Ttype
 
 	if v = generator.ID(); v != v1 {
 		t.Errorf("bad1 %d exp %d", v, v1)
@@ -30,7 +30,7 @@ func TestUniqueIDTypedUint64(t *testing.T) {
 	t.Logf("value via %%s: %s", v)
 
 	t.Logf("value via %%v: %v", v)
-	var vNil T
+	var vNil Ttype
 	t.Log(generator.StringT(vNil))
 	//t.Fail()
 }

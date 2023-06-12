@@ -27,3 +27,7 @@ func IsNil(v any) (isNil bool) {
 		return
 	*/
 }
+
+func Uintptr(v any) (p uintptr) {
+	return (*[2]uintptr)(unsafe.Pointer(&v))[1]
+}

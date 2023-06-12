@@ -310,6 +310,38 @@ func (nb *NBChan[T]) CloseNow(errp ...*error) (didClose bool, err error) {
 	return
 }
 
+// Scavenge adjusts capacity of nb.sendQueue
+//   - Scavenge allows for reducing buffer capacity thus reduce memory leaks
+//   - if setCapacity is 0 nb.sendQueue is not modified
+//   - if setCapacity is >0, nb.sendQueue capacity is set to near this value,
+//     while ensuring enough capacity for cuerrent elements
+//   - NBChan unused nb.sendQueue elements are zero-value
+func (nb *NBChan[T]) Scavenge(setCapacity int) (length, capacity int) {
+	nb.stateLock.Lock()
+	defer nb.stateLock.Unlock()
+
+	length = len(nb.sendQueue)
+	capacity = cap(nb.sendQueue)
+	if setCapacity > 0 {
+		if setCapacity < length {
+			setCapacity = length
+		}
+		if setCapacity < capacity {
+			var oldQueue = nb.sendQueue
+			var newQueue = make([]T, setCapacity)
+			copy(newQueue, oldQueue)
+			nb.sendQueue = newQueue
+			capacity = cap(newQueue)
+		} else if setCapacity > capacity {
+			var newElements = make([]T, setCapacity-capacity)
+			nb.sendQueue = append(nb.sendQueue, newElements...)
+			nb.sendQueue = nb.sendQueue[:length]
+			capacity = cap(nb.sendQueue)
+		}
+	}
+	return
+}
+
 func (nb *NBChan[T]) appendErrors(err error, getError func() (err error), errp ...*error) {
 
 	// obtain error pointer
