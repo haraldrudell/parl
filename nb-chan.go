@@ -121,28 +121,27 @@ func (nb *NBChan[T]) Send(value T) {
 }
 
 // Send sends many values non-blocking, thread-safe, panic-free and error-free on the channel
-func (nb *NBChan[T]) SendMany(values []T) {
-	if nb.isCloseInvoked.IsTrue() {
-		return // no send after Close(), atomic performance
-	}
-	var length int
-	if length = len(values); length == 0 {
-		return // nothing to do return
-	}
+func (nb *NBChan[T]) SendMany(values []T) (count, capacity int) {
 	nb.stateLock.Lock()
 	defer nb.stateLock.Unlock()
 
-	if nb.isCloseInvoked.IsTrue() {
+	var length = len(values)
+	if nb.isCloseInvoked.IsTrue() || length == 0 {
+		count = nb.unsentCount
+		capacity = cap(nb.sendQueue)
 		return // no send after Close()
 	}
 
 	nb.unsentCount += length
+	count = nb.unsentCount
 
 	// if thread is running, add to send queue
 	if nb.isRunningThread {
 		nb.sendQueue = append(nb.sendQueue, values...)
+		capacity = cap(nb.sendQueue)
 		return
 	}
+	capacity = cap(nb.sendQueue)
 
 	// get next value to send, append remaining to send queue
 	var value T
@@ -156,6 +155,7 @@ func (nb *NBChan[T]) SendMany(values []T) {
 	}
 
 	nb.startThread(value)
+	return
 }
 
 // Get returns a slice of n or default all available items held by the channel.
@@ -183,7 +183,7 @@ func (nb *NBChan[T]) Get(n ...int) (allItems []T) {
 	if nb.isRunningThread {
 		select {
 		case <-nb.closesOnThreadSend:
-		case item, itemValid = <-nb.closableChan.ch:
+		case item, itemValid = <-nb.closableChan.Ch():
 		}
 	}
 
@@ -322,23 +322,32 @@ func (nb *NBChan[T]) Scavenge(setCapacity int) (length, capacity int) {
 
 	length = len(nb.sendQueue)
 	capacity = cap(nb.sendQueue)
-	if setCapacity > 0 {
-		if setCapacity < length {
-			setCapacity = length
-		}
-		if setCapacity < capacity {
-			var oldQueue = nb.sendQueue
-			var newQueue = make([]T, setCapacity)
-			copy(newQueue, oldQueue)
-			nb.sendQueue = newQueue
-			capacity = cap(newQueue)
-		} else if setCapacity > capacity {
-			var newElements = make([]T, setCapacity-capacity)
-			nb.sendQueue = append(nb.sendQueue, newElements...)
-			nb.sendQueue = nb.sendQueue[:length]
-			capacity = cap(nb.sendQueue)
-		}
+
+	// check setCapacity
+	if setCapacity == 0 {
+		return // do not scavenge return: length and capacity valid
+	} else if setCapacity < length {
+		setCapacity = length
 	}
+	if setCapacity == capacity {
+		return // no scavenge to do return: length and capacity valid
+	}
+
+	// adjust nb.sendQueue capacity
+	var newQueue []T
+	if setCapacity < capacity {
+		newQueue = make([]T, setCapacity) // reduce capacity
+		copy(newQueue, nb.sendQueue)
+	} else { // increase cacacity
+		newQueue = append(nb.sendQueue[:capacity], make([]T, setCapacity-capacity)...)
+	}
+	if len(newQueue) != length {
+		newQueue = newQueue[:length] // reset to length
+	}
+
+	capacity = cap(newQueue) // actual slice capacity set by Go runtime
+	nb.sendQueue = newQueue
+
 	return
 }
 

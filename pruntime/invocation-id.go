@@ -14,7 +14,8 @@ import (
 A stack has a leading line with go routine ID, then two lines per frame:
 goroutine 1 [running]:
 runtime/debug.Stack(0x1, 0x1, 0x2)
-        /usr/local/Cellar/go/1.16.6/libexec/src/runtime/debug/stack.go:24 +0x9f
+
+	/usr/local/Cellar/go/1.16.6/libexec/src/runtime/debug/stack.go:24 +0x9f
 */
 const (
 	// the number of lines debug.Stack produces for each stack frame
@@ -34,7 +35,9 @@ func Invocation(stackFramesToSkip int) (stackTrace string) {
 	}
 
 	// remove the first few stack frames
-	stackTraceLines := strings.Split(string(debug.Stack()), "\n")
+	stackBytes := debug.Stack()
+	stackString := string(stackBytes)
+	stackTraceLines := strings.Split(stackString, "\n")
 	linesToSkip := (stackFramesToSkip + skipFrames) * linesPerStackFrame
 	copy(stackTraceLines[1:], stackTraceLines[1+linesToSkip:])
 	stackTraceLines = stackTraceLines[:len(stackTraceLines)-linesToSkip]

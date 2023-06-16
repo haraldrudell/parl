@@ -26,17 +26,21 @@ import "sync"
 //	  defer errCh.Close(&err) // will not terminate the process
 //	  errCh.Ch() <- err
 type ClosableChan[T any] struct {
-	hasChannel AtomicBool
+	hasChannel AtomicBool // hasChannel provides thread-safe read of ch
 	chLock     sync.Mutex
-	ch         chan T // behind lock
+	ch         chan T // channel is closed and written outside of new behind lock
 
 	closeOnce Once
 }
 
 // NewClosableChan returns a channel with thread-safe idempotent panic-free observable close
+//   - cannot use lock in new function
 func NewClosableChan[T any](ch ...chan T) (cl *ClosableChan[T]) {
 	c := ClosableChan[T]{}
-	c.getCh(ch...) // ch... or make provides the channel
+	if len(ch) > 0 {
+		c.ch = ch[0]
+		c.hasChannel.Set()
+	}
 	return &c
 }
 
@@ -75,11 +79,12 @@ func (cl *ClosableChan[T]) IsClosed() (isClosed bool) {
 	return cl.closeOnce.IsDone()
 }
 
-func (cl *ClosableChan[T]) getCh(ch0 ...chan T) (ch chan T) {
+func (cl *ClosableChan[T]) getCh() (ch chan T) {
 
 	// wrap lock in performance-friendly atomic
-	// channel is still provided when closed
-	if cl.hasChannel.IsTrue() {
+	//	- by reading hasChannel cl.ch access is thread-safe
+	//	- if channel is closed, return whatever ch is
+	if cl.hasChannel.IsTrue() || cl.closeOnce.IsDone() {
 		return cl.ch
 	}
 
@@ -87,20 +92,11 @@ func (cl *ClosableChan[T]) getCh(ch0 ...chan T) (ch chan T) {
 	cl.chLock.Lock()
 	defer cl.chLock.Unlock()
 
-	if cl.closeOnce.IsDone() || cl.hasChannel.IsTrue() {
-		ch = cl.ch
-		return // already closed or already present return
-	}
-
 	if ch = cl.ch; ch == nil {
-		if len(ch0) > 0 {
-			ch = ch0[0]
-		} else {
-			ch = make(chan T)
-		}
+		ch = make(chan T)
 		cl.ch = ch
+		cl.hasChannel.Set()
 	}
-	cl.hasChannel.Set()
 	return
 }
 

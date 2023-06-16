@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -456,7 +455,7 @@ func (ex *Executable) Exit(stausCode ...int) {
 	} else {
 		parl.Debug("\nexe.Exit: err: %T '%[1]v'", ex.err)
 	}
-	parl.Debug("\nexe.Exit invocation:\n%s\n", debug.Stack())
+	parl.Debug("\nexe.Exit invocation:\n%s\n", pruntime.StackString())
 	if parl.IsThisDebug() { // add newline during debug without location
 		plogger.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}

@@ -69,7 +69,9 @@ func NewStack(skipFrames int) (stack *Stack) {
 	// line 1 is status line
 	// line 2 is debug.Stack frame
 	// created by is 2 optional lines at end
-	trace := strings.Split(strings.TrimSuffix(string(debug.Stack()), "\n"), "\n")
+	stackBytes := debug.Stack()
+	stackString := string(stackBytes)
+	trace := strings.Split(strings.TrimSuffix(stackString, "\n"), "\n")
 	traceLen := len(trace)
 	skipAtStart := runtStatusLines + runtDebugStackLines + runtNewStackLines
 	skipAtEnd := 0

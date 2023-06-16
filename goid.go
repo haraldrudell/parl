@@ -7,8 +7,9 @@ package parl
 
 import (
 	"regexp"
-	"runtime/debug"
 	"strings"
+
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
@@ -19,7 +20,7 @@ const (
 var firstRexp = regexp.MustCompile(runFirstRexpT)
 
 func goID() (threadID ThreadID) {
-	debugStack := string(debug.Stack())
+	var debugStack = pruntime.StackString()
 	if index := strings.Index(debugStack, "\n"); index != -1 {
 		debugStack = debugStack[:index-1]
 	}

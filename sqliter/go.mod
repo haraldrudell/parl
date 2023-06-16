@@ -6,7 +6,7 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/haraldrudell/parl v0.4.97
+	github.com/haraldrudell/parl v0.4.98
 	modernc.org/sqlite v1.23.1
 )
 
@@ -16,10 +16,10 @@ require (
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
-	golang.org/x/mod v0.10.0 // indirect
+	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/text v0.10.0 // indirect
-	golang.org/x/tools v0.9.3 // indirect
+	golang.org/x/tools v0.10.0 // indirect
 	lukechampine.com/uint128 v1.3.0 // indirect
 	modernc.org/cc/v3 v3.41.0 // indirect
 	modernc.org/ccgo/v3 v3.16.14 // indirect

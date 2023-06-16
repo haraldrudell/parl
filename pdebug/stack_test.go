@@ -77,7 +77,7 @@ func TestStack(t *testing.T) {
 		t.Errorf("stack.Status: %s exp %s", stack.Status(), expStatus)
 	}
 	if stack.IsMain() {
-		t.Error("stack.IsMain true")
+		t.Errorf("stack.IsMain true: stack:\n%s\n", stack.String())
 	}
 	frames = stack.Frames()
 	if len(frames) < 1 {
@@ -111,6 +111,10 @@ func TestStack(t *testing.T) {
 		t.Errorf("stack.Shorts 1: %q exp %q", actualSL[1], cL.Short())
 	}
 }
+
+// END OF TEST
+// END OF TEST
+// END OF TEST
 
 type T struct {
 	creator, goFunction, frame0 *pruntime.CodeLocation
@@ -163,6 +167,10 @@ func TestStackString(t *testing.T) {
 
 	// assemble expected values
 
+	// The stack is created by T.stack2
+	//	- 1 status line: ID: 35 IsMain: false status: running
+	//	- 3x2 frames: pdebug.NewStack
+	//	- 1 creator line: cre: github.com/haraldrudell/parl/pdebug.TestStackString-stack_test.go:161
 	var expLines = 1 + 2*2 + 1 // 6: 0–5: ID, 2x2code locations, cre
 	var expLine1 = fmt.Sprintf("ID: %s IsMain: false status: %s", threadID, threadStatus)
 	var expLine3 = "\x20\x20" + filepath.Base(frame0cL.File) + ":" + strconv.Itoa(frame0cL.Line)
@@ -178,7 +186,7 @@ func TestStackString(t *testing.T) {
 	// testing.tRunner(0x14000003ba0, 0x1045849f8)
 	// testing.go:1576
 	// cre: testing.(*T).Run-testing.go:1629
-	t.Logf("\n%s", stack)
+	t.Logf("STACK OBTAINED:\n%s\n—", stack)
 
 	actualSL = strings.Split(stack.String(), "\n")
 	// length: 6: 0…5

@@ -10,10 +10,9 @@ ISC License
 package goid
 
 import (
-	"runtime/debug"
-
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/pdebug"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 // GoID obtains a numeric string that as of Go1.18 is
@@ -21,7 +20,7 @@ import (
 // unsigned integer beginning at 1 for the main invocation
 func GoID() (threadID parl.ThreadID) {
 	var err error
-	if threadID, _, err = pdebug.ParseFirstLine(string(debug.Stack())); err != nil {
+	if threadID, _, err = pdebug.ParseFirstLine(pruntime.FirstStackLine()); err != nil {
 		panic(err)
 	}
 	return

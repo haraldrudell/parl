@@ -40,13 +40,12 @@ the selected number of iterations: 480,165
 execution time: 2.364 μs
 the code allocated 1,664 bytes i 2 allocations
 
-A function call is 0.3215 ns
+# A function call is 0.3215 ns
 
 goos: darwin
 goarch: arm64
 pkg: github.com/haraldrudell/parl/goid
 BenchmarkGoID-10    	  480165	      2364 ns/op	    1664 B/op	       2 allocs/op
-
 */
 func BenchmarkData(b *testing.B) {
 	// a global variable is undefined every time

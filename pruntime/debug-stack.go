@@ -6,6 +6,7 @@ ISC License
 package pruntime
 
 import (
+	"runtime"
 	"runtime/debug"
 	"strings"
 )
@@ -17,6 +18,8 @@ const (
 	prLinesPerFrame      = 2
 	prCreatorLines       = 2
 )
+
+var _ = runtime.Stack
 
 /*
 DebugStack produces a string stack frame modified debug.Stack:
@@ -39,7 +42,9 @@ func DebugStack(skipFrames int) (stack string) {
 			/opt/homebrew/Cellar/go/1.18/libexec/src/testing/testing.go:1486 +0x300
 	*/
 	// convert to string, remove final newline, split into lines
-	trace := strings.Split(strings.TrimSuffix(string(debug.Stack()), "\n"), "\n")
+	stackBytes := debug.Stack()
+	stackString := string(stackBytes)
+	trace := strings.Split(strings.TrimSuffix(stackString, "\n"), "\n")
 
 	// check skipFrames maximum value
 	lineCount := len(trace)

@@ -7,7 +7,6 @@ package pdebug
 
 import (
 	"fmt"
-	"runtime/debug"
 	"strings"
 
 	"github.com/haraldrudell/parl"
@@ -79,7 +78,7 @@ func NewStack(skipFrames int) (stack parl.Stack) {
 	//	- convert to string
 	//	- remove final newline
 	//	- split into lines
-	trace := strings.Split(strings.TrimSuffix(string(debug.Stack()), "\n"), "\n")
+	trace := strings.Split(strings.TrimSuffix(pruntime.StackString(), "\n"), "\n")
 	traceLen := len(trace)
 	skipAtStart := runtStatusLines + runtDebugStackLines + runtNewStackLines
 	skipAtEnd := 0
@@ -195,49 +194,49 @@ func (s *Stack) MostRecentFrame() (frame parl.Frame) {
 	return
 }
 
-func (st *Stack) Shorts(prepend string) (s string) {
+func (s *Stack) Shorts(prepend string) (shorts string) {
 	if prepend != "" {
 		prepend += "\x20"
 	}
 	sL := []string{
-		prepend + "Thread ID: " + st.threadID.String(),
+		prepend + "Thread ID: " + s.threadID.String(),
 	}
-	for _, frame := range st.frames {
+	for _, frame := range s.frames {
 		sL = append(sL, prepend+frame.Loc().Short())
 	}
-	if st.creator.IsSet() {
-		sL = append(sL, prepend+"creator: "+st.creator.Short())
+	if s.creator.IsSet() {
+		sL = append(sL, prepend+"creator: "+s.creator.Short())
 	}
 	return strings.Join(sL, "\n")
 }
 
-func (st *Stack) SetID(threadID parl.ThreadID, status parl.ThreadStatus) {
-	st.threadID = threadID
-	st.status = status
+func (s *Stack) SetID(threadID parl.ThreadID, status parl.ThreadStatus) {
+	s.threadID = threadID
+	s.status = status
 }
 
-func (st *Stack) SetCreator(creator *pruntime.CodeLocation, isMainThread bool) {
-	st.creator = *creator
-	st.isMainThread = isMainThread
+func (s *Stack) SetCreator(creator *pruntime.CodeLocation, isMainThread bool) {
+	s.creator = *creator
+	s.isMainThread = isMainThread
 }
 
-func (st *Stack) SetFrames(frames []parl.Frame) {
-	st.frames = frames
+func (s *Stack) SetFrames(frames []parl.Frame) {
+	s.frames = frames
 }
 
-func (st *Stack) String() (s string) {
-	sL := make([]string, len(st.frames))
-	for i, frame := range st.frames {
+func (s *Stack) String() (str string) {
+	sL := make([]string, len(s.frames))
+	for i, frame := range s.frames {
 		sL[i] = frame.String()
 	}
-	if s = strings.Join(sL, "\n"); s != "" {
-		s += "\n"
+	if str = strings.Join(sL, "\n"); str != "" {
+		str += "\n"
 	}
 	return fmt.Sprintf("ID: %s IsMain: %t status: %s\n"+
 		"%s"+
 		"cre: %s",
-		st.threadID, st.isMainThread, st.status,
-		s,
-		st.creator.Long(),
+		s.threadID, s.isMainThread, s.status,
+		str,
+		s.creator.Long(),
 	)
 }

@@ -32,6 +32,8 @@ type Counters interface {
 	// Rate counter threads are monitored by the provided Go group and failure
 	// may force a counter restart or cause application termination. Failures
 	// are typically caused by panics in the counter update task.
+	//	- Counter is the data-provider side of a counter
+	//	- CounterValues is the consumer side of a counter
 	GetOrCreateCounter(name CounterID, period ...time.Duration) (counter Counter)
 	// GetOrCreateCounter is used by the data provider of a datapoint.
 	// A datapoint supports SetValue operation.

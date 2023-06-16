@@ -76,6 +76,7 @@ func (sd *SlowDetector) Values() (last, average, max time.Duration, hasValue boo
 	return sd.sd.Values()
 }
 
+// last-duration / average duration / max duration
 func (sd *SlowDetector) Status0() (s string) {
 	last, average, max, hasValue := sd.sd.Values()
 	if !hasValue {
