@@ -10,16 +10,22 @@ import (
 	"runtime"
 )
 
+// this error string appears as multiple string literals in channel.go
 const rtSendOnClosedChannel = "send on closed channel"
 
-// IsSendOnClosedChannel determines if err’s chain contains the
+// IsSendOnClosedChannel returns true if err’s error chain contains the
 // runtime error “send on closed channel”
+//   - runtime.plainError is an unexported named type of underlying type string
+//   - each error occurrence has a unique runtime.plainError value
+//   - runtime.plainError type have empty method RuntimeError()
+//   - the [runtime.Error] interface has the RuntimeError method
+//   - the Error method of runtime.Error returns the string value
 func IsSendOnClosedChannel(err error) (is bool) {
 
-	// is err runtime.Error?
-	runtimeError := IsRuntimeError(err)
+	// runtimeError is any runtime.Error implementation in the err error chain
+	var runtimeError = IsRuntimeError(err)
 	if runtimeError == nil {
-		return
+		return // not a [runtime.Error] or runtime.plainErrror return
 	}
 
 	// is it the right runtime error?
@@ -27,6 +33,8 @@ func IsSendOnClosedChannel(err error) (is bool) {
 }
 
 // IsRuntimeError determines if err’s error chain contains a runtime.Error
+//   - err1 is then a non-nil error value
+//   - runtime.Error is an interface describing the unexported runtime.plainError type
 func IsRuntimeError(err error) (err1 runtime.Error) {
 	// errors.As cannot handle nil
 	if err == nil {

@@ -184,7 +184,11 @@ func (st *StatusTerminal) LogTimeStamp(format string, a ...any) {
 // For non-ansi-terminal stderr, LogTimeStamp simply prints lines of text.
 func (st *StatusTerminal) Log(format string, a ...any) {
 	if !st.IsTerminal.IsTrue() {
-		st.Print(parl.Sprintf(format, a...)) // parl.Log is thread-safe
+		var s = parl.Sprintf(format, a...)
+		st.Print(s) // parl.Log is thread-safe
+		for writer := range st.copyLog {
+			st.write(s, writer.Write)
+		}
 		return
 	}
 
@@ -202,7 +206,11 @@ func (st *StatusTerminal) Log(format string, a ...any) {
 	st.lock.Lock()
 	defer st.lock.Unlock()
 
-	st.Print(st.clearStatus() + s + st.restoreStatus())
+	if st.statusEnded.IsFalse() {
+		st.Print(st.clearStatus() + s + st.restoreStatus())
+	} else {
+		st.Print(s)
+	}
 	for writer := range st.copyLog {
 		st.write(s, writer.Write)
 	}
@@ -258,12 +266,15 @@ func (st *StatusTerminal) CopyLog(writer io.Writer, remove ...bool) {
 }
 
 func (st *StatusTerminal) EndStatus() {
-	if !st.statusEnded.Set() {
-		return
+	if st.statusEnded.IsTrue() {
+		return //already end
 	}
-
 	st.lock.Lock()
 	defer st.lock.Unlock()
+
+	if !st.statusEnded.Set() {
+		return // did not win shutdown return
+	}
 
 	st.output = ""
 	st.Print(NewLine)

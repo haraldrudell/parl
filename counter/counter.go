@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Counter is a counter without rate information.
 package counter
 
 import (
@@ -13,139 +12,113 @@ import (
 )
 
 // Counter is a counter without rate information. Thread-safe.
-//   - value: monotonically increasing affected by method Inc
-//   - running: value of Inc - Dec
-//   - max: the highest historical value of running
-//   - Counter implements parl.Counter and parl.CounterValues.
-//
-// Note: because Counter uses atomics and not lock, data integrity is not
-// guaranteed or achievable. Data is valid and consistent but may be of
-// progressing revision.
+//   - provider methods: Inc Dec Add
+//   - consumer methods: Get GetReset Value Running Max
+//   - initialization-free
 type Counter struct {
-	value   uint64 // atomic
-	running uint64 // atomic
-	max     uint64 // atomic
+	CounterConsumer
 }
 
-var _ parl.CounterValues = &Counter{} // Counter is parl.CounterValues
+var _ parl.Counter = &Counter{}       // Counter supports data providers
+var _ parl.CounterValues = &Counter{} // Counter supports data consumers
 
+// newCounter returns a counter without rate information.
 func newCounter() (counter parl.Counter) { // Counter is parl.Counter
 	return &Counter{}
 }
 
-func (cn *Counter) Inc() (counter parl.Counter) {
-	counter = cn
+// Inc increments the counter. Thread-Safe, method chaining
+func (c *Counter) Inc() (counter parl.Counter) {
+	counter = c
+	// acquire and relinquish lock or atomic, lock-free access
+	defer c.a.RelinquishAccess(c.a.RequestAccess())
 
 	// update value, running and max
-	atomic.AddUint64(&cn.value, 1)
-	cn.updateMax(atomic.AddUint64(&cn.running, 1)) // returns the new value
+	atomic.AddUint64(&c.value, 1)
+	c.updateMax(atomic.AddUint64(&c.running, 1)) // returns the new value
 
 	return
 }
 
-func (cn *Counter) Dec() (counter parl.Counter) {
-	counter = cn
+// Dec decrements the counter but not below zero. Thread-Safe, method chaining
+func (c *Counter) Dec() (counter parl.Counter) {
+	counter = c
+	// acquire and relinquish lock or atomic, lock-free access
+	defer c.a.RelinquishAccess(c.a.RequestAccess())
 
 	for {
 
-		// check if current can be decremented
-		current := atomic.LoadUint64(&cn.running) // current value
-		if current == 0 {
+		// check if running can be decremented
+		var running = atomic.LoadUint64(&c.running) // current value
+		if running == 0 {
 			return // do not decrement lower than 0 return
 		}
 
-		// attenpt to decrement
-		newCurrent := current - 1 // 0…
-		if atomic.CompareAndSwapUint64(&cn.running, current, newCurrent) {
+		// attempt to decrement
+		var newRunning = running - 1 // 0…
+		if atomic.CompareAndSwapUint64(&c.running, running, newRunning) {
 			return // decrement succeeded return
 		}
 	}
 }
 
-func (cn *Counter) Add(delta int64) (counter parl.Counter) {
-	counter = cn
-
+// Add adds a positive or negative delta. Thread-Safe, method chaining
+func (c *Counter) Add(delta int64) (counter parl.Counter) {
+	counter = c
 	// check for nothing to do
 	if delta == 0 {
 		return // no change return
 	}
+	// acquire and relinquish lock or atomic, lock-free access
+	defer c.a.RelinquishAccess(c.a.RequestAccess())
 
 	// positive case: update value, running, max
 	if delta > 0 {
-		u64 := uint64(delta)
-		atomic.AddUint64(&cn.value, u64)
-		cn.updateMax(atomic.AddUint64(&cn.running, u64))
-		return // popsitive additiona complete return
+		var deltaU64 = uint64(delta)
+		atomic.AddUint64(&c.value, deltaU64)
+		c.updateMax(atomic.AddUint64(&c.running, deltaU64))
+		return // popsitive addition complete return
 	}
 
 	// delta negative
-	decrementAmount := uint64(-delta)
+	var decrementAmount = uint64(-delta)
 	for {
 
-		// check current value
-		running := atomic.LoadUint64(&cn.running)
-		if running == 0 {
-			return // cannot decrement further return
+		// cap decrement amount to avoid negative result
+		var running = atomic.LoadUint64(&c.running)
+		if decrementAmount > running {
+			decrementAmount = running
 		}
 
-		// cap decrement amount to avoid negative result
-		var newValue uint64
-		if decrementAmount < running {
-			newValue = running - decrementAmount
+		// check for nothing to do
+		if decrementAmount == 0 {
+			return // cannot decrement return
 		}
 
 		// attempt to store new value
-		if atomic.CompareAndSwapUint64(&cn.running, running, newValue) {
+		if atomic.CompareAndSwapUint64(&c.running, running, running-decrementAmount) {
 			return // decrement successful return
 		}
 	}
 }
 
-func (cn *Counter) Clone() (counterValues parl.CounterValues) {
-
-	// allocate new container
-	cv := Counter{}
-	counterValues = &cv
-
-	// copy by reading atomically in order
-	cv.value, cv.running, cv.max = cn.Get()
-	return
-}
-
-func (cn *Counter) CloneReset(stopRateCounters bool) (counterValues parl.CounterValues) {
-	counterValues = cn.Clone()
-
-	// clear atomically in order
-	atomic.StoreUint64(&cn.value, 0)
-	atomic.StoreUint64(&cn.running, 0)
-	atomic.StoreUint64(&cn.max, 0)
-	return
-}
-
-func (cn *Counter) Get() (value, running, max uint64) {
-	value = atomic.LoadUint64(&cn.value)
-	running = atomic.LoadUint64(&cn.running)
-	max = atomic.LoadUint64(&cn.max)
-	return
-}
-
-func (cn *Counter) Value() (value uint64) {
-	value = atomic.LoadUint64(&cn.value)
-	return
+// Consumer return the read-only consumer interface for this counter
+func (c *Counter) Consumer() (consumer parl.CounterValues) {
+	return &c.CounterConsumer
 }
 
 // updateMax ensures that max is at least running
-func (cn *Counter) updateMax(running uint64) {
+func (c *Counter) updateMax(running uint64) {
 	for {
 
-		// check whether maxc has acceptable value
-		max := atomic.LoadUint64(&cn.max) // get current max value
+		// check whether max has acceptable value
+		var max = atomic.LoadUint64(&c.max) // get current max value
 		if running <= max {
 			return // no update required return
 		}
 
 		// CompareAndSwapUint64 updates to running if value still matches max
-		if atomic.CompareAndSwapUint64(&cn.max, max, running) {
+		if atomic.CompareAndSwapUint64(&c.max, max, running) {
 			return // update successful return
 		}
 	}

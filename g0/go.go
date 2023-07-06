@@ -30,13 +30,14 @@ const (
 //   - SubGroup creates a subordinate thread-group with its own error channel.
 //     Fatal-error thread-exits in SubGroup can be recovered locally in that thread-group
 type Go struct {
-	goEntityID // Wait()
-	// isTerminated indicates that this Go thread is terminated
-	//	- an atomic is requires since wg.Done and wg.IsZero are separate operations
-	isTerminated    parl.AtomicBool
+	goEntityID
 	goParent        // Cancel() Context()
 	creatorThreadId parl.ThreadID
 	thread          ThreadSafeThreadData
+	// endCh is a channel that closes when this threadGroup ends
+	//	- endCh.Ch() is awaitable channel
+	//	- endCh.IsClosed() indicates ended
+	endCh parl.ClosableChan[struct{}]
 }
 
 // newGo returns a Go object for a thread operating in a Go thread-group. Thread-safe.
@@ -83,7 +84,8 @@ func (g0 *Go) AddError(err error) {
 // Done handles thread exit. Deferrable
 func (g0 *Go) Done(errp *error) {
 	g0.checkState(true)
-	if !g0.isTerminated.Set() {
+	var didClose, _ = g0.endCh.Close()
+	if !didClose {
 		panic(perrors.ErrorfPF("Go received multiple Done: ", perrors.ErrpString(errp)))
 	}
 
@@ -112,12 +114,16 @@ func (g0 *Go) GoRoutine() (threadID parl.ThreadID, goFunction *pruntime.CodeLoca
 	return
 }
 
+func (g0 *Go) Wait() {
+	<-g0.endCh.Ch()
+}
+
 // checkState is invoked by public methods ensuring that terminated
 // objects are not being used
 //   - checkState also collects data on the new thread
 func (g0 *Go) checkState(skipTerminated bool, label ...string) (g *Go) {
 	g = g0
-	if !skipTerminated && g0.isTerminated.IsTrue() {
+	if !skipTerminated && g0.endCh.IsClosed() {
 		panic(perrors.NewPF("operation on terminated Go thread object"))
 	}
 

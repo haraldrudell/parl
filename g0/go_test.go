@@ -35,7 +35,7 @@ func TestGo(t *testing.T) {
 	goGroup = NewGoGroup(context.Background())
 	g0 = goGroup.Go()
 	g0Impl = g0.(*Go)
-	if g0Impl.isTerminated.IsTrue() {
+	if g0Impl.endCh.IsClosed() {
 		t.Error("Go terminated")
 	}
 	g0.Register(label)

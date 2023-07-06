@@ -23,7 +23,9 @@ const (
 // goContext is a promotable private field with Cancel and Context methods only.
 //   - goContext is based on parl.NewCancelContext
 type goContext struct {
-	c atomic.Pointer[context.Context]
+	goEntityID
+	c              atomic.Pointer[context.Context]
+	cancelListener func()
 }
 
 // newGoContext returns a subordinate context with Cancel and Context methods
@@ -32,7 +34,9 @@ func newGoContext(ctx context.Context) (gc *goContext) {
 		panic(perrors.NewPF("ctx cannot be nil"))
 	}
 	var ctx2 = parl.NewCancelContext(ctx)
-	c := goContext{}
+	c := goContext{
+		goEntityID: *newGoEntityID(),
+	}
 	c.c.Store(&ctx2)
 	return &c
 }
@@ -52,7 +56,9 @@ func (c *goContext) AddNotifier(notifier func(slice pruntime.StackSlice)) {
 
 // Cancel signals shutdown to all threads of a thread-group.
 func (c *goContext) Cancel() {
-
+	if f := c.cancelListener; f != nil {
+		f()
+	}
 	// if caller is debug, debug-print cancel action
 	if parl.IsThisDebugN(g1ccSkipFrames) {
 		parl.GetDebug(g1ccSkipFrames)("CancelAndContext.Cancel:\n" + pdebug.NewStack(g1ccSkipFrames).Shorts(g1ccPrepend))

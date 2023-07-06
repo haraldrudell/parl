@@ -6,114 +6,165 @@ ISC License
 package g0
 
 import (
-	"context"
-	"fmt"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pmaps"
-	"github.com/haraldrudell/parl/pruntime"
 )
 
-type goGroup interface {
-	isEnd() (isEnd bool)
-	ThreadsInternal() (orderedMap pmaps.KeyOrderedMap[GoEntityID, parl.ThreadData])
-	Context() (ctx context.Context)
-	fmt.Stringer
-}
-
-var c0 pruntime.CachedLocation
+const (
+	threadLoggerLabel = "ThreadLogger"
+)
 
 // ThreadLogger waits for a GoGroup, SubGo or SubGroup to terminate while printing
 // information on threads that have yet to exit every second.
-//   - invoke ThreadLogger after goGroup.Cancel and ThreadLogger will list information
-//     on goroutines that has yet to exit
-//   - goGen is the thread group and is a parl.GoGroup SubGo or SubGroup
-//   - — goGen should have SetDebug(parl.AggregateThread) causing it to aggregate
-//     information on live threads
-//   - logFn is an optional logging function, default parl.Log to stderr
-//   - ThreadLogger returns pointer to sync.WaitGroup so it can be waited upon
-//   - —
 //   - Because the GoGroup owner needs to continue consuming the GoGroup’s error channel,
 //     ThreadLogger has built-in threading
 //   - the returned sync.WaitGroup pointer should be used to ensure main does
 //     not exit prematurely. The WaitGroup ends when the GoGroup ends and ThreadLogger
 //     ceases output
+type ThreadLogger struct {
+	goGroup  *GoGroup
+	log      parl.PrintfFunc
+	endCh    chan struct{}
+	ErrCh    *parl.NBChan[parl.GoError]
+	isCancel atomic.Bool
+}
+
+var _ = parl.AggregateThread
+
+// NewThreadLogger wraps a GoGen thread-group in a debug listener
+//   - parl.AggregateThread is enabled for the thread-group
+//   - ThreadLogger listens for thread-group Cancel
+//   - Wait method ensures process does not exit prior to ThreadLogger complete
+//   - logFn is an optional logging function, default parl.Log to stderr
 //
 // Usage:
 //
 //	main() {
-//	  var goGroup = g0.NewGoGroup(context.Background())
-//	  defer goGroup.Wait()
-//
-//	  goGroup.SetDebug(parl.AggregateThread)
-//	  defer func() { g0.ThreadLogger(goGroup).Wait() }()
-//
-//	 defer goGroup.Cancel()
-func ThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interface{})) (
-	wg *sync.WaitGroup) {
-	wg = &sync.WaitGroup{}
+//	  var threadGroup = g0.NewGoGroup(context.Background())
+//	  defer threadGroup.Wait()
+//	  defer g0.NewThreadLogger(threadGroup).Log().Wait()
+//	  defer threadGroup.Cancel()
+//	  …
+//	 threadGroup.Cancel()
+func NewThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interface{})) (threadLogger *ThreadLogger) {
+	t := ThreadLogger{endCh: make(chan struct{})}
 
 	// obtain logging function
-	var log parl.PrintfFunc
 	if len(logFn) > 0 {
-		log = logFn[0]
+		t.log = logFn[0]
 	}
-	if log == nil {
-		log = parl.Log
+	if t.log == nil {
+		t.log = parl.Log
 	}
 
 	// obtain GoGroup
-	var g0 goGroup
 	var ok bool
-	if g0, ok = goGen.(goGroup); !ok {
+	if t.goGroup, ok = goGen.(*GoGroup); !ok {
 		panic(perrors.ErrorfPF("type assertion failed, need GoGroup SubGo or SubGroup, received: %T", goGen))
 	}
+	t.ErrCh = &t.goGroup.ch
+	return &t
+}
 
-	// wait for g0 to end with logging to log
-	if g0.isEnd() {
-		log("%s: IsEnd true", c0.FuncIdentifier())
+// Log preares the threadgroup for logging on Cancel
+func (t *ThreadLogger) Log() (t2 *ThreadLogger) {
+	t2 = t
+
+	// if threadGroup has already ended, print that
+	var g = t.goGroup
+	var log = t.log
+	if g.isEnd() {
+		log(threadLoggerLabel + ": IsEnd true")
+		close(t.endCh)
 		return // thread-group already ended
 	}
-	wg.Add(1)
-	go printThread(wg, log, c0.FuncIdentifier(), g0)
+	g.aggregateThreads.Set()
+
+	if g.Context().Err() == nil {
+		g.goContext.cancelListener = t.cancelListener
+		log(threadLoggerLabel + ": listening for Cancel")
+		return
+	}
+
+	t.launchThread()
 	return
 }
 
+func (t *ThreadLogger) Wait() {
+	<-t.endCh
+}
+
+// cancelListener is invoked on every threadGroup.Cancel()
+func (t *ThreadLogger) cancelListener() {
+	if !t.isCancel.CompareAndSwap(false, true) {
+		return // subsequent cancel invocation
+	}
+	t.log(threadLoggerLabel + ": Cancel detected")
+	t.launchThread()
+}
+
+// launchThread prepares the waitgroup and lunches the logging thread
+func (t *ThreadLogger) launchThread() {
+	go t.printThread()
+}
+
 // printThread prints goroutines that have yet to exit every second
-func printThread(wg parl.SyncDone, log parl.PrintfFunc, label string, g0 goGroup) {
-	defer wg.Done()
+func (t *ThreadLogger) printThread() {
+	var g = t.goGroup
+	var log = t.log
+	defer close(t.endCh)
 	defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
-	defer func() { log("%s %s: %s", parl.ShortSpace(), label, "thread-group ended") }()
+	defer func() { log("%s %s: %s", parl.ShortSpace(), threadLoggerLabel, "thread-group ended") }()
 
 	// ticker for periodic printing
 	var ticker = time.NewTicker(time.Second)
 	defer ticker.Stop()
 
+	var endCh <-chan struct{}
+	if g.hasErrorChannel.IsTrue() {
+		endCh = g.ch.WaitForCloseCh()
+	} else {
+		endCh = g.endCh.Ch()
+	}
 	for {
-		var orderedMap = g0.ThreadsInternal()
-		ts := make([]string, orderedMap.Length())
+
+		// multi-line string of all threads
+		var threadLines string
+		// threads ordered by goEntityID
+		var orderedMap = g.ThreadsInternal()
+		// printable string representation of all threads
+		var ts = make([]string, orderedMap.Length())
 		for i, goEntityId := range orderedMap.List() {
 			var threadData, _ = orderedMap.Get(goEntityId)
 			var _ parl.ThreadData
 			ts[i] = threadData.(*ThreadData).LabeledString() + " G" + goEntityId.String()
 		}
-		threadLines := strings.Join(ts, "\n")
+		threadLines = strings.Join(ts, "\n")
+
+		// header line
+		//	- 230622 16:51:28-07 ThreadLogger: GoGen: goGroup#1_threads:316(325)_
+		//		New:main.main()-graffick.go:111 threads: 317
 		log("%s %s: GoGen: %s threads: %d\n%s",
-			parl.ShortSpace(),
-			label,
-			g0,
-			len(threadLines), threadLines,
+			parl.ShortSpace(),   // 230622 16:51:26-07
+			threadLoggerLabel,   // ThreadLogger
+			g,                   // GoGen: goGroup#1…
+			orderedMap.Length(), // threads: 317
+			threadLines,         // one line for each thread
 		)
+
+		// exit if thread-group done
+		if g.isEnd() {
+			return
+		}
 
 		// blocks here
 		select {
-		case <-g0.Context().Done():
-			return
-		case <-ticker.C:
+		case <-endCh: // thread-group ended
+		case <-ticker.C: // timer trig
 		}
 	}
 }

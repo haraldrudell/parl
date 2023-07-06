@@ -50,7 +50,7 @@ Executable constant strings that describes an executable
 advisable static values include Program Version Comment Description Copyright License Arguments
 like:
 
-	var exe = mains.Executable{
+	var ex = mains.Executable{
 	  Program:     "getip",
 	  Version:     "0.0.1",
 	  Comment:     "first version",

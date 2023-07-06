@@ -71,7 +71,7 @@ func (av *Averager[T]) Add(value T, t ...time.Time) {
 //   - if sample count is zero, average is zero
 //   - count is number of values making up the average
 func (av *Averager[T]) Average(t ...time.Time) (average float64, count uint64) {
-	av.getCurrent(av.period.Index(t...)) // ensure peiods are updated
+	av.getCurrent(av.period.Index(t...)) // ensure periods are updated
 	av.sliceLock.RLock()
 	defer av.sliceLock.RUnlock()
 

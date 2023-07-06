@@ -67,18 +67,14 @@ type CounterSetData interface {
 	GetDatapoint(name CounterID) (value, max, min uint64, isValid bool, average float64, n uint64)
 }
 
-// Counter is the data provider interface for a counter with Inc Dec SetValue operations.
-//   - value is a monotonously increasing value counting Inc and positive Add occurrences.
-//     value is used to count the total occurrences of something.
-//   - running is the sum of Inc Dec and Add operations, but alaways 0 or greater.
-//     running is used to count the currently operating instances of something.
-//   - max is the maxmimum value reached by running
-//
-// Counter is thread-safe.
+// Counter is the data provider interface for a counter
+//   - Inc Dec Add operations, Thread-safe
 type Counter interface {
-	Inc() (counter Counter) // Inc increments the counter. Supports method chaining
-	Dec() (counter Counter) // Dec decrements the counter but not beyond zero. Supports method chaining
-	// Add adds a positive or negative delta
+	// Inc increments the counter. Thread-Safe, method chaining
+	Inc() (counter Counter)
+	// Dec decrements the counter but not below zero. Thread-Safe, method chaining
+	Dec() (counter Counter)
+	// Add adds a positive or negative delta. Thread-Safe, method chaining
 	Add(delta int64) (counter Counter)
 }
 
@@ -99,16 +95,39 @@ type CounterSet interface {
 	ResetCounters(stopRateCounters bool)
 }
 
-// CounterValues is the consumer interface for a counter.
-//   - value holds the current value from Inc or SetValue operations
-//   - running hold the combining result of Inc and Dec operations. It is not affected by SetValue
-//   - max is the maximum of running counter or SetValue operations
-//   - values are uint64, Counter is thread-safe
+// CounterStore is a CounterSet consumer interface facilitating caching
+type CounterStore interface {
+	// GetOrCreateCounter retrieves a regular counter
+	//	- never returns nil
+	//	- type asserted to CounterValues
+	GetCounter(name CounterID) (counter Counter)
+	//GetCounter retrieves a counter that must exist
+	//	- may return nil
+	//	- type asserted to RateCounterValues or DatapointValue
+	GetNamedCounter(name CounterID) (counter any)
+}
+
+// CounterValues is the consumer interface for a counter. Thread-safe
 type CounterValues interface {
-	Clone() (counterValues CounterValues)                           // Clone takes a snapshot of a counter state.
-	CloneReset(stopRateCounters bool) (counterValues CounterValues) // CloneReset takes a snapshot of a counter state and resets it to its initial state.
+	// Get returns value/running/max with integrity. Thread-Safe
+	//	- value is the monotonically increasing value
+	//	- running is the fluctuating running value
+	//	- max is the highest value running has had
 	Get() (value, running, max uint64)
+	// GetReset returns value/running/max with integrity and resets the counter. Thread-Safe
+	//	- value is the monotonically increasing value
+	//	- running is the fluctuating running value
+	//	- max is the highest value running has had
+	GetReset() (value, running, max uint64)
+	// Value returns the monotonically increasing value. Thread-Safe
+	//	- number of Inc invocations and positive Adds
 	Value() (value uint64)
+	// Running returns the fluctuating running value. Thread-Safe
+	//	- number of Inc less Dec invocations and sum of Adds
+	//	- never below 0
+	Running() (running uint64)
+	// Max returns the highest value running has had. Thread-Safe
+	Max() (max uint64)
 }
 
 // CounterValues is the consumer interface for a rate counter.
@@ -121,7 +140,7 @@ type CounterValues interface {
 //   - RunningMaxDecRate the max rate of decrease in running, a 0 or negative value
 //   - RunningAverage the average of running taken over up to 10 periods
 type RateCounterValues interface {
-	CounterValues // Clone() CloneReset() Get() Value() Running() Max() DidSetValue()
+	CounterValues // Get() GetReset() Value() Running() Max()
 	Rates() (rates map[RateType]int64)
 }
 

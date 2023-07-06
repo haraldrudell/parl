@@ -7,36 +7,43 @@ package g0
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/haraldrudell/parl"
 )
 
+func ExitingGoroutine(g parl.Go) {
+	g.Done(nil)
+}
+
+func ReadErrorChannelToEnd(ch <-chan parl.GoError, t *testing.T) {
+}
+
 func TestThreadLogger(t *testing.T) {
 
-	var wg = &sync.WaitGroup{}
-	defer func() { wg.Wait() }()
-
+	// goGroup being logged
 	var goGroup parl.GoGroup = NewGoGroup(context.Background())
-	goGroup.SetDebug(parl.AggregateThread)
 
-	wg = ThreadLogger(goGroup)
+	// waitgroup for threadLogger end
+	var wg = NewThreadLogger(goGroup).Log()
 
 	// launch a quickly terminating goroutine
 	//	- this will cause goGroup to terminate
-	go func(g0 parl.Go) {
-		defer g0.Done(nil)
-	}(goGroup.Go())
+	go ExitingGoroutine(goGroup.Go())
 
+	// read error channel to end
 	for {
 		e, ok := <-goGroup.Ch()
 		if !ok {
-			return // error channel closed
+			break // error channel closed
 		}
 		var err = e.Err()
 		if err != nil {
 			t.Errorf("goGroup err: %s", e)
 		}
 	}
+
+	t.Log("wg.Wait…")
+	wg.Wait()
+	t.Log("wg.Wait complete")
 }

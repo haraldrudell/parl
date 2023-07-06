@@ -17,6 +17,12 @@ const (
 	DebugOption            = "-debug"
 )
 
+// helpOptions are additional options implemented by the flag package
+//   - [mains.ArgParser] invokes [flag.Parse]
+//   - [flag.FlagSet] parseOne method have these as string constants in the code
+var helpOptions = []string{"h", "help"}
+
+// mains.YamlNo mains.YamlYes
 type YamlOption bool
 
 type BaseOptionsType = struct {
@@ -29,6 +35,9 @@ type BaseOptionsType = struct {
 
 var BaseOptions BaseOptionsType
 
+// BaseOptionData returns basic options for mains
+//   - verbose debug silent
+//   - if yaml == YamlYes: yamlFile yamlKey
 func BaseOptionData(program string, yaml YamlOption) (od []OptionData) {
 	od = []OptionData{
 		{P: &BaseOptions.Verbosity, Name: "verbose", Value: "", Usage: "Regular expression for selective debug, eg. main.main: https://github.com/google/re2/wiki/Syntax"},
@@ -42,4 +51,9 @@ func BaseOptionData(program string, yaml YamlOption) (od []OptionData) {
 		}...)
 	}
 	return
+}
+
+// returns implicit help options: "h" "help"
+func HelpOptions() (optionNames []string) {
+	return helpOptions
 }

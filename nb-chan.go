@@ -7,35 +7,62 @@ package parl
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pruntime"
-	"github.com/haraldrudell/parl/pslices"
+	"github.com/haraldrudell/parl/sets"
 )
 
-// NBChan is a non-blocking send channel with trillion-size buffer.
+const (
+	defaultNBChanSize = 10         // T elements
+	NBChanExit        = "exit"     // NBChan thread is not running
+	NBChanAlert       = "alert"    // NBChan thread is always running and blocked idle waiting for alert
+	NBChanGets        = "GetWait"  // NBChan thread is blocked waiting for Get invocations to complete
+	NBChanSends       = "SendWait" // NBChan thread is blocked waiting for Send/SendMany invocations to complete
+	NBChanSendBlock   = "chSend"   // NBChan thread is blocked in channel send
+	NBChanRunning     = "run"      // NBChan is running
+)
+
+const (
+	// NBChanAlways configures NBChan to always have a thread
+	//   - benefit: for empty NBChan, Send/SendMany to  channel receive is faster due to avoiding thread launch
+	//   - cost: a thread is always running instad of only running when NBChan non-empty
+	//   - cost: Close or CloseNow must be invoked to shutdown NBChan
+	NBChanAlways NBChanThreadType = iota + 1
+	// NBChanNone configures no thread.
+	//	- benefit: lower cpu
+	//	- cost: data can only be received using [NBChan.Get]
+	NBChanNone
+)
+
+// NBChan is a non-blocking send channel with trillion-size queues.
 //   - NBChan behaves both like a channel and a thread-safe slice
-//   - NBChan is initialization-free, thread-safe, panic-free, idempotent, deferrable and observable.
-//   - values are sent using non-blocking, thread-safe, error-free and panic-free Send and SendMany
+//   - — efficiency of sending and receiving multiple items at once
+//   - — ability to wait for items to become available
+//   - NBChan is initialization-free, thread-safe, idempotent and observable with panic-free methods and deferrable medthods
+//   - values are sent to the channel using Send/SendMany that are never blocked by channel send
+//     and are panic-free error-free
 //   - values are received from the channel or fetched all or many at once using Get
-//   - NBChan has deferrable, panic-free, idempotent close:
-//     Close, CloseNow
-//   - the underlying channel is closed when:
+//   - — Get wait:DataWaitCh and NBChanNone is highest throughput at lowest cpu load
+//   - — — cost is no channel is sending values, Get must be used
+//   - — — benefit is no thread
+//   - — Get Ch and NBChanAlways is higher throughput than regular thread
+//   - — — cost is thread is always running
+//   - — with regular thread or NBChanAlways:
+//   - — — Ch offers wait with channel receive
+//   - — — DataWaitCh only waits for data available
+//   - NBChan has deferrable, panic-free, observable, idempotent close.
+//     The underlying channel is closed when:
 //   - — Close is invoked and the channel is read to end
 //   - — CloseNow is invoked
 //   - NBChan is observable:
 //   - — DidClose indicates whether Close or CloseNow has been invoked
 //   - — IsClosed indicates whether the underlying channel has closed
-//   - — deferrable, panic-free WaitForClose waits until the underlying channel has been closed.
-//   - cautious consumers may collect errors via:
-//   - — CloseNow or WaitForClose
-//   - — GetError method preferrably after CloseNow, WaitForClose or IsClosed returns true
-//   - NBChan.GetError() returns thread panics and close errors.
-//     Neither are expected to occur
-//   - — NBChan implements a thread-safe error store perrors.ParlError.
-//   - — No errors are added to the error store after the channel has closed.
-//   - Ch(), Send(), SendMany() Close() CloseNow() IsClosed() DidClose() Count() GetError() are not blocked by channel send
-//     and are panic-free.
+//   - — WaitForClose is deferrable and panic-free and waits until the underlying channel has been closed.
+//   - — WaitForCloseCh returns a channel that closes when the underlying channel closes
+//   - NBChan is designed for error-free operation and only has panics and close errrors. All errors can be collected via:
+//   - — CloseNow WaitForClose GetError
+//   - NBChan has contention-separation between Send/SendMany and Get
 //   - NBChan can be used as an error channel where the sending thread does not
 //     block from a delayed or missing reader.
 //
@@ -58,21 +85,77 @@ import (
 type NBChan[T any] struct {
 	closableChan ClosableChan[T]
 
-	stateLock       sync.Mutex
-	unsentCount     int  // inside lock. One item may be with sendThread
-	sendQueue       []T  // inside lock. One item may be with sendThread
-	isRunningThread bool // inside lock
-	// closesOnThreadSend is created inside the lock every time a value is provided
-	// to the send thread
-	//	- closesOnThreadSend will close immediately after the thread sends
-	//	- from inside the lock, this allows for the thread’s value to be collected
-	closesOnThreadSend        chan struct{} // write inside lock
-	isCloseInvoked            AtomicBool    // Set inside lock
-	isWaitForCloseInitialized AtomicBool    // Set inside lock
+	// size to use for [NBChan.newQueue]
+	//	- atomic
+	//	- set by [NBChan.SetAllocationSize]
+	allocationSize uint64
+	// number of items held by NBChan
+	//	- one item may be with [NBChan.sendThread]
+	//	- atomic
+	unsentCount uint64
+	// number of pending [NBChan.Get] invocations
+	//	- blocks [NBChan.sendThread] from fetching more values
+	//	- atomic
+	gets      uint64
+	getsWait  PeriodWaiter // holds thread waiting while gets > 0
+	sends     uint64
+	sendsWait PeriodWaiter // prevents thread from exiting while sends > 0
+	// capacity of [NBChan.inputQueue]
+	//	- atomic
+	//	- written behind inputLock
+	inputCapacity uint64
+	// capacity of [NBChan.outputQueue]
+	//	- atomic
+	//	- written behind outputLock
+	outputCapacity uint64
+	noThread       atomic.Bool
+	dataWaitCh     atomic.Pointer[chan struct{}]
 
-	waitForClose sync.WaitGroup // valid when isWaitForCloseInitialized is true
+	availableLock   sync.Mutex
+	isDataAvailable atomic.Bool // written behind availableLock
 
-	perrors.ParlError // thread panics and close errors
+	// allows to wait for thread exit
+	//	- because thread may relaunch only relevent after isCloseInvoked
+	threadWait atomic.Pointer[chan struct{}]
+	// closesOnThreadSend is a channel created prior to every
+	// sendThread channel send operation
+	//	- when isRunningThread true, closesOnThreadSend is valid
+	//	- the channel will close immediately after thread send completes
+	//	- this allows for the thread’s value to be collected by Get
+	//	- reinitialized behind threadLock
+	closesOnThreadSend atomic.Pointer[chan struct{}]
+	isThreadAlways     atomic.Bool
+	// set to true by sendThread when entering alert-wait
+	//	- reset by winner invocation for alerting sendThread
+	threadAlertPending atomic.Bool
+	threadAlertWait    PeriodWaiter      // wait mechanic for always-thread alert-wait
+	threadAlertValue   atomic.Pointer[T] // possible value sent by winner invocation to sendThread
+	// threadLock bundles isRunningThread updates:
+	//	- isRunningThread false-to-true winner and closesOnThreadSend reinitialized
+	//	- reinitialize closesOnThreadSend
+	//	- isClose isCloseNow transitions and isRunningThread state
+	//	- collecting sendThread value with isRunningThread and closesOnThreadSend
+	//	- isClose detection for alway-running alert-wait-entry
+	//	- sendThread exit decision
+	//	- sendThread isCloseNow detection
+	threadLock sync.Mutex
+	// isRunningThread indicates that [NBChan.sendThread] is running
+	//	- winner gets to invoke [NBChan.startThread]
+	isRunningThread atomic.Bool // written behind threadLock
+
+	inputLock         sync.Mutex  // controls inputQueue and close
+	inputQueue        []T         // behind inputLock. One item may be with sendThread
+	isCloseInvoked    atomic.Bool // written behind inputLock
+	isCloseNowInvoked atomic.Bool // written behind inputLock
+
+	isWaitForCloseDone atomic.Bool                   // decides winner to close waitForClose
+	waitForClose       atomic.Pointer[chan struct{}] // mechanic to wait for close completion
+
+	outputLock   sync.Mutex // must not be acquired while holding inputLock
+	outputQueue0 []T        // behind getLock: outputQueue initial state, sliced to zero length
+	outputQueue  []T        // behind getLock: outputQueue sliced off from low to high indexes
+
+	perrors.ParlError // thread panics and channel close errors
 }
 
 // NewNBChan returns a non-blocking trillion-size buffer channel.
@@ -83,385 +166,100 @@ type NBChan[T any] struct {
 //
 //	var nbChan NBChan[error]
 //	go thread(&nbChan)
-func NewNBChan[T any](ch ...chan T) (nbChan *NBChan[T]) {
-	nb := NBChan[T]{}
-	if len(ch) > 0 {
-		nb.closableChan = *NewClosableChan(ch[0]) // store ch if present
+func NewNBChan[T any](threadType ...NBChanThreadType) (nbChan *NBChan[T]) {
+	n := NBChan[T]{}
+	if len(threadType) > 0 {
+		switch threadType[0] {
+		case NBChanAlways:
+			n.isThreadAlways.Store(true)
+		case NBChanNone:
+			n.noThread.Store(true)
+		}
 	}
-	return &nb
+	return &n
+}
+
+// SetAllocationSize sets the initial element size of the two queues. Thread-safe
+//   - NBChan allocates two queues of size which may be enlarged by item counts
+//   - supports functional chaining
+func (n *NBChan[T]) SetAllocationSize(size int) (nb *NBChan[T]) {
+	nb = n
+	if size <= 0 {
+		return // noop return
+	}
+	atomic.StoreUint64(&n.allocationSize, uint64(size))
+	n.ensureInput(size)
+	n.ensureOutput(size)
+	return
+}
+
+func (n *NBChan[T]) SetAlwaysThread() (nb *NBChan[T]) {
+	nb = n
+	n.isThreadAlways.Store(true)
+	return
+}
+
+func (n *NBChan[T]) SetNoThread() {
+	n.noThread.Store(true)
+}
+
+// ThreadStatus indicates the current status of a possible thread
+func (n *NBChan[T]) ThreadStatus() (threadStatus string) {
+	if !n.isRunningThread.Load() {
+		return NBChanExit
+	} else if n.threadAlertPending.Load() {
+		return NBChanAlert
+	} else if n.getsWait.Count() > 0 {
+		return NBChanGets
+	} else if n.sendsWait.Count() > 0 {
+		return NBChanSends
+	} else if n.isSendThreadChannelSend() {
+		return NBChanSendBlock
+	}
+	return NBChanRunning
 }
 
 // Ch obtains the receive-only channel
-func (nb *NBChan[T]) Ch() (ch <-chan T) {
-	return nb.closableChan.Ch()
-}
-
-// Send sends a single value non-blocking, thread-safe, panic-free and error-free on the channel
-func (nb *NBChan[T]) Send(value T) {
-	if nb.isCloseInvoked.IsTrue() {
-		return // no send after Close(), atomic performance
-	}
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	if nb.isCloseInvoked.IsTrue() {
-		return // no send after Close()
-	}
-
-	nb.unsentCount++
-
-	// if thread is running, append to send queue
-	if nb.isRunningThread {
-		nb.sendQueue = append(nb.sendQueue, value)
-		return
-	}
-
-	// send using new thread
-	nb.startThread(value)
-}
-
-// Send sends many values non-blocking, thread-safe, panic-free and error-free on the channel
-func (nb *NBChan[T]) SendMany(values []T) (count, capacity int) {
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	var length = len(values)
-	if nb.isCloseInvoked.IsTrue() || length == 0 {
-		count = nb.unsentCount
-		capacity = cap(nb.sendQueue)
-		return // no send after Close()
-	}
-
-	nb.unsentCount += length
-	count = nb.unsentCount
-
-	// if thread is running, add to send queue
-	if nb.isRunningThread {
-		nb.sendQueue = append(nb.sendQueue, values...)
-		capacity = cap(nb.sendQueue)
-		return
-	}
-	capacity = cap(nb.sendQueue)
-
-	// get next value to send, append remaining to send queue
-	var value T
-	if len(nb.sendQueue) > 0 {
-		value = nb.sendQueue[0]
-		pslices.TrimLeft(&nb.sendQueue, 1)
-		nb.sendQueue = append(nb.sendQueue, values...)
-	} else {
-		value = values[0]
-		nb.sendQueue = append(nb.sendQueue, values[1:]...)
-	}
-
-	nb.startThread(value)
-	return
-}
-
-// Get returns a slice of n or default all available items held by the channel.
-//   - if channel is empty, 0 items are returned
-//   - Get is non-blocking
-//   - n > 0: max this many items
-//   - n == 0 (or <0): all items
-//   - Get is panic-free non-blocking error-free thread-safe
-func (nb *NBChan[T]) Get(n ...int) (allItems []T) {
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	// n0: 0 for all items, >0 that many items
-	var n0 int
-	if len(n) > 0 {
-		n0 = n[0]
-	}
-	if n0 < 0 {
-		n0 = 0
-	}
-
-	// get possible item from send thread
-	var item T
-	var itemValid bool
-	if nb.isRunningThread {
-		select {
-		case <-nb.closesOnThreadSend:
-		case item, itemValid = <-nb.closableChan.Ch():
-		}
-	}
-
-	// allocate and populate allItems
-	var itemLength int
-	if itemValid {
-		itemLength = 1
-	}
-	nq := len(nb.sendQueue)
-	// cap n to set n0
-	if n0 != 0 && nq+itemLength > n0 {
-		nq = n0 - itemLength
-	}
-	allItems = make([]T, nq+itemLength)
-	// possible item from channel
-	if itemValid {
-		allItems[0] = item
-	}
-	// items from sendQueue
-	if nq > 0 {
-		copy(allItems[itemLength:], nb.sendQueue)
-		pslices.TrimLeft(&nb.sendQueue, nq)
-		nb.unsentCount -= nq
-	}
-
-	return
+//   - values can be retrieved using this channel or [NBChan.Get]
+func (n *NBChan[T]) Ch() (ch <-chan T) {
+	return n.closableChan.Ch()
 }
 
 // Count returns number of unsent values
-func (nb *NBChan[T]) Count() (unsentCount int) {
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	return nb.unsentCount
+func (n *NBChan[T]) Count() (unsentCount int) {
+	return int(atomic.LoadUint64(&n.unsentCount))
 }
 
-// Close orders the channel to close once pending sends complete.
-//   - Close is thread-safe, non-blocking, error-free and panic-free.
-//   - when Close returns, the channel may still be open and have items
-func (nb *NBChan[T]) Close() (didClose bool) {
-	if nb.isCloseInvoked.IsTrue() {
-		return // Close was already invoked atomic performance
-	}
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	if !nb.isCloseInvoked.Set() {
-		return // Close was already invoked
-	}
-
-	if nb.isRunningThread {
-		return // there is a pending thread that will execute close on exit
-	}
-
-	didClose, _ = nb.close()
-	return
+// Capacity returns size of allocated queues
+func (n *NBChan[T]) Capacity() (capacity int) {
+	return int(atomic.LoadUint64(&n.inputCapacity) + atomic.LoadUint64(&n.outputCapacity))
 }
 
-// DidClose indicates if Close was invoked
+func (n *NBChan[T]) DataWaitCh() (ch <-chan struct{}) {
+	return n.updateDataAvailable()
+}
+
+// DidClose indicates if Close or CloseNow was invoked
 //   - the channel may remain open until the last item has been read
-//   - or CloseNow is invoked
-func (nb *NBChan[T]) DidClose() (didClose bool) {
-	return nb.isCloseInvoked.IsTrue()
+//   - [NBChan.CloseNow] immediately closes the channel discarding onread items
+//   - [NBChan.IsClosed] checks if the channel is closed
+func (n *NBChan[T]) DidClose() (didClose bool) {
+	return n.isCloseInvoked.Load()
 }
 
 // IsClosed indicates whether the channel has actually closed.
-func (nb *NBChan[T]) IsClosed() (isClosed bool) {
-	return nb.closableChan.IsClosed()
+func (n *NBChan[T]) IsClosed() (isClosed bool) {
+	return n.closableChan.IsClosed()
 }
 
-// WaitForClose blocks until the channel is closed and empty
-//   - if Close is not invoked or the channel is not read to end,
-//     WaitForClose blocks indefinitely
-//   - if CloseNow is invoked, WaitForClose is unblocked
-//   - if errp is non-nil, any thread and close errors are appended to it
-//   - a close error will already have been returned by Close
-//   - WaitForClose is thread-safe and panic-free
-func (nb *NBChan[T]) WaitForClose(errp ...*error) {
-	defer nb.appendErrors(nil, nb.GetError, errp...)
+type NBChanThreadType uint8
 
-	if nb.closableChan.IsClosed() {
-		return // channel is closed no wait required return
-	}
-	if !nb.isWaitForCloseInitialized.IsTrue() {
-		nb.initWaitForClose() // ensure waitForClose state is valid
-	}
-	nb.waitForClose.Wait()
+func (n NBChanThreadType) String() (s string) {
+	return nbChanThreadTypeSet.StringT(n)
 }
 
-// CloseNow closes without waiting for sends to complete.
-//   - CloseNow is thread-safe, non-blocking, error-free and panic-free
-//   - CloseNow does not return until the channel is closed.
-//   - Upon return, all invocations have a possible close error in err.
-//   - if errp is non-nil, it is updated with error status
-func (nb *NBChan[T]) CloseNow(errp ...*error) (didClose bool, err error) {
-	if nb.closableChan.IsClosed() {
-		return // channel is already closed
-	}
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	nb.isCloseInvoked.Set()
-
-	// discard pending data
-	var length = len(nb.sendQueue)
-	nb.sendQueue = nil
-	if length > 0 {
-		nb.unsentCount -= length
-	}
-
-	// empty the channel
-	if nb.isRunningThread {
-		select {
-		case <-nb.closesOnThreadSend:
-		case <-nb.Ch():
-		}
-	}
-
-	didClose, err = nb.close()
-
-	// save close error in possible error pointer
-	nb.appendErrors(err, nil, errp...)
-
-	return
-}
-
-// Scavenge adjusts capacity of nb.sendQueue
-//   - Scavenge allows for reducing buffer capacity thus reduce memory leaks
-//   - if setCapacity is 0 nb.sendQueue is not modified
-//   - if setCapacity is >0, nb.sendQueue capacity is set to near this value,
-//     while ensuring enough capacity for cuerrent elements
-//   - NBChan unused nb.sendQueue elements are zero-value
-func (nb *NBChan[T]) Scavenge(setCapacity int) (length, capacity int) {
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	length = len(nb.sendQueue)
-	capacity = cap(nb.sendQueue)
-
-	// check setCapacity
-	if setCapacity == 0 {
-		return // do not scavenge return: length and capacity valid
-	} else if setCapacity < length {
-		setCapacity = length
-	}
-	if setCapacity == capacity {
-		return // no scavenge to do return: length and capacity valid
-	}
-
-	// adjust nb.sendQueue capacity
-	var newQueue []T
-	if setCapacity < capacity {
-		newQueue = make([]T, setCapacity) // reduce capacity
-		copy(newQueue, nb.sendQueue)
-	} else { // increase cacacity
-		newQueue = append(nb.sendQueue[:capacity], make([]T, setCapacity-capacity)...)
-	}
-	if len(newQueue) != length {
-		newQueue = newQueue[:length] // reset to length
-	}
-
-	capacity = cap(newQueue) // actual slice capacity set by Go runtime
-	nb.sendQueue = newQueue
-
-	return
-}
-
-func (nb *NBChan[T]) appendErrors(err error, getError func() (err error), errp ...*error) {
-
-	// obtain error pointer
-	var errp0 *error
-	if len(errp) > 0 {
-		errp0 = errp[0]
-	}
-	if errp0 == nil {
-		return // no error pointer nowhere to store return
-	}
-
-	perrors.AppendErrorDefer(errp0, &err, getError)
-}
-
-// startThread launches the send thread
-//   - must be invoked inside the lock
-func (nb *NBChan[T]) startThread(value T) {
-	nb.isRunningThread = true
-	nb.closesOnThreadSend = make(chan struct{})
-	go nb.sendThread(value) // send err in new thread
-}
-
-// sendThread operates outside the lock for as long as there are items to send
-func (nb *NBChan[T]) sendThread(value T) {
-	defer Recover(Annotation(), nil, func(err error) {
-		if pruntime.IsSendOnClosedChannel(err) {
-			return // ignore if the channel was or became closed
-		}
-		nb.AddError(err)
-	})
-
-	var ok bool
-	for {
-		nb.threadSend(value)
-
-		if value, ok = nb.valueToSend(); !ok {
-			return
-		}
-	}
-}
-
-func (nb *NBChan[T]) threadSend(value T) {
-	defer close(nb.closesOnThreadSend)
-
-	nb.closableChan.Ch() <- value // may block or panic
-}
-
-func (nb *NBChan[T]) valueToSend() (value T, ok bool) {
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	// clear isRunningThread inside the lock
-	// possibly invoke close
-	defer nb.sendThreadDefer(&ok)
-
-	// count the item just sent
-	nb.unsentCount--
-
-	// no more values: end thread
-	if ok = len(nb.sendQueue) != 0; !ok {
-		return // thread to exit: ok == false return
-	}
-
-	// send next value in queue
-	value = nb.sendQueue[0]
-	pslices.TrimLeft(&nb.sendQueue, 1)
-	// closesOnThreadSend is re-created every time prior to exiting the lock
-	// when a value is provided for the send thread
-	nb.closesOnThreadSend = make(chan struct{})
-	return
-}
-
-// sendThreadDefer is invoked when send thread is about to exit
-//   - sendThreadDefer is invoked inside the lock
-func (nb *NBChan[T]) sendThreadDefer(ok *bool) {
-	if *ok {
-		return // thread is not exiting
-	}
-	nb.isRunningThread = false
-	if nb.isCloseInvoked.IsTrue() { // Close() was invoked after thread started
-		nb.close()
-	}
-}
-
-// close closes the underlying channel
-//   - close is invoked inside the lock
-func (nb *NBChan[T]) close() (didClose bool, err error) {
-	if didClose, err = nb.closableChan.Close(); !didClose {
-		return
-	}
-	if err != nil {
-		nb.AddError(err) // store possible close error
-	}
-	if nb.isWaitForCloseInitialized.IsTrue() {
-		nb.waitForClose.Done()
-	}
-
-	return
-}
-
-// initWaitForClose ensures that waitForClose is valid
-func (nb *NBChan[T]) initWaitForClose() {
-	nb.stateLock.Lock()
-	defer nb.stateLock.Unlock()
-
-	if nb.closableChan.IsClosed() {
-		return // channel already closed
-	}
-	if !nb.isWaitForCloseInitialized.Set() {
-		return // was already initialized return
-	}
-
-	nb.waitForClose.Add(1) // has to wait for close to occur
-}
+var nbChanThreadTypeSet = sets.NewSet(sets.NewElements[NBChanThreadType](
+	[]sets.SetElement[NBChanThreadType]{
+		{ValueV: NBChanAlways, Name: "alwaysCh"},
+		{ValueV: NBChanNone, Name: "noCh"},
+	}))
