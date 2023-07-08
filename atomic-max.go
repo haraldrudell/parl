@@ -36,7 +36,7 @@ func (m *AtomicMax[T]) Value(value T) (isNewMax bool) {
 	if isNewMax = valueU64 > current; !isNewMax {
 		return // not a new max return
 	}
-	m.hasValue.Store(true)
+	m.hasValue.CompareAndSwap(false, true)
 
 	// store the new max
 	for {

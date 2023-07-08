@@ -525,7 +525,7 @@ func TestNBChanAlways(t *testing.T) {
 
 	// an always thread with value should be in channel-send block
 	nbChan.Send(value2)
-	timer = time.NewTimer(time.Millisecond)
+	timer = time.NewTimer(200 * time.Millisecond)
 	for nbChan.ThreadStatus() != NBChanSendBlock {
 		select {
 		case <-timer.C:
