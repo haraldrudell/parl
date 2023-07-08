@@ -36,12 +36,22 @@ func ErrChWait(errCh <-chan error, errp *error) {
 }
 
 // SendErr sends error as the final action of a goroutine
+//   - SendErr should only panic from structural coding problems
 func SendErr(errCh chan<- error, errp *error) {
 	if errp == nil {
 		panic(perrors.NewPF("errp cannot be nil"))
-	} else if errCh == nil {
-		panic(perrors.NewPF("errCh cannot be nil"))
 	}
-	// may panic if channel is closed
-	errCh <- *errp
+	didSend, isNilChannel, isClosedChannel, err := ChannelSend(errCh, *errp, SendNonBlocking)
+	if didSend {
+		return // error value sent return
+	} else if isNilChannel {
+		err = perrors.ErrorfPF("fatal: error channel nil: %w", err)
+	} else if isClosedChannel {
+		err = perrors.ErrorfPF("fatal: error channel closed: %w", err)
+	} else if err != nil {
+		err = perrors.ErrorfPF("fatal: panic when sending on error channel: %w", err)
+	} else {
+		err = perrors.NewPF("fatal: error channel blocking on send")
+	}
+	panic(err)
 }

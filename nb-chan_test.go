@@ -498,14 +498,17 @@ func TestNBChanAlways(t *testing.T) {
 	var values []int
 	var timer *time.Timer
 
-	// create, send and empty channel
+	// an always thread should on idle enter alert state
 	nbChan = *NewNBChan[int](NBChanAlways)
+	// send and receive to make sure thread is up
 	nbChan.Send(value)
-	values = nbChan.Get()
+	// wait for thread to launch
+	values = []int{<-nbChan.Ch()}
 	if !slices.Equal(values, expValues) {
 		t.Errorf("Get0 '%v' exp '%v'", values, expValues)
 	}
-	// wait up to 1 ms for proper thread status
+	// thread should no enter alert status: running but idling
+	//	- wait up to 1 ms for proper thread status
 	timer = time.NewTimer(time.Millisecond)
 	for nbChan.ThreadStatus() != NBChanAlert {
 		select {
@@ -519,6 +522,8 @@ func TestNBChanAlways(t *testing.T) {
 	if nbChan.ThreadStatus() != NBChanAlert {
 		t.Errorf("ThreadStatus %s exp %s", nbChan.ThreadStatus(), NBChanAlert)
 	}
+
+	// an always thread with value should be in channel-send block
 	nbChan.Send(value2)
 	timer = time.NewTimer(time.Millisecond)
 	for nbChan.ThreadStatus() != NBChanSendBlock {

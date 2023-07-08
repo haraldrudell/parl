@@ -14,6 +14,7 @@ import (
 	"github.com/haraldrudell/parl/ptime"
 )
 
+// RateRunner is a container managing threads executing rate-counter tasks by their period
 type RateRunner struct {
 	g0 parl.GoGen
 
@@ -22,6 +23,7 @@ type RateRunner struct {
 	m     map[time.Duration]*runner
 }
 
+// NewRateRunner returns a thread-container for running rate-counter averaging
 func NewRateRunner(g0 parl.GoGen) (rr *RateRunner) {
 	return &RateRunner{
 		g0: g0,
@@ -29,10 +31,12 @@ func NewRateRunner(g0 parl.GoGen) (rr *RateRunner) {
 	}
 }
 
+// RateRunnerTask describes a rate counter
 type RateRunnerTask interface {
-	Do()
+	Do(at time.Time) // Do executes averaging for an accurate timestamp
 }
 
+// AddTask adds a new rate-counter to the container
 func (rr *RateRunner) AddTask(period time.Duration, task RateRunnerTask) {
 	rr.lock.Lock()
 	defer rr.lock.Unlock()
@@ -50,6 +54,6 @@ func (rr *RateRunner) AddTask(period time.Duration, task RateRunnerTask) {
 
 	runner := NewRunner()
 	runner.Add(task)
-	go ptime.OnTimedThread(runner.Do, period, time.Local, rr.subGo.Go())
+	go ptime.OnTickerThread(runner.Do, period, time.Local, rr.subGo.Go())
 	rr.m[period] = runner
 }

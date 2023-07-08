@@ -6,10 +6,12 @@ ISC License
 package counter
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/g0"
 )
 
 func Test_newRateCounter(t *testing.T) {
@@ -21,14 +23,14 @@ func Test_newRateCounter(t *testing.T) {
 	var counterCounters *Counters
 
 	// g0 nil: no counter threads allowed
-	counters = newCounters(nil)
+	var threadGroup = g0.NewGoGroup(context.Background())
+	counters = newCounters(threadGroup.Go())
 	counterCounters, _ = counters.(*Counters)
 
 	// newRateCounter zero period panic
-	err = nil
-	parl.RecoverInvocationPanic(func() {
-		newRateCounter(0, counterCounters)
-	}, &err)
+	counterCounters.AddTask(0, newRateCounter())
+	goError := <-threadGroup.Ch()
+	err = goError.Err()
 	if err == nil {
 		t.Error("RecoverInvocationPanic exp panic missing")
 	} else if !strings.Contains(err.Error(), messagePeriod) {

@@ -30,7 +30,7 @@ type Period struct {
 	fraction0 uint64
 }
 
-// NewPeriod retuens a new numbered-interval sequence.
+// NewPeriod returns a new numbered-interval sequence.
 func NewPeriod(interval time.Duration) (period *Period) {
 	t := time.Now()
 	p := Period{interval: interval}

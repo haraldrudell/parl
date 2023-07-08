@@ -52,7 +52,7 @@ type CounterSetData interface {
 	Get(name CounterID) (value, running, max uint64)
 	// Rates returns the rate values a possible rate counter
 	//	- if no such counter exists or values are not yet available, nil
-	Rates(name CounterID) (rates map[RateType]int64)
+	Rates(name CounterID) (rates map[RateType]float64)
 	// DatapointValue returns the latest value a possible datapoint
 	//	- if no such datapoint exists, 0
 	DatapointValue(name CounterID) (value uint64)
@@ -141,7 +141,7 @@ type CounterValues interface {
 //   - RunningAverage the average of running taken over up to 10 periods
 type RateCounterValues interface {
 	CounterValues // Get() GetReset() Value() Running() Max()
-	Rates() (rates map[RateType]int64)
+	Rates() (rates map[RateType]float64)
 }
 
 // Rate describes a rate datapoint.
@@ -178,6 +178,8 @@ const (
 	RunningRate
 	RunningMaxRate
 	RunningMaxDecRate
+	// accumulated change in running over several intervals
+	//	- running value goes up and down
 	RunningAverage
 	NotAValue // NotAValue is an internal stand-in value indicating a value not in use
 )

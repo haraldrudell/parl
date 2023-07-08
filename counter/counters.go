@@ -100,9 +100,9 @@ func (cs *Counters) Get(name parl.CounterID) (value, running, max uint64) {
 	return
 }
 
-func (cs *Counters) Rates(name parl.CounterID) (rates map[parl.RateType]int64) {
+func (cs *Counters) Rates(name parl.CounterID) (rates map[parl.RateType]float64) {
 	if counter, ok := cs.GetNamedCounter(name).(interface {
-		Rates() (rates map[parl.RateType]int64)
+		Rates() (rates map[parl.RateType]float64)
 	}); ok {
 		rates = counter.Rates()
 	}
@@ -172,7 +172,9 @@ func (cs *Counters) getOrCreate(isDatapoint bool, name parl.CounterID, period ..
 		if period0 == 0 {
 			item = newCounter() // non-rate counter
 		} else {
-			item = newRateCounter(period0, cs)
+			var r = newRateCounter()
+			item = r
+			cs.AddTask(period0, r)
 		}
 	} else {
 		item = newDatapoint(period0)
