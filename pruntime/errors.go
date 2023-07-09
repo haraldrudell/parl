@@ -10,8 +10,11 @@ import (
 	"runtime"
 )
 
-// this error string appears as multiple string literals in channel.go
-const rtSendOnClosedChannel = "send on closed channel"
+const (
+	// this error string appears as multiple string literals in channel.go
+	rtSendOnClosedChannel  = "send on closed channel"
+	rtCloseOfClosedChannel = "close of closed channel"
+)
 
 // IsSendOnClosedChannel returns true if err’s error chain contains the
 // runtime error “send on closed channel”
@@ -30,6 +33,20 @@ func IsSendOnClosedChannel(err error) (is bool) {
 
 	// is it the right runtime error?
 	return runtimeError.Error() == rtSendOnClosedChannel
+}
+
+// IsCloseOfClosedChannel returns true if err’s error chain contains the
+// runtime error “close of closed channel”
+func IsCloseOfClosedChannel(err error) (is bool) {
+
+	// runtimeError is any runtime.Error implementation in the err error chain
+	var runtimeError = IsRuntimeError(err)
+	if runtimeError == nil {
+		return // not a [runtime.Error] or runtime.plainErrror return
+	}
+
+	// is it the right runtime error?
+	return runtimeError.Error() == rtCloseOfClosedChannel
 }
 
 // IsRuntimeError determines if err’s error chain contains a runtime.Error
