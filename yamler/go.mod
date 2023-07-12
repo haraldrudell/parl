@@ -7,13 +7,13 @@ replace github.com/haraldrudell/parl => ../../parl
 replace github.com/haraldrudell/parl/mains => ../mains
 
 require (
-	github.com/haraldrudell/parl v0.4.102
-	github.com/haraldrudell/parl/mains v0.4.102
+	github.com/haraldrudell/parl v0.4.103
+	github.com/haraldrudell/parl/mains v0.4.103
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df // indirect
+	golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
 )

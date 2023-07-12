@@ -10,12 +10,14 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pio"
+	"golang.org/x/sys/unix"
 )
 
 func TestExecStream(t *testing.T) {
@@ -48,7 +50,7 @@ func TestExecStream(t *testing.T) {
 
 	// terminate using context
 	ctxCancel := parl.NewCancelContext(context.Background())
-	startCallback := func(err error) {
+	startCallback := func(execCmd *exec.Cmd, err error) {
 		if err == nil {
 			t.Log("startCallback invoking cancel")
 			parl.InvokeCancel(ctxCancel)
@@ -69,7 +71,7 @@ func TestExecStream(t *testing.T) {
 // ITEST= go test ./pexec
 func TestExecStreamGoodExit(t *testing.T) {
 	if _, ok := os.LookupEnv("ITEST"); !ok {
-		t.Skip("skiop because ITEST not set")
+		t.Skip("skip because ITEST not set")
 	}
 	var args []string = []string{"sleep", "0"}
 
@@ -78,9 +80,35 @@ func TestExecStreamGoodExit(t *testing.T) {
 	var isCancel bool
 	var statusCode int
 	var ctx context.Context = context.Background()
-	var startCallback func(err error)
+	var startCallback func(execCmd *exec.Cmd, err error)
 
 	statusCode, isCancel, err = ExecStreamFull(pio.EofReader, stdout, stderr, nil, ctx, startCallback, nil, args...)
+
+	// Success: status code: 0 isCancel: false, err: OK
+	t.Logf("Success: status code: %d isCancel: %t, err: %s", statusCode, isCancel, perrors.Short(err))
+}
+
+func SIGTERMstartCallback(execCmd *exec.Cmd, err error) {
+	execCmd.Process.Signal(unix.SIGTERM)
+}
+
+// ITEST= go test -v -run ^TestExecStreamSIGTERM$ github.com/haraldrudell/parl/pexec
+//
+// exec-stream_test.go:112: Success: status code: -1 isCancel: false, err: pexec.ExecStreamFull execCmd.Wait signal: terminated at pexec.ExecStreamFull()-exec-stream-full.go:168
+func TestExecStreamSIGTERM(t *testing.T) {
+
+	if _, ok := os.LookupEnv("ITEST"); !ok {
+		t.Skip("skip because ITEST not set")
+	}
+	var args []string = []string{"sleep", "10"}
+
+	var stdout, stderr io.WriteCloser
+	var err error
+	var isCancel bool
+	var statusCode int
+	var ctx context.Context = context.Background()
+
+	statusCode, isCancel, err = ExecStreamFull(pio.EofReader, stdout, stderr, nil, ctx, SIGTERMstartCallback, nil, args...)
 
 	// Success: status code: 0 isCancel: false, err: OK
 	t.Logf("Success: status code: %d isCancel: %t, err: %s", statusCode, isCancel, perrors.Short(err))
