@@ -67,7 +67,7 @@ func (c *CounterConsumer) Value() (value uint64) { return atomic.LoadUint64(&c.v
 // Running returns the fluctuating running value
 //   - number of Inc less Dec invocations and sum of Adds
 //   - never below 0
-func (c *CounterConsumer) Running() (running uint64) { return atomic.LoadUint64(&c.value) }
+func (c *CounterConsumer) Running() (running uint64) { return atomic.LoadUint64(&c.running) }
 
 // Max returns the highest value running has had
 func (c *CounterConsumer) Max() (max uint64) { return atomic.LoadUint64(&c.max) }

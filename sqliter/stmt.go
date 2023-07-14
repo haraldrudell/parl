@@ -246,7 +246,10 @@ func enqueue(queueID *int) (doWait bool) {
 		var ch chan struct{}
 		if *queueID == executingID {
 			ch := make(chan struct{})
-			timer = time.NewTimer(sqMaxWait)
+			if timer != nil {
+				timer.Stop()
+			}
+			timer = time.NewTimer(sqMaxWait) // 5 ms
 			go func() {
 				defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
 
