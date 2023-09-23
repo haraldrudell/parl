@@ -40,7 +40,11 @@ func ParseFirstLine(debugStack string) (ID parl.ThreadID, status parl.ThreadStat
 
 	// return values
 	values := matches[0][1:]
-	ID = parl.ThreadID(values[0])
+	var u64 uint64
+	if u64, err = strconv.ParseUint(values[0], 10, 64); err != nil {
+		return
+	}
+	ID = parl.ThreadID(u64)
 	status = parl.ThreadStatus(values[1])
 
 	return

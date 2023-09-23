@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +24,12 @@ func TestGoID(t *testing.T) {
 	var expectedID parl.ThreadID
 	s := strings.TrimPrefix(string(debug.Stack()), runtGoroutinePrefix)
 	if index := strings.Index(s, "\x20"); index != -1 {
-		expectedID = parl.ThreadID(s[:index])
+		var e error
+		var u64 uint64
+		if u64, e = strconv.ParseUint(s[:index], 10, 64); e != nil {
+			panic(e)
+		}
+		expectedID = parl.ThreadID(u64)
 	} else {
 		t.Error("debug.Stack failed")
 	}

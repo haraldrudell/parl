@@ -78,7 +78,7 @@ func NewStack(skipFrames int) (stack parl.Stack) {
 	//	- convert to string
 	//	- remove final newline
 	//	- split into lines
-	trace := strings.Split(strings.TrimSuffix(pruntime.StackString(), "\n"), "\n")
+	trace := strings.Split(strings.TrimSuffix(string(pruntime.StackTrace()), "\n"), "\n")
 	traceLen := len(trace)
 	skipAtStart := runtStatusLines + runtDebugStackLines + runtNewStackLines
 	skipAtEnd := 0

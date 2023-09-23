@@ -23,7 +23,7 @@ const (
 var firstRexp = regexp.MustCompile(runFirstRexpT)
 
 // getID obtains gorutine ID, as of go1.18 a numeric string "1"…
-func ParseFirstLine(debugStack string) (ID string, status string, err error) {
+func ParseFirstLine(debugStack string) (ID uint64, status string, err error) {
 
 	// remove possible lines 2…
 	if index := strings.Index(debugStack, "\n"); index != -1 {
@@ -39,7 +39,11 @@ func ParseFirstLine(debugStack string) (ID string, status string, err error) {
 
 	// return values
 	values := matches[0][1:]
-	ID = values[0]
+	numericString := values[0]
+	if ID, err = strconv.ParseUint(numericString, 10, 64); err != nil {
+		err = perrors.Errorf("goid.ParseUint failed to parse: %q", debugStack)
+		return
+	}
 	status = values[1]
 
 	return

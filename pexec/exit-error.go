@@ -27,14 +27,30 @@ var _ = unix.SIGKILL + unix.SIGINT + unix.SIGTERM
 //   - — unix.SIGINT from ^C
 //   - — unix.SIGKILL from context termination
 //   - — unix.SIGTERM from operating-system process-termination
-func ExitError(err error) (hasStatusCode bool, statusCode int, signal unix.Signal) {
+func ExitError(err error) (hasStatusCode bool, statusCode int, signal unix.Signal, stderr []byte) {
+
+	// determine if err contains an ExitError
+	//	- ExitError is the error returned when a child process
+	//		for executing a command was created and failed
 	var exitError *exec.ExitError
 	if hasStatusCode = errors.As(err, &exitError); !hasStatusCode {
-		return
+		return // not an ExitError return
 	}
+
+	// obtain possibly cached standard error output
+	//	- if the Stderr field was not assigned and the process
+	//		echoes to standard error and fails, then that output may have been
+	//		cached in the ExitError
+	if len(exitError.Stderr) > 0 {
+		stderr = exitError.Stderr
+	}
+
+	// obtain the status code returned by the command
 	if statusCode = exitError.ExitCode(); statusCode != TerminatedBySignal {
-		return
+		return // is not terminated by signal
 	}
+
+	// handle terminated by signal
 	if waitStatus, ok := exitError.ProcessState.Sys().(syscall.WaitStatus); ok {
 		signal = waitStatus.Signal()
 	}

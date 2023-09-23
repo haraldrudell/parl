@@ -8,6 +8,7 @@ package parlimports
 import (
 	"fmt"
 	"runtime/debug"
+	"strconv"
 	"strings"
 
 	"github.com/haraldrudell/parl/pruntime"
@@ -31,7 +32,7 @@ type Stack struct {
 	// ThreadID is a unqique ID associated with this thread.
 	// typically numeric string “1”…
 	// it can be used as a map key or converted to string
-	threadID string
+	threadID uint64
 	// Status is typically word “running”
 	status string
 	// isMainThread indicates if this is the thread that launched main.main
@@ -113,7 +114,7 @@ func NewStack(skipFrames int) (stack *Stack) {
 	skipIndex := traceLen - skipAtEnd             // limit index at end
 
 	// parse first line: s.ID s.Status
-	var threadID string
+	var threadID uint64
 	var status string
 	if threadID, status, err = ParseFirstLine(trace[0]); err != nil {
 		panic(err)
@@ -145,7 +146,7 @@ func NewStack(skipFrames int) (stack *Stack) {
 	return
 }
 
-func (s *Stack) ID() (threadID string) {
+func (s *Stack) ID() (threadID uint64) {
 	return s.threadID
 }
 
@@ -167,7 +168,7 @@ func (s *Stack) Frames() (frames []*Frame) {
 
 func (st *Stack) Shorts(prepend string) (s string) {
 	sL := []string{
-		prepend + "Thread ID: " + st.threadID,
+		prepend + "Thread ID: " + strconv.FormatUint(st.threadID, 10),
 	}
 	for _, frame := range st.frames {
 		sL = append(sL, prepend+frame.Loc().Short())
@@ -178,7 +179,7 @@ func (st *Stack) Shorts(prepend string) (s string) {
 	return strings.Join(sL, "\n")
 }
 
-func (st *Stack) SetID(threadID string, status string) {
+func (st *Stack) SetID(threadID uint64, status string) {
 	st.threadID = threadID
 	st.status = status
 }
@@ -200,7 +201,7 @@ func (st *Stack) String() (s string) {
 	if s = strings.Join(sL, "\n"); s != "" {
 		s += "\n"
 	}
-	return fmt.Sprintf("ID: %s IsMain: %t status: %s\n"+
+	return fmt.Sprintf("ID: %d IsMain: %t status: %s\n"+
 		"%s"+
 		"cre: %s",
 		st.threadID, st.isMainThread, st.status,

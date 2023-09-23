@@ -43,7 +43,8 @@ func (tr *Tracer) AssignTaskToThread(threadID parl.ThreadID, task parl.TracerTas
 		recordListBefore = tr.tasks[taskBefore]
 		// unassign from previous task as appropriate
 		if task == "" || task != taskBefore {
-			recordListBefore = append(recordListBefore, NewTracerRecord(trUnassigned+string(threadID)))
+			recordListBefore = append(recordListBefore,
+				NewTracerRecord(trUnassigned+threadID.String()))
 			tr.tasks[taskBefore] = recordListBefore
 		}
 	}
@@ -60,7 +61,7 @@ func (tr *Tracer) AssignTaskToThread(threadID parl.ThreadID, task parl.TracerTas
 	if len(recordListNow) == 0 {
 		recordListNow = []parl.TracerRecord{NewTracerRecord(string(task))} // first record is task name
 	}
-	recordListNow = append(recordListNow, NewTracerRecord(trAssigned+string(threadID)))
+	recordListNow = append(recordListNow, NewTracerRecord(trAssigned+threadID.String()))
 	tr.tasks[task] = recordListNow
 	return
 }
@@ -75,7 +76,7 @@ func (tr *Tracer) RecordTaskEvent(threadID parl.ThreadID, text string) (tr2 parl
 	var ok0 bool
 	var recordList []parl.TracerRecord
 	if assignedTask, ok0 = tr.threads[threadID]; !ok0 {
-		assignedTask = parl.TracerTaskID(trDefaultTask + string(threadID))
+		assignedTask = parl.TracerTaskID(trDefaultTask + threadID.String())
 		recordList = tr.tasks[assignedTask]
 		if len(recordList) == 0 {
 			recordList = []parl.TracerRecord{NewTracerRecord(string(assignedTask))} // first record is task name

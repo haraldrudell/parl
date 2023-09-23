@@ -50,10 +50,26 @@ func (m *ThreadSafeMap[K, V]) Put(key K, value V) {
 // Delete removes mapping using key K.
 //   - if key K is not mapped, the map is unchanged.
 //   - O(log n)
-func (m *ThreadSafeMap[K, V]) Delete(key K) {
+func (m *ThreadSafeMap[K, V]) Delete(key K, useZeroValue ...bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	// if doZero is not present and true, regular map delete
+	if len(useZeroValue) == 0 || !useZeroValue[0] {
+		delete(m.m, key)
+		return
+	}
+
+	// if key mapping does not exist: noop
+	if _, itemExists := m.m[key]; !itemExists {
+		return // write-free item does not exist return
+	}
+
+	// set value to zero to prevent temporary memory leaks
+	var zeroValue V
+	m.m[key] = zeroValue
+
+	// delete
 	delete(m.m, key)
 }
 
@@ -80,19 +96,32 @@ func (m *ThreadSafeMap[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bo
 }
 
 // Clear empties the map
-func (m *ThreadSafeMap[K, V]) Clear() {
+func (m *ThreadSafeMap[K, V]) Clear(useRange ...bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.m = make(map[K]V)
+	// if useRange is not present and true, clear by re-initialize
+	if len(useRange) == 0 || !useRange[0] {
+		m.m = make(map[K]V)
+		return
+	}
+
+	// zero-out and delete each item
+	var zeroValue V
+	for k, _ := range m.m {
+		m.m[k] = zeroValue
+		delete(m.m, k)
+	}
 }
 
 // Clone returns a shallow clone of the map
 func (m *ThreadSafeMap[K, V]) Clone() (clone *ThreadSafeMap[K, V]) {
 	var c ThreadSafeMap[K, V]
 	clone = &c
+	c.lock.Lock() // write will holding c lock
+	defer c.lock.Unlock()
 
-	m.lock.RLock()
+	m.lock.RLock() // prevent changes while range operation in progress
 	defer m.lock.RUnlock()
 
 	c.m = maps.Clone(m.m)

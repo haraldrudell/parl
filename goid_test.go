@@ -18,7 +18,7 @@ func Test_goID(t *testing.T) {
 
 	threadID = goID()
 	if !threadID.IsValid() {
-		t.Errorf("threadID not valid: %q", string(threadID))
+		t.Errorf("threadID not valid: %d", threadID)
 	}
 	s := threadID.String()
 	if s == "" {

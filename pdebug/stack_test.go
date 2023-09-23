@@ -19,12 +19,22 @@ import (
 	"github.com/haraldrudell/parl/pruntime"
 )
 
+// single-step through constructor
+func TestStack0(t *testing.T) {
+	var stack parl.Stack = NewStack(0)
+	_ = stack
+}
+
 func TestStack(t *testing.T) {
 	var threadID, expStatus = func() (threadID parl.ThreadID, status parl.ThreadStatus) {
 		// "goroutine 34 [running]:"
 		line := strings.Split(string(debug.Stack()), "\n")[0]
 		values := strings.Split(line, "\x20")
-		threadID = parl.ThreadID(values[1])
+		if u64, err := strconv.ParseUint(values[1], 10, 64); err != nil {
+			panic(err)
+		} else {
+			threadID = parl.ThreadID(u64)
+		}
 		status = parl.ThreadStatus(values[2][1 : len(values[2])-2])
 		return
 	}()
@@ -138,7 +148,11 @@ func stack2(t *T, goFunction, creator *pruntime.CodeLocation) {
 		// "goroutine 34 [running]:"
 		line := strings.Split(string(debug.Stack()), "\n")[0]
 		values := strings.Split(line, "\x20")
-		threadID = parl.ThreadID(values[1])
+		if u64, err := strconv.ParseUint(values[1], 10, 64); err != nil {
+			panic(err)
+		} else {
+			threadID = parl.ThreadID(u64)
+		}
 		status = parl.ThreadStatus(values[2][1 : len(values[2])-2])
 		return
 	}()
@@ -221,7 +235,7 @@ func TestStackString(t *testing.T) {
 
 func TestParseFirstStackLine(t *testing.T) {
 	input := "goroutine 19 [running]:\ngarbage"
-	expID := parl.ThreadID("19")
+	expID := parl.ThreadID(19)
 	expStatus := parl.ThreadStatus("running")
 
 	ID, status, err := ParseFirstLine(input)

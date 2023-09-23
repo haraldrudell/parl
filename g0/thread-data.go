@@ -21,6 +21,7 @@ const (
 //   - ThreadData does not have initialization
 type ThreadData struct {
 	// threadID is the ID of the running thread
+	//	- a small integer with 1 for main thread, displayed by debug.Stack
 	threadID parl.ThreadID
 	// createLocation is the code line of the go-statement function-call
 	// invocation launching the thread

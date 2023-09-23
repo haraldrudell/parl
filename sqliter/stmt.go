@@ -46,11 +46,22 @@ var lastQueueID int    // behind queue
 var executingID int    // behind queue
 var executingCount int // behind queue
 
+// Stmt implements retries for a SQLite3 table
+//   - the code here implements retries due to SQLite3 producing various
+//     concurrency errors
+//   - this is legacy code from 2022-06 featuring functional program rather than
+//     structs which has lead to multiple memory leaks
 type Stmt struct {
 	*sql.Stmt
 	ds *DataSource
 }
 
+// ExecContext executes a SQL statements that does not return any rows
+//   - for performance reasons cached prepared statements are used
+//   - the code here implements retries due to SQLite3 producing various
+//     concurrency errors
+//   - this is legacy code from 2022-06 featuring functional program rather than
+//     structs which has lead to multiple memory leaks
 func (st *Stmt) ExecContext(ctx context.Context, args ...any) (sqlResult sql.Result, err error) {
 	st.retry(func() (e error) {
 		sqlResult, err = st.Stmt.ExecContext(ctx, args...)
@@ -58,6 +69,13 @@ func (st *Stmt) ExecContext(ctx context.Context, args ...any) (sqlResult sql.Res
 	})
 	return
 }
+
+// QueryContext executes a SQL statements that may return multiple rows
+//   - for performance reasons cached prepared statements are used
+//   - the code here implements retries due to SQLite3 producing various
+//     concurrency errors
+//   - this is legacy code from 2022-06 featuring functional program rather than
+//     structs which has lead to multiple memory leaks
 func (st *Stmt) QueryContext(ctx context.Context, args ...any) (sqlRows *sql.Rows, err error) {
 	st.retry(func() (e error) {
 		sqlRows, err = st.Stmt.QueryContext(ctx, args...)
@@ -65,6 +83,13 @@ func (st *Stmt) QueryContext(ctx context.Context, args ...any) (sqlRows *sql.Row
 	})
 	return
 }
+
+// QueryRowContext executes a SQL statements that returns exactly one row
+//   - for performance reasons cached prepared statements are used
+//   - the code here implements retries due to SQLite3 producing various
+//     concurrency errors
+//   - this is legacy code from 2022-06 featuring functional program rather than
+//     structs which has lead to multiple memory leaks
 func (st *Stmt) QueryRowContext(ctx context.Context, args ...any) (sqlRow *sql.Row) {
 	st.retry(func() (e error) {
 		sqlRow = st.Stmt.QueryRowContext(ctx, args...)
@@ -73,10 +98,17 @@ func (st *Stmt) QueryRowContext(ctx context.Context, args ...any) (sqlRow *sql.R
 	return
 }
 
+// retry implements retries using functional programming rargher than
+// an object-oriented struct
+//   - query is a function that executes a query against a SQLite3 table
+//     returning its error result
+//   - this is legacy code from 2022-06 featuring functional program rather than
+//     structs which has lead to multiple memory leaks
 func (st *Stmt) retry(query func() (err error)) {
 	// use counters to measure query concurrency
-	c := st.ds.counters.GetOrCreateCounter(sqStatement).Inc()
+	var c = st.ds.counters.GetOrCreateCounter(sqStatement).Inc()
 	defer c.Dec()
+
 	// diagnostic printing
 	t0 := time.Now()  // t0 measures total duration of query
 	tLast := t0       // tLast measures execution time of query once successful
@@ -191,6 +223,7 @@ func shouldQueryPrint(d time.Duration) (print bool) {
 	return
 }
 
+// registerQuery adds a new concurrent query to executingCount
 func registerQuery() {
 	queue.L.Lock()
 	defer queue.L.Unlock()
@@ -198,6 +231,8 @@ func registerQuery() {
 	executingCount++
 }
 
+// unregisterQuery removes a concurrent quesrty and alerts the next thread that
+// the database may now be available
 func unregisterQuery() {
 	queue.L.Lock()
 	defer queue.L.Unlock()
@@ -206,6 +241,7 @@ func unregisterQuery() {
 	queue.Signal()
 }
 
+// enqueue blocks until the query should be retried
 func enqueue(queueID *int) (doWait bool) {
 	queue.L.Lock()
 	defer queue.L.Unlock()
@@ -224,13 +260,6 @@ func enqueue(queueID *int) (doWait bool) {
 		return // database busy but not executing our queries: unqueued retry
 	}
 
-	var timer *time.Timer
-	defer func() {
-		if timer != nil {
-			timer.Stop()
-		}
-	}()
-
 	// if join at end of queue, trigger retry for the first item
 	if *queueID > executingID {
 		queue.Signal() // let first item in queue retry
@@ -243,27 +272,10 @@ func enqueue(queueID *int) (doWait bool) {
 	for {
 
 		// head of the line: cap wait at 5 ms
-		var ch chan struct{}
 		if *queueID == executingID {
-			ch := make(chan struct{})
-			if timer != nil {
-				timer.Stop()
-			}
-			timer = time.NewTimer(sqMaxWait) // 5 ms
-			go func() {
-				defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
-
-				select {
-				case <-timer.C:
-					queue.Signal()
-				case <-ch:
-					timer.Stop()
-				}
-			}()
-		}
-		queue.Wait()
-		if ch != nil {
-			close(ch)
+			doThread(queue)
+		} else {
+			queue.Wait()
 		}
 
 		// head of the line: retry every time
@@ -273,6 +285,46 @@ func enqueue(queueID *int) (doWait bool) {
 	}
 
 	return
+}
+
+// doThread does queue.Wait with timeout
+//   - this is convoluted 2022-06 legacy functional code.
+//   - sync.Cond should not be used due to deteriorating performance
+//     with thread-count
+//   - there is no guaranteed link between the Signal and the Wait
+//   - due for refactor to struct: the Go way
+//   - 230718 will not return unless:
+//   - — timer is garbage collectable
+//   - — thread has been ordered to cancel
+//     -
+//   - — a timer-leak reaches 512 KiB (pprof detectable) in 7 days
+//   - — a thread-leak reaches 512 KiB (pprof detectable) in 30 h
+func doThread(queue *sync.Cond) {
+	var timer = time.NewTimer(sqMaxWait) // 5 ms
+	defer timer.Stop()                   // ensure timer is garbage collected
+	var cancelCh = make(chan struct{})
+	defer close(cancelCh) // order thread to exit
+
+	go theThread(queue, timer, cancelCh)
+	queue.Wait()
+}
+
+// theThread waits for either timer elapsing or cancelCh closing
+//   - on timeout does queue.Signal
+func theThread(
+	queue *sync.Cond,
+	timer *time.Timer,
+	cancelCh chan struct{},
+) {
+	defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
+
+	// 230718 there was a memory leak
+	//	- abandoned threads are stuck at the select
+	select {
+	case <-timer.C:
+		queue.Signal()
+	case <-cancelCh:
+	}
 }
 
 func dequeue(queueID *int) {

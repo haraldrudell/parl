@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pmaps"
 	"github.com/haraldrudell/parl/sets"
@@ -95,7 +96,7 @@ func (sdt *SlowDetectorThread) Start(sdi *SlowDetectorInvocation) {
 func (sdt *SlowDetectorThread) Stop(sdi *SlowDetectorInvocation) {
 
 	// remove from map
-	sdt.slowMap.Delete(sdi.sID)
+	sdt.slowMap.Delete(sdi.sID, parli.MapDeleteWithZeroValue)
 
 	if sdt.slowMap.Length() > 0 || sdt.slowTyp != SlowShutdownThread {
 		return // not to be shutdown or not to be shutdown now return

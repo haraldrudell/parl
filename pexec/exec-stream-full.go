@@ -62,7 +62,7 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 	}
 
 	// execCtx allows for local cancel, ie. failing copyThreads
-	execCtx := parl.NewCancelContext(ctx)
+	var execCtx = parl.NewCancelContext(ctx)
 
 	// thread management: waitgroup and thread-safe error store
 	var wg sync.WaitGroup
@@ -171,14 +171,14 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 	if err != nil {
 		var hasStatusCode bool
 		var signal syscall.Signal
-		hasStatusCode, statusCode, signal = ExitError(err)
+		hasStatusCode, statusCode, signal, _ = ExitError(err)
 
 		// was the context canceled?
 		if execCtx.Err() != nil &&
 			hasStatusCode && // there was an exec.ExitError
 			statusCode == TerminatedBySignal && // the process was terminated by a signal
 			signal == unix.SIGKILL { // in fact SIGKILL
-			// if it was SIGKILL, ignore it: it was cuased by context cancelation
+			// if it was SIGKILL, ignore it: it was caused by context cancelation
 			err = nil // ignore the error
 			isCancel = true
 		}

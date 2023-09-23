@@ -7,6 +7,11 @@ package parli
 
 import "golang.org/x/exp/constraints"
 
+const (
+	MapDeleteWithZeroValue = true
+	MapClearUsingRange     = true
+)
+
 // pmaps.AggregatingPriorityQueue uses cached priority obtained from
 // Aggregators that operates on the values outside of the AggregatingPriorityQueue.
 //   - the Update method reprioritizes an updated value element
@@ -123,9 +128,14 @@ type ThreadSafeMap[K comparable, V any] interface {
 	// Delete removes mapping using key K.
 	//   - if key K is not mapped, the map is unchanged.
 	//   - O(log n)
-	Delete(key K)
+	//	- if useZeroValue present and parli.MapDeleteWithZeroValue or true,
+	//		the deleted value is fiorst assigned the zero-value
+	Delete(key K, useZeroValue ...bool)
 	// Clear empties the map
-	Clear()
+	//	- if useRange is present and parli.MapClearUsingRange or true,
+	//		delete using range operations setting each item to zero-value
+	//	- otherwise, clear by replacing with new map
+	Clear(useRange ...bool)
 	// Length returns the number of mappings
 	Length() (length int)
 	// Clone returns a shallow clone of the map

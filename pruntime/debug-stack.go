@@ -6,27 +6,49 @@ ISC License
 package pruntime
 
 import (
+	"bytes"
 	"runtime"
 	"runtime/debug"
-	"strings"
 )
 
 const (
-	prLeadInLines        = 1
+	// the lead-in line contains “goroutine 18 [running]:”
+	prLeadInLines = 1
+	// stack frame of pruntime.DebugStack function
 	prDebugStackStdFrame = 1
-	prDebugStackFnFrame  = 1
-	prLinesPerFrame      = 2
-	prCreatorLines       = 2
+	// stack frame of debuig.Stack function
+	prDebugStackFnFrame = 1
+	//	- first line of frame describes source file
+	//	- second line of frame describes package and function
+	prLinesPerFrame = 2
+	// creator lines are two lines that describe how a goroutine was launched:
+	//	- “created by…”
+	prCreatorLines = 2
+	// newline as a byte
+	byteNewline = byte('\n')
+	// tab as a byte
+	byteTab = byte('\t')
+	// space as a byte
+	byteSpace = byte('\x20')
 )
+
+// byte slice newline separator
+var byteSliceNewline = []byte{byteNewline}
+
+// byte slice tab
+var byteSliceTab = []byte{byteTab}
+
+// byte slice two spaces
+var byteSliceTwoSpaces = []byte{byteSpace, byteSpace}
 
 var _ = runtime.Stack
 
-/*
-DebugStack produces a string stack frame modified debug.Stack:
-Stack frames other than the callers of puntime.DebugStack are removed.
-skipFrames allows for removing additional frames.
-tabs are replaces with two spaces.
-*/
+// DebugStack returns a string stack trace intended to be printed or when a full printable trace is desired
+//   - top returned stack frame is caller of [pruntime.DebugStack]
+//   - skipFrames allows for removing additional frames.
+//   - differences from debug.Stack:
+//   - tabs are replaced with two spaces
+//   - Stack frames other than the callers of pruntime.DebugStack are removed
 func DebugStack(skipFrames int) (stack string) {
 	if skipFrames < 0 {
 		skipFrames = 0
@@ -41,23 +63,34 @@ func DebugStack(skipFrames int) (stack string) {
 		created by testing.(*T).Run
 			/opt/homebrew/Cellar/go/1.18/libexec/src/testing/testing.go:1486 +0x300
 	*/
-	// convert to string, remove final newline, split into lines
-	stackBytes := debug.Stack()
-	stackString := string(stackBytes)
-	trace := strings.Split(strings.TrimSuffix(stackString, "\n"), "\n")
+
+	// remove final newline, split into lines
+	//	- hold off on converting to string to reduce interning memory leak
+	//	- [][]byte
+	var stackTraceByteLines = bytes.Split(bytes.TrimSuffix(debug.Stack(), byteSliceNewline), byteSliceNewline)
+
+	// number of stack frames that are not header data or creator line
+	var frameCount = (len(stackTraceByteLines)-prLeadInLines-prCreatorLines)/prLinesPerFrame -
+		prDebugStackStdFrame - prDebugStackFnFrame
 
 	// check skipFrames maximum value
-	lineCount := len(trace)
-	frameCount := (lineCount-prLeadInLines-prCreatorLines)/prLinesPerFrame -
-		prDebugStackStdFrame - prDebugStackFnFrame
 	if skipFrames > frameCount {
 		skipFrames = frameCount
 	}
 
-	// remove undesirable stack frames
-	skipLines := prLinesPerFrame * (prDebugStackStdFrame + prDebugStackFnFrame + skipFrames)
-	copy(trace[prLeadInLines:], trace[prLeadInLines+skipLines:])
-	trace = trace[:len(trace)-skipLines]
+	// undesirable stack frames: debug.Stack, pruntime.DebugStack and skipFrames
+	var skipLines = prLinesPerFrame * (prDebugStackStdFrame + prDebugStackFnFrame + skipFrames)
 
-	return strings.ReplaceAll(strings.Join(trace, "\n"), "\t", "\x20\x20")
+	// remove lines
+	copy(stackTraceByteLines[prLeadInLines:], stackTraceByteLines[prLeadInLines+skipLines:])
+	stackTraceByteLines = stackTraceByteLines[:len(stackTraceByteLines)-skipLines]
+
+	// merge back together, replace tab with two spaces, make string
+	stack = string(bytes.ReplaceAll(
+		bytes.Join(stackTraceByteLines, byteSliceNewline),
+		byteSliceTab,
+		byteSliceTwoSpaces,
+	))
+
+	return
 }

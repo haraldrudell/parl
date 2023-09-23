@@ -18,10 +18,11 @@ type Devicette interface {
 	// Serial returns the serial number for this device
 	Serial() (serial AndroidSerial)
 	// Shell executes a shell command on the device.
-	// The resulting socket can be obtained either using the reader callback,
-	// which is a socket connection to the device,
-	// or by collecting the out string.
-	Shell(command string, reader func(conn io.ReadWriteCloser) (err error)) (out string, err error)
+	//	- the response is a byte sequence
+	//	- note: interning large strings may lead to memory leaks
+	Shell(command string) (out []byte, err error)
+	// ShellStream executes a shell command on the device returning a readable socket
+	ShellStream(command string) (conn io.ReadWriteCloser, err error)
 	/*
 		Pull copies a remote file or directory on the Android device to a local file system location.
 		the local file must not exist.

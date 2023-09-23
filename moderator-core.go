@@ -7,7 +7,9 @@ package parl
 
 import (
 	"fmt"
+	"math"
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -18,18 +20,38 @@ const (
 ModeratorCore invokes functions at a limited level of parallelism.
 ModeratorCore is a ticketing system.
 ModeratorCore does not have a cancel feature.
- m := NewModeratorCore(20, ctx)
- m.Do(func() (err error) { // waiting here for a ticket
-   // got a ticket!
-   …
-   return or panic // ticket automatically returned
- m.String() → waiting: 2(20)
+
+	m := NewModeratorCore(20, ctx)
+	m.Do(func() (err error) { // waiting here for a ticket
+	  // got a ticket!
+	  …
+	  return or panic // ticket automatically returned
+	m.String() → waiting: 2(20)
 */
 type ModeratorCore struct {
+	// parallelism is the maximum number of outstanding tickets
 	parallelism uint64
-	cond        *sync.Cond
-	active      uint64 // behind lock
-	waiting     uint64 // behind lock
+	// number of issued tickets
+	//	- if less than parallelism:
+	//	- — moderator is in atomic mode, ie.
+	//	- —	tickets obtained by atomic access only
+	//	- if equal to parallelism:
+	//	- — moderator is in lock mode. ie.
+	//	- — tickets are transfered orderly using queue,
+	//		waiting and transferBehindLock
+	active atomic.Uint64
+	// lock used when moderator in lock mode
+	//	- treads use the cond with waiting and transferBehindLock
+	//	- orderly first-come-first-served
+	queue sync.Cond
+	// number of threads waiting for a ticket
+	//	- behind lock
+	//	- atomic so Status can read
+	waiting atomic.Uint64
+	// transferBehindLock facilitates locked ticket transfer
+	//	- behind lock
+	//	- atomic so it can be inspected
+	transferBehindLock atomic.Uint64
 }
 
 // moderatorCore is a parl-private version of ModeratorCore
@@ -38,75 +60,123 @@ type moderatorCore struct {
 }
 
 // NewModerator creates a new Moderator used to limit parallelism
-func NewModeratorCore(parallelism uint64) (mo *ModeratorCore) {
+func NewModeratorCore(parallelism uint64) (m *ModeratorCore) {
 	if parallelism < 1 {
 		parallelism = defaultParallelism
 	}
 	return &ModeratorCore{
 		parallelism: parallelism,
-		cond:        sync.NewCond(&sync.Mutex{}),
+		queue:       *sync.NewCond(&sync.Mutex{}),
 	}
 }
 
-// Do calls fn limited by the moderator’s parallelism.
-// Do blocks until a ticket is available
-// Do uses the same thread.
-func (mo *ModeratorCore) Do(fn func()) {
-	mo.getTicket()          // blocking
-	defer mo.returnTicket() // we will always get a ticket, and it should be returned
+// Ticket returns a ticket possibly blocking until one is available
+//   - Ticket returns the function for returning the ticket
+//
+// Usage:
+//
+//	defer moderator.Ticket()()
+func (m *ModeratorCore) Ticket() (returnTicket func()) {
+	returnTicket = m.returnTicket
 
-	if fn != nil {
-		fn()
-	}
-}
-
-func (mo *ModeratorCore) getTicket() {
-	mo.cond.L.Lock()
-	defer mo.cond.L.Unlock()
-
-	isWaiting := false
+	// try available ticket at atomic performance
 	for {
-		if mo.active < mo.parallelism {
-			mo.active++
+		if tickets := m.active.Load(); tickets == m.parallelism {
+			break // it’s lock mode
+		} else if m.active.CompareAndSwap(tickets, tickets+1) {
+			return // got atomic ticket return
+		}
+	}
 
-			// maintain waiting counter
-			if isWaiting {
-				mo.waiting--
+	// enter lock mode
+	m.queue.L.Lock()
+	defer m.queue.L.Unlock()
+	defer m.lastWaitCheck()
+
+	// critial section: ticket loop
+	var isWaiting bool
+	for {
+
+		// attempt atomic ticket
+		for {
+			if tickets := m.active.Load(); tickets == m.parallelism {
+				break // still lock mode
+			} else if m.active.CompareAndSwap(tickets, tickets+1) {
+				return // got atomic ticket return
 			}
-			return
 		}
 
-		// maintain waiting counter
+		// attempt transfer-behind-lock ticket
+		if m.transferBehindLock.Load() > 0 {
+			m.transferBehindLock.Add(math.MaxUint64)
+			return // ticket transfer successful return
+		}
+
+		// wait for ticket to become available
 		if !isWaiting {
 			isWaiting = true
-			mo.waiting++
+			m.waiting.Add(1)
+			defer m.waiting.Add(math.MaxUint64)
 		}
-
-		// block until cond.Notify or cond.Broadcast
-		mo.cond.Wait()
+		// blocks here
+		m.queue.Wait()
 	}
 }
 
-func (mo *ModeratorCore) returnTicket() {
-	mo.cond.L.Lock()
-	defer mo.cond.Signal()
-	defer mo.cond.L.Unlock()
+// lastWaitCheck prevents tickets from getting stuck as transfers
+//   - invoked while holding lock
+//   - this can happen if 1 thread is waiting and multiple threads transfer tickets
+func (m *ModeratorCore) lastWaitCheck() {
+	if m.waiting.Load() > 0 {
+		return // more threads are waiting
+	}
+	var transfers = m.transferBehindLock.Load()
+	if transfers == 0 {
+		return // no extra transfers available return
+	}
 
-	mo.active--
+	// put extra transfers in atomic tickets
+	m.transferBehindLock.Store(0)
+	m.active.Add(math.MaxUint64 - transfers + 1)
 }
 
-func (mo *ModeratorCore) Status() (parallelism uint64, active uint64, waiting uint64) {
-	parallelism = mo.parallelism
-	mo.cond.L.Lock()
-	defer mo.cond.L.Unlock()
+// returnTicket returns a ticket obtained by Ticket
+func (m *ModeratorCore) returnTicket() {
 
-	active = mo.active
-	waiting = mo.waiting
+	// attempt ticket-return atomically
+	for {
+		if tickets := m.active.Load(); tickets == m.parallelism {
+			break // lock mode: use transfer-ticket
+		} else if m.active.CompareAndSwap(tickets, tickets-1) {
+			return // ticket returned atomically return
+		}
+	}
+
+	// return ticket using transfer behind lock
+	m.queue.L.Lock()
+	defer m.queue.L.Unlock()
+
+	// if no thread waiting, return atomically
+	if m.waiting.Load() == 0 {
+		m.active.Add(math.MaxUint64)
+		return // atomic transfer complete return
+	}
+
+	// if thread waiting, do ticket transfer
+	m.transferBehindLock.Add(1)
+	m.queue.Signal() // signal while holding lock
+}
+
+// Status: values may lack integrity
+func (m *ModeratorCore) Status() (parallelism, active, waiting uint64) {
+	parallelism = m.parallelism
+	active = m.active.Load()
+	waiting = m.waiting.Load()
 	return
 }
 
-func (mo *ModeratorCore) String() (s string) {
-	parallelism, active, waiting := mo.Status()
+func (m *ModeratorCore) String() (s string) {
+	var parallelism, active, waiting = m.Status()
 	if active < parallelism {
 		s = fmt.Sprintf("available: %d(%d)", parallelism-active, parallelism)
 	} else {

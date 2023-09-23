@@ -18,17 +18,15 @@ const (
 	threadDataLabel = "myThreadName"
 )
 
-func TestThreadData(t *testing.T) {
-	var createShort = ".(*SomeType).SomeCode()"
-	var funcShort = ".(*SomeType).SomeFunction()"
-
-	var exp string
+func TestThreadDataZeroValue(t *testing.T) {
 
 	// check zero-value results
 	var threadData ThreadData
+	// a zero-value threadData should not be valid
 	if threadData.ThreadID().IsValid() {
 		t.Error("threadData.ThreadID().IsValid() true")
 	}
+	// a zero-value threadData should not have Create
 	if threadData.Create().IsSet() {
 		t.Error("threadData.Create().IsSet() true")
 	}
@@ -50,10 +48,42 @@ func TestThreadData(t *testing.T) {
 	if short := threadDatap.Short(); short != ThreadDataNil {
 		t.Errorf("nil.Short(): %q exp %q", short, ThreadDataNil)
 	}
+}
+
+func TestThreadData(t *testing.T) {
+	var expCreateShort = ".(*SomeType).SomeCode"
+	var expFuncShort = ".(*SomeType).SomeFunction"
+
+	var exp string
+	var threadData ThreadData
 
 	// check populated returns
 	var someType SomeType
 	someType.SomeCode(&threadData)
+
+	// ID: 36 IsMain: false status: running
+	// github.com/haraldrudell/parl/g0.(*SomeType).SomeMethod(0x140001482c0, 0x0?)
+	// 	thread-data_test.go:135
+	// github.com/haraldrudell/parl/g0.(*SomeType).SomeFunction(0x14000106b60?, 0x102ef8280?)
+	// 	thread-data_test.go:132
+	// cre: github.com/haraldrudell/parl/g0.(*SomeType).SomeCode in goroutine 35-thread-data_test.go:126
+	//t.Logf("stack: \n%s", someType.stack)
+
+	// ThreadID: 20
+	// Create: File: "/opt/sw/parl/g0/thread-data_test.go" Line: 147 FuncName: "github.com/haraldrudell/parl/g0.(*SomeType).SomeCode in goroutine 19"
+	// Func: File: "/opt/sw/parl/g0/thread-data_test.go" Line: 153 FuncName: "github.com/haraldrudell/parl/g0.(*SomeType).SomeFunction"
+	// Name: myThreadName
+	// t.Logf("\n"+
+	// 	"ThreadID: %s\n"+
+	// 	"Create: %s\n"+
+	// 	"Func: %s\n"+
+	// 	"Name: %s",
+	// 	threadData.ThreadID().String(),
+	// 	threadData.Create().Dump(),
+	// 	threadData.Func().Dump(),
+	// 	threadData.Name(),
+	// )
+
 	threadID, createLocation, funcLocation, label := threadData.Get()
 	if threadData.ThreadID() != threadID {
 		t.Error("bad threadData.threadID()")
@@ -70,11 +100,11 @@ func TestThreadData(t *testing.T) {
 	if threadID != someType.stack.ID() {
 		t.Errorf("bad ID %q exp %q", threadID, someType.stack.ID())
 	}
-	if !strings.Contains(createLocation.Short(), createShort) {
-		t.Errorf("createLocation.Short(): %q exp %q", createLocation.Short(), createShort)
+	if !strings.Contains(createLocation.Short(), expCreateShort) {
+		t.Errorf("createLocation.Short(): %q exp %q", createLocation.Short(), expCreateShort)
 	}
-	if !strings.Contains(funcLocation.Short(), funcShort) {
-		t.Errorf("funcLocation.Short(): %q exp %q", funcLocation.Short(), funcShort)
+	if !strings.Contains(funcLocation.Short(), expFuncShort) {
+		t.Errorf("funcLocation.Short(): %q exp %q", funcLocation.Short(), expFuncShort)
 	}
 	if label != threadDataLabel {
 		t.Errorf("label: %q exp %q", label, threadDataLabel)

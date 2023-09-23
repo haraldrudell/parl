@@ -26,9 +26,11 @@ type Adbette interface {
 	// server to connect to one of its devices
 	ConnectToDevice(serial AndroidSerial) (err error)
 	// Shell executes a shell command on a device connected to the adb server.
-	// out is a combination of stderr and stdout.
-	// The status code from an on-device command cannot be obtained
-	Shell(command string, reader ...func(conn io.ReadWriteCloser) (err error)) (out string, err error)
+	//	- out is a combination of stderr and stdout.
+	//	- The status code from an on-device command cannot be obtained
+	Shell(command string) (out []byte, err error)
+	// ShellStream executes a shell command on the device returning a readable socket
+	ShellStream(command string) (conn io.ReadWriteCloser, err error)
 	// TrackDevices orders a server to emit serial number as they become available
 	TrackDevices() (err error)
 	// Devices lists the currently online serials
@@ -71,8 +73,9 @@ Note that locahost is valid both for IPv4 and IPv6.
 type AdbSocketAddress string
 
 // AndroidSerial uniquely identities an Android device.
-// It is typically a string of a dozen or so 8-bit chanacters consisting of
-// lower and upper case a-zA-Z0-9
+//   - has .String and .IsValid, is Ordered
+//   - typically a string of a dozen or so 8-bit chanacters consisting of
+//     lower and upper case a-zA-Z0-9
 type AndroidSerial string
 
 // Adbetter is a factory instance for connections featuring Adbette

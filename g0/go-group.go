@@ -277,7 +277,7 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 	if goImpl, ok = thread.(*Go); !ok {
 		panic(perrors.NewPF("type assertion failed"))
 	}
-	g0.gos.Delete(goImpl.G0ID())
+	g0.gos.Delete(goImpl.G0ID(), parli.MapDeleteWithZeroValue)
 	if g0.isSubGroup.IsTrue() {
 
 		// SubGroup with its own error channel with fatals not affecting parent
@@ -503,8 +503,13 @@ func (g0 *GoGroup) Wait() {
 	<-g0.endCh.Ch()
 }
 
-func (g0 *GoGroup) cmpNames(a *ThreadData, b *ThreadData) (result bool) {
-	return a.label < b.label
+func (g0 *GoGroup) cmpNames(a *ThreadData, b *ThreadData) (result int) {
+	if a.label < b.label {
+		return -1
+	} else if a.label > b.label {
+		return 1
+	}
+	return 0
 }
 
 func (g0 *GoGroup) setFirstFatal() {

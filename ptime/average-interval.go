@@ -23,20 +23,26 @@ func NewAverageInterval(index PeriodIndex) (ai *AverageInterval) {
 	return &AverageInterval{index: index}
 }
 
-// Add adds a datapoint to the averager
-func (ai *AverageInterval) Add(value float64) {
-	ai.totalLock.Lock()
-	defer ai.totalLock.Unlock()
-
-	ai.count++
-	ai.total += value
+func (a *AverageInterval) Index() (index PeriodIndex) {
+	return a.index
 }
 
-// Aggregate provides averaging content for calcukating the average
-func (ai *AverageInterval) Aggregate(countp *uint64, floatp *float64) {
-	ai.totalLock.RLock()
-	defer ai.totalLock.RUnlock()
+// Add adds a datapoint to the averager
+//   - count of values incremented
+//   - value added to total
+func (a *AverageInterval) Add(value float64) {
+	a.totalLock.Lock()
+	defer a.totalLock.Unlock()
 
-	*countp += ai.count
-	*floatp += ai.total
+	a.count++
+	a.total += value
+}
+
+// Aggregate provides averaging content for calculating the average
+func (a *AverageInterval) Aggregate(countp *uint64, floatp *float64) {
+	a.totalLock.RLock()
+	defer a.totalLock.RUnlock()
+
+	*countp += a.count
+	*floatp += a.total
 }

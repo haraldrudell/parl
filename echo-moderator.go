@@ -65,7 +65,8 @@ func (em *EchoModerator) Do(fn func()) {
 			em.label, waiting+1, ptime.Duration(age), threadStr)
 	}
 
-	em.moderator.Do((echoModerator{fn: fn, EchoModerator: em}).criticalSection)
+	defer em.moderator.Ticket()()
+	(echoModerator{fn: fn, EchoModerator: em}).criticalSection()
 }
 
 type echoModerator struct {

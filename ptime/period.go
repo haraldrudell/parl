@@ -25,8 +25,15 @@ type PeriodIndex uint64
 // Period provides real-time based fixed-length interval perioding ordered using a uint64 zero-based index.
 //   - Period provides first period index and fractional usage of the first period
 type Period struct {
-	interval  time.Duration
-	period0   PeriodIndex
+	// interval is ns duration of  period
+	interval time.Duration
+	// period0 is the numeric value for the first period
+	//	- the exact number is relative to a process-wide timestamp
+	period0 PeriodIndex
+	// this Period was instantiated sometime during the period period0
+	//	- fraction0 is how much the first period0 is prior to instantiation
+	//	- fraction0 0 means the none of period0 was active
+	//	- fraction0 2^63 means all of period0 was active
 	fraction0 uint64
 }
 
@@ -47,7 +54,7 @@ func NewPeriod(interval time.Duration) (period *Period) {
 }
 
 // Index returns the index number for the current period or the period at time t
-//   - Index is zero-based
+//   - index is a number p.period0 or larger
 func (p *Period) Index(t ...time.Time) (index PeriodIndex) {
 	if p.interval <= 0 {
 		panic(perrors.ErrorfPF("period must be positive: %s", Duration(p.interval)))
@@ -72,6 +79,7 @@ func (p *Period) Index(t ...time.Time) (index PeriodIndex) {
 			t0.Format(cyclebreaker.Rfc3339ns), tPeriodEpoch.Format(cyclebreaker.Rfc3339ns)),
 		)
 	}
+
 	return
 }
 
@@ -112,7 +120,9 @@ func (p *Period) Sub(now PeriodIndex, n int) (periodIndex PeriodIndex) {
 	return
 }
 
-// Available returns the number of possible periods 1… but no greater than cap
+// Available returns the correct number of slice entries to incldue now
+//   - after the inital few periods, returns cap
+//   - possible values 1… but no greater than cap
 //   - now cannot be less than period0
 func (p *Period) Available(now PeriodIndex, cap int) (periods int) {
 	if now < p.period0 {

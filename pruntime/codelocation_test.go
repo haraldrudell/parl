@@ -40,6 +40,10 @@ func TestCodeLocation(t *testing.T) {
 	if !ok {
 		t.Error("runtime.Caller failed")
 	}
+
+	// actualCodeLocation: File: "/opt/sw/parl/pruntime/codelocation_test.go" Line: 22 FuncName: "github.com/haraldrudell/parl/pruntime.(*clTypeName).FuncName"
+	// t.Logf("actualCodeLocation: %s", actualCodeLocation.Dump())
+
 	// rFunc: runtime.Func is all opaque fields. methods:
 	// Entry() (uintptr)
 	// FileLine(uintptr) (line string, line int) "/opt/foxyboy/sw/privates/parl/mains/executable.go"
