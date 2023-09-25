@@ -7,33 +7,70 @@ package pfs
 
 import (
 	"io/fs"
-	"path/filepath"
-	"syscall"
+	"os"
 
 	"github.com/haraldrudell/parl/perrors"
 )
 
-type DLEntry struct {
-	RelDir      string // directory name that may begin with '.'
-	AbsDir      string // absolute directory name
-	FqPath      string // fully qualified path to entry
-	fs.DirEntry        // .Name() .IsDir() .Type() .Info()
-	Info        fs.FileInfo
-	Stat        *syscall.Stat_t
+// Entry is a file system entry that is not a directory
+//   - can be part of directory, symlink or other
+type Entry struct {
+	// we can have entries with FileInfo nil, so base path must be stored
+	base string
+	// info.Name() has basename, os.FileInfo: interface
+	//	- may be nil
+	//	- Name() Size() Mode() ModTime() IsDir() Sys()
+	os.FileInfo
+	// if an error is encountered during scanning for symlinks,
+	// that error is stored here, then presented to WalkFn
+	// during the later walk phase
+	err error
 }
 
-func GetEntry(rel, abs string, entry fs.DirEntry, info fs.FileInfo, stat *syscall.Stat_t) (e *DLEntry) {
-	return &DLEntry{RelDir: rel, AbsDir: abs, FqPath: filepath.Join(abs, entry.Name()), DirEntry: entry, Info: info, Stat: stat}
+// NewEntry returns Entry or Directory
+//   - path is absolute path to this file
+func NewEntry(base string) (entry *Entry) {
+	return &Entry{base: base}
 }
 
-type EntryResult struct {
-	*DLEntry
-	Err error
+func (e *Entry) FetchFileInfo(path string) (err error) {
+	// Lstat describes a symlink, not what a symlink points to
+	e.FileInfo, err = os.Lstat(path)
+	perrors.Is(&err, "os.Lstat %w", err)
+	return
 }
 
-func GetErrorResult(err error) (result *EntryResult) {
-	if err == nil {
-		panic(perrors.Errorf("GetErrorResult with error nil"))
+func (e *Entry) IsSymlink() (isSymlink bool) {
+	if f := e.FileInfo; f != nil {
+		isSymlink = f.Mode()&os.ModeSymlink != 0
 	}
-	return &EntryResult{Err: err}
+	return
+}
+
+// Name gets filepath.Base() in a safe way
+//   - Name() fails if FileInfo si not available
+func (e *Entry) Name() (base string) {
+	if e.FileInfo != nil {
+		base = e.FileInfo.Name()
+		return
+	}
+	base = e.base
+	return
+}
+
+// Walk traverses which for a file is only the file itself
+func (e *Entry) Walks() (info fs.FileInfo, err error) {
+	info = e.FileInfo
+	err = e.err
+	return
+}
+
+// SetError stores an error encountered during scan for symlinks
+//   - it is provided to filepath.WalkFunc during the walk phase
+func (e *Entry) SetError(err error) {
+	if e.err == nil {
+		e.err = err
+	} else {
+		e.err = perrors.AppendError(e.err, err)
+	}
 }

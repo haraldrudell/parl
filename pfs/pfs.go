@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pfs provides file-system related functions
 package pfs
 
 import (
@@ -12,15 +11,7 @@ import (
 	"path/filepath"
 )
 
-var EndListing = errors.New("endListing")
-
-// AbsEval makes path absolute and resolves symlinks
-func AbsEval(path string) (p string, err error) {
-	if p, err = filepath.Abs(path); err == nil {
-		p, err = filepath.EvalSymlinks(p)
-	}
-	return
-}
+var ErrEndListing = errors.New("endListing")
 
 // Dirs retrieves absolute paths to all directories, while following symlinks, from initial dir argument.
 // callback: cb is 6–58% faster than slice, results are found faster, and it can be canceled midway.
@@ -52,7 +43,7 @@ func Dirs(dir string, callback ...func(dir string) (err error)) (dirs []string, 
 			}
 		}
 		return // good exit
-	}); err == EndListing {
+	}); err == ErrEndListing {
 		err = nil
 	}
 	return
