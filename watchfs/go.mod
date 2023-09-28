@@ -7,7 +7,7 @@ replace github.com/haraldrudell/parl => ../../parl
 require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/google/uuid v1.3.1
-	github.com/haraldrudell/parl v0.4.108
+	github.com/haraldrudell/parl v0.4.109
 )
 
 require (

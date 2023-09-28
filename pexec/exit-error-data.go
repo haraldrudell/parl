@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/haraldrudell/parl/pbytes"
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/sys/unix"
 )
@@ -19,6 +20,8 @@ const (
 	ExitErrorIncludeStderr = true
 	StatusCode1            = 1
 )
+
+var eeNewlineBytes = []byte("\n")
 
 type ExitErrorData struct {
 	Err        error
@@ -102,7 +105,9 @@ func (e *ExitErrorData) ExitErrorString(includeStderr ...bool) (errS string) {
 	// stderr
 	if len(includeStderr) > 0 && includeStderr[0] &&
 		len(stderr) > 0 {
-		s = append(s, fmt.Sprintf("stderr: ‘%s’", string(stderr)))
+		if serr := pbytes.TrimNewline(stderr); len(serr) > 0 {
+			s = append(s, fmt.Sprintf("stderr: ‘%s’", string(serr)))
+		}
 	}
 
 	errS = strings.Join(s, "\x20")
