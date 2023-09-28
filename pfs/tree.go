@@ -9,6 +9,7 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 )
@@ -35,17 +36,23 @@ type Tree struct {
 	//	- path value has no symlinks and are clean and absolute
 	symlinkRegistry PathRegistry[string]
 	walkFunc        filepath.WalkFunc
-	FSEntryCount    int
+	FSEntryCount    *atomic.Uint64
 }
 
 // NewTree returns a file-system scan object
 func NewTree(walkFunc filepath.WalkFunc) (tree *Tree) {
+	var u64 atomic.Uint64
 	return &Tree{
 		rootsRegistry:   *NewPathRegistry[Root](),
 		obsoleteRoots:   *NewPathRegistry[Root](),
 		symlinkRegistry: *NewPathRegistry[string](),
 		walkFunc:        walkFunc,
+		FSEntryCount:    &u64,
 	}
+}
+
+func (t *Tree) SetCounter(FSEntryCount *atomic.Uint64) {
+	t.FSEntryCount = FSEntryCount
 }
 
 // ScanRoots scans rootpath and all additional encountered roots
@@ -156,7 +163,7 @@ func (t *Tree) scanRoot(rootPath string) (err error) {
 	if absPath, rootEntry, err = root.Init(); err != nil {
 		return
 	}
-	t.FSEntryCount++
+	t.FSEntryCount.Add(1)
 
 	if parl.IsThisDebug() {
 		St("scanRoot: %q abs: %q", rootPath, absPath)
@@ -166,7 +173,7 @@ func (t *Tree) scanRoot(rootPath string) (err error) {
 	t.rootsRegistry.Add(absPath, root)
 
 	// scan the root collecting its symlinks
-	err = NewEntryScanner(rootEntry, absPath, rootPath, t.addSymlink, &t.FSEntryCount).Scan()
+	err = NewEntryScanner(rootEntry, absPath, rootPath, t.addSymlink, t.FSEntryCount).Scan()
 
 	return
 }

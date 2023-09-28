@@ -110,7 +110,20 @@ func (st *StatusTerminal) Status(s string) {
 	}
 
 	// split s into lines
-	lines := strings.Split(s, NewLine) // empty string has slice length 1, empty line
+	var lines = strings.Split(s, NewLine) // empty string has slice length 1, empty line
+
+	// StatusDebug is used to troubleshoot status line counting
+	//	- without invoking NewStatusDebug, d does nothing
+	//	- d.n is true if d is active
+	//	- d appends a text to the end of the last status line:
+	//	- “01n02e03w004L05N06”
+	//	- to activate d, use option “-verbose StatusTerminal.Status”
+	var d = StatusDebug{}
+	if parl.IsThisDebug() {
+		d = *NewStatusDebug(lines, width)
+		// insert a pre-release of debug data to have fixed status length
+		lines[len(lines)-1] += d.DebugText()
+	}
 
 	// remove trailing blank lines
 	length := len(lines)
@@ -121,6 +134,7 @@ func (st *StatusTerminal) Status(s string) {
 		}
 		i--
 	}
+	d.metaEmptyLineCount = len(lines) - i
 	// i now a valid index 0…
 	if i != length {
 		lines = lines[:i] // lines has no trailing blank lines, length may be 0
@@ -141,6 +155,7 @@ func (st *StatusTerminal) Status(s string) {
 		if length > 0 {
 			displayLineCount += (length - 1) / width
 			cursorAtEndOfLine = length%width == 0
+			d.metaLongLines += (length - 1) / width
 		}
 		output += line
 
@@ -149,12 +164,18 @@ func (st *StatusTerminal) Status(s string) {
 				output += EraseEndOfLine
 			}
 			displayLineCount++ // count the newline
+			d.metaCountedNewlines++
 			output += NewLine
 		} else {
 			if !cursorAtEndOfLine {
 				output += Space // places cursor one step to the right of final output character
 			}
 		}
+	}
+
+	// update meta string
+	if d.n {
+		output = d.UpdateOutput(output, displayLineCount)
 	}
 
 	st.lock.Lock()

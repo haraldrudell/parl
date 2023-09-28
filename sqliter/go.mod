@@ -6,7 +6,7 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/uuid v1.3.1
-	github.com/haraldrudell/parl v0.4.107
+	github.com/haraldrudell/parl v0.4.108
 	modernc.org/sqlite v1.25.0
 )
 
@@ -26,7 +26,7 @@ require (
 	modernc.org/ccgo/v3 v3.16.15 // indirect
 	modernc.org/libc v1.24.1 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
-	modernc.org/memory v1.7.1 // indirect
+	modernc.org/memory v1.7.2 // indirect
 	modernc.org/opt v0.1.3 // indirect
 	modernc.org/strutil v1.2.0 // indirect
 	modernc.org/token v1.1.0 // indirect

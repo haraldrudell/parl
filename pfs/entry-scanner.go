@@ -7,6 +7,7 @@ package pfs
 
 import (
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
@@ -16,13 +17,13 @@ import (
 type EntryScanner struct {
 	symlinkCb                 func(abs string)
 	firstPending, lastPending *PendingEntry
-	pFSEntryCount             *int
+	pFSEntryCount             *atomic.Uint64
 }
 
 func NewEntryScanner(
 	rootEntry FSEntry, abs, path string,
 	symlinkCb func(abs string),
-	pFSEntryCount *int,
+	pFSEntryCount *atomic.Uint64,
 ) (scanner *EntryScanner) {
 	var pending = NewPendingEntry(abs, path, rootEntry)
 	return &EntryScanner{
@@ -70,7 +71,7 @@ func (s *EntryScanner) Scan() (err error) {
 		var paths []string
 		// errors are stored in dirEntry or child
 		children, paths, _ = dirEntry.FetchChildren(path)
-		*s.pFSEntryCount += len(children)
+		s.pFSEntryCount.Add(uint64(len(children)))
 		for i, child := range children {
 
 			// obtain abs and path for child

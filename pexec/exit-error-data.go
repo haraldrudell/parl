@@ -7,8 +7,9 @@ package pexec
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
-	"strconv"
+	"strings"
 
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/sys/unix"
@@ -76,21 +77,34 @@ func (e *ExitErrorData) Error() (exitErrorMessage string) {
 // ExitErrorString returns a printable string if the err error chain
 // contains an ExitError
 //   - if no ExitError, the empty string
-//   - for non-signal: status code: 1 ‘it fucked up, he got away’
+//   - for non-signal: status code: 1 ‘read error’
 //   - for signal: signal: "abort trap" ‘signal: abort trap’
+//   - prints stderr if includeStderr is ExitErrorIncludeStderr and stderr non-empty
 func (e *ExitErrorData) ExitErrorString(includeStderr ...bool) (errS string) {
+	var s []string
+	var stderr []byte
 	if e.ExitErr != nil {
-		if e.StatusCode == TerminatedBySignal {
-			errS = "signal: " + strconv.Quote(e.Signal.String())
-		} else {
-			errS = "status code: " + strconv.Itoa(e.StatusCode)
+		if stderr = e.ExitErr.Stderr; len(stderr) == 0 {
+			stderr = e.Stderr
 		}
-		errS += "\x20"
+
+		// it’s either status code or signal
+		if e.StatusCode == TerminatedBySignal {
+			s = append(s, fmt.Sprintf("signal: %q", e.Signal.String()))
+		} else {
+			s = append(s, fmt.Sprintf("status code: %d", e.StatusCode))
+		}
 	}
-	errS += "‘" + perrors.Short(e.Err) + "’"
+
+	// original error message
+	s = append(s, fmt.Sprintf("message: ‘%s’", perrors.Short(e.Err)))
+
+	// stderr
 	if len(includeStderr) > 0 && includeStderr[0] &&
-		len(e.Stderr) > 0 {
-		errS += " stderr: ‘" + string(e.Stderr) + "’"
+		len(stderr) > 0 {
+		s = append(s, fmt.Sprintf("stderr: ‘%s’", string(stderr)))
 	}
+
+	errS = strings.Join(s, "\x20")
 	return
 }
