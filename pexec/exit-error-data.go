@@ -17,24 +17,32 @@ import (
 )
 
 const (
+	// [ExitErrorData.ExitErrorString] should include standard error output
 	ExitErrorIncludeStderr = true
-	StatusCode1            = 1
+	// status code 1, which in POSIX means a general error
+	StatusCode1    = 1
+	addStderrStack = 1
 )
 
-var eeNewlineBytes = []byte("\n")
-
+// ExitErrorData provides additional detail on pexec.ExitError values
 type ExitErrorData struct {
-	Err        error
-	ExitErr    *exec.ExitError
+	// the original error
+	Err error
+	// Err interpreted as ExitError, possibly nil
+	ExitErr *exec.ExitError
+	// status code in ExitError, possibly 0
 	StatusCode int
-	Signal     unix.Signal
-	Stderr     []byte
+	// signal in ExitError, possibly 0
+	Signal unix.Signal
+	// stderr in ExitError or from argument, possibly nil
+	Stderr []byte
 }
 
+// ExitErrorData implements error
 var _ error = &ExitErrorData{}
 
-// NewExitErrorData returns once-retrieved data on a possible ExitError
-//   - if ExitErr field is nil or IsExitError meythod returns false, err does not contain an ExitError
+// NewExitErrorData returns parse-once data on a possible ExitError
+//   - if ExitErr field is nil or IsExitError method returns false, err does not contain an ExitError
 //   - the returned value is an error implementation
 func NewExitErrorData(err error, stderr ...[]byte) (exitErrorData *ExitErrorData) {
 	var e = ExitErrorData{Err: err}
@@ -47,6 +55,8 @@ func NewExitErrorData(err error, stderr ...[]byte) (exitErrorData *ExitErrorData
 	return &e
 }
 
+// IsExitError returns true if an pexec.ExitError is present
+//   - false if Err was nil or some other type of error
 func (e *ExitErrorData) IsExitError() (isExitError bool) {
 	return e.ExitErr != nil
 }
@@ -64,12 +74,18 @@ func (e *ExitErrorData) IsStatusCode1() (is1 bool) {
 // IsSignalKill returns true if the err error chain contains an
 // ExitError with signal kill
 //   - signal kill is the response to a command’s context being
-//     canceled
+//     canceled. This should be checked together with [context.Context.Err]
+//   - SIGKILL can also be sent to the process by the operating system
+//     trying to reclaim memory or by other processes
 func (e *ExitErrorData) IsSignalKill() (isSignalKill bool) {
 	return e.StatusCode == TerminatedBySignal &&
 		e.Signal == unix.SIGKILL
 }
 
+// the Error method returns the message from any ExitError,
+// otherwise empty string
+//   - Error also makes ExitErrorData implementing the error
+//     interface
 func (e *ExitErrorData) Error() (exitErrorMessage string) {
 	if e.ExitErr != nil {
 		exitErrorMessage = e.ExitErr.Error()
@@ -77,12 +93,34 @@ func (e *ExitErrorData) Error() (exitErrorMessage string) {
 	return
 }
 
-// ExitErrorString returns a printable string if the err error chain
-// contains an ExitError
-//   - if no ExitError, the empty string
-//   - for non-signal: status code: 1 ‘read error’
-//   - for signal: signal: "abort trap" ‘signal: abort trap’
-//   - prints stderr if includeStderr is ExitErrorIncludeStderr and stderr non-empty
+// AddStderr adds standard error output at the end of the error message
+// for err. Also ensures stack trace.
+//   - ExitError has standard error if the Output method was used
+//   - NewExitErrorData can also have been provided stderr
+func (e *ExitErrorData) AddStderr(err error) (err2 error) {
+	if stderr := e.Stderr; len(stderr) > 0 {
+		if serr := pbytes.TrimNewline(stderr); len(serr) > 0 {
+			err2 = perrors.Errorf("%w stderr: ‘%s’", err, string(serr))
+			return // standard error appended to message
+		}
+	}
+	if perrors.HasStack(err) {
+		err2 = err
+		return // error already has stack trace: no change return
+	}
+	err2 = perrors.Stackn(err, addStderrStack)
+	return // stackk added Stderr return
+}
+
+// ExitErrorString returns the ExitError error message and data from
+// Err and stderr, not an error value
+//   - for non-signal: “status code: 1 ‘read error’”
+//   - for signal: “signal: "abort trap" ‘signal: abort trap’”
+//   - the error message for err: “message: ‘failure’”
+//   - stderr if non-empty from ExitErr or stderr argument and
+//     includeStderr is ExitErrorIncludeStderr:
+//   - “stderr: ‘I/O error’”
+//   - returned value is never empty
 func (e *ExitErrorData) ExitErrorString(includeStderr ...bool) (errS string) {
 	var s []string
 	var stderr []byte

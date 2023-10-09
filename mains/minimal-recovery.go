@@ -13,8 +13,16 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// MinimalRecovery prints error with location to os.Stderr and exits with status code 1
-// if errp points to non-nil error.gp-timestamp
+// MinimalRecovery handles process exit for main,
+// in particular error message and non-zero status code for errors
+//   - on success:
+//   - –  a timestamped success message is printed to stderr
+//   - — the function returns
+//   - panics are not handled
+//   - on error:
+//   - if error contains a panic, error is printed with stack trace
+//   - otherwise one-liner with location
+//   - os.Exit is invoked with status code 1
 //
 // Usage:
 //
@@ -22,11 +30,22 @@ import (
 //	  var err error
 //	  defer mains.MinimalRecovery(&err)
 func MinimalRecovery(errp *error) {
-	var ts = time.Now().Format(parl.Rfc3339s)
-	if errp == nil || *errp == nil {
-		parl.Log("%s Completed successfully", ts)
-		return // no error return
+
+	var err error
+	if errp != nil {
+		err = *errp
 	}
-	parl.Log("%s error: %s", ts, perrors.Short(*errp))
-	os.Exit(1)
+	var ts = time.Now().Format(parl.Rfc3339s)
+	if err == nil {
+		parl.Log("%s Completed successfully", ts)
+		return // success return
+	}
+	var eStr string
+	if isPanic, _, _, _ := perrors.IsPanic(err); isPanic {
+		eStr = perrors.Long(err)
+	} else {
+		eStr = perrors.Short(err)
+	}
+	parl.Log("%s error: %s", ts, eStr)
+	os.Exit(1) // failure process termination
 }

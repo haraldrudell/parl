@@ -23,6 +23,7 @@ const (
 	metaFormat = metaMarker + "%02dn%02de%02dw%03dL%02dN%02d"
 )
 
+// - to activate d, use option “-verbose StatusTerminal..Status”
 type StatusDebug struct {
 	// d.n indicates StatusDebug is active
 	//	- n is true if the new function was invoked
@@ -41,6 +42,7 @@ type StatusDebug struct {
 	width int
 }
 
+// - to activate d, use option “-verbose StatusTerminal..Status”
 func NewStatusDebug(lines []string, width int) (debug *StatusDebug) {
 	return &StatusDebug{
 		n:                true,
@@ -49,6 +51,7 @@ func NewStatusDebug(lines []string, width int) (debug *StatusDebug) {
 	}
 }
 
+// meta formatting string: “01n02e03w004L05N06”
 func (d *StatusDebug) DebugText() (text string) {
 	return fmt.Sprintf(
 		metaFormat, d.metaDisplayCount, d.metaNewlineCount,
@@ -57,6 +60,8 @@ func (d *StatusDebug) DebugText() (text string) {
 	)
 }
 
+// inserts the process-complete status at end of status
+// - without changing the length of status
 func (d *StatusDebug) UpdateOutput(output string, displayLineCount int) (o string) {
 	d.metaDisplayCount = displayLineCount
 	var metaIndex = strings.Index(output, metaMarker)

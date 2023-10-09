@@ -30,6 +30,7 @@ func TestDuration(t *testing.T) {
 		{"days", args{time.Duration(math.Round(math.Pi * 1e14))}, "3d15h"},  // 87h15m59.265358979s
 		{"months", args{time.Duration(math.Round(math.Pi * 1e15))}, "36d"},  // 872h39m52.653589793s
 		{"years", args{time.Duration(math.Round(math.Pi * 1e17))}, "3636d"}, // 87266h27m45.358979328s
+		{"negative", args{time.Duration(-time.Second / 3)}, "-333ms"},       // 87266h27m45.358979328s
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

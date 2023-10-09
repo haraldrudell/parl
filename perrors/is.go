@@ -42,6 +42,12 @@ func Is2PF(errp *error, e error, format string, a ...interface{}) (isBad bool) {
 	return true
 }
 
+// Is returns true if *errp contains a non-nil error
+//   - if return value is true and format is not empty string, *errp is updated with
+//     fmt.Errorf using format and a, typically including “%w” and an error
+//   - if *errp is non-nil and does not have a stack, a stack is inserted into
+//     its error chain
+//   - errp cannot be nil or panic
 func Is(errp *error, format string, a ...interface{}) (isBad bool) {
 	if errp == nil {
 		panic(NewPF("errp nil"))

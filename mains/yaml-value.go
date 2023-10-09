@@ -17,7 +17,13 @@ type YamlValue struct {
 	Pointer interface{}
 }
 
+//   - instancePointer is a reference to a YamlData value that must be struct
+//   - fieldPointer is a list of references to values read from yaml
+//     that matches the fields of YamlData
 func NewYamlValue(instancePointer interface{}, fieldPointer interface{}) (yv *YamlValue) {
+
+	// get the reflect value of the YamlData value struct
+	//	- this is provided by instancePointer
 	reflectValue := reflect.ValueOf(instancePointer)
 	if !reflectValue.IsValid() {
 		perrors.Errorf("NewYamlValue: instancePointer cannot be nil")
@@ -26,6 +32,8 @@ func NewYamlValue(instancePointer interface{}, fieldPointer interface{}) (yv *Ya
 	if structValue.Kind() != reflect.Struct {
 		perrors.Errorf("NewYamlValue: instancePointer not pointer to struct instance")
 	}
+
+	// iterate over all fields of the value, ie. instancePointer
 	numField := structValue.NumField()
 	for i := 0; i < numField; i++ {
 		fieldValue := structValue.Field(i)

@@ -39,18 +39,19 @@ top level dictionary is the yamlKey argument or “options” if not set.
 thunk needs to in otuside of the library for typoing reasons and is
 implemented similar to the below. y is the variable receiving parsed yaml data. The om list
 is then svcaned for its Y pointers to copy yaml settings to options.
- func applyYaml(bytes []byte, unmarshal mains.UnmarshalFunc, yamlDictionaryKey string) (hasData bool, err error) {
-   yamlContentObject := map[string]*YamlData{} // need map[string] because yaml top level is dictionary
-   if err = unmarshal(bytes, &yamlContentObject); err != nil {
-     return
-   }
-   yamlDataPointer := yamlContentObject[yamlDictionaryKey] // pick out the options dictionary value
-   if hasData = yamlDataPointer != nil; !hasData {
-     return
-   }
-   y = *yamlDataPointer
-   return
- }
+
+	func applyYaml(bytes []byte, unmarshal mains.UnmarshalFunc, yamlDictionaryKey string) (hasData bool, err error) {
+	  yamlContentObject := map[string]*YamlData{} // need map[string] because yaml top level is dictionary
+	  if err = unmarshal(bytes, &yamlContentObject); err != nil {
+	    return
+	  }
+	  yamlDataPointer := yamlContentObject[yamlDictionaryKey] // pick out the options dictionary value
+	  if hasData = yamlDataPointer != nil; !hasData {
+	    return
+	  }
+	  y = *yamlDataPointer
+	  return
+	}
 */
 func ApplyYaml(ex mains.Executable, yamlFile, yamlKey string, thunk UnmarshalThunk, om []mains.OptionData) {
 	if thunk == nil {
@@ -81,7 +82,8 @@ func ApplyYaml(ex mains.Executable, yamlFile, yamlKey string, thunk UnmarshalThu
 
 	hasData, err := thunk(byts, yaml.Unmarshal, yamlDictionaryKey)
 	if err != nil {
-		ex.AddErr(perrors.Errorf("ex.ApplyYaml thunk: filename: %q: %w", filename, err)).Exit()
+		ex.AddErr(perrors.Errorf("ex.ApplyYaml thunk: filename: %q: %w", filename, err))
+		ex.Exit()
 	} else if !hasData {
 		return
 	}

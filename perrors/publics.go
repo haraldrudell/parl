@@ -32,19 +32,24 @@ func AddKeyValue(err error, key, value string) (e error) {
 	return errorglue.NewErrorData(err, key, value)
 }
 
-// error116.AppendError associates an additional error with err.
-// err and err2 can be nil.
-// Associated error instances can be retrieved using error116.AllErrors, error116.ErrorList or
-// by printing using rich error printing of the error116 package.
-// TODO 220319 fill in printing
+// AppendError associates an additional error with err.
+//   - return value is nil if and only if both err and err2 are nil
+//   - if either err or err2 is nil, return value is the non-nil argument
+//   - if both err and err2 are non-nil, the return value is err with err2 associated
+//   - associated error instances can be retrieved using:
+//   - — perrors.AllErrors,
+//   - — perros.ErrorList or
+//   - — by rich error printing of perrors package: perrors.Long or
+//   - — “%+v”
 func AppendError(err error, err2 error) (e error) {
 	if err2 == nil {
-		return err // noop return
+		e = err // err2 is nil, return is err, possibly nil
+	} else if err == nil {
+		e = err2 // err is nil, return is non-nil err2
+	} else {
+		e = errorglue.NewRelatedError(err, err2) // both non-nil
 	}
-	if err == nil {
-		return err2 // single error return
-	}
-	return errorglue.NewRelatedError(err, err2)
+	return
 }
 
 // AppendErrorDefer aggregates error sources into errp.

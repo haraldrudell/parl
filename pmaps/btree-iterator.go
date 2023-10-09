@@ -27,7 +27,7 @@ func NewBtreeIterator[V any](tree *btree.BTreeG[V]) (iterator *BtreeIterator[V])
 // func(item T) bool
 var _ btree.ItemIteratorG[int]
 
-// Iteerate returns a sorted list of the first n elements
+// Iterate returns a sorted list of the first n elements
 func (b *BtreeIterator[V]) Iterate(n int) (list []V) {
 
 	// create list
@@ -44,13 +44,13 @@ func (b *BtreeIterator[V]) Iterate(n int) (list []V) {
 // iterator receives elements from the B-tree
 func (b *BtreeIterator[V]) iterator(value V) (keepGoing bool) {
 	if b.listIndex >= len(b.list) {
-		fmt.Fprintf(os.Stderr, "LIST %d >= %d", b.listIndex, len(b.list))
-		return true
+		fmt.Fprintf(os.Stderr, "pmaps.BtreeIterator[…].iterator %d >= %d", b.listIndex, len(b.list))
+		return
 	}
 
 	b.list[b.listIndex] = value
 	b.listIndex++
 
-	keepGoing = true
+	keepGoing = b.listIndex < len(b.list)
 	return
 }
