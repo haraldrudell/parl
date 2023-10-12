@@ -503,6 +503,10 @@ func (g0 *GoGroup) Wait() {
 	<-g0.endCh.Ch()
 }
 
+func (g0 *GoGroup) WaitCh() (ch <-chan struct{}) {
+	return g0.endCh.Ch()
+}
+
 func (g0 *GoGroup) cmpNames(a *ThreadData, b *ThreadData) (result int) {
 	if a.label < b.label {
 		return -1

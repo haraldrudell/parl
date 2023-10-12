@@ -11,6 +11,7 @@ import (
 	"net/netip"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 const (
@@ -148,13 +149,13 @@ func NewNextHop3(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr, nIPv4, 
 }
 
 // HasGateway determines if next hop uses a remote gateway
-func (nh *NextHop) HasGateway() bool {
-	return nh.Gateway.IsValid() && !nh.Gateway.IsUnspecified()
+func (n *NextHop) HasGateway() bool {
+	return n.Gateway.IsValid() && !n.Gateway.IsUnspecified()
 }
 
 // HasSrc determines if next hop has src specified
-func (nh *NextHop) HasSrc() bool {
-	return nh.Src.IsValid() && !nh.Src.IsUnspecified()
+func (n *NextHop) HasSrc() bool {
+	return n.Src.IsValid() && !n.Src.IsUnspecified()
 }
 
 func (n *NextHop) IsZeroValue() (isZeroValue bool) {
@@ -246,51 +247,109 @@ func (n *NextHop) Name(useNameCache ...NameCacher) (name string, err error) {
 	return
 }
 
-// Target describes the detination for this next hop
-func (nh *NextHop) Target() (gateway netip.Addr, s string) {
-	if nh == nil {
-		return
+// Target describes the destination for this next hop
+//   - gateway is invalid for local network targets or gateway unspecified address "0.0.0.0"
+//   - s is:
+//   - empty string for nil NextHop
+//   - network interface name mac index or 0 for gateway missing, invalid or unspecified
+//   - otherwise gateway ip, interface description and source IP or source cidr
+func (n *NextHop) Target() (gateway netip.Addr, s string) {
+
+	// ensure NextHop present
+	if n == nil {
+		return // no NextHop available: invalid and empty string
 	}
-	s = nh.LinkAddr.OneString()
-	if !nh.HasGateway() {
-		return
+
+	// network interface description:
+	// “en5” or “aa:bb…” or “#3” or “0” but never empty string
+	s = n.LinkAddr.OneString()
+	if !n.HasGateway() {
+		return // target is on local network, only the network interface describes it, gateway invalid
 	}
-	gw := nh.Gateway
-	gateway = gw
-	if !gateway.IsValid() || gateway.IsUnspecified() {
-		return
+	// gateway is valid gateway IP from NextHop field
+	gateway = n.Gateway
+	// is4 indicates that an IPv4 address is sought
+	var is4 = Addr46(gateway).Is4()
+
+	// try to obtain source IP and prefix
+
+	// srcIP is possible source IP specified in NextHop
+	var srcIP netip.Addr
+	// hasSrcIP indicates that srcIP is usable
+	var hasSrcIP = n.Src.IsValid() && !n.Src.IsUnspecified()
+	if hasSrcIP {
+		srcIP = Addr46(n.Src)
 	}
-	srcIP := nh.Src
-	s1 := srcIP.String()
-	index := nh.LinkAddr.IfIndex
-	if index > 0 {
-		iface, err := net.InterfaceByIndex(int(index))
-		if err == nil {
-			addrs, e2 := iface.Addrs()
-			if e2 == nil {
-				if srcIP.IsValid() && !srcIP.IsUnspecified() {
-					if len(addrs) > 0 {
-						s1 = addrs[0].String()
-					}
-				} else {
-					for _, ipNet := range addrs {
-						if ipNet, ok := ipNet.(*net.IPNet); ok {
-							var netipAddr netip.Addr
-							var ok bool
-							if netipAddr, ok = netip.AddrFromSlice(ipNet.IP); !ok {
-								continue
-							}
-							if netipAddr.Compare(srcIP) == 0 {
-								s1 = ipNet.String()
-								break
-							}
-						}
-					}
-				}
+	var cidr netip.Prefix
+	var e error
+	cidr, e = n.ifCidr(srcIP, is4)
+	_ = e
+
+	// sourceIPString is source IP “1.2.3.4” or cidr “1.2.3.4/24”
+	var sourceIPString string
+	if cidr.IsValid() {
+		sourceIPString = "\x20" + cidr.String()
+	} else if hasSrcIP {
+		sourceIPString = "\x20" + srcIP.String()
+	}
+
+	// “192.168.1.12 en5 192.168.1.21/24”
+	s = fmt.Sprintf("%s %s%s", gateway, s, sourceIPString)
+
+	return
+}
+
+// targets tries to obtain cidr from network interface IP assignment
+func (n *NextHop) ifCidr(srcIP netip.Addr, is4 bool) (cidr netip.Prefix, err error) {
+
+	// network interface index
+	var index = n.LinkAddr.IfIndex
+	if index == 0 {
+		return // failed to obtain network interface index
+	}
+	var iface *net.Interface
+	if iface, err = net.InterfaceByIndex(int(index)); perrors.IsPF(&err, "InterfaceByIndex %w", err) {
+		return // failed to obtain interface
+	}
+	// addrs is a list of IP addresses assigned to the network interface
+	var addrs []net.Addr
+	if addrs, err = iface.Addrs(); perrors.IsPF(&err, "iface.Addrs %w", err) {
+		return // failed to obtain interface address
+	}
+	if len(addrs) == 0 {
+		return // failed to obtain any assigned addresses
+	}
+	// prefixes are list of cidrs assigned top network interface
+	var prefixes []netip.Prefix
+	if prefixes, err = AddrSlicetoPrefix(addrs, Do46); err != nil {
+		return // addr slice failed to convert
+	}
+	if !srcIP.IsValid() {
+		// if no srcIP, pick the first address of the correct family
+		for _, prefix := range prefixes {
+			var addr = Addr46(prefix.Addr())
+			if addr.Is4() == is4 {
+				cidr = prefix
+				return // found a cidr
 			}
 		}
+		var family string
+		if is4 {
+			family = "IPv4"
+		} else {
+			family = "IPv6"
+		}
+		err = perrors.ErrorfPF("interface %s has no %d addresses", iface.Name, family)
+		return
 	}
-	s = fmt.Sprintf("%s %s %s", gateway, s, s1)
+	// find the prefix that contains scrIP, it should exist
+	for _, prefix := range prefixes {
+		if prefix.Contains(srcIP) {
+			cidr = prefix
+			return
+		}
+	}
+	err = perrors.ErrorfPF("interface %s is not assign a cidr for %s", iface.Name, srcIP)
 	return
 }
 
@@ -303,30 +362,30 @@ func (n *NextHop) Dump() (s string) {
 	)
 }
 
-func (nextHop *NextHop) String() (s string) {
+func (n *NextHop) String() (s string) {
 
 	// addr and hasNameZone
 	var hasNameZone bool
-	if nextHop.HasGateway() {
-		s = nextHop.Gateway.String()
-		gatewayAddr := nextHop.Gateway
+	if n.HasGateway() {
+		s = n.Gateway.String()
+		gatewayAddr := n.Gateway
 		_, _, hasZone, isNumeric := Zone(gatewayAddr)
 		hasNameZone = hasZone && !isNumeric
 	}
 
 	// interface name
-	if !hasNameZone && !nextHop.LinkAddr.IsZeroValue() {
+	if !hasNameZone && !n.LinkAddr.IsZeroValue() {
 		if s != "" {
 			s += "\x20"
 		}
-		s += nextHop.LinkAddr.OneString() // name or mac or if-index
+		s += n.LinkAddr.OneString() // name or mac or if-index
 	}
 
 	// src 1.2.3.4
-	if nextHop.Src.IsValid() &&
-		((nextHop.Src.Is4() && nextHop.nIPv4 > 1) ||
-			(nextHop.Src.Is6() && nextHop.nIPv6 > 1)) {
-		s += " src " + nextHop.Src.String()
+	if n.Src.IsValid() &&
+		((n.Src.Is4() && n.nIPv4 > 1) ||
+			(n.Src.Is6() && n.nIPv6 > 1)) {
+		s += " src " + n.Src.String()
 	}
 
 	return

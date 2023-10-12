@@ -14,18 +14,24 @@ import (
 )
 
 const (
-	// DefaultRouteIPv4 is the default route 0/0 for IPv4
-	DefaultRouteIPv4 = "0.0.0.0/0"
-	// VPNRoute0IPv4 is overriding VPN route 0/1 for IPv4
-	VPNRoute0IPv4 = "0.0.0.0/1"
-	// VPNRoute128IPv4 is overriding VPN route 128/1 for IPv4
-	VPNRoute128IPv4 = "128.0.0.0/1"
-	// DefaultRouteIPv6 is the default route ::/0 for IPv6
-	DefaultRouteIPv6 = "::/0"
-	// VPNRouteIPv6 is overriding VPN route ::/3 for IPv6
-	VPNRouteIPv6 = "::/3"
-	zeroSuffix   = ".0"
+	// zeroSuffix is used to shorten IPv4 addresses: “0.0.0.0/1” → “0/1”
+	zeroSuffix = ".0"
 )
+
+// DefaultRouteIPv4 is the default route “0/0” for IPv4
+var DefaultRouteIPv4 = netip.MustParsePrefix("0.0.0.0/0")
+
+// VPNRoute0IPv4 is overriding VPN route “0/1” for IPv4
+var VPNRoute0IPv4 = netip.MustParsePrefix("0.0.0.0/1")
+
+// VPNRoute128IPv4 is overriding VPN route “128/1” for IPv4
+var VPNRoute128IPv4 = netip.MustParsePrefix("128.0.0.0/1")
+
+// DefaultRouteIPv6 is the default route “::/0” for IPv6
+var DefaultRouteIPv6 = netip.MustParsePrefix("::/0")
+
+// VPNRouteIPv6 is overriding VPN route “::/3” for IPv6
+var VPNRouteIPv6 = netip.MustParsePrefix("::/3")
 
 // IsNetwork determines if IP is the network address (all zeros) for this Mask
 // for 1.2.3.4/24 the network address 1.2.3.0 returns true

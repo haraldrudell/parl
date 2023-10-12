@@ -6,17 +6,22 @@ ISC License
 package yamler
 
 import (
-	"flag"
 	"strings"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/mains"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pflags"
 	"github.com/haraldrudell/parl/pstrings"
 	"gopkg.in/yaml.v3"
 )
 
-type UnmarshalFunc func(in []byte, out interface{}) (err error) // yaml.Unmarshal
+const (
+	// key name from options or a default ‘options’
+	defaultTopKey = "options"
+)
+
+// yaml.Unmarshal
+type UnmarshalFunc func(in []byte, out interface{}) (err error)
 type UnmarshalThunk func(bytes []byte, unmarshal UnmarshalFunc, yamlKey string) (hasDate bool, err error)
 
 var Unmarshal = yaml.Unmarshal
@@ -53,22 +58,32 @@ is then svcaned for its Y pointers to copy yaml settings to options.
 	  return
 	}
 */
-func ApplyYaml(ex mains.Executable, yamlFile, yamlKey string, thunk UnmarshalThunk, om []mains.OptionData) {
+func ApplyYaml(
+	program, yamlFile, yamlDictionaryKey string,
+	thunk UnmarshalThunk,
+	om []pflags.OptionData,
+) (err error) {
 	if thunk == nil {
-		panic(perrors.New("yaml.ApplyYaml: thunk cannot be nil"))
+		panic(perrors.NewPF("yaml.ApplyYaml: thunk cannot be nil"))
 	}
-	parl.Debug("Arguments: yamlFile: %q yamlKey: %q", yamlFile, yamlKey)
-	filename, byts := FindFile(yamlFile, ex.Program)
-	if filename == "" || len(byts) == 0 {
+	parl.Debug("Arguments: yamlFile: %q yamlKey: %q", yamlFile, yamlDictionaryKey)
+	if yamlDictionaryKey == "" {
+		yamlDictionaryKey = defaultTopKey
+	}
+	var filename string
+	var byts []byte
+	if filename, byts, err = FindFile(yamlFile, program); err != nil {
+		return
+	} else if filename == "" || len(byts) == 0 {
 		parl.Debug("ex.ApplyYaml: no yaml file")
 		return
 	}
-	yamlDictionaryKey := GetTopLevelKey(yamlKey) // key name from option or a default
 	parl.Debug("filename: %q top-level key: %q bytes: %q", filename, yamlDictionaryKey, string(byts))
 
 	// try to obtain the list of defined keys in the options dictionary
 	var yamlVisitedKeys map[string]bool
-	yco := map[string]map[string]interface{}{} // a dictionary of dictionaries with unknown content
+	// a dictionary of dictionaries with unknown content
+	var yco = map[string]map[string]interface{}{}
 	parl.Debug("ex.ApplyYaml: first yaml.Unmarshal")
 	if yaml.Unmarshal(byts, &yco) == nil {
 		yamlVisitedKeys = map[string]bool{}
@@ -80,19 +95,17 @@ func ApplyYaml(ex mains.Executable, yamlFile, yamlKey string, thunk UnmarshalThu
 	}
 	parl.Debug("ex.ApplyYaml: yamlVisitedKeys: %v\n", yamlVisitedKeys)
 
-	hasData, err := thunk(byts, yaml.Unmarshal, yamlDictionaryKey)
-	if err != nil {
-		ex.AddErr(perrors.Errorf("ex.ApplyYaml thunk: filename: %q: %w", filename, err))
-		ex.Exit()
+	var hasData bool
+	if hasData, err = thunk(byts, yaml.Unmarshal, yamlDictionaryKey); perrors.IsPF(&err, "ex.ApplyYaml thunk: filename: %q: %w", filename, err) {
+		return
 	} else if !hasData {
 		return
 	}
 
 	// iterate over options
-	// ignore if no yaml key
-	// ignore if yamlVisitedKeys exists and do not have the option
-	visitedOptions := map[string]bool{}
-	flag.Visit(func(fp *flag.Flag) { visitedOptions[fp.Name] = true })
+	//	- ignore if no yaml key
+	//	- ignore if yamlVisitedKeys exists and do not have the option
+	var visitedOptions = NewVisitedOptionsMap()
 	for _, optionData := range om {
 		if visitedOptions[optionData.Name] || // was specified on command line
 			optionData.Y == nil { // does not have yaml value
@@ -105,9 +118,10 @@ func ApplyYaml(ex mains.Executable, yamlFile, yamlKey string, thunk UnmarshalThu
 		} else if pstrings.IsDefaultValue(optionData.Y.Pointer) {
 			continue // no visited information,, so ignore default values
 		}
-		if err := optionData.ApplyYaml(); err != nil {
-			ex.AddErr(err)
-			ex.Exit()
+		if err = optionData.ApplyYaml(); err != nil {
+			return
 		}
 	}
+
+	return
 }

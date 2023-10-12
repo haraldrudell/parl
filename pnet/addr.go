@@ -168,3 +168,13 @@ func AddrToIPAddr(addr netip.Addr) (addrInterface net.Addr) {
 	}
 	return &net.IPAddr{IP: addr.AsSlice(), Zone: addr.Zone()}
 }
+
+// Addr46 convert 4in6 to 4 for consistent IPv4/IPv6
+func Addr46(addr netip.Addr) (addr46 netip.Addr) {
+	if addr.Is4In6() {
+		addr46 = netip.AddrFrom4(addr.As4())
+	} else {
+		addr46 = addr
+	}
+	return
+}

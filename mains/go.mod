@@ -5,7 +5,7 @@ go 1.19
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.110
+	github.com/haraldrudell/parl v0.4.111
 	golang.org/x/sys v0.13.0
 )
 

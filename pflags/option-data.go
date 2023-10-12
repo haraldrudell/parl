@@ -3,7 +3,7 @@
 ISC License
 */
 
-package mains
+package pflags
 
 import (
 	"flag"
@@ -14,10 +14,7 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-const (
-	silentOption = "silent"
-	SilentString = "-" + silentOption
-)
+const ()
 
 // OptionData contain options data for the flag package
 //   - OptionData is used for command-line options to be declarative

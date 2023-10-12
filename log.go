@@ -36,7 +36,7 @@ func Log(format string, a ...interface{}) {
 	stderrLogger.Log(format, a...)
 }
 
-// Logw invocations always print and outoput to stderr.
+// Logw invocations always print and output to stderr.
 // Logw outputs without appending newline.
 func Logw(format string, a ...interface{}) {
 	stderrLogger.Logw(format, a...)

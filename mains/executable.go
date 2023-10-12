@@ -18,6 +18,7 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/errorglue"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pflags"
 	"github.com/haraldrudell/parl/plogger"
 	"github.com/haraldrudell/parl/pos"
 	"github.com/haraldrudell/parl/pruntime"
@@ -169,10 +170,11 @@ func (x *Executable) LongErrors(isLongErrors bool, isErrorLocation bool) *Execut
 //	  NoStdin bool // nostdin: true
 //	}
 //	var y YamlData
-func (x *Executable) PrintBannerAndParseOptions(optionsList []OptionData) (ex1 *Executable) {
+func (x *Executable) PrintBannerAndParseOptions(optionsList []pflags.OptionData) (ex1 *Executable) {
 	ex1 = x
+
 	// print program name and populated details
-	banner := pstrings.FilteredJoin([]string{
+	var banner = pstrings.FilteredJoin([]string{
 		pstrings.FilteredJoinWithHeading([]string{
 			"", x.Program,
 			"version", x.Version,
@@ -186,7 +188,10 @@ func (x *Executable) PrintBannerAndParseOptions(optionsList []OptionData) (ex1 *
 		parl.Info(banner)
 	}
 
-	NewArgParser(optionsList, x.usage).Parse()
+	pflags.NewArgParser(optionsList, x.usage).Parse()
+	if BaseOptions.Version {
+		os.Exit(0)
+	}
 
 	// parse arguments
 	args := flag.Args() // command-line arguments not part of flags
@@ -218,7 +223,9 @@ func (x *Executable) PrintBannerAndParseOptions(optionsList []OptionData) (ex1 *
 	if count > 0 && (x.Arguments&ManyArguments != 0) {
 		x.Args = args
 	}
+
 	x.optionsWereParsed.Store(true)
+
 	return
 }
 

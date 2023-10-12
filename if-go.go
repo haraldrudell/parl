@@ -196,6 +196,8 @@ type SubGo interface {
 	SubGroup(onFirstFatal ...GoFatalCallback) (subGroup SubGroup)
 	// Wait waits for all threads of this thread-group to terminate.
 	Wait()
+	// returns a channel that closes on subGo end similar to Wait
+	WaitCh() (ch <-chan struct{})
 	// EnableTermination false prevents the SubGo or GoGroup from terminating
 	// even if the number of threads is zero
 	EnableTermination(allowTermination bool)
