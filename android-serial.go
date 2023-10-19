@@ -5,6 +5,10 @@ ISC License
 
 package parl
 
+func NewAndroidSerial(s string) (serial AndroidSerial) {
+	return AndroidSerial(s)
+}
+
 func (a AndroidSerial) String() (s string) {
 	return string(a)
 }

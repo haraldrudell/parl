@@ -76,4 +76,5 @@ type AndroidStatus string
 
 // AndroidOnline is the Android device status
 // that indicates an online device
+//   - can be checked using method [AndroidSerial.IsOnline]
 const AndroidOnline AndroidStatus = "device"

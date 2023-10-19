@@ -3,7 +3,7 @@
 ISC License
 */
 
-package yamler
+package yamlo
 
 /*
 filename: program-host.yaml program.yaml

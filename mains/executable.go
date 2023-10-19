@@ -26,6 +26,14 @@ import (
 )
 
 const (
+	// if [Executable.OKtext] is assigned NoOK there ir no successful message on app exit
+	NoOK = "-"
+	// displays error location but not stack traces
+	//	- second argument to [Executable.LongErrors]
+	OutputErrorLocationTrue = true
+)
+
+const (
 	rfcTimeFormat = "2006-01-02 15:04:05-07:00"
 	usageHeader   = "Usage:"
 	optionsSyntax = "[options…]"
@@ -33,7 +41,6 @@ const (
 	timeHeader    = "time: %s"
 	hostHeader    = "host: %s"
 	defaultOK     = "completed successfully"
-	NoOK          = "-"
 )
 
 const (
@@ -279,7 +286,7 @@ func (x *Executable) Recover(errp ...*error) {
 	// ensure -debug honored if panic before options parsing
 	if !x.optionsWereParsed.Load() {
 		for _, option := range os.Args {
-			if option == DebugOption { // -debug
+			if option == pflags.DebugOption { // -debug
 				parl.SetDebug(true)
 			}
 		}

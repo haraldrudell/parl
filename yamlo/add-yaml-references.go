@@ -3,21 +3,20 @@
 ISC License
 */
 
-package yamler
+package yamlo
 
 import (
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pflags"
 )
 
-// SubPackageOptions returns a [pflags.OptionData] slice of options to main
+// AddYamlReferences returns a [pflags.OptionData] slice of options to main
 //   - return value is appended to the [pflags.OptionData] list in main
-//   - newYamlValue returns a pflags.YamlValue referencing main’s y YamlData
 //   - filedPointerValues is a list of references to main’s y YamlData
-func SubPackageOptions(
-	newYamlValue func(fieldPointerValue interface{}) (yamlValue *pflags.YamlValue),
-	fieldPointerValues []interface{},
+//   - subPackageOptionData is a list of options declared in subpackage
+func AddYamlReferences(
 	subPackageOptionData []pflags.OptionData,
+	fieldPointerValues []interface{},
 ) (optionDataList []pflags.OptionData) {
 
 	// verify main and subPackage integrity
@@ -38,8 +37,10 @@ func SubPackageOptions(
 
 		// update subPackageOptionData so that [ApplyYaml] can update
 		// this option value with values read from yaml
-		subPackageOptionData[i].Y = newYamlValue(yReference)
+		subPackageOptionData[i].Y = yReference
 	}
+
+	optionDataList = subPackageOptionData
 
 	return
 }
