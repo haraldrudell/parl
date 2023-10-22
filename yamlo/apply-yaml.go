@@ -38,12 +38,14 @@ const (
 //     the YamData struct
 //   - -verbose=yamlo.ApplyYaml “github.com/haraldrudell/parl/yamlo.ApplyYaml”
 func ApplyYaml(
-	program, yamlFile, yamlDictionaryKey string,
+	program, yamlFile, yamlDictionaryKey string, doYaml bool,
 	genericYaml yamler.GenericYaml,
 	optionData []pflags.OptionData,
 ) (err error) {
 	if genericYaml == nil {
 		panic(perrors.NewPF("genericYaml cannot be nil"))
+	} else if !doYaml {
+		return
 	}
 
 	// read text from the yaml file

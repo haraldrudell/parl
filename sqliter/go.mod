@@ -1,12 +1,14 @@
 module github.com/haraldrudell/parl/sqliter
 
-go 1.19
+go 1.21
+
+toolchain go1.21.3
 
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/uuid v1.3.1
-	github.com/haraldrudell/parl v0.4.112
+	github.com/haraldrudell/parl v0.4.113
 	modernc.org/sqlite v1.26.0
 )
 
@@ -24,7 +26,7 @@ require (
 	lukechampine.com/uint128 v1.3.0 // indirect
 	modernc.org/cc/v3 v3.41.0 // indirect
 	modernc.org/ccgo/v3 v3.16.15 // indirect
-	modernc.org/libc v1.24.1 // indirect
+	modernc.org/libc v1.27.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.7.2 // indirect
 	modernc.org/opt v0.1.3 // indirect

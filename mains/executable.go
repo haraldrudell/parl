@@ -19,7 +19,7 @@ import (
 	"github.com/haraldrudell/parl/errorglue"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pflags"
-	"github.com/haraldrudell/parl/plogger"
+	"github.com/haraldrudell/parl/plog"
 	"github.com/haraldrudell/parl/pos"
 	"github.com/haraldrudell/parl/pruntime"
 	"github.com/haraldrudell/parl/pstrings"
@@ -385,7 +385,7 @@ func (x *Executable) AddErr(err error) {
 			errS = "nil"
 		}
 		parl.Debug("\n%s(error: %s)\n%[1]s invocation:\n%[3]s", packFunc, errS, pruntime.Invocation(0))
-		plogger.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
+		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}
 
 	// if AddErr with no error, do nothing
@@ -430,7 +430,7 @@ func (x *Executable) Exit(stausCode ...int) {
 	}
 	parl.Debug("\nexe.Exit invocation:\n%s\n", string(pruntime.StackTrace()))
 	if parl.IsThisDebug() { // add newline during debug without location
-		plogger.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
+		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}
 
 	// terminate when there are no errors

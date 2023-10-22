@@ -28,8 +28,8 @@ type YamlOption bool
 
 // BaseOptionsType is the type that holds mains’ effective option values
 type BaseOptionsType = struct {
-	YamlFile, YamlKey, Verbosity string
-	Debug, Silent, Version       bool
+	YamlFile, YamlKey, Verbosity   string
+	Debug, Silent, Version, DoYaml bool
 }
 
 // BaseOptions is the value that holds mains’ effective option values
@@ -52,6 +52,7 @@ func BaseOptionData(program string, yaml YamlOption) (optionData []pflags.Option
 		var yamlOptions = []pflags.OptionData{
 			{P: &BaseOptions.YamlFile, Name: "yamlFile", Value: "", Usage: fmt.Sprintf("Use specific file other than %s.yaml %[1]s-%s.yaml in ~/apps .. /etc", program, pos.ShortHostname())},
 			{P: &BaseOptions.YamlKey, Name: "yamlKey", Value: "", Usage: "Other dictionary key than ‘options:’"},
+			{P: &BaseOptions.DoYaml, Name: "no-yaml", Value: true, Usage: "do not read yaml data"},
 		}
 		optionData = append(optionData, yamlOptions...)
 	}

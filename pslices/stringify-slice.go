@@ -3,8 +3,7 @@
 ISC License
 */
 
-// StringifySlice returns the string slice representation of a slice
-package pslice
+package pslices
 
 import "fmt"
 

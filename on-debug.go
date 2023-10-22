@@ -9,16 +9,17 @@ const (
 	debugThunkFrames = 2 // DebugThunk + IsThisDebugN
 )
 
-// DebugThunk is similar to parl.Debug but arguments are only resolved when
-// debug is true, ie. the arguments will actually be printed
+// OnDebug is similar to parl.Debug but arguments are only resolved when
+// debug is true, ie. when arguments should actually be printed
 //   - the argument can be a function literal invoking parl.Sprintf
 //
 // Usage:
 //
-//	parl.DebugThunk(func() string { return parl.Sprintf("a: %d", 3)}) })
-func DebugThunk(argThunk func() string) {
+//	var x int
+//	parl.OnDebug(func() string { return parl.Sprintf("before: %d", x)})
+func OnDebug(invokedIfDebug func() string) {
 	if !IsThisDebugN(debugThunkFrames) {
 		return
 	}
-	stderrLogger.Log(argThunk())
+	stderrLogger.Log(invokedIfDebug())
 }

@@ -26,6 +26,10 @@ const (
 	Space                  = "\x20"
 )
 
+const (
+	CopyLogRemoveFile = true
+)
+
 // the Write signature of an io.Writer
 type WriterWrite func(p []byte) (n int, err error)
 

@@ -3,7 +3,7 @@
 ISC License
 */
 
-package plogger
+package plog
 
 import (
 	"io"
@@ -11,6 +11,9 @@ import (
 	"os"
 )
 
+// logMap translates an [io.Writer] instance to a [log.logger] instance
+//   - key: io.Writer such as os.Stderr
+//   - value: log.Logger obtaiend from [log.New]
 var logMap = map[io.Writer]*log.Logger{
 	os.Stdout: log.New(os.Stdout, "", 0),
 	os.Stderr: log.New(os.Stderr, "", 0),

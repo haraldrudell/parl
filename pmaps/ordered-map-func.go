@@ -11,16 +11,22 @@ import (
 )
 
 const (
-	btreeDegree = 6 // each level has 2^6 children, 32
+	btreeDegree = 6 // each level has 2^6 children: 64
 )
 
 // OrderedMapFunc is a mapping whose values are provided in custom order
-//   - cmp must only return 0 for values that are the same identical value
+//   - cmp(a, b) implements sort order and returns:
+//   - — a negative number if a should be before b
+//   - — 0 if a == b, to be defined what the ordering action is
+//   - — a positive number if a should be after b
+//   - — the reason to use a cmp function rather than a less function used by btree
+//     is that the comparison function allows for detecting sort-order duplicates, ie.
+//     identical items
 //   - mapping implementation is Go Map
 //   - ordering structure is B-tree
-//   - B-tree avoids:
-//   - — vector-copy of large sorted slices and
-//   - — linear traversal of linked-lists and
+//   - B-tree offers:
+//   - — avoiding vector-copy of large sorted slices which is slow and
+//   - — avoiding linear traversal of linked-lists which is slow and
 //   - — is a more efficient structure than binary tree
 type OrderedMapFunc[K comparable, V any] struct {
 	Map[K, V] // Get() Length() Range()
@@ -28,10 +34,15 @@ type OrderedMapFunc[K comparable, V any] struct {
 	cmp       func(a, b V) (result int)
 }
 
+// type LessFunc[T any] func(a, b T) bool.
+// the less function returns:
+//   - true when a is before b in the sort order
+//   - false for equal ordering, identical items
+//     or btree will fail
 var _ btree.LessFunc[int]
 
 // NewOrderedMapFunc returns a mapping whose values are provided in custom order.
-//   - cmp(a, b) returns:
+//   - cmp(a, b) implements sort order and returns:
 //   - — a negative number if a should be before b
 //   - — 0 if a == b
 //   - — a positive number if a should be after b

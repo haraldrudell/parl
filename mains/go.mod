@@ -1,11 +1,13 @@
 module github.com/haraldrudell/parl/mains
 
-go 1.19
+go 1.21
+
+toolchain go1.21.3
 
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.112
+	github.com/haraldrudell/parl v0.4.113
 	golang.org/x/sys v0.13.0
 )
 

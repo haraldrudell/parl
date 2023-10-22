@@ -11,6 +11,7 @@ import (
 	"github.com/haraldrudell/parl/iters"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pfmt"
+	"github.com/haraldrudell/parl/plog"
 	"golang.org/x/exp/slices"
 )
 
@@ -99,7 +100,7 @@ func (st *SetImpl[T]) Elements() (elements []T) {
 
 func PrintAsString(value any) (s string) {
 	tt := t{f: value}
-	s = pfmt.Sprintf("%v", tt)
+	s = plog.Sprintf("%v", tt)
 	s = strings.TrimPrefix(strings.TrimSuffix(s, "}"), "{")
 	return
 }
@@ -134,6 +135,6 @@ func (st *SetImpl[T]) StringT(value T) (s string) {
 
 func (st *SetImpl[T]) String() (s string) {
 	var t T
-	s = pfmt.Sprintf("%T:%d", t, len(st.elementMap))
+	s = plog.Sprintf("%T:%d", t, len(st.elementMap))
 	return
 }

@@ -8,11 +8,11 @@ package cyclebreaker
 import (
 	"os"
 
-	"github.com/haraldrudell/parl/plogger"
+	"github.com/haraldrudell/parl/plog"
 )
 
 var output = func() (output func(calldepth int, s string) error) {
-	return plogger.GetLog(os.Stderr).Output
+	return plog.GetLog(os.Stderr).Output
 }()
 
 func Log(format string, a ...any) {

@@ -253,3 +253,31 @@ func mocksLogStat() (text1, textNewline, expectedLocation, regexpLocation string
 	}
 	return
 }
+
+func TestIsThisDebugN(t *testing.T) {
+	SetDebug(false)
+
+	// matching Regexp should…
+	SetRegexp("TestIsThisDebugN")
+	if !IsThisDebug() {
+		t.Error("IsThisDebug false")
+	}
+	if !IsThisDebugN(0) {
+		t.Error("IsThisDebugN(0) false")
+	}
+	if IsThisDebugN(1) {
+		t.Error("IsThisDebugN(1) true")
+	}
+
+	// no debug should…
+	SetRegexp("")
+	if IsThisDebug() {
+		t.Error("IsThisDebug true")
+	}
+	if IsThisDebugN(0) {
+		t.Error("IsThisDebugN(0) true")
+	}
+	if IsThisDebugN(1) {
+		t.Error("IsThisDebugN(1) true")
+	}
+}

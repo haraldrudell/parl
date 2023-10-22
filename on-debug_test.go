@@ -39,7 +39,7 @@ func TestDebugThunk(t *testing.T) {
 
 	// Debug false
 	testWriter.counter.Set(0)
-	DebugThunk(func() string { return "" })
+	OnDebug(func() string { return "" })
 	if c := testWriter.counter.Value(); c != uint64(expNoDebug) {
 		t.Errorf("debug false testWriter.counter %d exp %d", c, expNoDebug)
 	}
@@ -47,7 +47,7 @@ func TestDebugThunk(t *testing.T) {
 	// Debug true
 	SetDebug(true)
 	testWriter.counter.Set(0)
-	DebugThunk(func() string { return "" })
+	OnDebug(func() string { return "" })
 	if c := testWriter.counter.Value(); c != uint64(expDebug) {
 		t.Errorf("debug true testWriter.counter %d exp %d", c, expDebug)
 	}
@@ -58,7 +58,7 @@ func TestDebugThunk(t *testing.T) {
 	t.Logf("funcName: %q", funcName)
 	SetRegexp(funcName)
 	testWriter.counter.Set(0)
-	DebugThunk(func() string { return "" })
+	OnDebug(func() string { return "" })
 	if c := testWriter.counter.Value(); c != uint64(expRegexp) {
 		t.Errorf("regexp testWriter.counter %d exp %d", c, expRegexp)
 	}
