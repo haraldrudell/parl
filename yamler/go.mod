@@ -7,7 +7,7 @@ replace github.com/haraldrudell/parl => ../../parl
 replace github.com/haraldrudell/parl/mains => ../mains
 
 require (
-	github.com/haraldrudell/parl v0.4.113
+	github.com/haraldrudell/parl v0.4.114
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	gopkg.in/yaml.v3 v3.0.1
 )
