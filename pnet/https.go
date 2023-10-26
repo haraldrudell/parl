@@ -61,7 +61,7 @@ func (hp *Https) listenerThread() {
 	}
 	hp.ReadyWg.Done()
 	didReadyWg = true
-	hp.IsListening.Set()
+	hp.IsListening.Store(true)
 
 	srv := &hp.Server
 	if err := srv.Serve(tlsListener); err != nil { // blocking until Shutdown or Close

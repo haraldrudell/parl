@@ -7,6 +7,7 @@ package parl
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/haraldrudell/parl/perrors"
@@ -37,19 +38,19 @@ type WinOrWaiterCore struct {
 	ctx context.Context
 
 	// isCalculationPut indicates that calculation field has value. atomic access
-	isCalculationPut AtomicBool
+	isCalculationPut atomic.Bool
 	// calculationPut makes threads wait until calculation has value
 	calculationPut Once
 	// calculation allow to wait for the result of a winner calculation
 	//	- winner holds lock.Lock until the calculation is complete
 	//	- loser threads wait for lock.RLock to check the result
-	calculation AtomicReference[Future[time.Time]]
+	calculation atomic.Pointer[Future[time.Time]]
 
 	// winnerPicker picks winner thread using atomic access
 	//	- winner is the thread that on Set gets wasNotSet true
 	//	- true while a winner calculates next data value
 	//	- set to zero when winnerFunc returns
-	winnerPicker AtomicBool
+	winnerPicker atomic.Bool
 }
 
 // WinOrWaiter returns a semaphore used for completing an on-demand task by
@@ -91,10 +92,10 @@ func (ww *WinOrWaiterCore) WinOrWait() (err error) {
 	}
 	// seenCalculation is the calculation present when this thread arrived.
 	// seenCalculation may be nil
-	var seenCalculation = ww.calculation.Get()
+	var seenCalculation = ww.calculation.Load()
 
 	// ensure that ww.calculation holds a calculation
-	if ww.isCalculationPut.IsFalse() {
+	if !ww.isCalculationPut.Load() {
 
 		// invocation prior to first calculation started
 		// start the first calculation, or wait for it to be started if another thread already started it
@@ -110,7 +111,7 @@ func (ww *WinOrWaiterCore) WinOrWait() (err error) {
 	for {
 
 		// check for valid calculation result
-		calculation = ww.calculation.Get()
+		calculation = ww.calculation.Load()
 		// calculation.Result may block
 		if result, isValid := calculation.Result(); isValid {
 			switch ww.strategy {
@@ -127,7 +128,7 @@ func (ww *WinOrWaiterCore) WinOrWait() (err error) {
 		}
 
 		// ensure data processing is in progress
-		if isWinner := ww.winnerPicker.Set(); isWinner {
+		if isWinner := ww.winnerPicker.CompareAndSwap(false, true); isWinner {
 			return ww.winnerFunc() // this thread completed the task return
 		}
 
@@ -143,13 +144,13 @@ func (ww *WinOrWaiterCore) IsCancel() (isCancel bool) {
 }
 
 func (ww *WinOrWaiterCore) winnerFunc() (err error) {
-	ww.winnerPicker.Set()
-	defer ww.winnerPicker.Clear()
+	ww.winnerPicker.Store(true)
+	defer ww.winnerPicker.Store(false)
 
 	// get calculation
 	var calculation = NewFuture[time.Time]()
-	ww.calculation.Put(calculation)
-	ww.isCalculationPut.Set()
+	ww.calculation.Store(calculation)
+	ww.isCalculationPut.Store(true)
 
 	// calculate
 	result := time.Now()

@@ -19,9 +19,7 @@ const (
 //     allows for race-free consumers
 //   - Close is idempotent, panic-free
 //   - if atomic.Pointer[Awaitable] is used for retrieval, a cyclic semaphore is achieved
-type CyclicAwaitable struct {
-	p atomic.Pointer[Awaitable]
-}
+type CyclicAwaitable atomic.Pointer[Awaitable]
 
 // NewCyclicAwaitable returns an awaitable that can be re-initialized
 //   - Init must be invoked prior to use
@@ -40,31 +38,31 @@ func (a *CyclicAwaitable) Init(initiallyClosed ...bool) (a2 *CyclicAwaitable) {
 	if shouldBeClosed {
 		awaitable.Close()
 	}
-	a.p.Store(awaitable)
+	(*atomic.Pointer[Awaitable])(a).Store(awaitable)
 	return
 }
 
 // Ch returns an awaitable channel. Thread-safe
 func (a *CyclicAwaitable) Ch() (ch AwaitableCh) {
-	return a.p.Load().Ch()
+	return (*atomic.Pointer[Awaitable])(a).Load().Ch()
 }
 
 // isClosed inspects whether the awaitable has been triggered
 //   - isClosed indicates that the channel is closed
 //   - isAboutToClose indicates that Close has been invoked,
 //     but that channel close may still be in progress
-//   - the two values are requried to attain race-free consumers
 //   - if isClosed is true, isAboutToClose is also true
+//   - the two values are requried to attain race-free consumers
 //   - Thread-safe
 func (a *CyclicAwaitable) IsClosed() (isClosed, isAboutToClose bool) {
-	return a.p.Load().IsClosed()
+	return (*atomic.Pointer[Awaitable])(a).Load().IsClosed()
 }
 
 // Close triggers awaitable by closing the channel
-//   - upon return, the channel is guarantee to be closed
+//   - upon return, the channel is guaranteed to be closed
 //   - idempotent, panic-free, thread-safe
-func (a *CyclicAwaitable) Close() (wasClosed bool) {
-	return a.p.Load().Close()
+func (a *CyclicAwaitable) Close() (didClose bool) {
+	return (*atomic.Pointer[Awaitable])(a).Load().Close()
 }
 
 // Open rearms the awaitable for another cycle
@@ -73,7 +71,7 @@ func (a *CyclicAwaitable) Close() (wasClosed bool) {
 func (a *CyclicAwaitable) Open() (didOpen bool) {
 	var openp *Awaitable
 	for {
-		var ap = a.p.Load()
+		var ap = (*atomic.Pointer[Awaitable])(a).Load()
 		var isClosed, _ = ap.IsClosed()
 		if !isClosed {
 			return // was open return
@@ -81,7 +79,7 @@ func (a *CyclicAwaitable) Open() (didOpen bool) {
 		if openp == nil {
 			openp = NewAwaitable()
 		}
-		if didOpen = a.p.CompareAndSwap(ap, openp); didOpen {
+		if didOpen = (*atomic.Pointer[Awaitable])(a).CompareAndSwap(ap, openp); didOpen {
 			return // did open the channel return
 		}
 	}

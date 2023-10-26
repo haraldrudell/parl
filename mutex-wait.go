@@ -5,12 +5,15 @@ ISC License
 
 package parl
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 // MutexWait is maximum-lightweight observable single-fire Mutex. Thread-Safe
 type MutexWait struct {
 	lock       sync.Mutex
-	isUnlocked AtomicBool
+	isUnlocked atomic.Bool
 }
 
 // NewMutexWait returns a maximum-lightweight observable single-fire Mutex. Thread-Safe
@@ -22,7 +25,7 @@ func NewMutexWait() (mutexWait *MutexWait) {
 
 // IsUnlocked returns whether the MutexWait has fired
 func (mw *MutexWait) IsUnlocked() (isUnlocked bool) {
-	return mw.isUnlocked.IsTrue()
+	return mw.isUnlocked.Load()
 }
 
 // Wait blocks until MutexWait has fired
@@ -33,7 +36,7 @@ func (mw *MutexWait) Wait() {
 
 // Unlock fires MutexWait
 func (mw *MutexWait) Unlock() {
-	if mw.isUnlocked.Set() {
+	if mw.isUnlocked.CompareAndSwap(false, true) {
 		mw.lock.Unlock()
 	}
 }

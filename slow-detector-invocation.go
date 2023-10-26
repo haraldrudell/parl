@@ -11,7 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/haraldrudell/parl/ptime"
 )
@@ -25,7 +24,7 @@ type SlowDetectorInvocation struct {
 	stop      func(sdi *SlowDetectorInvocation, value ...time.Time)
 	sd        *SlowDetectorCore
 
-	tx        AtomicReference[time.Time]
+	tx        atomic.Pointer[time.Time]
 	lock      sync.Mutex
 	intervals []Interval
 }
@@ -76,12 +75,11 @@ func (sdi *SlowDetectorInvocation) Label() (label string) {
 
 // T0 returns the effective time of the invocation of Start
 func (sdi *SlowDetectorInvocation) Time(t time.Time) (previousT time.Time) {
-	addr := (*unsafe.Pointer)(unsafe.Pointer(&sdi.tx))
 	var tp *time.Time
 	if t.IsZero() {
-		tp = (*time.Time)(atomic.LoadPointer(addr))
+		tp = sdi.tx.Load()
 	} else {
-		tp = (*time.Time)(atomic.SwapPointer(addr, unsafe.Pointer(&t)))
+		tp = sdi.tx.Swap(&t)
 	}
 	if tp != nil {
 		previousT = *tp

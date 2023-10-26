@@ -49,7 +49,7 @@ func GoNo(g0 parl.GoGen) (goNo string) {
 	case *Go:
 		goNo = "Go" + g.id.String() + ":" + g.GoID().String()
 	case *GoGroup:
-		if g.hasErrorChannel.IsFalse() {
+		if !g.hasErrorChannel.Load() {
 			goNo = "SubGo"
 		} else if g.parent != nil {
 			goNo = "SubGroup"

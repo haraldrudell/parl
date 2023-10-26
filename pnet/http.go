@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/haraldrudell/parl"
@@ -19,14 +20,14 @@ import (
 type Http struct {
 	Network string // "tcp", "tcp4", "tcp6", "unix" or "unixpacket"
 	http.Server
-	ListenInvoked parl.AtomicBool
+	ListenInvoked atomic.Bool
 	ReadyWg       sync.WaitGroup
 	ErrCh         chan<- error
 	ErrChMutex    sync.Mutex
-	ErrChClosed   parl.AtomicBool
+	ErrChClosed   atomic.Bool
 	net.Addr      // interface
-	IsListening   parl.AtomicBool
-	IsShutdown    parl.AtomicBool
+	IsListening   atomic.Bool
+	IsShutdown    atomic.Bool
 }
 
 // NewHttp creates http server host is host:port, default ":http"
@@ -73,7 +74,7 @@ func (hp *Http) Listen() (errCh <-chan error) {
 func (hp *Http) SubListen() (errCh <-chan error) {
 	hp.ReadyWg.Add(1)
 	defer hp.ReadyWg.Done()
-	if !hp.ListenInvoked.Set() {
+	if !hp.ListenInvoked.CompareAndSwap(false, true) {
 		panic(perrors.New("multiple http.Run invocations"))
 	}
 	errChan := make(chan error)
@@ -99,7 +100,7 @@ func (hp *Http) listenerThread() {
 	}
 	hp.ReadyWg.Done()
 	didReadyWg = true
-	hp.IsListening.Set()
+	hp.IsListening.Store(true)
 
 	if err := hp.Server.Serve(listener); err != nil { // blocking until Shutdown or Close
 		if err != http.ErrServerClosed {
@@ -121,11 +122,11 @@ func (hp *Http) Listener() (listener net.Listener, err error) {
 }
 
 func (hp *Http) WaitForUp() (isUp bool, addr net.Addr) {
-	if !hp.ListenInvoked.IsTrue() {
+	if !hp.ListenInvoked.Load() {
 		return // Listen has not been invoked
 	}
 	hp.ReadyWg.Wait()
-	if isUp = hp.IsListening.IsTrue(); isUp {
+	if isUp = hp.IsListening.Load(); isUp {
 		addr = hp.Addr
 	}
 	return
@@ -134,13 +135,13 @@ func (hp *Http) WaitForUp() (isUp bool, addr net.Addr) {
 func (hp *Http) SendErr(err error) {
 	hp.ErrChMutex.Lock()
 	defer hp.ErrChMutex.Unlock()
-	if !hp.ErrChClosed.IsTrue() {
+	if !hp.ErrChClosed.Load() {
 		hp.ErrCh <- err
 	}
 }
 
 func (hp *Http) CloseErr() {
-	if hp.ErrChClosed.Set() {
+	if hp.ErrChClosed.CompareAndSwap(false, true) {
 		hp.ErrChMutex.Lock()
 		close(hp.ErrCh)
 		hp.ErrChMutex.Unlock()
@@ -148,7 +149,7 @@ func (hp *Http) CloseErr() {
 }
 
 func (hp *Http) Shutdown() {
-	if !hp.IsShutdown.Set() {
+	if !hp.IsShutdown.CompareAndSwap(false, true) {
 		return // already shutdown
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)

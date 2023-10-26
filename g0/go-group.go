@@ -8,6 +8,7 @@ package g0
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/parli"
@@ -41,16 +42,16 @@ const (
 type GoGroup struct {
 	creator          pruntime.CodeLocation
 	parent           goGroupParent
-	hasErrorChannel  parl.AtomicBool // this GoGroup uses its error channel: NewGoGroup() or SubGroup()
-	isSubGroup       parl.AtomicBool // is SubGroup(): not NewGoGroup() or SubGo()
-	hadFatal         parl.AtomicBool
+	hasErrorChannel  atomic.Bool // this GoGroup uses its error channel: NewGoGroup() or SubGroup()
+	isSubGroup       atomic.Bool // is SubGroup(): not NewGoGroup() or SubGo()
+	hadFatal         atomic.Bool
 	onFirstFatal     parl.GoFatalCallback
 	gos              parli.ThreadSafeMap[GoEntityID, *ThreadData]
 	goContext        // Cancel() Context()
 	ch               parl.NBChan[parl.GoError]
-	noTermination    parl.AtomicBool
-	isDebug          parl.AtomicBool
-	aggregateThreads parl.AtomicBool
+	noTermination    atomic.Bool
+	isDebug          atomic.Bool
+	aggregateThreads atomic.Bool
 	// doneLock ensures:
 	//	- consistency of data during GoDone
 	//	- change in isWaitGroupDone and g0.goEntityID.wg.DoneBool is atomic
@@ -179,18 +180,18 @@ func new(
 		gos:       pmaps.NewRWMap[GoEntityID, *ThreadData](),
 	}
 	if parl.IsThisDebug() {
-		g.isDebug.Set()
+		g.isDebug.Store(true)
 	}
 	if len(onFirstFatal) > 0 {
 		g.onFirstFatal = onFirstFatal[0]
 	}
 	if hasErrorChannel {
-		g.hasErrorChannel.Set()
+		g.hasErrorChannel.Store(true)
 	}
 	if isSubGroup {
-		g.isSubGroup.Set()
+		g.isSubGroup.Store(true)
 	}
-	if g.isDebug.IsTrue() {
+	if g.isDebug.Load() {
 		s := "new:" + g.typeString()
 		if parent != nil {
 			if p, ok := parent.(*GoGroup); ok {
@@ -208,10 +209,10 @@ func (g0 *GoGroup) Add(goEntityID GoEntityID, threadData *ThreadData) {
 	defer g0.doneLock.Unlock()
 
 	g0.wg.Add(1)
-	if g0.isDebug.IsTrue() {
+	if g0.isDebug.Load() {
 		parl.Log("goGroup#%s:Add(id%s:%s)#%d", g0.G0ID(), goEntityID, threadData.Short(), g0.goEntityID.wg.Count())
 	}
-	if g0.aggregateThreads.IsTrue() {
+	if g0.aggregateThreads.Load() {
 		g0.gos.Put(goEntityID, threadData)
 	}
 	if g0.parent != nil {
@@ -220,7 +221,7 @@ func (g0 *GoGroup) Add(goEntityID GoEntityID, threadData *ThreadData) {
 }
 
 func (g0 *GoGroup) UpdateThread(goEntityID GoEntityID, threadData *ThreadData) {
-	if g0.aggregateThreads.IsTrue() {
+	if g0.aggregateThreads.Load() {
 		g0.gos.Put(goEntityID, threadData)
 	}
 	if g0.parent != nil {
@@ -235,7 +236,7 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 	}
 
 	// first fatal thread-exit of this thread-group
-	if err != nil && g0.hadFatal.Set() {
+	if err != nil && g0.hadFatal.CompareAndSwap(false, true) {
 
 		// handle FirstFatal()
 		g0.setFirstFatal()
@@ -260,7 +261,7 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 		panic(perrors.ErrorfPF("in GoGroup after termination: %s", perrors.Short(err)))
 	}
 
-	if g0.isDebug.IsTrue() {
+	if g0.isDebug.Load() {
 		var threadData parl.ThreadData
 		var id string
 		if thread != nil {
@@ -278,7 +279,7 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 		panic(perrors.NewPF("type assertion failed"))
 	}
 	g0.gos.Delete(goImpl.G0ID(), parli.MapDeleteWithZeroValue)
-	if g0.isSubGroup.IsTrue() {
+	if g0.isSubGroup.Load() {
 
 		// SubGroup with its own error channel with fatals not affecting parent
 		// send fatal error to parent as non-fatal error with error context GeLocalChan
@@ -288,7 +289,7 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 		// pretend good thread exit to parent
 		g0.parent.GoDone(thread, nil)
 	}
-	if g0.hasErrorChannel.IsTrue() {
+	if g0.hasErrorChannel.Load() {
 
 		// emit on local error channel
 		var context parl.GoErrorContext
@@ -307,10 +308,10 @@ func (g0 *GoGroup) GoDone(thread parl.Go, err error) {
 		g0.parent.GoDone(thread, err)
 	}
 
-	if g0.isDebug.IsTrue() {
+	if g0.isDebug.Load() {
 		s := "goGroup#" + g0.G0ID().String() + ":"
 		if isTermination {
-			s += parl.Sprintf("Terminated:isSubGroup:%t:hasEc:%t", g0.isSubGroup.IsTrue(), g0.hasErrorChannel.IsTrue())
+			s += parl.Sprintf("Terminated:isSubGroup:%t:hasEc:%t", g0.isSubGroup.Load(), g0.hasErrorChannel.Load())
 		} else {
 			s += Shorts(g0.Threads())
 		}
@@ -363,7 +364,7 @@ func (g0 *GoGroup) FirstFatal() (firstFatal *parl.OnceWaiterRO) {
 
 	if g0.onceWaiter == nil {
 		g0.onceWaiter = parl.NewOnceWaiter(context.Background())
-		if g0.hadFatal.IsTrue() {
+		if g0.hadFatal.Load() {
 			g0.onceWaiter.Cancel()
 		}
 	}
@@ -371,20 +372,20 @@ func (g0 *GoGroup) FirstFatal() (firstFatal *parl.OnceWaiterRO) {
 }
 
 func (g0 *GoGroup) EnableTermination(allowTermination bool) {
-	if g0.isDebug.IsTrue() {
+	if g0.isDebug.Load() {
 		parl.Log("goGroup%s#:EnableTermination:%t", g0.G0ID(), allowTermination)
 	}
 	if g0.endCh.IsClosed() {
 		return // GoGroup is already shutdown return
 	} else if !allowTermination {
-		if g0.noTermination.Set() { // prevent termination, it was previously allowed
+		if g0.noTermination.CompareAndSwap(false, true) { // prevent termination, it was previously allowed
 			g0.CascadeEnableTermination(1)
 		}
 		return // prevent termination complete
 	}
 
 	// now allow termination
-	if !g0.noTermination.Clear() {
+	if !g0.noTermination.CompareAndSwap(true, false) {
 		return // termination allowed already
 	}
 
@@ -397,7 +398,7 @@ func (g0 *GoGroup) EnableTermination(allowTermination bool) {
 		return // GoGroup did not terminate
 	}
 
-	if g0.hasErrorChannel.IsTrue() {
+	if g0.hasErrorChannel.Load() {
 		g0.ch.Close() // close local error channel
 	}
 	// mark GoGroup terminated
@@ -405,7 +406,7 @@ func (g0 *GoGroup) EnableTermination(allowTermination bool) {
 	g0.goContext.Cancel()
 }
 
-func (g0 *GoGroup) IsEnableTermination() (mayTerminate bool) { return !g0.noTermination.IsTrue() }
+func (g0 *GoGroup) IsEnableTermination() (mayTerminate bool) { return !g0.noTermination.Load() }
 
 // CascadeEnableTermination manipulates wait groups of this goGroup and
 // those of its parents to allow or prevent termination
@@ -462,24 +463,24 @@ func (g0 *GoGroup) NamedThreads() (threads []parl.ThreadData) {
 
 func (g0 *GoGroup) SetDebug(debug parl.GoDebug) {
 	if debug == parl.DebugPrint {
-		g0.isDebug.Set()
-		g0.aggregateThreads.Set()
+		g0.isDebug.Store(true)
+		g0.aggregateThreads.Store(true)
 		return
 	}
-	g0.isDebug.Clear()
+	g0.isDebug.Store(false)
 
 	if debug == parl.AggregateThread {
-		g0.aggregateThreads.Set()
+		g0.aggregateThreads.Store(true)
 		return
 	}
 
-	g0.aggregateThreads.Clear()
+	g0.aggregateThreads.Store(false)
 }
 
 // Cancel signals shutdown to all threads of a thread-group.
 func (g *GoGroup) Cancel() {
 	g.goContext.Cancel()
-	if g.isEnd() || g.goContext.wg.Count() > 0 || g.noTermination.IsTrue() {
+	if g.isEnd() || g.goContext.wg.Count() > 0 || g.noTermination.Load() {
 		return // already ended or have child object or termination off return
 	}
 
@@ -489,10 +490,10 @@ func (g *GoGroup) Cancel() {
 	g.doneLock.Lock()
 	defer g.doneLock.Unlock()
 
-	if g.isEnd() || g.goContext.wg.Count() > 0 || g.noTermination.IsTrue() {
+	if g.isEnd() || g.goContext.wg.Count() > 0 || g.noTermination.Load() {
 		return // already ended or have child object or termination off return
 	}
-	if g.hasErrorChannel.IsTrue() {
+	if g.hasErrorChannel.Load() {
 		g.ch.Close() // close local error channel
 	}
 	// mark GoGroup terminated
@@ -537,7 +538,7 @@ func (g0 *GoGroup) setFirstFatal() {
 func (g0 *GoGroup) isEnd() (isEnd bool) {
 
 	// SubGo termination flag
-	if !g0.hasErrorChannel.IsTrue() {
+	if !g0.hasErrorChannel.Load() {
 		return g0.endCh.IsClosed()
 	}
 
@@ -549,7 +550,7 @@ func (g0 *GoGroup) isEnd() (isEnd bool) {
 func (g0 *GoGroup) typeString() (s string) {
 	if g0.parent == nil {
 		s = "goGroup"
-	} else if g0.isSubGroup.IsTrue() {
+	} else if g0.isSubGroup.Load() {
 		s = "subGroup"
 	} else {
 		s = "subGo"

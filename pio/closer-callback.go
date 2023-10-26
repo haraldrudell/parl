@@ -8,6 +8,7 @@ package pio
 import (
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
@@ -25,7 +26,7 @@ var _ io.Closer
 // CloserCallbacker implements a close callback for io.Closer
 type CloserCallbacker struct {
 	closeCallback func(err error) (e error)
-	isClosed      parl.AtomicBool
+	isClosed      atomic.Bool
 	wg            sync.WaitGroup
 }
 
@@ -33,7 +34,7 @@ func (cc *CloserCallbacker) Close(closer io.Closer) (err error) {
 	parl.RecoverInvocationPanic(func() {
 		err = closer.Close()
 	}, &err)
-	if cc.isClosed.Set() {
+	if cc.isClosed.CompareAndSwap(false, true) {
 		if cc.closeCallback != nil {
 			var e error
 			parl.RecoverInvocationPanic(func() {
@@ -47,7 +48,7 @@ func (cc *CloserCallbacker) Close(closer io.Closer) (err error) {
 }
 
 func (cc *CloserCallbacker) IsClosed() (isClosed bool) {
-	return cc.isClosed.IsTrue()
+	return cc.isClosed.Load()
 }
 
 func (cc *CloserCallbacker) Wait() {

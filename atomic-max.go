@@ -12,23 +12,32 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-type AtomicMax[T constraints.Integer] struct {
-	value    atomic.Uint64
-	hasValue atomic.Bool
+// AtomicMax is a thread-safe max container
+type AtomicMax[T constraints.Integer] struct{ value, value0 atomic.Uint64 }
+
+// NewAtomicMax returns a thread-safe max container
+//   - T underlying type must be int
+//   - negative values are not allowed
+//   - to set initial value, use Init
+func NewAtomicMax[T constraints.Integer]() (atomicMax *AtomicMax[T]) { return &AtomicMax[T]{} }
+
+// Init performs actions that cannot happen prior to copying AtomicMax
+//   - supports functional chaining
+//   - Thread-safe
+func (m *AtomicMax[T]) Init(value T) (atomicMax *AtomicMax[T]) {
+	atomicMax = m
+	m.value.Store(uint64(value))
+	m.value0.Store(uint64(value)) // set initial threshold
+	return
 }
 
-func NewAtomicMax[T constraints.Integer](value T) (atomicMax *AtomicMax[T]) {
-	m := AtomicMax[T]{}
-	if value != 0 {
-		m.value.Store(uint64(value)) // set initial threshold
-	}
-	return &m
-}
-
+// Value updates the container possibly with a new Max value
+//   - value cannot be negative
+//   - Thread-safe
 func (m *AtomicMax[T]) Value(value T) (isNewMax bool) {
 
 	// check if value is a new max
-	valueU64, err := ints.Unsigned[uint64](value, "")
+	var valueU64, err = ints.Unsigned[uint64](value, "")
 	if err != nil {
 		panic(err) // value out of range, ie. negative
 	}
@@ -36,7 +45,6 @@ func (m *AtomicMax[T]) Value(value T) (isNewMax bool) {
 	if isNewMax = valueU64 > current; !isNewMax {
 		return // not a new max return
 	}
-	m.hasValue.CompareAndSwap(false, true)
 
 	// store the new max
 	for {
@@ -51,10 +59,15 @@ func (m *AtomicMax[T]) Value(value T) (isNewMax bool) {
 	}
 }
 
+// Max returns current max and a flag whether a value is present
+//   - Thread-safe
 func (m *AtomicMax[T]) Max() (value T, hasValue bool) {
-	return T(m.value.Load()), m.hasValue.Load()
+	var u64 = m.value.Load()
+	value = T(u64)
+	hasValue = u64 != m.value0.Load()
+	return
 }
 
-func (m *AtomicMax[T]) Max1() (value T) {
-	return T(m.value.Load())
-}
+// Max1 returns current maximum whether default or set by Value
+//   - Thread-safe
+func (m *AtomicMax[T]) Max1() (value T) { return T(m.value.Load()) }

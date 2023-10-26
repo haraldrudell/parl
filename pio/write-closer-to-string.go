@@ -9,8 +9,8 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 
-	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -22,7 +22,7 @@ var ErrFileAlreadyClosed = errors.New("file alread closed")
 // WriteCloserToString is an io.WriteCloser that aggregates its oputput in a string. Thread-safe.
 //   - the string is available using the Data method.
 type WriteCloserToString struct {
-	isClosed parl.AtomicBool
+	isClosed atomic.Bool
 	lock     sync.Mutex
 	s        string
 }
@@ -34,7 +34,7 @@ func NewWriteCloserToString() io.WriteCloser {
 
 // Write always succeeds
 func (wc *WriteCloserToString) Write(p []byte) (n int, err error) {
-	if wc.isClosed.IsTrue() {
+	if wc.isClosed.Load() {
 		err = perrors.ErrorfPF(ErrFileAlreadyClosed.Error())
 		return
 	}
@@ -50,7 +50,7 @@ func (wc *WriteCloserToString) Write(p []byte) (n int, err error) {
 // Close should only be invoked once.
 // Close is not required for releasing resources.
 func (wc *WriteCloserToString) Close() (err error) {
-	wc.isClosed.Set()
+	wc.isClosed.Store(true)
 	return
 }
 

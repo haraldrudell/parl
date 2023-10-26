@@ -37,11 +37,30 @@ type SlowDetectorCore struct {
 	average   ptime.Averager[time.Duration]
 }
 
-func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen, threshold ...time.Duration) (slowDetector *SlowDetectorCore) {
+func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen, nonReturnPeriod ...time.Duration) (slowDetector *SlowDetectorCore) {
 	if callback == nil {
 		panic(perrors.NewPF("callback cannot be nil"))
 	}
 
+	// threshold 1: time between non-return reports, default 1 minute
+	var nonReturnPeriod0 time.Duration
+	if len(nonReturnPeriod) > 0 {
+		nonReturnPeriod0 = nonReturnPeriod[0]
+	} else {
+		nonReturnPeriod0 = defaultNonReturnPeriod
+	}
+
+	return &SlowDetectorCore{
+		ID:       slowIDGenerator.ID(),
+		callback: callback,
+		thread:   NewSlowDetectorThread(slowTyp, nonReturnPeriod0, goGen),
+		max:      *NewAtomicMax[time.Duration](),
+		average:  *ptime.NewAverager[time.Duration](),
+	}
+}
+
+func (s *SlowDetectorCore) Init(threshold ...time.Duration) (slowDetector *SlowDetectorCore) {
+	slowDetector = s
 	// threshold0: minimum slowness to report, default 100 ms
 	var threshold0 time.Duration
 	if len(threshold) > 0 {
@@ -49,22 +68,8 @@ func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen,
 	} else {
 		threshold0 = defaultMinReportDuration
 	}
-
-	// threshold 1: time between non-return reports, default 1 minute
-	var nonReturnPeriod time.Duration
-	if len(threshold) > 1 {
-		nonReturnPeriod = threshold[1]
-	} else {
-		nonReturnPeriod = defaultNonReturnPeriod
-	}
-
-	return &SlowDetectorCore{
-		ID:       slowIDGenerator.ID(),
-		callback: callback,
-		thread:   NewSlowDetectorThread(slowTyp, nonReturnPeriod, goGen),
-		max:      *NewAtomicMax(threshold0),
-		average:  *ptime.NewAverager[time.Duration](),
-	}
+	s.max.Init(threshold0)
+	return
 }
 
 // Start returns the effective start time for a new timing cycle

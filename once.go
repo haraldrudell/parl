@@ -5,7 +5,10 @@ ISC License
 
 package parl
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 // parl.Once is an observable sync.Once with an alternative DoErr method. Thread-safe
 //   - parl.Once is thread-safe and does not require initialization
@@ -15,9 +18,9 @@ import "sync"
 //   - Result returns DoErr outcome, hasValue indicates if values are present. Atomic eprformance
 type Once struct {
 	once   sync.Once
-	isDone AtomicBool // isDone indicates if the Once has completed, either by Do or Doerr
+	isDone atomic.Bool // isDone indicates if the Once has completed, either by Do or Doerr
 
-	hasResult AtomicBool // hasResult is true when Once has been completed by DoErr
+	hasResult atomic.Bool // hasResult is true when Once has been completed by DoErr
 	// result is the outcome of a possible DoErr invocation
 	//	- thread-safe by hasResult atomic
 	result InvokeResult
@@ -59,13 +62,13 @@ func (o *Once) DoErr(f func() (err error)) (didOnce, isPanic bool, err error) {
 
 // IsDone returns whether the Once did execute, provided with atomic performance
 func (o *Once) IsDone() (isDone bool) {
-	return o.isDone.IsTrue()
+	return o.isDone.Load()
 }
 
 // Result returns the DoErr outcome provided with atomic performance
 //   - only available if hasResult is true
 func (o *Once) Result() (isPanic bool, hasResult bool, err error) {
-	if hasResult = o.hasResult.IsTrue(); !hasResult {
+	if hasResult = o.hasResult.Load(); !hasResult {
 		return // no result available return
 	}
 
@@ -86,7 +89,7 @@ type doErrData struct {
 
 // invokeFErr is behind o.once
 func (d *doErrData) invokeFErr() {
-	defer d.isDone.Set()
+	defer d.isDone.Store(true)
 	defer d.updateResult()
 
 	*d.didOnce = true
@@ -94,7 +97,7 @@ func (d *doErrData) invokeFErr() {
 }
 
 func (d *doErrData) updateResult() {
-	defer d.hasResult.Set()
+	defer d.hasResult.Store(true)
 
 	d.result.IsPanic = *d.isPanic
 	d.result.Err = *d.errp
@@ -107,7 +110,7 @@ type doErrF struct {
 
 // invokeF is behind o.once
 func (d *doErrF) invokeF() {
-	defer d.isDone.Set()
+	defer d.isDone.Store(true)
 
 	d.f()
 }

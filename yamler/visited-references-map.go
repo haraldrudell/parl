@@ -14,11 +14,16 @@ import (
 )
 
 const (
+	// the reflect.Type.String value for the any type
 	anyString = "interface\x20{}"
 )
 
-// structMapPath contains a struct-map[string]any pair and its path
-//   - struct1 is traversed and the map2 is checked for fields existing meaning they are visited
+// structMapPath is a work item comparing a struct with an unmarshaled
+// free-form object consisting of values any, map[string] and and []any
+//   - struct1 is traversed and the
+//   - map2 is checked for the existence of struct1 fields
+//   - meaning those fields were visited
+//   - path is a field-name list for nested structs
 type structMapPath struct {
 	// y is the struct’s type
 	struct1 *reflect.Value
@@ -30,9 +35,12 @@ type structMapPath struct {
 	path []string
 }
 
-// VisitedReferencesMap unmarshals yaml to an any object and then
-// build a visited references map by comparring that object to its
-// value pointer
+// VisitedReferencesMap returns a map of
+// key: any-typed pointers to fields of u.y,
+// value: lower-case field names
+// - unmarshals yaml again to an any object and then
+// builds the visited references map by comparing the unmarshaled object to the
+// u.y struct-pointer
 func (u *Unmarshaler[T]) VisitedReferencesMap(yamlText []byte, yamlDictionaryKey string) (yamlVisistedReferences map[any]string, err error) {
 
 	// unmarshal a freeform object: any, map[string]any, []any
@@ -47,7 +55,7 @@ func (u *Unmarshaler[T]) VisitedReferencesMap(yamlText []byte, yamlDictionaryKey
 	var freeformValue any
 	if topLevelDictionary, ok := freeFormYaml.(map[string]any); !ok {
 		err = perrors.NewPF("yaml top-level object not dictionary")
-		return
+		return // bad yaml return
 	} else if freeformValue = topLevelDictionary[yamlDictionaryKey]; freeformValue == nil {
 		yamlVisistedReferences = make(map[any]string)
 		return // options value not present: empty map return
@@ -55,10 +63,10 @@ func (u *Unmarshaler[T]) VisitedReferencesMap(yamlText []byte, yamlDictionaryKey
 	yamlText = nil
 	freeFormYaml = nil
 
-	// now company u.y and freeFormValue to get referenced fields of y
+	// now compare u.y and freeFormValue to get referenced fields of y
 	u.refs = make(map[any]string)
 	if err = u.compareStructs(u.y, freeformValue); err != nil {
-		return
+		return // nil or not struct* error during struct compare
 	}
 
 	yamlVisistedReferences = u.refs
@@ -75,10 +83,10 @@ func (u *Unmarshaler[T]) compareStructs(y, anyYaml any) (err error) {
 	// the structMapPath being processed
 	var struct0 structMapPath
 	if struct0.struct1, err = u.structp(y); perrors.Is(&err, "y: %w", err) {
-		return
+		return // y nil or not struct*
 	}
 	if struct0.map2, err = u.mapStringAny(anyYaml); perrors.Is(&err, "anyYaml: %w", err) {
-		return
+		return // anyYaml nil or not map[string]any
 	}
 
 	// list of struct-map-path values being processed
@@ -98,11 +106,12 @@ func (u *Unmarshaler[T]) compareStructs(y, anyYaml any) (err error) {
 			// fieldName is lower-case as in yaml: “fieldone” not ”FieldOne”
 			var fieldName = strings.ToLower(struct0.struct1.Type().Field(i).Name)
 			if fieldName == "" {
-				perrors.NewPF("")
+				err = perrors.ErrorfPF("field#d: field name empty", i)
+				return // empty field name return
 			}
 			var fieldKind = field.Kind()
 
-			// field from map: mapValue is the any type
+			// field from map: map[string]any returns the any type
 			var mapValue = struct0.map2.MapIndex(reflect.ValueOf(fieldName))
 			if !mapValue.IsValid() {
 				continue // freeFormYaml does not have the field
@@ -119,7 +128,7 @@ func (u *Unmarshaler[T]) compareStructs(y, anyYaml any) (err error) {
 							map2:    mp,
 							path:    append(append([]string{}, struct0.path...), fieldName), // clone
 						})
-						continue
+						continue // structPair stired for processing, check next field
 					}
 				}
 			}
@@ -137,7 +146,7 @@ func (u *Unmarshaler[T]) compareStructs(y, anyYaml any) (err error) {
 
 			// make reference to field
 			var fieldAddr = field.Addr()
-			// make type any
+			// make type any (exits reflect domain)
 			var anyPointerToField = fieldAddr.Interface()
 			u.refs[anyPointerToField] = fieldName
 		}
@@ -153,44 +162,45 @@ func (u *Unmarshaler[T]) mapStringAny(m any) (reflectMapStringAny *reflect.Value
 	var reflectTypeM = reflect.TypeOf(m)
 	if reflectTypeM == nil {
 		err = perrors.NewPF("m cannot be nil, must be map[string]any")
-		return
+		return // nil return
 	} else if reflectTypeM.Kind() != reflect.Map ||
 		reflectTypeM.Key().Kind() != reflect.String ||
 		reflectTypeM.Elem().String() != anyString {
 		err = perrors.ErrorfPF("m must be map[string]any: %T", m)
-		return
+		return // not map[string]any return
 	}
 
 	// get reflect value of m
 	var reflectValueM = reflect.ValueOf(m)
 	reflectMapStringAny = &reflectValueM
 
-	return
+	return // good return
 }
 
-// structp ensures v is pointer to struct using reflection or error
+// structp ensures v is pointer to struct using reflection, if not: error
+//   - error on v nil or not *struct
 func (u *Unmarshaler[T]) structp(v any) (reflectStruct *reflect.Value, err error) {
 
 	// get the non-nil reflect value of v
 	var reflectValueV = reflect.ValueOf(v)
 	if !reflectValueV.IsValid() {
 		err = perrors.NewPF("v cannot be nil, must be *struct")
-		return
+		return // nil return
 	}
 
 	// get the struct that supposedly v points to
 	var structValue reflect.Value
 	if reflectValueV.Kind() != reflect.Pointer {
 		err = perrors.NewPF("v not pointer, must be *struct")
-		return
+		return // not pointer return
 	}
 	structValue = reflectValueV.Elem()
 	if structValue.Kind() != reflect.Struct {
 		err = perrors.ErrorfPF("v points to non-struct value, must be *struct")
-		return
+		return // not struct* return
 	}
 
 	reflectStruct = &structValue
 
-	return
+	return //  good return
 }

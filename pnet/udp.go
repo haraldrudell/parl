@@ -8,6 +8,7 @@ package pnet
 import (
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
@@ -18,14 +19,14 @@ type UDP struct {
 	F              UDPFunc
 	MaxSize        int
 	net.UDPAddr    // struct IP Port Zone
-	ListenInvoked  parl.AtomicBool
+	ListenInvoked  atomic.Bool
 	StartingListen sync.WaitGroup
 	ErrCh          chan<- error
-	IsListening    parl.AtomicBool
+	IsListening    atomic.Bool
 	NetUDPConn     *net.UDPConn
 	connMutex      sync.RWMutex
 	Addr           net.Addr
-	IsShutdown     parl.AtomicBool
+	IsShutdown     atomic.Bool
 }
 
 type UDPFunc func(b []byte, oob []byte, flags int, addr *net.UDPAddr)
@@ -52,11 +53,11 @@ const (
 
 func (udp *UDP) Listen() (errCh <-chan error) {
 	udp.StartingListen.Add(1)
-	if !udp.ListenInvoked.Set() {
+	if !udp.ListenInvoked.CompareAndSwap(false, true) {
 		udp.StartingListen.Done()
 		panic(perrors.New("multiple udp.Listen invocations"))
 	}
-	if udp.IsShutdown.IsTrue() {
+	if udp.IsShutdown.Load() {
 		udp.StartingListen.Done()
 		panic(perrors.New("udp.Listen after Shutdown"))
 	}
@@ -94,16 +95,16 @@ func (udp *UDP) listenThread() {
 		return
 	}
 	udp.Addr = netUDPConn.LocalAddr()
-	udp.IsListening.Set()
+	udp.IsListening.Store(true)
 	udp.StartingListen.Done()
 	startingDone = true
 	defer func() {
-		if !udp.IsShutdown.IsTrue() {
+		if !udp.IsShutdown.Load() {
 			if err := netUDPConn.Close(); err != nil {
 				errCh <- err
 			}
 		}
-		udp.IsListening.Clear()
+		udp.IsListening.Store(false)
 	}()
 
 	// read datagrams
@@ -117,7 +118,7 @@ func (udp *UDP) listenThread() {
 		var err error
 		n, oobn, flags, addr, err = netUDPConn.ReadMsgUDP(b, oob)
 		if err != nil {
-			if udp.IsShutdown.IsTrue() && udp.isClosedErr(err) {
+			if udp.IsShutdown.Load() && udp.isClosedErr(err) {
 				return // we are shutdown
 			}
 			errCh <- perrors.Errorf("ReadMsgUDP: '%w'", err)
@@ -132,11 +133,11 @@ func (udp *UDP) listenThread() {
 }
 
 func (udp *UDP) WaitForUp() (isUp bool, addr net.Addr) {
-	if !udp.ListenInvoked.IsTrue() {
+	if !udp.ListenInvoked.Load() {
 		return // Listen has not been invoked
 	}
 	udp.StartingListen.Wait()
-	if isUp = udp.IsListening.IsTrue(); isUp {
+	if isUp = udp.IsListening.Load(); isUp {
 		addr = udp.Addr
 	}
 	return
@@ -164,7 +165,7 @@ func (udp *UDP) isClosedErr(err error) (isClose bool) {
 func (udp *UDP) setConn(conn *net.UDPConn) (isShutdown bool) {
 	udp.connMutex.Lock()
 	defer udp.connMutex.Unlock()
-	isShutdown = udp.IsShutdown.IsTrue()
+	isShutdown = udp.IsShutdown.Load()
 	if !isShutdown {
 		udp.NetUDPConn = conn
 	}
@@ -174,7 +175,7 @@ func (udp *UDP) setConn(conn *net.UDPConn) (isShutdown bool) {
 func (udp *UDP) Shutdown() {
 	udp.connMutex.RLock()
 	defer udp.connMutex.RUnlock()
-	if !udp.IsShutdown.Set() {
+	if !udp.IsShutdown.CompareAndSwap(false, true) {
 		return // it was already shutdown
 	}
 	conn := udp.NetUDPConn

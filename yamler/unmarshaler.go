@@ -31,7 +31,7 @@ func NewUnmarshaler[T any](y *T) (unmarshaler GenericYaml) {
 //   - yamlDictionaryKey is the name of the top-level dictionary-key
 //     typically “options”
 //   - hasData indicates that unmarshal succeeded and yamlDictionaryKey
-//     was present
+//     had value
 func (u *Unmarshaler[T]) Unmarshal(yamlText []byte, yamlDictionaryKey string) (hasData bool, err error) {
 
 	// top-level object in yaml is supposed to be a dictionary
@@ -48,15 +48,16 @@ func (u *Unmarshaler[T]) Unmarshal(yamlText []byte, yamlDictionaryKey string) (h
 	// get the value of the T type read from yaml if it exists
 	var yamlDataPointer = yamlContentObject[yamlDictionaryKey] // pick out the options dictionary value
 	if hasData = yamlDataPointer != nil; !hasData {
-		return // dictionary key not present return
+		return // value for dictionary key not present return
 	}
 
 	// assign the unmarshaled yaml values to effective yaml values
 	*u.y = *yamlDataPointer
 
-	return // yaml loaded return
+	return // yaml loaded successfully return
 }
 
+// YDump returns field names and values for the yaml value struct
 func (u *Unmarshaler[T]) YDump() (yamlVPrint string) {
 	return parl.Sprintf("%+v", *u.y)
 }

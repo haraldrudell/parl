@@ -82,7 +82,7 @@ func (t *ThreadLogger) Log() (t2 *ThreadLogger) {
 		close(t.endCh)
 		return // thread-group already ended
 	}
-	g.aggregateThreads.Set()
+	g.aggregateThreads.Store(true)
 
 	if g.Context().Err() == nil {
 		g.goContext.cancelListener = t.cancelListener
@@ -125,7 +125,7 @@ func (t *ThreadLogger) printThread() {
 	defer ticker.Stop()
 
 	var endCh <-chan struct{}
-	if g.hasErrorChannel.IsTrue() {
+	if g.hasErrorChannel.Load() {
 		endCh = g.ch.WaitForCloseCh()
 	} else {
 		endCh = g.endCh.Ch()

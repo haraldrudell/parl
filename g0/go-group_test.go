@@ -137,18 +137,18 @@ func TestGoGroup(t *testing.T) {
 	goGroup = NewGoGroup(context.Background())
 	subGo = goGroup.SubGo()
 	goGroupImpl = subGo.(*GoGroup)
-	if goGroupImpl.isSubGroup.IsTrue() {
+	if goGroupImpl.isSubGroup.Load() {
 		t.Error("SubGo returned SubGroup")
 	}
-	if goGroupImpl.hasErrorChannel.IsTrue() {
+	if goGroupImpl.hasErrorChannel.Load() {
 		t.Error("SubGo has error channel")
 	}
 	subGroup = goGroup.SubGroup()
 	goGroupImpl = subGroup.(*GoGroup)
-	if goGroupImpl.isSubGroup.IsFalse() {
+	if !goGroupImpl.isSubGroup.Load() {
 		t.Error("SubGroup did not return SubGroup")
 	}
-	if goGroupImpl.hasErrorChannel.IsFalse() {
+	if !goGroupImpl.hasErrorChannel.Load() {
 		t.Error("SubGroup does not have error channel")
 	}
 
@@ -183,11 +183,11 @@ func TestGoGroup(t *testing.T) {
 		t.Error("goGroup no-debug collects threads")
 	}
 	goGroup.SetDebug(parl.DebugPrint)
-	if goGroupImpl.isDebug.IsFalse() {
+	if !goGroupImpl.isDebug.Load() {
 		t.Error("goGroup.SetDebug DebugPrint failed")
 	}
 	goGroup.SetDebug(parl.AggregateThread)
-	if goGroupImpl.isDebug.IsTrue() {
+	if goGroupImpl.isDebug.Load() {
 		t.Error("goGroup.SetDebug AggregateThread failed")
 	}
 	goGroup.Go().Register(label)

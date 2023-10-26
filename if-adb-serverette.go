@@ -71,7 +71,7 @@ type ServerFactory interface {
 
 // AndroidStatus indicates the current status of a device
 // known to a Server or Serverette
-// it is a single word of ANSII-set characters
+//   - AndroidStatus is a single word of ANSII-set characters
 type AndroidStatus string
 
 // AndroidOnline is the Android device status

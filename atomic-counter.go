@@ -10,51 +10,47 @@ import (
 	"sync/atomic"
 )
 
-type AtomicCounter uint64
+// AtomicCounter is a uint64 thread-safe counter
+type AtomicCounter atomic.Uint64
 
-func (max *AtomicCounter) Inc() (value uint64) {
-	value = atomic.AddUint64((*uint64)(max), 1)
-	return
-}
+// Inc increments with wrap-around. Thread-Safe
+//   - value is new value
+func (a *AtomicCounter) Inc() (value uint64) { return (*atomic.Uint64)(a).Add(1) }
 
-func (max *AtomicCounter) Inc2() (value uint64, didInc bool) {
+// Inc2 is increment without wrap-around. Thread-Safe
+//   - at math.MaxUint64, increments are ineffective
+func (a *AtomicCounter) Inc2() (value uint64, didInc bool) {
 	for {
-		var beforeValue = atomic.LoadUint64((*uint64)(max))
+		var beforeValue = (*atomic.Uint64)(a).Load()
 		if beforeValue == math.MaxUint64 {
-			return
-		} else if didInc = atomic.CompareAndSwapUint64((*uint64)(max), beforeValue, beforeValue+1); didInc {
-			return
+			return // at max
+		} else if didInc = (*atomic.Uint64)(a).CompareAndSwap(beforeValue, beforeValue+1); didInc {
+			return // inc successful return
 		}
 	}
 }
 
-func (max *AtomicCounter) Dec() (value uint64) {
-	value = atomic.AddUint64((*uint64)(max), math.MaxUint64)
-	return
-}
+// Dec is decrement with wrap-around. Thread-Safe
+func (a *AtomicCounter) Dec() (value uint64) { return (*atomic.Uint64)(a).Add(math.MaxUint64) }
 
-func (max *AtomicCounter) Dec2() (value uint64, didDec bool) {
+// Dec2 is decrement with no wrap-around. Thread-Safe
+//   - at 0, decrements are ineffective
+func (a *AtomicCounter) Dec2() (value uint64, didDec bool) {
 	for {
-		var beforeValue = atomic.LoadUint64((*uint64)(max))
+		var beforeValue = (*atomic.Uint64)(a).Load()
 		if beforeValue == 0 {
-			return
-		} else if didDec = atomic.CompareAndSwapUint64((*uint64)(max), beforeValue, beforeValue-1); didDec {
-			return
+			return // no dec return
+		} else if didDec = (*atomic.Uint64)(a).CompareAndSwap(beforeValue, beforeValue-1); didDec {
+			return // dec successful return
 		}
 	}
 }
 
-func (max *AtomicCounter) Add(value uint64) (newValue uint64) {
-	newValue = atomic.AddUint64((*uint64)(max), value)
-	return
-}
+// Add is add with wrap-around. Thread-Safe
+func (a *AtomicCounter) Add(value uint64) (newValue uint64) { return (*atomic.Uint64)(a).Add(value) }
 
-func (max *AtomicCounter) Set(value uint64) (oldValue uint64) {
-	oldValue = atomic.SwapUint64((*uint64)(max), value)
-	return
-}
+// Set sets a new aggregate value. Thread-Safe
+func (a *AtomicCounter) Set(value uint64) (oldValue uint64) { return (*atomic.Uint64)(a).Swap(value) }
 
-func (max *AtomicCounter) Value() (value uint64) {
-	value = atomic.LoadUint64((*uint64)(max))
-	return
-}
+// Value returns current counter-value
+func (a *AtomicCounter) Value() (value uint64) { return (*atomic.Uint64)(a).Load() }

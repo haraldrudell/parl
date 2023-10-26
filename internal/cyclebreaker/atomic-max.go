@@ -14,7 +14,7 @@ import (
 
 type AtomicMax[T constraints.Integer] struct {
 	value    uint64
-	hasValue AtomicBool
+	hasValue atomic.Bool
 }
 
 func NewAtomicMax[T constraints.Integer](value T) (atomicMax *AtomicMax[T]) {
@@ -35,7 +35,7 @@ func (max *AtomicMax[T]) Value(value T) (isNewMax bool) {
 	if isNewMax = valueU64 > current; !isNewMax {
 		return // not a new max return
 	}
-	max.hasValue.Set()
+	max.hasValue.Store(true)
 
 	// store the new max
 	for {
@@ -52,7 +52,7 @@ func (max *AtomicMax[T]) Value(value T) (isNewMax bool) {
 
 func (max *AtomicMax[T]) Max() (value T, hasValue bool) {
 	value = T(atomic.LoadUint64((*uint64)(&max.value)))
-	hasValue = max.hasValue.IsTrue()
+	hasValue = max.hasValue.Load()
 	return
 }
 

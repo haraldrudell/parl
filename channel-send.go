@@ -10,7 +10,8 @@ import (
 	"github.com/haraldrudell/parl/pruntime"
 )
 
-const SendNonBlocking = true // with nonBlocking set to SendNonBlocking, ChannelSend will never block
+// with nonBlocking set to SendNonBlocking, ChannelSend will never block
+const SendNonBlocking = true
 
 // ChannelSend is channel send without panics and possibly non-blocking
 //   - if nonBlocking is SendNonBlocking or true, channel send will be attempted but not block
@@ -20,20 +21,35 @@ const SendNonBlocking = true // with nonBlocking set to SendNonBlocking, Channel
 //   - isClosedChannel is true if the panic was caused by ch being closed
 //   - there should be no panics other than from ch being closed
 func ChannelSend[T any](ch chan<- T, value T, nonBlocking ...bool) (didSend, isNilChannel, isClosedChannel bool, err error) {
-	var sendNb bool
-	if len(nonBlocking) > 0 {
-		sendNb = nonBlocking[0]
-	}
-	defer Recover(Annotation(), &err, func(e error) {
-		if pruntime.IsSendOnClosedChannel(e) {
-			isClosedChannel = true
-		}
-	})
 
+	// check for nil channel
 	if isNilChannel = ch == nil; isNilChannel {
 		err = perrors.NewPF("ch channel nil")
 		return
 	}
+
+	// get non-blocking flag
+	var sendNb bool
+	if len(nonBlocking) > 0 {
+		sendNb = nonBlocking[0]
+	}
+
+	// send, recovering panics
+	didSend, err = channelSend(ch, value, sendNb)
+
+	// set isClosed flag
+	if err != nil && pruntime.IsSendOnClosedChannel(err) {
+		isClosedChannel = true
+	}
+
+	return
+}
+
+// channelSend sends possibly non-blocking
+//   - the only way to determine closed channel is to send, which panics
+//   - a separate function to recover the panic
+func channelSend[T any](ch chan<- T, value T, sendNb bool) (didSend bool, err error) {
+	defer Recover(Annotation(), &err, NoOnError)
 
 	// send non-blocking
 	if sendNb {

@@ -8,6 +8,7 @@ package parl
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl/perrors"
 )
@@ -25,7 +26,7 @@ import (
 //   - the cycles can be permanently canceled or trigged and rearmed
 type CyclicWait struct {
 	parentContext context.Context
-	isCancel      AtomicBool
+	isCancel      atomic.Bool
 
 	lock sync.RWMutex
 	ow   OnceWaiter
@@ -91,14 +92,14 @@ func (cw *CyclicWait) Cancel() {
 	defer cw.lock.Unlock()
 
 	// trig this cycle
-	cw.isCancel.Set()
+	cw.isCancel.Store(true)
 	cw.ow.Cancel()
 }
 
 // IsCancel returns whether Cancel has been invoked.
 // ISCancel will return false during CancelAndRearm cycles.
 func (cw *CyclicWait) IsCancel() (isCancel bool) {
-	return cw.isCancel.IsTrue()
+	return cw.isCancel.Load()
 }
 
 // CancelAndRearm trigs the object and then rearms unless
@@ -110,7 +111,7 @@ func (cw *CyclicWait) CancelAndRearm() (wasRearmed bool) {
 	// trig this cycle
 	cw.ow.Cancel()
 
-	if cw.parentContext.Err() != nil || cw.isCancel.IsTrue() {
+	if cw.parentContext.Err() != nil || cw.isCancel.Load() {
 		return // ream false: parent context has been canceled
 	}
 

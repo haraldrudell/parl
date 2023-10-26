@@ -29,7 +29,7 @@ type Watcher struct {
 	eventFn0      func(event *WatchEvent)
 	watcher       *fsnotify.Watcher
 	ID            int64
-	watcherClosed parl.AtomicBool
+	watcherClosed atomic.Bool
 	wg            sync.WaitGroup
 }
 
@@ -62,7 +62,7 @@ func (w *Watcher) List() (paths []string) {
 }
 
 func (w *Watcher) Shutdown() {
-	if w.watcherClosed.Set() {
+	if w.watcherClosed.CompareAndSwap(false, true) {
 		var err error
 		if err = w.watcher.Close(); err != nil {
 			w.errFn(perrors.Errorf("watcher.Close: %w", err))

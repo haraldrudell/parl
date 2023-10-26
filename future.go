@@ -7,13 +7,14 @@ package parl
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 // Future contains an awaitable calculation using performant
 // sync.RWMutex and atomics. Thread-safe
 type Future[T any] struct {
 	// isCompleted makes lock atomic-access observable
-	isCompleted AtomicBool
+	isCompleted atomic.Bool
 
 	// lock’s write lock is held by the calculating thread until the calculation completes
 	//	- other threads are held waiting in Result using RLock for the calculation to complete
@@ -37,7 +38,7 @@ func NewFuture[T any]() (calculation *Future[T]) {
 
 // IsCompleted returns whether the calculation is complete. Thread-safe
 func (cn *Future[T]) IsCompleted() (isCompleted bool) {
-	return cn.isCompleted.IsTrue()
+	return cn.isCompleted.Load()
 }
 
 // Result retrieves the calculation’s result. May block. Thread-safe
@@ -54,7 +55,7 @@ func (cn *Future[T]) Result() (result T, isValid bool) {
 //   - result is considered valid if errp is nil or *errp is nil
 func (cn *Future[T]) End(result *T, errp *error) {
 	defer cn.lock.Unlock()
-	defer cn.isCompleted.Set()
+	defer cn.isCompleted.Store(true)
 
 	// store value if calculation successful
 	if cn.isValid = errp == nil || *errp == nil; cn.isValid {

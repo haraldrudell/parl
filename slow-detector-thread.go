@@ -7,6 +7,7 @@ package parl
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/haraldrudell/parl/parli"
@@ -30,7 +31,7 @@ type SlowDetectorThread struct {
 	slowTyp         slowType
 	nonReturnPeriod time.Duration
 	slowMap         pmaps.RWMap[slowID, *SlowDetectorInvocation]
-	hasThread       AtomicBool
+	hasThread       atomic.Bool
 
 	slowLock sync.Mutex
 	goGen    GoGen
@@ -74,7 +75,7 @@ func (sdt *SlowDetectorThread) Start(sdi *SlowDetectorInvocation) {
 	// store in map
 	sdt.slowMap.Put(sdi.sID, sdi)
 
-	if !sdt.hasThread.Set() {
+	if !sdt.hasThread.CompareAndSwap(false, true) {
 		return // thread already running return
 	}
 

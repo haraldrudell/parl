@@ -12,36 +12,33 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-const (
-	stateUninitialized = 0
-	stateHasValue      = 1
-)
-
+// AtomicMin is a thread-safe container for a minimum value of any integer type
 type AtomicMin[T constraints.Integer] struct {
-	state uint32
-	once  sync.Once
-	value uint64
+	isInitialized atomic.Bool   // whether a value is present
+	value         atomic.Uint64 // current min value as uint64
+	initLock      sync.Mutex    // thread selector and wait for wtriting initial value
 }
 
-func (min *AtomicMin[T]) Value(value T) (isNewMin bool) {
+// Value notes a new min-candidate
+//   - if not a new minima, state is not changed
+//   - Thread-safe
+func (a *AtomicMin[T]) Value(value T) (isNewMin bool) {
 
+	// value-valueU64 is candidate min-value
 	var valueU64 uint64 = uint64(value)
 
 	// ensure initialized
-	if atomic.LoadUint32(&min.state) == stateUninitialized {
-		min.once.Do(func() {
-			atomic.StoreUint64(&min.value, valueU64)
-			atomic.StoreUint32(&min.state, stateHasValue)
-			isNewMin = true
-		})
-		if isNewMin {
-			return // value-initializing invocation always has min value
+	if !a.isInitialized.Load() {
+		if isNewMin = a.init(valueU64); isNewMin {
+			return // this thread set initial value return
 		}
 	}
 
 	// aggregate minimum
-	var current uint64 = atomic.LoadUint64(&min.value)
-	if isNewMin = valueU64 < current; !isNewMin {
+	var current = a.value.Load()
+	var currentT = T(current)
+	// make comparison in T domain
+	if isNewMin = value < currentT; !isNewMin {
 		return // too large value, nothing to do return
 	}
 
@@ -49,21 +46,38 @@ func (min *AtomicMin[T]) Value(value T) (isNewMin bool) {
 	for {
 
 		// try to write
-		if atomic.CompareAndSwapUint64(&min.value, current, valueU64) {
-			return // min.value updated return
+		if a.value.CompareAndSwap(current, valueU64) {
+			return // min-value updated return
 		}
 
 		// load new copy of value
-		current = atomic.LoadUint64(&min.value)
-		if current <= valueU64 {
-			return // min.value now ok return
+		current = a.value.Load()
+		currentT = T(current)
+		if currentT <= value {
+			return // ok min-value written by other thread return
 		}
 	}
 }
 
-func (min *AtomicMin[T]) Min() (value T, hasValue bool) {
-	if hasValue = atomic.LoadUint32(&min.state) == stateHasValue; hasValue {
-		value = T(atomic.LoadUint64(&min.value))
+// Min returns current minimum value and a flag whether a value is present
+//   - Thread-safe
+func (a *AtomicMin[T]) Min() (value T, hasValue bool) {
+	if hasValue = a.isInitialized.Load(); !hasValue {
+		return // no min yet return
 	}
+	value = T(a.value.Load())
+	return
+}
+
+// init uses lock to have loser threads wait until winner thread has updated value
+func (a *AtomicMin[T]) init(valueU64 uint64) (didStore bool) {
+	a.initLock.Lock()
+	defer a.initLock.Unlock()
+
+	if didStore = !a.isInitialized.Load(); !didStore {
+		return // another thread was first
+	}
+	a.value.Store(valueU64)
+	a.isInitialized.Store(true)
 	return
 }

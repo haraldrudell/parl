@@ -10,9 +10,7 @@ import (
 	"strings"
 )
 
-type structWithPrivateFieldAny struct {
-	any
-}
+type structWithPrivateFieldAny struct{ any }
 
 // NoRecurseVPrint returns the reflection string representation of value
 // without invoking the String method.

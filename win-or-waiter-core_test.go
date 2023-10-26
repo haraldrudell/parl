@@ -30,13 +30,13 @@ func TestNewWinOrWaiterCore(t *testing.T) {
 	if winOrWaiter.strategy != winOrWaiterStrategy {
 		t.Errorf("bad startegy: %d exp %d", winOrWaiter.strategy, winOrWaiterStrategy)
 	}
-	if winOrWaiter.isCalculationPut.IsTrue() {
+	if winOrWaiter.isCalculationPut.Load() {
 		t.Error("winOrWaiter.isCalculationPut true")
 	}
-	if winOrWaiter.calculation.Get() != nil {
+	if winOrWaiter.calculation.Load() != nil {
 		t.Error("winOrWaiter.calculation not nil")
 	}
-	if winOrWaiter.winnerPicker.IsTrue() {
+	if winOrWaiter.winnerPicker.Load() {
 		t.Error("winOrWaiter.winnerPicker true")
 	}
 
@@ -50,13 +50,13 @@ func TestNewWinOrWaiterCore(t *testing.T) {
 	t.Log("waiting for calculator invocation…")
 	calculatorInvoked.Wait()
 
-	if winOrWaiter.isCalculationPut.IsFalse() {
+	if !winOrWaiter.isCalculationPut.Load() {
 		t.Error("2 winOrWaiter.isCalculationPut false")
 	}
-	if winOrWaiter.calculation.Get() == nil {
+	if winOrWaiter.calculation.Load() == nil {
 		t.Error("2 winOrWaiter.calculation nil")
 	}
-	if winOrWaiter.winnerPicker.IsFalse() {
+	if !winOrWaiter.winnerPicker.Load() {
 		t.Error("2 winOrWaiter.winnerPicker false")
 	}
 
@@ -86,7 +86,7 @@ func TestNewWinOrWaiterCore(t *testing.T) {
 	calculatorThread.Wait()
 	loserThread.Wait()
 
-	calculationReference = winOrWaiter.calculation.Get()
+	calculationReference = winOrWaiter.calculation.Load()
 	if calculationReference == nil {
 		t.Error("3 winOrWaiter.calculation.Get nil")
 		t.FailNow()
@@ -101,7 +101,7 @@ func TestNewWinOrWaiterCore(t *testing.T) {
 	if result.IsZero() {
 		t.Error("3 result IsZero")
 	}
-	if winOrWaiter.winnerPicker.IsTrue() {
+	if winOrWaiter.winnerPicker.Load() {
 		t.Error("3 winOrWaiter.winnerPicker true")
 	}
 }

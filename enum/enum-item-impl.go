@@ -7,6 +7,7 @@ package enum
 
 import (
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/sets"
 	"golang.org/x/exp/constraints"
 )
 
@@ -18,6 +19,8 @@ type EnumItemImpl[K constraints.Ordered, V any] struct {
 	KeyK   K      // key that maps to this enumeration value
 	Full   string // sentence describing this flag
 }
+
+var _ sets.Element[int] = &EnumItemImpl[int, int]{}
 
 func NewEnumItemImpl[K constraints.Ordered, V any](value V, key K, full string) (item parl.EnumItem[K, V]) {
 	return &EnumItemImpl[K, V]{KeyK: key, Full: full, ValueV: value}

@@ -7,6 +7,7 @@ package g0
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/pruntime"
@@ -16,7 +17,7 @@ import (
 //   - ThreadSafeThreadData does not have initialization
 //   - haveThreadID indicates whether data is present
 type ThreadSafeThreadData struct {
-	haveThreadID parl.AtomicBool
+	haveThreadID atomic.Bool
 
 	lock sync.RWMutex
 	td   ThreadData
@@ -25,7 +26,7 @@ type ThreadSafeThreadData struct {
 // HaveThreadID indicates whether Update has been invoked on this ThreadDataWrap
 // object.
 func (tw *ThreadSafeThreadData) HaveThreadID() (haveThreadID bool) {
-	return tw.haveThreadID.IsTrue()
+	return tw.haveThreadID.Load()
 }
 
 // Update populates the wrapped ThreadData from the stack trace.
@@ -40,7 +41,7 @@ func (tw *ThreadSafeThreadData) Update(
 
 	tw.td.Update(threadID, createInvocation, goFunction, label)
 	if threadID.IsValid() {
-		tw.haveThreadID.Set() // if we know have a vald ThreadID
+		tw.haveThreadID.Store(true) // if we know have a vald ThreadID
 	}
 }
 

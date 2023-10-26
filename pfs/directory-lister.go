@@ -23,7 +23,7 @@ type DirectoryLister struct {
 	Abs        string
 	Results    chan *EntryResult
 	sdChan     chan struct{}
-	isShutdown parl.AtomicBool
+	isShutdown atomic.Bool
 	output     chan *EntryResult
 	pinger     chan struct{}
 	readEnd    bool
@@ -59,7 +59,7 @@ func NewDirStream(path string, chanSize int) (dir *DirectoryLister) {
 }
 
 func (dir *DirectoryLister) Shutdown() {
-	if dir.isShutdown.Set() {
+	if dir.isShutdown.CompareAndSwap(false, true) {
 		close(dir.sdChan)
 	}
 }

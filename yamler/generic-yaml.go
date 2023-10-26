@@ -6,7 +6,7 @@ ISC License
 package yamler
 
 // GenericYaml is a wrapper for [yamlo.Unmarshaler] that allows the
-// yamler package to unmarshal yaml to an unimported type
+// yamlo package to unmarshal yaml to an unimported type
 type GenericYaml interface {
 	// Unmarshal updates [yamlo.Unmarshaler]’s value pointer with
 	// data from yaml
@@ -16,9 +16,13 @@ type GenericYaml interface {
 	//	- hasData indicates that unmarshal succeeded and yamlDictionaryKey
 	//		was present
 	Unmarshal(yamlText []byte, yamlDictionaryKey string) (hasData bool, err error)
-	// VisitedReferencesMap unmarshals yaml to an any object and then
-	// build a visited references map by comparring that object to its
-	// value pointer
+	// VisitedReferencesMap returns a map of
+	// key: any-typed pointers to fields of u.y,
+	// value: lower-case field names
+	// - unmarshals yaml again to an any object and then
+	// builds the visited references map by comparing the unmarshaled object to the
+	// u.y struct-pointer
 	VisitedReferencesMap(yamlText []byte, yamlDictionaryKey string) (yamlVisistedReferences map[any]string, err error)
+	// YDump returns field names and values for the yaml value struct
 	YDump() (yamlVPrint string)
 }

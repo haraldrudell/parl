@@ -9,6 +9,7 @@ package pio
 import (
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
@@ -18,7 +19,7 @@ import (
 type TeeWriter struct {
 	closeCallback func() (err error)
 	writers       []io.Writer
-	isClosed      parl.AtomicBool
+	isClosed      atomic.Bool
 	wg            sync.WaitGroup
 }
 
@@ -40,7 +41,7 @@ func NewTeeWriter(closeCallback func() (err error), writers ...io.Writer) (teeWr
 }
 
 func (tw *TeeWriter) Write(p []byte) (n int, err error) {
-	if tw.isClosed.IsTrue() {
+	if tw.isClosed.Load() {
 		err = perrors.NewPF("Write after Close")
 		return
 	}
@@ -61,7 +62,7 @@ func (tw *TeeWriter) Write(p []byte) (n int, err error) {
 func (tw *TeeWriter) Close() (err error) {
 
 	// prevent multiple Close invocations
-	if !tw.isClosed.Set() {
+	if !tw.isClosed.CompareAndSwap(false, true) {
 		err = perrors.NewPF("Second Close invocation")
 		return
 	}
