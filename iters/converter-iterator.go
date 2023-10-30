@@ -73,6 +73,13 @@ func NewConverterIterator[K constraints.Ordered, V any](
 	}
 }
 
+// Init implements the right-hand side of a short variable declaration in
+// the init statement for a Go “for” clause
+func (i *ConverterIterator[K, T]) Init() (iterationVariable T, iterator Iterator[T]) {
+	iterator = i
+	return
+}
+
 // invokeConverterFunction invokes converterFunction recovering a possible panic
 //   - if cancelState == notCanceled, a new value is requested.
 //     Otherwise, iteration cancel is requested

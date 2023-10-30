@@ -62,6 +62,13 @@ func NewFunctionIterator[T any](
 	}
 }
 
+// Init implements the right-hand side of a short variable declaration in
+// the init statement for a Go “for” clause
+func (i *FunctionIterator[T]) Init() (iterationVariable T, iterator Iterator[T]) {
+	iterator = i
+	return
+}
+
 // invokeFn invokes fn recovering a possible panic
 //   - if cancelState == notCanceled, a new value is requested.
 //     Otherwise, iteration cancel is requested

@@ -8,6 +8,8 @@ package iters
 import (
 	"sync"
 	"sync/atomic"
+
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // SliceIterator traverses a slice container. thread-safe
@@ -42,6 +44,39 @@ func NewSliceIterator[T any](slice []T) (iterator Iterator[T]) {
 	i := SliceIterator[T]{slice: slice}
 	i.Delegator = *NewDelegator(i.delegateAction)
 	return &i
+}
+
+// Init implements the right-hand side of a short variable declaration in
+// the init statement for a Go “for” clause
+func (i *SliceIterator[T]) Init() (iterationVariable T, iterator Iterator[T]) {
+	iterator = i
+	return
+}
+
+// Cond implements the condition statement of a Go “for” clause
+//   - the iterationVariable is updated by being provided as a pointer.
+//     iterationVariable cannot be nil
+//   - errp is an optional error pointer receiving any errors during iterator execution
+//   - condition is true if iterationVariable was assigned a value and the iteration should continue
+func (i *SliceIterator[T]) Cond(iterationVariablep *T, errp ...*error) (condition bool) {
+	if iterationVariablep == nil {
+		perrors.NewPF("iterationVariablep cannot bee nil")
+	}
+
+	// check for next value
+	var value T
+	if value, condition = i.delegateAction(IsNext); condition {
+		*iterationVariablep = value
+	}
+
+	return // condition and iterationVariablep updated, errp unchanged
+}
+
+// Cancel release resources for this iterator. Thread-safe
+//   - not every iterator requires a Cancel invocation
+func (i *SliceIterator[T]) Cancel(errp ...*error) (err error) {
+	i.isEnd.CompareAndSwap(false, true)
+	return
 }
 
 // delegateAction finds the next or the same value. Thread-safe
@@ -93,11 +128,4 @@ func (i *SliceIterator[T]) delegateAction(isSame NextAction) (value T, hasValue 
 	}
 
 	return // value and hasValue indicates availability
-}
-
-// Cancel release resources for this iterator. Thread-safe
-//   - not every iterator requires a Cancel invocation
-func (i *SliceIterator[T]) Cancel() (err error) {
-	i.isEnd.CompareAndSwap(false, true)
-	return
 }

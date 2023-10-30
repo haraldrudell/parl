@@ -38,8 +38,7 @@ type SetImpl[T comparable] struct {
 //		}))
 func NewSet[T comparable](elements iters.Iterator[Element[T]]) (set Set[T]) {
 	s := SetImpl[T]{elementMap: map[T]Element[T]{}}
-	for ; elements.Has(); elements.Next() {
-		element := elements.SameValue()
+	for element, _ := elements.Init(); elements.Cond(&element); {
 		valueT := element.Value()
 		if existingElement, ok := s.elementMap[valueT]; ok {
 			panic(perrors.ErrorfPF(

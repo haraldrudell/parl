@@ -102,6 +102,32 @@ func NewElements[T comparable, E any](elements []E) (iter iters.Iterator[Element
 	}
 }
 
+// Init implements the right-hand side of a short variable declaration in
+// the init statement for a Go “for” clause
+func (i *Elements[T, E]) Init() (iterationVariable Element[T], iterator iters.Iterator[Element[T]]) {
+	iterator = i
+	return
+}
+
+// Cond implements the condition statement of a Go “for” clause
+//   - the iterationVariable is updated by being provided as a pointer.
+//     iterationVariable cannot be nil
+//   - errp is an optional error pointer receiving any errors during iterator execution
+//   - condition is true if iterationVariable was assigned a value and the iteration should continue
+func (i *Elements[T, E]) Cond(iterationVariablep *Element[T], errp ...*error) (condition bool) {
+	if iterationVariablep == nil {
+		perrors.NewPF("iterationVariablep cannot bee nil")
+	}
+
+	// check for next value
+	var value Element[T]
+	if value, condition = i.delegateAction(iters.IsNext); condition {
+		*iterationVariablep = value
+	}
+
+	return // condition and iterationVariablep updated, errp unchanged
+}
+
 // delegateAction finds the next or the same value. Thread-safe
 //   - isSame == IsSame means first or same value should be returned
 //   - value is the sought value or the T type’s zero-value if no value exists
@@ -158,7 +184,7 @@ func (i *elementsAction[T, E]) delegateAction(isSame iters.NextAction) (value El
 
 // Cancel release resources for this iterator. Thread-safe
 //   - not every iterator requires a Cancel invocation
-func (i *elementsAction[T, E]) Cancel() (err error) {
+func (i *elementsAction[T, E]) Cancel(errp ...*error) (err error) {
 	i.noValuesAvailable.CompareAndSwap(false, true)
 	return
 }

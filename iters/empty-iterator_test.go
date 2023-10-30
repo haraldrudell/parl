@@ -22,23 +22,23 @@ func TestEmptyIterator(t *testing.T) {
 	} else if actual != zeroValue {
 		t.Error("Next returned other than zero-value")
 	}
-	if ok = iter.HasNext(); ok {
-		t.Error("GoNext returned true")
-	}
-	if actual = iter.NextValue(); actual != zeroValue {
-		t.Errorf("Next not zero value: %d exp %d", actual, zeroValue)
-	}
+	// if ok = iter.HasNext(); ok {
+	// 	t.Error("GoNext returned true")
+	// }
+	// if actual = iter.NextValue(); actual != zeroValue {
+	// 	t.Errorf("Next not zero value: %d exp %d", actual, zeroValue)
+	// }
 	if actual, ok = iter.Same(); ok {
 		t.Error("Next returned true")
 	} else if actual != zeroValue {
 		t.Error("Next returned other than zero-value")
 	}
-	if ok = iter.Has(); ok {
-		t.Error("Has returned true")
-	}
-	if actual = iter.SameValue(); actual != zeroValue {
-		t.Errorf("Same not zero value: %d exp %d", actual, zeroValue)
-	}
+	// if ok = iter.Has(); ok {
+	// 	t.Error("Has returned true")
+	// }
+	// if actual = iter.SameValue(); actual != zeroValue {
+	// 	t.Errorf("Same not zero value: %d exp %d", actual, zeroValue)
+	// }
 	if err = iter.Cancel(); err != nil {
 		t.Errorf("Cancel err: %v", err)
 	}

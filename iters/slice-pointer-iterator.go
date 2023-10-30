@@ -8,14 +8,16 @@ package iters
 import (
 	"sync"
 	"sync/atomic"
+
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // SlicePointerIterator traverses a slice container using pointers to value. thread-safe.
 //   - the difference is that:
 //   - instead of copying a value from the slice,
 //   - a pointer to the slice value is returned
-type SlicePointerIterator[T any] struct {
-	slice []T // the slice providing values
+type SlicePointerIterator[E any, T *E] struct {
+	slice []E // the slice providing values
 
 	// isEnd is fast outside-lock check for no values available
 	isEnd atomic.Bool
@@ -36,7 +38,7 @@ type SlicePointerIterator[T any] struct {
 	//   - Next HasNext NextValue
 	//     Same Has SameValue
 	//   - the delegate provides DelegateAction[T] function
-	Delegator[*T]
+	Delegator[T]
 }
 
 // NewSlicePointerIterator returns an iterator of pointers to T
@@ -45,17 +47,50 @@ type SlicePointerIterator[T any] struct {
 //   - a pointer to the slice value is returned
 //   - the returned [Iterator] value cannot be copied, the pointer value
 //     must be used
-func NewSlicePointerIterator[T any](slice []T) (iterator Iterator[*T]) {
-	i := SlicePointerIterator[T]{slice: slice}
+func NewSlicePointerIterator[E any](slice []E) (iterator Iterator[*E]) {
+	i := SlicePointerIterator[E, *E]{slice: slice}
 	i.Delegator = *NewDelegator(i.delegateAction)
 	return &i
+}
+
+// Init implements the right-hand side of a short variable declaration in
+// the init statement for a Go “for” clause
+func (i *SlicePointerIterator[E, T]) Init() (iterationVariable T, iterator Iterator[T]) {
+	iterator = i
+	return
+}
+
+// Cond implements the condition statement of a Go “for” clause
+//   - the iterationVariable is updated by being provided as a pointer.
+//     iterationVariable cannot be nil
+//   - errp is an optional error pointer receiving any errors during iterator execution
+//   - condition is true if iterationVariable was assigned a value and the iteration should continue
+func (i *SlicePointerIterator[E, T]) Cond(iterationVariablep *T, errp ...*error) (condition bool) {
+	if iterationVariablep == nil {
+		perrors.NewPF("iterationVariablep cannot bee nil")
+	}
+
+	// check for next value
+	var value T
+	if value, condition = i.delegateAction(IsNext); condition {
+		*iterationVariablep = value
+	}
+
+	return // condition and iterationVariablep updated, errp unchanged
+}
+
+// Cancel release resources for this iterator. Thread-safe
+//   - not every iterator requires a Cancel invocation
+func (i *SlicePointerIterator[E, T]) Cancel(errp ...*error) (err error) {
+	i.isEnd.CompareAndSwap(false, true)
+	return
 }
 
 // Next finds the next or the same value. Thread-safe
 //   - isSame true means first or same value should be returned
 //   - value is the sought value or the T type’s zero-value if no value exists
 //   - hasValue true means value was assigned a valid T value
-func (i *SlicePointerIterator[T]) delegateAction(isSame NextAction) (value *T, hasValue bool) {
+func (i *SlicePointerIterator[E, T]) delegateAction(isSame NextAction) (value T, hasValue bool) {
 
 	if i.isEnd.Load() {
 		return // no more values return
@@ -100,11 +135,4 @@ func (i *SlicePointerIterator[T]) delegateAction(isSame NextAction) (value *T, h
 	}
 
 	return // value and hasValue indicates availability
-}
-
-// Cancel release resources for this iterator. Thread-safe
-//   - not every iterator requires a Cancel invocation
-func (i *SlicePointerIterator[T]) Cancel() (err error) {
-	i.isEnd.CompareAndSwap(false, true)
-	return
 }

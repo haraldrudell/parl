@@ -8,6 +8,7 @@ package parl
 import (
 	"fmt"
 
+	"github.com/haraldrudell/parl/iters"
 	"golang.org/x/exp/constraints"
 )
 
@@ -36,16 +37,16 @@ type KeyEnum[K constraints.Ordered, T any] interface {
 
 	// K
 
-	IsKey(key K) (isKey bool)            // IsKey checks whether key maps to an enumerated value
-	Value(key K) (enum T, err error)     // Value looks up an enumerated value by key
-	KeyIterator() (iterator Iterator[K]) // KeyIterator returns an iterator that iterates over all keys in order of definition
+	IsKey(key K) (isKey bool)                  // IsKey checks whether key maps to an enumerated value
+	Value(key K) (enum T, err error)           // Value looks up an enumerated value by key
+	KeyIterator() (iterator iters.Iterator[K]) // KeyIterator returns an iterator that iterates over all keys in order of definition
 
 	// T
 
 	IsValid(enum T) (isEnumValue bool)      // IsValid checks whether value is among enumerated values
 	Key(value T) (key K, err error)         // Key gets the key value for an enumerated T value
 	ValueAny(value any) (enum T, err error) // ValueAny attempts to convert any value to a T enumerated value
-	Iterator() (iterator Iterator[T])       // Iterator returns an iterator that iterates over all enumerated values in order of definition
+	Iterator() (iterator iters.Iterator[T]) // Iterator returns an iterator that iterates over all enumerated values in order of definition
 	Description(enum T) (desc string)       // Description gets a descriptive sentence for an enum value
 	StringT(enum T) (s string)              // StringT provides a string representation for an enumeration value
 	// Compare compares two T values.
