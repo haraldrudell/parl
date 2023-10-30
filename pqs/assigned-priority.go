@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pmaps
+package pqs
 
 import (
 	"golang.org/x/exp/constraints"

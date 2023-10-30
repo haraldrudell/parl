@@ -7,78 +7,97 @@ package iters
 
 import (
 	"sync"
-
-	"github.com/haraldrudell/parl/perrors"
+	"sync/atomic"
 )
 
 // SliceIterator traverses a slice container. thread-safe
 type SliceIterator[T any] struct {
-	lock     sync.Mutex
-	didNext  bool // indicates whether any value has been sought
-	hasValue bool // indicates whether index has been verified to be valid
-	index    int  // index in slice, 0…len(slice)
-	slice    []T
+	slice []T // the slice providing values
+
+	// isEnd is fast outside-lock check for no values available
+	isEnd atomic.Bool
+
+	// lock serializes Next and Cancel invocations
+	lock sync.Mutex
+	// didNext indicates that the first value was sought
+	//	- behind lock
+	didNext bool
+	// hasValue indicates that slice[index] is the current value
+	//	- behind lock
+	hasValue bool
+	// index in slice, 0…len(slice)
+	//	- behind lock
+	index int
+
+	// Delegator implements the value methods required by the [Iterator] interface
+	//   - Next HasNext NextValue
+	//     Same Has SameValue
+	//   - the delegate provides DelegateAction[T] function
+	Delegator[T]
 }
 
 // NewSliceIterator returns an empty iterator of values type T.
 // sliceIterator is thread-safe.
 func NewSliceIterator[T any](slice []T) (iterator Iterator[T]) {
-	return &Delegator[T]{Delegate: &SliceIterator[T]{slice: slice}}
+	i := SliceIterator[T]{slice: slice}
+	i.Delegator = *NewDelegator(i.delegateAction)
+	return &i
 }
 
-// InitSliceIterator initializes a SliceIterator struct.
-// sliceIterator is thread-safe.
-func InitSliceIterator[T any](iterp *SliceIterator[T], slice []T) {
-	if iterp == nil {
-		panic(perrors.NewPF("iterator cannot be nil"))
+// delegateAction finds the next or the same value. Thread-safe
+//   - isSame == IsSame means first or same value should be returned
+//   - value is the sought value or the T type’s zero-value if no value exists
+//   - hasValue true means value was assigned a valid T value
+func (i *SliceIterator[T]) delegateAction(isSame NextAction) (value T, hasValue bool) {
+
+	if i.isEnd.Load() {
+		return // no more values return
 	}
-	iterp.lock = sync.Mutex{}
-	iterp.didNext = false
-	iterp.hasValue = false
-	iterp.index = 0
-	iterp.slice = slice
-}
 
-func (iter *SliceIterator[T]) Next(isSame NextAction) (value T, hasValue bool) {
-	iter.lock.Lock()
-	defer iter.lock.Unlock()
+	i.lock.Lock()
+	defer i.lock.Unlock()
 
-	// if next operation has not completed, we do not know if a value exist,
-	// and next operation must be completed.
-	// if next has completed and we seek the same value, next operation should not be done.
-	if !iter.didNext || isSame != IsSame {
+	if i.isEnd.Load() {
+		return // no more values return
+	}
+
+	// for IsSame operation the first value must be sought
+	//	- therefore, if the first value has not been sought, seek it now or
+	//	- if not IsSame operation, advance to the next value
+	if !i.didNext || isSame != IsSame {
+
+		// note that first value has been sought
+		if !i.didNext {
+			i.didNext = true
+		}
 
 		// find slice index to use
-		if iter.hasValue {
-			// if a value has been found and is valid, advance index.
-			// the final value for iter.index is len(iter.slice)
-			iter.index++
+		//	- if a value was found, advance index
+		//	- final i.index value is len(i.slice)
+		if i.hasValue {
+			i.index++
 		}
 
 		// check if the new index is within available slice values
-		// when iter.index has reached len(iter.slice), iter.hasValue is always false.
-		// when hasValue is false, iter.index will no longer be incremented.
-		iter.hasValue = iter.index < len(iter.slice)
-
-		// indicate that iter.hasValue is now valid
-		if !iter.didNext {
-			iter.didNext = true
-		}
+		//	- when i.index has reached len(i.slice), i.hasValue is always false
+		//	- when hasValue is false, i.index will no longer be incremented
+		i.hasValue = i.index < len(i.slice)
 	}
 
-	// get the value if it is valid, otherwise zero-value
-	if hasValue = iter.hasValue; hasValue {
-		value = iter.slice[iter.index]
+	// update hasValue and value
+	//	- get the value if it is valid, otherwise zero-value
+	if hasValue = i.hasValue; hasValue {
+		value = i.slice[i.index]
+	} else {
+		i.isEnd.CompareAndSwap(false, true)
 	}
 
 	return // value and hasValue indicates availability
 }
 
-func (iter *SliceIterator[T]) Cancel() (err error) {
-	iter.lock.Lock()
-	defer iter.lock.Unlock()
-
-	iter.hasValue = false // invalidate iter.value
-	iter.slice = nil      // prevent any next operation
+// Cancel release resources for this iterator. Thread-safe
+//   - not every iterator requires a Cancel invocation
+func (i *SliceIterator[T]) Cancel() (err error) {
+	i.isEnd.CompareAndSwap(false, true)
 	return
 }

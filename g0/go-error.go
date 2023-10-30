@@ -34,44 +34,44 @@ func NewGoError(err error, errContext parl.GoErrorContext, g0 parl.Go) (goError 
 
 // Error returns a human-readable error message making GoError implement error
 //   - for nil errors, empty string is returned
-func (ge *GoError) Error() (message string) {
-	if ge.err != nil {
-		message = ge.err.Error()
+func (e *GoError) Error() (message string) {
+	if e.err != nil {
+		message = e.err.Error()
 	}
 	return
 }
 
 // Time returns when the GoError was created
-func (ge *GoError) Time() (when time.Time) {
-	return ge.t
+func (e *GoError) Time() (when time.Time) {
+	return e.t
 }
 
 // Err returns the unbderlying error
-func (ge *GoError) Err() (err error) {
-	return ge.err
+func (e *GoError) Err() (err error) {
+	return e.err
 }
 
-func (ge *GoError) IsThreadExit() (isThreadExit bool) {
-	return ge.errContext == parl.GeExit ||
-		ge.errContext == parl.GePreDoneExit
+func (e *GoError) IsThreadExit() (isThreadExit bool) {
+	return e.errContext == parl.GeExit ||
+		e.errContext == parl.GePreDoneExit
 }
 
-func (ge *GoError) IsFatal() (isThreadExit bool) {
-	return (ge.errContext == parl.GeExit ||
-		ge.errContext == parl.GePreDoneExit) &&
-		ge.err != nil
+func (e *GoError) IsFatal() (isThreadExit bool) {
+	return (e.errContext == parl.GeExit ||
+		e.errContext == parl.GePreDoneExit) &&
+		e.err != nil
 }
 
-func (ge *GoError) ErrContext() (errContext parl.GoErrorContext) {
-	return ge.errContext
+func (e *GoError) ErrContext() (errContext parl.GoErrorContext) {
+	return e.errContext
 }
 
-func (ge *GoError) Go() (g0 parl.Go) {
-	return ge.g0
+func (e *GoError) Go() (g0 parl.Go) {
+	return e.g0
 }
 
-func (ge *GoError) String() (s string) {
-	err := ge.err
+func (e *GoError) String() (s string) {
+	err := e.err
 	if stack := errorglue.GetInnerMostStack(err); len(stack) > 0 {
 		s = "-at:" + stack[0].Short()
 	}
@@ -81,5 +81,5 @@ func (ge *GoError) String() (s string) {
 	} else {
 		message = "OK"
 	}
-	return "error:\x27" + message + "\x27context:" + ge.errContext.String() + s
+	return "error:\x27" + message + "\x27context:" + e.errContext.String() + s
 }

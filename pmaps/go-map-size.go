@@ -35,7 +35,7 @@ const (
 // Source code:
 //   - the map source code part of the runtime package is available online:
 //   - — https://go.googlesource.com/go/+/refs/heads/master/src/runtime/map.go
-//   - runtime source is typically installed on a computer that has go:
+//   - runtime source is typically installed on a computer that has Go:
 //   - — module directory: …libexec/src, package directory: runtime
 //   - — on macOS homebrew similar to: …/homebrew/Cellar/go/1.20.2/libexec/src
 func GoMapSize[K comparable, V any](m map[K]V) (size uint64) {

@@ -54,7 +54,7 @@ func (hp *Http) RunTLS() (errCh <-chan error) {
 
 func (hp *Http) run(errCh chan<- error, listener net.Listener) {
 	defer close(errCh)
-	defer parl.Recover(parl.Annotation(), func(e error) { errCh <- e })
+	defer parl.Recover("", func(e error) { errCh <- e })
 	if err := hp.Server.Serve(listener); err != nil { // blocking until Shutdown or Close
 		if err != http.ErrServerClosed {
 			errCh <- err

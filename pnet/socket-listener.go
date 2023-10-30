@@ -142,7 +142,7 @@ func (s *SocketListener[C]) AcceptConnections(handler func(C)) {
 	}
 	defer s.acceptWait.Done() // indicate accept thread exited
 	defer s.connWait.Wait()   // wait for connection goroutines
-	defer parl.Recover2(parl.Annotation(), nil, s.errCh.AddErrorProc)
+	defer parl.Recover2("", nil, s.errCh.AddErrorProc)
 
 	s.handler = handler
 	var err error
@@ -267,7 +267,7 @@ func (s *SocketListener[C]) close(sendError bool) (didClose bool, err error) {
 //   - invokeHandler recovers panics in handler function
 func (s *SocketListener[C]) invokeHandler(conn net.Conn) {
 	defer s.connWait.Done()
-	defer parl.Recover2(parl.Annotation(), nil, s.errCh.AddErrorProc)
+	defer parl.Recover2("", nil, s.errCh.AddErrorProc)
 
 	var c C
 	var ok bool

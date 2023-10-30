@@ -15,6 +15,6 @@ var GoGroupFactory parl.GoFactory = &goGroupFactory{}
 
 type goGroupFactory struct{}
 
-func (gf *goGroupFactory) NewGoGroup(ctx context.Context, onFirstFatal ...parl.GoFatalCallback) (g1 parl.GoGroup) {
+func (f *goGroupFactory) NewGoGroup(ctx context.Context, onFirstFatal ...parl.GoFatalCallback) (goGroup parl.GoGroup) {
 	return NewGoGroup(ctx, onFirstFatal...)
 }

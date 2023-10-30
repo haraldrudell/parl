@@ -15,8 +15,9 @@ type panicDetector struct {
 }
 
 // panicDetectorOne is a static value facilitating panic detection for this runtime.
-// because panicDetectorOne is instantiated during initialization, it is
-// subsequently thread-safe.
+// panicDetectorOne is created during package initialization and is
+// therefore thread-safe.
+//   - panicDetectorOne is used by [errorglue.Indices]
 var panicDetectorOne = func() (pd *panicDetector) {
 	p := panicDetector{
 		runtimeDeferInvokerLocation:  runtimeGopanic,

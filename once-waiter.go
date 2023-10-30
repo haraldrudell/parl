@@ -76,7 +76,7 @@ func (ow *OnceWaiter) Cancel() {
 }
 
 func onceWaiterSender(done <-chan struct{}, ch chan<- struct{}) {
-	Recover(Annotation(), nil, Infallible) // panic prints to stderr
+	Recover("", nil, Infallible) // panic prints to stderr
 
 	<-done
 	ch <- struct{}{}

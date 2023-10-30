@@ -21,7 +21,7 @@ func NewMap[K comparable, V any]() (mapping *Map[K, V]) {
 	return &Map[K, V]{m: make(map[K]V)}
 }
 
-// Get returns the value mapped by key or the V zero-value otherwise.
+// Get returns the value mapped by key or the V zero-value otherwise
 //   - ok: true if a mapping was found
 //   - O(1)
 func (m *Map[K, V]) Get(key K) (value V, ok bool) {
@@ -29,7 +29,7 @@ func (m *Map[K, V]) Get(key K) (value V, ok bool) {
 	return
 }
 
-// Put saves or replaces a mapping
+// Put create or replaces a mapping
 func (m *Map[K, V]) Put(key K, value V) {
 	m.m[key] = value
 }
@@ -59,20 +59,28 @@ func (m *Map[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bool)) {
 }
 
 // Clear empties the map
-//   - re-initialize the map is faster
-//   - if ranging and deleting keys, the unused size of the map is retained
+//   - clears by re-initializing the map
+//   - when instead ranging and deleting all keys,
+//     the unused size of the map is retained
 func (m *Map[K, V]) Clear() {
 	m.m = make(map[K]V)
 }
 
 // Clone returns a shallow clone of the map
+//   - mp is an optional pointer to an already allocated map instance
+//     to be used
+//   - clone is done by ranging all keys
 func (m *Map[K, V]) Clone(mp ...*Map[K, V]) (clone *Map[K, V]) {
+
+	// clone should point to a destination instance
 	if len(mp) > 0 {
 		clone = mp[0]
 	}
 	if clone == nil {
 		clone = &Map[K, V]{}
 	}
+
 	clone.m = maps.Clone(m.m)
+
 	return
 }

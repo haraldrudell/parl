@@ -47,7 +47,7 @@ const (
 
 func (hp *Https) listenerThread() {
 	defer hp.CloseErr()
-	defer parl.Recover(parl.Annotation(), nil, hp.SendErr)
+	defer parl.Recover("", nil, hp.SendErr)
 	var didReadyWg bool
 	defer func() {
 		if !didReadyWg {

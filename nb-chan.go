@@ -77,7 +77,7 @@ const (
 //	func thread(errCh *parl.NBChan[error]) {
 //	defer errCh.Close() // non-blocking close effective on send complete
 //	var err error
-//	defer parl.Recover(parl.Annotation(), &err, errCh.AddErrorProc)
+//	defer parl.Recover(parl."", &err, errCh.AddErrorProc)
 //	errCh.Ch() <- err // non-blocking
 //	if err = someFunc(); err != nil {
 //	err = perrors.Errorf("someFunc: %w", err)

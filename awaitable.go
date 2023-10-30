@@ -12,10 +12,9 @@ import "sync/atomic"
 //   - one-to-many, happens-before
 //   - the synchronization mechanic is closing channel, allowing consumers to await
 //     multiple events
-//   - status can be inspected in a thread-safe manner: isClosed, isAboutToClose
-//     allows for race-free consumers
-//   - Close is idempotent, panic-free
-//   - if atomic.Pointer[Awaitable] is used for retrieval, a cyclic semaphore is achieved
+//   - IsClosed provides thread-safe observability
+//   - Close is idempotent and panic-free
+//   - [parl.CyclicAwaitable] is re-armable, cyclic version
 type Awaitable struct {
 	isClosed atomic.Bool
 	ch       chan struct{}
@@ -33,18 +32,13 @@ func (a *Awaitable) Ch() (ch AwaitableCh) {
 
 // isClosed inspects whether the awaitable has been triggered
 //   - isClosed indicates that the channel is closed
-//   - isAboutToClose indicates that Close has been invoked,
-//     but that channel close may still be in progress
-//   - if isClosed is true, isAboutToClose is also true
-//   - the two values are requried to attain race-free consumers
 //   - Thread-safe
-func (a *Awaitable) IsClosed() (isClosed, isAboutToClose bool) {
+func (a *Awaitable) IsClosed() (isClosed bool) {
 	select {
 	case <-a.ch:
 		isClosed = true
 	default:
 	}
-	isAboutToClose = a.isClosed.Load()
 	return
 }
 

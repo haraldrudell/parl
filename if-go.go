@@ -31,7 +31,7 @@ type Go interface {
 	// information on the new thread.
 	// - label is an optional name that can be assigned to a Go goroutine thread
 	Register(label ...string) (g0 Go)
-	// AddError emits a non-fatal error.
+	// AddError emits a non-fatal errors
 	AddError(err error)
 	// Go returns a Go object to be provided as a go-statement function-argument
 	//	in a function call invocation launching a new gorotuine thread.
@@ -59,29 +59,42 @@ type Go interface {
 	//   - the SubGroup thread-group terminates when both its own threads have exited and
 	//	- the threads of its subordinate thread-groups.
 	SubGroup(onFirstFatal ...GoFatalCallback) (subGroup SubGroup)
-	// Done indicates that this goroutine has finished.
+	// Done indicates that this goroutine is exiting
 	//	- err == nil means successful exit
-	//	- non-nil err indicates a fatal error.
-	// 	- Done is deferrable.
+	//	- non-nil err indicates fatal error
+	// 	- deferrable
 	Done(errp *error)
 	// Wait awaits exit of this Go thread.
 	Wait()
+	WaitCh() (ch AwaitableCh)
 	// Cancel signals for the threads in this Go thread’s parent GoGroup thread-group
 	// and any subordinate thread-groups to exit.
 	Cancel()
 	// Context will Cancel when the parent thread-group Cancels
 	//	or Cancel is invoked on this Go object.
-	// Subordinate thread-groups do not Cancel the context of the Go thread.
+	//	- Subordinate thread-groups do not Cancel the context of the Go thread.
 	Context() (ctx context.Context)
 	// ThreadInfo returns thread data that is partially or fully populated
+	//	- ThreadID may be invalid: threadID.IsValid.
+	//	- goFunction may be zero-value: goFunction.IsSet
+	//	- those values present after public methods of parl.Go has been invoked by
+	//		the new goroutine
 	ThreadInfo() (threadData ThreadData)
 	// values always present
 	Creator() (threadID ThreadID, createLocation *pruntime.CodeLocation)
-	// ThreadID may be invalid: threadID.IsValid.
-	// goFunction may be zero-value: goFunction.IsSet
+	//	- ThreadID may be invalid: threadID.IsValid.
+	//	- goFunction may be zero-value: goFunction.IsSet
+	//	- those values present after public methods of parl.Go has been invoked by
+	//		the new goroutine
 	GoRoutine() (threadID ThreadID, goFunction *pruntime.CodeLocation)
-	// GoID efficiently returns the goroutine ID that mey be invalid
+	// GoID efficiently returns the goroutine ID that may be invalid
+	//	- valid after public methods of parl.Go has been invoked by
+	//		the new goroutine
 	GoID() (threadID ThreadID)
+	// EntityID returns a value unique for this Go
+	//	- ordered: usable as map key or for sorting
+	//	- always valid, has .String method
+	EntityID() (goEntityID GoEntityID)
 	fmt.Stringer
 }
 
@@ -159,6 +172,8 @@ type GoGroup interface {
 	// EnableTermination false prevents the SubGo or GoGroup from terminating
 	// even if the number of threads is zero
 	EnableTermination(allowTermination bool)
+	// IsEnableTermination returns the state of EnableTermination,
+	// initially true
 	IsEnableTermination() (mayTerminate bool)
 	// Cancel terminates the threads in this and subordinate thread-groups.
 	Cancel()
@@ -197,7 +212,7 @@ type SubGo interface {
 	// Wait waits for all threads of this thread-group to terminate.
 	Wait()
 	// returns a channel that closes on subGo end similar to Wait
-	WaitCh() (ch <-chan struct{})
+	WaitCh() (ch AwaitableCh)
 	// EnableTermination false prevents the SubGo or GoGroup from terminating
 	// even if the number of threads is zero
 	EnableTermination(allowTermination bool)

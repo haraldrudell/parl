@@ -73,7 +73,7 @@ func (c *ContextCopier) Configuration() (
 func (c *ContextCopier) ContextThread() {
 	var err error
 	parl.SendErr(c.errCh, &err)
-	defer parl.Recover(parl.Annotation(), &err, parl.NoOnError)
+	defer parl.PanicToErr(&err)
 
 	select {
 	case <-c.ctx.Done():

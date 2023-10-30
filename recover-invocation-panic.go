@@ -22,7 +22,7 @@ func RecoverInvocationPanic(fn func(), errp *error) {
 	if errp == nil {
 		panic(perrors.ErrorfPF("%w", ErrErrpNil))
 	}
-	defer Recover(Annotation(), errp, NoOnError)
+	defer PanicToErr(errp)
 
 	fn()
 }
@@ -34,7 +34,7 @@ func RecoverInvocationPanic(fn func(), errp *error) {
 var ErrErrpNil = NilValueError(errors.New("errp cannot be nil"))
 
 func RecoverInvocationPanicErr(fn func() (err error)) (isPanic bool, err error) {
-	defer Recover(Annotation(), &err, NoOnError)
+	defer PanicToErr(&err)
 
 	isPanic = true
 	err = fn()
@@ -55,7 +55,7 @@ type TResult[T any] struct {
 func NewTResult[T any](tFunc TFunc[T]) (tResult *TResult[T]) {
 	var t = TResult[T]{IsPanic: true}
 	tResult = &t
-	defer Recover(Annotation(), &t.Err, NoOnError)
+	defer PanicToErr(&t.Err)
 
 	t.Value, t.Err = tFunc()
 	t.IsPanic = false

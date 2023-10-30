@@ -3,14 +3,13 @@
 ISC License
 */
 
-// Ranking is a map of updatable values traversable by rank
-package pmaps
+package pqs
 
 import (
 	"strconv"
 	"testing"
 
-	"github.com/haraldrudell/parl/parli"
+	"github.com/haraldrudell/parl"
 )
 
 func TestNewRanking(t *testing.T) {
@@ -35,7 +34,7 @@ func TestNewRanking(t *testing.T) {
 	exp3 := []*entity{&entity1}
 	expLength := 3
 
-	var ranking parli.PriorityQueue[entity, int]
+	var ranking parl.PriorityQueue[entity, int]
 	var pmapsRanking *PriorityQueue[entity, int]
 	var ok bool
 	var rankList []*entity

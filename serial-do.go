@@ -15,7 +15,6 @@ import (
 )
 
 // SerialDo serializes a thunk.
-//
 type SerialDo struct {
 	thunk         func(at time.Time)
 	eventReceiver func(event *SerialDoEvent)
@@ -156,7 +155,7 @@ func (sdo *SerialDo) performDo(now time.Time) (typ SerialDoType, isPending bool)
 }
 
 func (sdo *SerialDo) invokeEventFn(typ SerialDoType, t time.Time) {
-	defer Recover(Annotation(), nil, sdo.errFn)
+	defer Recover("", nil, sdo.errFn)
 
 	if sdo.eventReceiver == nil {
 		return
@@ -166,14 +165,14 @@ func (sdo *SerialDo) invokeEventFn(typ SerialDoType, t time.Time) {
 }
 
 func (sdo *SerialDo) invokeThunk(at time.Time) {
-	defer Recover(Annotation(), nil, sdo.errFn)
+	defer Recover("", nil, sdo.errFn)
 
 	sdo.thunk(at)
 }
 
 func (sdo *SerialDo) doThread(at time.Time) {
 	defer sdo.wg.Done()
-	defer Recover(Annotation(), nil, sdo.errFn)
+	defer Recover("", nil, sdo.errFn)
 
 	for {
 		sdo.invokeThunk(at)

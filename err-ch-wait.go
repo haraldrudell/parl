@@ -22,7 +22,7 @@ import "github.com/haraldrudell/parl/perrors"
 //	func someFunc(errCh chan<- error) {
 //	  var err error
 //	  defer parl.SendErr(errCh, &err)
-//	  defer parl.Recover(parl.Annotation(), &err, parl.NoOnError)
+//	  defer parl.PanicToErr(errp)
 func ErrChWait(errCh <-chan error, errp *error) {
 	if errp == nil {
 		panic(perrors.NewPF("errp cannot be nil"))

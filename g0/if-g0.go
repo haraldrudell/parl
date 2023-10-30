@@ -12,11 +12,11 @@ import (
 )
 
 type goGroupParent interface {
-	Add(id GoEntityID, threadData *ThreadData)
+	Add(id parl.GoEntityID, threadData *ThreadData)
 	CascadeEnableTermination(delta int)
 	ConsumeError(goError parl.GoError)
 	GoDone(g0 parl.Go, err error)
-	UpdateThread(goEntityID GoEntityID, threadData *ThreadData)
+	UpdateThread(goEntityID parl.GoEntityID, threadData *ThreadData)
 	Context() (ctx context.Context)
 }
 
@@ -27,7 +27,7 @@ type goParent interface {
 	FromGoSubGo(onFirstFatal ...parl.GoFatalCallback) (g0 parl.SubGo)
 	FromGoSubGroup(onFirstFatal ...parl.GoFatalCallback) (g0 parl.SubGroup)
 	GoDone(g0 parl.Go, err error)
-	UpdateThread(goEntityID GoEntityID, threadData *ThreadData)
+	UpdateThread(goEntityID parl.GoEntityID, threadData *ThreadData)
 	Cancel()
 	Context() (ctx context.Context)
 }

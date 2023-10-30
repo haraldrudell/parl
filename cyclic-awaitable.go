@@ -8,7 +8,9 @@ package parl
 import "sync/atomic"
 
 const (
-	CyclicAwaitableClosed = true
+	// as argument to NewCyclicAwaitable, causes the awaitable ot be initially
+	// triggered
+	CyclicAwaitableClosed bool = true
 )
 
 // CyclicAwaitable is an awaitable that can be re-initialized
@@ -19,67 +21,47 @@ const (
 //     allows for race-free consumers
 //   - Close is idempotent, panic-free
 //   - if atomic.Pointer[Awaitable] is used for retrieval, a cyclic semaphore is achieved
-type CyclicAwaitable atomic.Pointer[Awaitable]
+type CyclicAwaitable struct{ *atomic.Pointer[Awaitable] }
 
 // NewCyclicAwaitable returns an awaitable that can be re-initialized
-//   - Init must be invoked prior to use
-func NewCyclicAwaitable() (awaitable *CyclicAwaitable) {
-	return &CyclicAwaitable{}
-}
-
-// Init sets the initial state of the awaitable
-//   - default is not triggered
-//   - if argument [task.CyclicAwaitableClosed], initial state
-//     is triggered
-func (a *CyclicAwaitable) Init(initiallyClosed ...bool) (a2 *CyclicAwaitable) {
-	a2 = a
-	var shouldBeClosed = len(initiallyClosed) > 0 && initiallyClosed[0]
-	var awaitable = NewAwaitable()
-	if shouldBeClosed {
-		awaitable.Close()
+//   - if argument [task.CyclicAwaitableClosed] is provided, the initial state
+//     of the CyclicAwaitable is triggered
+func NewCyclicAwaitable(initiallyClosed ...bool) (awaitable *CyclicAwaitable) {
+	c := CyclicAwaitable{Pointer: &atomic.Pointer[Awaitable]{}}
+	c.Store(NewAwaitable())
+	if len(initiallyClosed) > 0 && initiallyClosed[0] {
+		c.Close()
 	}
-	(*atomic.Pointer[Awaitable])(a).Store(awaitable)
-	return
+	return &c
 }
 
 // Ch returns an awaitable channel. Thread-safe
-func (a *CyclicAwaitable) Ch() (ch AwaitableCh) {
-	return (*atomic.Pointer[Awaitable])(a).Load().Ch()
-}
+func (a *CyclicAwaitable) Ch() (ch AwaitableCh) { return a.Pointer.Load().Ch() }
 
 // isClosed inspects whether the awaitable has been triggered
 //   - isClosed indicates that the channel is closed
-//   - isAboutToClose indicates that Close has been invoked,
-//     but that channel close may still be in progress
-//   - if isClosed is true, isAboutToClose is also true
-//   - the two values are requried to attain race-free consumers
 //   - Thread-safe
-func (a *CyclicAwaitable) IsClosed() (isClosed, isAboutToClose bool) {
-	return (*atomic.Pointer[Awaitable])(a).Load().IsClosed()
-}
+func (a *CyclicAwaitable) IsClosed() (isClosed bool) { return a.Load().IsClosed() }
 
 // Close triggers awaitable by closing the channel
 //   - upon return, the channel is guaranteed to be closed
 //   - idempotent, panic-free, thread-safe
-func (a *CyclicAwaitable) Close() (didClose bool) {
-	return (*atomic.Pointer[Awaitable])(a).Load().Close()
-}
+func (a *CyclicAwaitable) Close() (didClose bool) { return a.Load().Close() }
 
 // Open rearms the awaitable for another cycle
 //   - upon return, the channel is guarantee to be open
 //   - idempotent, panic-free, thread-safe
 func (a *CyclicAwaitable) Open() (didOpen bool) {
-	var openp *Awaitable
+	var openedAwaitable *Awaitable
 	for {
-		var ap = (*atomic.Pointer[Awaitable])(a).Load()
-		var isClosed, _ = ap.IsClosed()
-		if !isClosed {
+		var awaitable = a.Load()
+		if !awaitable.IsClosed() {
 			return // was open return
 		}
-		if openp == nil {
-			openp = NewAwaitable()
+		if openedAwaitable == nil {
+			openedAwaitable = NewAwaitable()
 		}
-		if didOpen = (*atomic.Pointer[Awaitable])(a).CompareAndSwap(ap, openp); didOpen {
+		if didOpen = a.CompareAndSwap(awaitable, openedAwaitable); didOpen {
 			return // did open the channel return
 		}
 	}

@@ -6,154 +6,85 @@ All rights reserved
 package iters
 
 import (
-	"errors"
-	"strings"
 	"testing"
-
-	"github.com/haraldrudell/parl/perrors"
 )
 
 func TestConverterIterator(t *testing.T) {
-	valueK := "value"
-	valueT := 17
-	iterErr := errors.New("iter-err")
-	errBadK := errors.New("bad K")
-	errFnShouldFail := errors.New("fnShouldError")
+	// keys that the converter-iterator will iterate over
+	var keys = []string{"z", "keyTwo"}
+	// the expected values produces by the converter iterator
+	var values = func(keys []string) (values []int) {
+		values = make([]int, len(keys))
+		for i, key := range keys {
+			values[i] = len(key)
+		}
+		return
+	}(keys)
 
-	var err error
-	var iter Iterator[int]
-	var slice = []string{valueK}
-	var actualT int
+	t.Logf("keys: %v", keys)
+	t.Logf("values: %v", values)
+
+	var keyIterator = NewSliceIterator(keys)
+	var value int
 	var hasValue bool
-	var zeroValueT int
-	var fnShouldError bool
-	fn := func(key string, isCancel bool) (value int, err error) {
-		if fnShouldError {
-			fnShouldError = false
-			err = errFnShouldFail
-			return
-		}
-		if isCancel {
-			return
-		}
-		if key != valueK {
-			err = errBadK
-			return
-		}
-		value = valueT
-		return
-	}
-
-	// test methods
-
-	// Next
-	iter = NewConverterIterator(NewSliceIterator(slice), fn)
-	// Next1: exhaust keys
-	if actualT, hasValue = iter.Next(); !hasValue {
-		t.Error("Next1 hasValue false")
-	}
-	if actualT != valueT {
-		t.Errorf("Next1 %d exp: %d", actualT, valueT)
-	}
-	// Next2: exhaust keys
-	if actualT, hasValue = iter.Next(); hasValue {
-		t.Error("Next2 hasValue true")
-	}
-	if actualT != zeroValueT {
-		t.Errorf("Next2 %d exp: %d", actualT, zeroValueT)
-	}
-	// Next3: fn error
-	fnShouldError = true
-	iter = NewConverterIterator(NewSliceIterator(slice), fn)
-	if actualT, hasValue = iter.Next(); hasValue {
-		t.Error("Next3 hasValue true")
-	}
-	if actualT != zeroValueT {
-		t.Errorf("Next3 %d exp: %d", actualT, zeroValueT)
-	}
-	//Next4
-	if actualT, hasValue = iter.Next(); hasValue {
-		t.Error("Next4 hasValue true")
-	}
-	if actualT != zeroValueT {
-		t.Errorf("Next4 %d exp: %d", actualT, zeroValueT)
-	}
-
-	// SameValue
-	iter = NewConverterIterator(NewSliceIterator(slice), fn)
-	if actualT = iter.SameValue(); actualT != valueT {
-		t.Errorf("SameValue %d exp: %d", actualT, valueT)
-	}
-	// SameValue2
-	if actualT = iter.SameValue(); actualT != valueT {
-		t.Errorf("SameValue2 %d exp: %d", actualT, valueT)
-	}
-
-	// Cancel
-	iter = NewConverterIterator(NewSliceIterator(slice), fn)
-	delegator := iter.(*Delegator[int])
-	converterItertor := delegator.Delegate.(*ConverterIterator[string, int])
-	converterItertor.err = iterErr
-	if err = iter.Cancel(); err != iterErr {
-		t.Errorf("Cancel1 err: '%v' exp: '%v'", err, iterErr)
-	}
-	if err = iter.Cancel(); err != iterErr {
-		t.Errorf("Cancel2 err: '%v' exp: '%v'", err, iterErr)
-	}
-	iter = NewConverterIterator(NewSliceIterator(slice), func(key string, isCancel bool) (value int, err error) {
-		return
-	})
-	if err = iter.Cancel(); err != nil {
-		t.Errorf("Cancel3 err: '%v''", err)
-	}
-}
-
-func TestNewConverterIterator(t *testing.T) {
-	valueK := "value"
-	messageFnNil := "fn cannot be nil"
-	messageKeytIteratorNil := "keyIterator cannot be nil"
-
-	var slice = []string{valueK}
+	var zeroValue int
 	var err error
-	fn := func(key string, isCancel bool) (value int, err error) { return }
 
-	NewConverterIterator(NewSliceIterator(slice), fn)
+	var iterator Iterator[int] = NewConverterIterator(
+		keyIterator,
+		converterFunction,
+	)
 
-	func() {
-		defer func() {
-			if v := recover(); v != nil {
-				var ok bool
-				if err, ok = v.(error); !ok {
-					err = perrors.Errorf("panic-value not error; %T '%[1]v'", v)
-				}
-			}
-		}()
-		NewConverterIterator[string, int](nil, nil)
-	}()
-	if err == nil || !strings.Contains(err.Error(), messageFnNil) {
-		t.Errorf("NewConverterIterator incorrect panic: '%v' exp %q", err, messageFnNil)
+	// Same should advance to the first value
+	value, hasValue = iterator.Same()
+	//hasValue should be true
+	if !hasValue {
+		t.Error("Same hasValue false")
+	}
+	// value should be first value
+	if value != values[0] {
+		t.Errorf("Same value %q exp %q", value, values[0])
 	}
 
-	func() {
-		defer func() {
-			if v := recover(); v != nil {
-				var ok bool
-				if err, ok = v.(error); !ok {
-					err = perrors.Errorf("panic-value not error; %T '%[1]v'", v)
-				}
-			}
-		}()
-		NewConverterIterator(nil, fn)
-	}()
-	if err == nil || !strings.Contains(err.Error(), messageKeytIteratorNil) {
-		t.Errorf("NewConverterIterator incorrect key panic: '%v' exp %q", err, messageKeytIteratorNil)
+	// Next should return the second value
+	value, hasValue = iterator.Next()
+	if !hasValue {
+		t.Errorf("Next hasValue false")
+	}
+	if value != values[1] {
+		t.Errorf("Next value %q exp %q", value, values[1])
+	}
+
+	// Next should return no value
+	value, hasValue = iterator.Next()
+	if hasValue {
+		t.Errorf("Next2 hasValue true")
+	}
+	if value != zeroValue {
+		t.Errorf("Next2 value %q exp %q", value, zeroValue)
+	}
+
+	// cancel should not return error
+	if err = iterator.Cancel(); err != nil {
+		t.Errorf("Cancel err '%v'", err)
 	}
 }
 
-func TestInitConverterIterator(t *testing.T) {
-	keyIterator := NewEmptyIterator[string]()
-	var iterp ConverterIterator[string, int]
-	fn := func(key string, isCancel bool) (value int, err error) { return }
+// type ConverterFunction[K constraints.Ordered, V any]
+// func(key K, isCancel bool) (value V, err error)
+var _ ConverterFunction[string, int] = converterFunction
 
-	InitConverterIterator(&iterp, keyIterator, fn)
+// converterFunction can be used with a
+// ConverterIterator as ConverterFunction[string, int]
+func converterFunction(key string, isCancel bool) (value int, err error) {
+
+	// handle cancel
+	if isCancel {
+		return
+	}
+
+	// produce value corresponding to key
+	value = len(key)
+
+	return
 }

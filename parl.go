@@ -60,7 +60,7 @@ mains.Recover is similar for the process.
 	func thread(errCh *parl.NBChan[error]) { // real-time non-blocking error channel
 	  defer errCh.Close() // non-blocking close effective on send complete
 	  var err error
-	  defer parl.Recover2(parl.Annotation(), &err, errCh.Send)
+	  defer parl.Recover2("", &err, errCh.Send)
 	  errCh.Ch() <- err // non-blocking
 	  if err = someFunc(); err != nil {
 	    err = perrors.Errorf("someFunc: %w", err) // labels and attaches a stack

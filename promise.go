@@ -49,7 +49,7 @@ func NewPromise[T any](resolver TFunc[T], g0 Go) (promise *Promise[T]) {
 func promiseThread[T any](resolver TFunc[T], future *Future[TResult[T]], g0 Go) {
 	var err error
 	defer g0.Done(&err)
-	defer Recover(Annotation(), &err, NoOnError)
+	defer PanicToErr(&err)
 
 	var promiseValue TResult[T]
 	defer future.End(&promiseValue, &promiseValue.Err)

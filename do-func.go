@@ -10,7 +10,7 @@ package parl
 func DoThread(op func() (err error), g0 Go) {
 	var err error
 	defer g0.Done(&err)
-	defer Recover(Annotation(), &err, NoOnError)
+	defer PanicToErr(&err)
 
 	err = op()
 }
@@ -18,7 +18,7 @@ func DoThread(op func() (err error), g0 Go) {
 func DoProcThread(op func(), g0 Go) {
 	var err error
 	defer g0.Done(&err)
-	defer Recover(Annotation(), &err, NoOnError)
+	defer PanicToErr(&err)
 
 	op()
 }
@@ -31,7 +31,7 @@ func DoThreadError(op func() (err error), errCh chan<- error, g0 Go) {
 		errCh <- err
 		err = nil
 	}()
-	defer Recover(Annotation(), &err, NoOnError)
+	defer PanicToErr(&err)
 
 	err = op()
 }

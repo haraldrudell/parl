@@ -137,18 +137,18 @@ func TestGoGroup(t *testing.T) {
 	goGroup = NewGoGroup(context.Background())
 	subGo = goGroup.SubGo()
 	goGroupImpl = subGo.(*GoGroup)
-	if goGroupImpl.isSubGroup.Load() {
+	if goGroupImpl.isSubGroup {
 		t.Error("SubGo returned SubGroup")
 	}
-	if goGroupImpl.hasErrorChannel.Load() {
+	if goGroupImpl.hasErrorChannel {
 		t.Error("SubGo has error channel")
 	}
 	subGroup = goGroup.SubGroup()
 	goGroupImpl = subGroup.(*GoGroup)
-	if !goGroupImpl.isSubGroup.Load() {
+	if !goGroupImpl.isSubGroup {
 		t.Error("SubGroup did not return SubGroup")
 	}
-	if !goGroupImpl.hasErrorChannel.Load() {
+	if !goGroupImpl.hasErrorChannel {
 		t.Error("SubGroup does not have error channel")
 	}
 
@@ -171,8 +171,9 @@ func TestGoGroup(t *testing.T) {
 	// Add() UpdateThread() SetDebug() Threads() NamedThreads() G0ID()
 	goGroup = NewGoGroup(context.Background())
 	goGroupImpl = goGroup.(*GoGroup)
+
 	expectG0ID = uint64(goGroupImpl.goEntityID.id)
-	if expectG0ID != uint64(goGroupImpl.G0ID()) {
+	if expectG0ID != uint64(goGroupImpl.EntityID()) {
 		t.Error("goGroupImpl.G0ID bad")
 	}
 	goGroup.Go().Register()
@@ -365,11 +366,11 @@ func TestCancel(t *testing.T) {
 	})
 
 	var threadGroup = NewGoGroup(ctx)
-	threadGroup.(*GoGroup).AddNotifier(func(slice pruntime.StackSlice) {
+	threadGroup.(*GoGroup).addNotifier(func(slice pruntime.StackSlice) {
 		t.Logf("CANCEL %s %s", GoChain(threadGroup), slice)
 	})
 	var subGroup = threadGroup.SubGroup()
-	subGroup.(*GoGroup).AddNotifier(func(slice pruntime.StackSlice) {
+	subGroup.(*GoGroup).addNotifier(func(slice pruntime.StackSlice) {
 		t.Logf("CANCEL %s %s", GoChain(subGroup), slice)
 	})
 	t.Logf("STATE0: %t %t", threadGroup.Context().Err() != nil, subGroup.Context().Err() != nil)

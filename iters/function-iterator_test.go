@@ -14,62 +14,66 @@ import (
 )
 
 func TestFunctionIterator(t *testing.T) {
-	slice := []string{"one", "two"}
-	//messageFnNil := "fn cannot be nil"
+	var values = []string{"one", "two"}
 
 	var value string
 	var hasValue bool
 	var zeroValue string
-	var iter FunctionIterator[string]
-	fn := func(index int) (value string, err error) {
-		if index == FunctionIteratorCancel {
-			t.Log("fn cancel")
-			return
-		}
-		if index >= len(slice) {
-			t.Log("fn ErrEndCallbacks")
-			err = cyclebreaker.ErrEndCallbacks
-			_ = errors.As
-			return
-		}
-		value = slice[index]
-		t.Logf("fn value: %q", value)
-		return
-	}
 	var err error
 
-	InitFunctionIterator(&iter, fn)
+	// test type that has tt.fn function that can be used with function iterator
+	var tt *fnIteratorTester = newFnIteratorTester(values, t)
+	// the iterator under test
+	var iterator Iterator[string] = NewFunctionIterator(tt.fn)
 
-	// Same twice
+	// NewFunctionIterator should return a value
+	if iterator == nil {
+		t.Error("iterator nil")
+		t.FailNow()
+	}
+
+	// request IsSame value twice should:
+	//	- retrieve the first value and return it
+	//	- then return the same value again
 	for i := 0; i <= 1; i++ {
-		if value, hasValue = iter.Next(IsSame); !hasValue {
-			t.Errorf("Same%d hasValue false", i)
-		}
-		if value != slice[0] {
-			t.Errorf("Same%d value %q exp %q", i, value, slice[0])
+		value, hasValue = iterator.Same()
 
+		//hasValue should be true
+		if !hasValue {
+			t.Errorf("Same%d: hasValue false", i)
+		}
+		// value should be first value
+		if value != values[0] {
+			t.Errorf("Same%d value %q exp %q", i, value, values[0])
 		}
 	}
 
-	// Next
-	if value, hasValue = iter.Next(IsNext); !hasValue {
+	// Next should return the second value
+	value, hasValue = iterator.Next()
+	if !hasValue {
 		t.Errorf("Next hasValue false")
 	}
-	if value != slice[1] {
-		t.Errorf("Next value %q exp %q", value, slice[1])
+	if value != values[1] {
+		t.Errorf("Next value %q exp %q", value, values[1])
 	}
-	if value, hasValue = iter.Next(IsNext); hasValue {
+
+	// Next should return no value
+	value, hasValue = iterator.Next()
+	if hasValue {
 		t.Errorf("Next2 hasValue true")
 	}
 	if value != zeroValue {
 		t.Errorf("Next2 value %q exp %q", value, zeroValue)
 	}
 
-	if err = iter.Cancel(); err != nil {
+	// cancel should not return error
+	if err = iterator.Cancel(); err != nil {
 		t.Errorf("Cancel err '%v'", err)
 	}
 
-	if value, hasValue = iter.Next(IsNext); hasValue {
+	// Next after cancel should not return a value
+	value, hasValue = iterator.Next()
+	if hasValue {
 		t.Errorf("Next3 hasValue true")
 	}
 	if value != zeroValue {
@@ -77,92 +81,102 @@ func TestFunctionIterator(t *testing.T) {
 	}
 }
 
+// tests interface Iterator[string]
 func TestNewFunctionIterator(t *testing.T) {
-	slice := []string{}
+	var values = []string{}
 	var zeroValue string
-	messageIterpNil := "cannot be nil"
-	fn := func(index int) (value string, err error) {
-		if index == FunctionIteratorCancel {
-			return
-		}
-		if index >= len(slice) {
-			err = cyclebreaker.ErrEndCallbacks
-			return
-		}
-		value = slice[index]
-		return
-	}
+	var messageIterpNil = "cannot be nil"
 
-	var iter Iterator[string]
+	var iterator Iterator[string]
 	var value string
 	var hasValue bool
 	var err error
 
-	iter = NewFunctionIterator(fn)
+	// test type that has tt.fn function that can be used with function iterator
+	var tt = newFnIteratorTester(values, t)
+	iterator = NewFunctionIterator(tt.fn)
 
-	if value, hasValue = iter.Same(); hasValue {
+	// Same should retrieve the first value, but there isn’t one
+	value, hasValue = iterator.Same()
+	// hasValue should be false
+	if hasValue {
 		t.Error("Same hasValue true")
 	}
+	// value shouldbe zero-value
 	if value != zeroValue {
 		t.Error("Same hasValue not zeroValue")
 	}
 
-	err = nil
-	cyclebreaker.RecoverInvocationPanic(func() {
-		NewFunctionIterator[string](nil)
-	}, &err)
+	// new with nil argument should panic
+	_, err = tt.invokeNewFunctionIterator(nil)
 	if err == nil || !strings.Contains(err.Error(), messageIterpNil) {
 		t.Errorf("InitSliceIterator incorrect panic: '%v' exp %q", err, messageIterpNil)
 	}
 
-	if err = NewFunctionIterator(fn).Cancel(); err != nil {
+	// new and cancel should not return error
+	iterator, err = tt.invokeNewFunctionIterator(tt.fn)
+	_ = err
+	err = iterator.Cancel()
+	if err != nil {
 		t.Errorf("Cancel2 err: '%v'", err)
 	}
 }
 
-func TestInitFunctionIterator(t *testing.T) {
-	slice := []string{"one", "two"}
-	messageIterpNil := "cannot be nil"
-	fn := func(index int) (value string, err error) {
-		if index == FunctionIteratorCancel {
-			return
-		}
-		if index >= len(slice) {
-			err = cyclebreaker.ErrEndCallbacks
-			return
-		}
-		value = slice[index]
+// fnIteratorTester is a fixture for testing Iterator[T] implementations
+type fnIteratorTester struct {
+	index  int        // index is current index in slice
+	values []string   // values are ethe values provided during iteration
+	t      *testing.T // testing instance
+}
+
+func newFnIteratorTester(values []string, t *testing.T) (tt *fnIteratorTester) {
+	return &fnIteratorTester{
+		values: values,
+		t:      t,
+	}
+}
+
+var _ IteratorFunction[string] = (&fnIteratorTester{}).fn
+
+// tt.fn is a function that can be used with function iterator
+func (tt *fnIteratorTester) fn(isCancel bool) (value string, err error) {
+	t := tt.t
+
+	// on cancel request
+	if isCancel {
+		t.Log("fn cancel")
 		return
 	}
 
-	var iter FunctionIterator[string]
-	var value string
-	var hasValue bool
-	var iterpNil *FunctionIterator[string]
-	var err error
+	// index should be a sequence 0…
 
-	InitFunctionIterator(&iter, fn)
-
-	if value, hasValue = iter.Next(IsSame); !hasValue {
-		t.Error("Same hasValue false")
-	}
-	if value != slice[0] {
-		t.Errorf("Same value %q exp %q", value, slice[0])
+	// index beyond number of values
+	if tt.index >= len(tt.values) {
+		t.Log("fn ErrEndCallbacks")
+		err = cyclebreaker.ErrEndCallbacks
+		_ = errors.As
+		return
 	}
 
-	err = nil
-	cyclebreaker.RecoverInvocationPanic(func() {
-		InitFunctionIterator(iterpNil, fn)
-	}, &err)
-	if err == nil || !strings.Contains(err.Error(), messageIterpNil) {
-		t.Errorf("InitSliceIterator incorrect panic: '%v' exp %q", err, messageIterpNil)
-	}
+	// return value
+	value = tt.values[tt.index]
+	tt.index++
+	t.Logf("fn value: %q", value)
 
-	err = nil
-	cyclebreaker.RecoverInvocationPanic(func() {
-		InitFunctionIterator(&iter, nil)
-	}, &err)
-	if err == nil || !strings.Contains(err.Error(), messageIterpNil) {
-		t.Errorf("InitSliceIterator incorrect panic: '%v' exp %q", err, messageIterpNil)
-	}
+	return
+}
+func (tt *fnIteratorTester) invokeNewFunctionIterator(fn IteratorFunction[string]) (
+	iterator Iterator[string],
+	err error,
+) {
+	defer func() {
+		v := recover()
+		if v == nil {
+			return
+		}
+		err = v.(error)
+	}()
+
+	iterator = NewFunctionIterator[string](fn)
+	return
 }

@@ -82,10 +82,10 @@ func (t *ThreadLogger) Log() (t2 *ThreadLogger) {
 		close(t.endCh)
 		return // thread-group already ended
 	}
-	g.aggregateThreads.Store(true)
+	g.isAggregateThreads.Store(true)
 
 	if g.Context().Err() == nil {
-		g.goContext.cancelListener = t.cancelListener
+		g.goContext.setCancelListener(t.cancelListener)
 		log(threadLoggerLabel + ": listening for Cancel")
 		return
 	}
@@ -117,7 +117,7 @@ func (t *ThreadLogger) printThread() {
 	var g = t.goGroup
 	var log = t.log
 	defer close(t.endCh)
-	defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
+	defer parl.Recover("", nil, parl.Infallible)
 	defer func() { log("%s %s: %s", parl.ShortSpace(), threadLoggerLabel, "thread-group ended") }()
 
 	// ticker for periodic printing
@@ -125,7 +125,7 @@ func (t *ThreadLogger) printThread() {
 	defer ticker.Stop()
 
 	var endCh <-chan struct{}
-	if g.hasErrorChannel.Load() {
+	if g.hasErrorChannel {
 		endCh = g.ch.WaitForCloseCh()
 	} else {
 		endCh = g.endCh.Ch()

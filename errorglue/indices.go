@@ -22,9 +22,9 @@ const (
 //   - stack[panicIndex] is the code line causing the panic
 func Indices(stack pruntime.StackSlice) (isPanic bool, recoveryIndex, panicIndex int) {
 	found := 0
-	length := len(stack)
+	stackLength := len(stack)
 	pd := panicDetectorOne
-	for i := 0; i < length; i++ {
+	for i := 0; i < stackLength; i++ {
 		funcName := stack[i].FuncName
 		if i > 0 && funcName == pd.runtimeDeferInvokerLocation {
 			recoveryIndex = i - 1
@@ -33,10 +33,10 @@ func Indices(stack pruntime.StackSlice) (isPanic bool, recoveryIndex, panicIndex
 				break
 			}
 		}
-		if i+1 < length && funcName == pd.runtimePanicFunctionLocation {
+		if i+1 < stackLength && funcName == pd.runtimePanicFunctionLocation {
 
 			// scan for end of runtime functions
-			for panicIndex = i + 1; panicIndex+1 < length; panicIndex++ {
+			for panicIndex = i + 1; panicIndex+1 < stackLength; panicIndex++ {
 				if !strings.HasPrefix(stack[panicIndex].FuncLine(), runtimePrefix) {
 					break // this frame not part of the runtime
 				}
@@ -52,6 +52,7 @@ func Indices(stack pruntime.StackSlice) (isPanic bool, recoveryIndex, panicIndex
 	return
 }
 
+// WhyNotPanic returns a printble string explaining panic-data on err
 func WhyNotPanic(err error) (s string) {
 	stack := GetInnerMostStack(err)
 	isPanic, recoveryIndex, panicIndex := Indices(stack)

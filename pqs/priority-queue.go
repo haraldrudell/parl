@@ -4,10 +4,11 @@ ISC License
 */
 
 // Ranking is a pointer-identity-to-value map of updatable values traversable by rank.
-// Ranking implements [parli.Ranking][V comparable, R constraints.Ordered].
-package pmaps
+// Ranking implements [parl.Ranking][V comparable, R constraints.Ordered].
+package pqs
 
 import (
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pslices"
@@ -15,7 +16,7 @@ import (
 )
 
 // PriorityQueue is a pointer-identity-to-value map of updatable values traversable by rank.
-// PriorityQueue implements [parli.PriorityQueue][V comparable, R constraints.Ordered].
+// PriorityQueue implements [parl.PriorityQueue][V comparable, R constraints.Ordered].
 //   - V is a value reference composite type that is comparable, ie. not slice map function.
 //     Preferrably, V is interface or pointer to struct type.
 //   - R is an ordered type such as int floating-point string, used to rank the V values
@@ -37,7 +38,7 @@ type PriorityQueue[V any, P constraints.Ordered] struct {
 // NewPriorityQueue returns a map of updatable values traversable by rank
 func NewPriorityQueue[V any, P constraints.Ordered](
 	priorityFunc func(value *V) (priority P),
-) (priorityQueue parli.PriorityQueue[V, P]) {
+) (priorityQueue parl.PriorityQueue[V, P]) {
 	if priorityFunc == nil {
 		perrors.NewPF("ranker cannot be nil")
 	}

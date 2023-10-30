@@ -64,10 +64,6 @@ func TestGo(t *testing.T) {
 	if _, ok = <-goGroup.Ch(); ok {
 		t.Error("g0.Done goGroup errch did not close")
 	}
-	if !g0Impl.wg.IsZero() {
-		t.Error("!g0Impl.wg.IsZero")
-		t.FailNow()
-	}
 	g0.Wait()
 
 	// Cancel() Context()

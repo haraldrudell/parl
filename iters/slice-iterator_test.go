@@ -6,96 +6,74 @@ All rights reserved
 package iters
 
 import (
-	"strings"
+	"slices"
 	"testing"
-
-	"github.com/haraldrudell/parl/internal/cyclebreaker"
-	"golang.org/x/exp/slices"
 )
 
 func TestSliceIterator(t *testing.T) {
-	slice := []string{"one", "two"}
-	var zeroValue string
+	var values = []string{"one", "two"}
 
 	var err error
-	var iter SliceIterator[string]
 	var value string
 	var hasValue bool
+	var zeroValue string
 
-	InitSliceIterator(&iter, slices.Clone(slice))
+	var iterator Iterator[string] = NewSliceIterator(slices.Clone(values))
 
-	// Same twice
+	// request IsSame value twice should:
+	//	- retrieve the first value and return it
+	//	- then return the same value again
 	for i := 0; i <= 1; i++ {
-		if value, hasValue = iter.Next(IsSame); !hasValue {
+		value, hasValue = iterator.Same()
+
+		//hasValue should be true
+		if !hasValue {
 			t.Errorf("Same%d hasValue false", i)
 		}
-		if value != slice[0] {
-			t.Errorf("Same%d value %q exp %q", i, value, slice[0])
+		// value should be first value
+		if value != values[0] {
+			t.Errorf("Same%d value %q exp %q", i, value, values[0])
 
 		}
 	}
 
-	// Next
-	if value, hasValue = iter.Next(IsNext); !hasValue {
+	// Next should return the second value
+	value, hasValue = iterator.Next()
+	if !hasValue {
 		t.Errorf("Next hasValue false")
 	}
-	if value != slice[1] {
-		t.Errorf("Next value %q exp %q", value, slice[1])
+	if value != values[1] {
+		t.Errorf("Next value %q exp %q", value, values[1])
 	}
-	if value, hasValue = iter.Next(IsNext); hasValue {
+
+	// Next should return no value
+	value, hasValue = iterator.Next()
+	if hasValue {
 		t.Errorf("Next2 hasValue true")
 	}
 	if value != zeroValue {
 		t.Errorf("Next2 value %q exp %q", value, zeroValue)
 	}
 
-	if err = iter.Cancel(); err != nil {
+	// cancel should not return error
+	if err = iterator.Cancel(); err != nil {
 		t.Errorf("Cancel err '%v'", err)
 	}
 }
 
 func TestNewSliceIterator(t *testing.T) {
-	slice := []string{}
-	var zeroValue string
+	var values = []string{}
 
-	var iter Iterator[string]
 	var value string
 	var hasValue bool
+	var zeroValue string
 
-	iter = NewSliceIterator(slices.Clone(slice))
+	var iterator Iterator[string] = NewSliceIterator(slices.Clone(values))
 
-	if value, hasValue = iter.Same(); hasValue {
+	if value, hasValue = iterator.Same(); hasValue {
 		t.Error("Same hasValue true")
 	}
 	if value != zeroValue {
 		t.Error("Same hasValue not zeroValue")
-	}
-}
-
-func TestInitSliceIterator(t *testing.T) {
-	slice := []string{"one"}
-	messageIterpNil := "cannot be nil"
-
-	var iter SliceIterator[string]
-	var value string
-	var hasValue bool
-	var iterpNil *SliceIterator[string]
-	var err error
-
-	iter = SliceIterator[string]{}
-	InitSliceIterator(&iter, slices.Clone(slice))
-
-	if value, hasValue = iter.Next(IsSame); !hasValue {
-		t.Error("Same hasValue false")
-	}
-	if value != slice[0] {
-		t.Errorf("Same value %q exp %q", value, slice[0])
-	}
-
-	cyclebreaker.RecoverInvocationPanic(func() {
-		InitSliceIterator(iterpNil, slice)
-	}, &err)
-	if err == nil || !strings.Contains(err.Error(), messageIterpNil) {
-		t.Errorf("InitSliceIterator incorrect panic: '%v' exp %q", err, messageIterpNil)
 	}
 }

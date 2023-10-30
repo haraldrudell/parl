@@ -41,7 +41,7 @@ func (p *Periodically) Wait() {
 
 func (p *Periodically) doThread() {
 	defer p.wg.Done()
-	defer Recover(Annotation(), nil, Infallible)
+	defer Recover("", nil, Infallible)
 
 	ticker := time.NewTicker(p.period)
 	defer ticker.Stop()
@@ -58,7 +58,7 @@ func (p *Periodically) doThread() {
 }
 
 func (p *Periodically) doFn(t time.Time) {
-	defer Recover(Annotation(), nil, Infallible)
+	defer Recover("", nil, Infallible)
 
 	p.fn(t)
 }

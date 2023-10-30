@@ -3,13 +3,13 @@
 ISC License
 */
 
-package pmaps
+package pqs
 
 import (
 	"strconv"
 	"testing"
 
-	"github.com/haraldrudell/parl/parli"
+	"github.com/haraldrudell/parl"
 )
 
 func TestNewOrderedThreadSafe(t *testing.T) {
@@ -28,7 +28,7 @@ func TestNewOrderedThreadSafe(t *testing.T) {
 	exp1 := []*entity{&entity2, &entity1}
 	expLength := 2
 
-	var ranking parli.PriorityQueue[entity, int]
+	var ranking parl.PriorityQueue[entity, int]
 	var pmapsRankingThreadSafe *PriorityQueueThreadSafe[entity, int]
 	var pmapsRanking *PriorityQueue[entity, int]
 	var ok bool

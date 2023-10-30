@@ -23,6 +23,10 @@ type ThreadSafeThreadData struct {
 	td   ThreadData
 }
 
+func NewThreadSafeThreadData() (t *ThreadSafeThreadData) {
+	return &ThreadSafeThreadData{}
+}
+
 // HaveThreadID indicates whether Update has been invoked on this ThreadDataWrap
 // object.
 func (tw *ThreadSafeThreadData) HaveThreadID() (haveThreadID bool) {

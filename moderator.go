@@ -5,10 +5,6 @@ ISC License
 
 package parl
 
-import (
-	"context"
-)
-
 /*
 Moderator invokes functions at a limited level of parallelism.
 It is a ticketing system
@@ -22,7 +18,7 @@ It is a ticketing system
 */
 type Moderator struct {
 	moderatorCore
-	ctx context.Context
+	//ctx context.Context
 }
 
 // NewModerator creates a cancelable Moderator used to limit parallelism

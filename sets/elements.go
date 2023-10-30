@@ -8,95 +8,157 @@ package sets
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl/iters"
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// type Elements[T comparable] []T
-
-// ElementSlice ToDo
-type ElementSlice[T comparable, E any] struct {
-	lock     sync.Mutex
-	didNext  bool // indicates whether any value has been sought
-	hasValue bool // indicates whether index has been verified to be valid
-	index    int  // index in slice, 0…len(slice)
-	slice    []E
+// Elements is an Iterator[Element[T]] that reads from concrete slice []E
+//   - E is input concrete type, likely *struct, that implements Element[T]
+//   - T is some comparable type that E produces, allowing for different
+//     instances of E to be distinguished from one another
+//   - Element[T] is a type used by sets, enumerations and bit-fields
+//   - the Elements iterator provides a sequence of interface-type elements
+//     based on a slice of concrete implementation-type values,
+//     without re-creating the slice. Go cannot do type assertions on a slice,
+//     only on individual values
+type Elements[T comparable, E any] struct {
+	// elementSlice implements Cancel and delegateAction function
+	//	- implements iterator for Element[T]
+	//	- pointer since delegateAction is provided to delegate
+	*elementsAction[T, E]
+	// Delegator implements the value methods required by the [Iterator] interface
+	//   - Next HasNext NextValue
+	//     Same Has SameValue
+	//   - the delegate provides DelegateAction[T] function
+	iters.Delegator[Element[T]]
 }
 
-// NewElements returns an iterator of interface-type sets.Element[T] based from a
-// slice of non-interface-type Elements[T comparable].
+// elementsAction is an enclosed type implementing delegateAction function
+type elementsAction[T comparable, E any] struct {
+	elements []E // the slice providing values
+
+	// indicates that no further values can be returned
+	//	- written behind publicsLock
+	noValuesAvailable atomic.Bool
+
+	// publicsLock serializes invocations of iterator [ElementSlice.delegateAction]
+	publicsLock sync.Mutex
+
+	// delegateAction
+
+	// didNext indicates that a Next operation has completed and that hasValue may be valid
+	//	- behind publicsLock
+	didNext bool
+	// index in slice, 0…len(slice)
+	//	- behind lock
+	index int
+}
+
+// NewElements returns an iterator of interface-type sets.Element[T]
+//   - elements is a slice of a concrete type, named E, that should implement
+//     sets.Element
+//   - at compile time, elements is slice of any: []any
+//   - based on a slice of non-interface-type Elements[T comparable].
 func NewElements[T comparable, E any](elements []E) (iter iters.Iterator[Element[T]]) {
 
-	// runtime check if requyired type conversion works
-	var e *E
-	var a any = e
-	if _, ok := a.(Element[T]); !ok {
-		var returnElementTypeStr string
+	// runtime check if required type conversion works
+	var pointerToRuntimeE *E
+	var pointerToRuntimeEInterface any = pointerToRuntimeE
+	// type assertion of the runtime type *E to the interface type Element[T]
+	if _, ok := pointerToRuntimeEInterface.(Element[T]); !ok {
+
+		// runtime type *E does not implement Element[T]
+		//	- produce error message
+
+		// string description of runtime type Element[T]
+		var runtimeTypeElementTStringDescription string
 		var t *Element[T]
-		if returnElementTypeStr = fmt.Sprintf("%T", t); len(returnElementTypeStr) > 0 {
-			returnElementTypeStr = returnElementTypeStr[1:]
+		if runtimeTypeElementTStringDescription = fmt.Sprintf("%T", t); len(runtimeTypeElementTStringDescription) > 0 {
+			// drop leading * indicating pointer
+			runtimeTypeElementTStringDescription = runtimeTypeElementTStringDescription[1:]
 		}
-		var eTypeStr string
-		if eTypeStr = fmt.Sprintf("%T", t); len(eTypeStr) > 0 {
-			eTypeStr = eTypeStr[1:]
+
+		// string description of runtime type E
+		var runtimeTypeEStringDescription string
+		if runtimeTypeEStringDescription = fmt.Sprintf("%T", t); len(runtimeTypeEStringDescription) > 0 {
+			// delete the * indicating pointer
+			runtimeTypeEStringDescription = runtimeTypeEStringDescription[1:]
 		}
+
 		panic(perrors.ErrorfPF("input type %s does not implement interface-type %s",
-			eTypeStr, returnElementTypeStr,
+			runtimeTypeEStringDescription,
+			runtimeTypeElementTStringDescription,
 		))
 	}
 
 	// create the iterator
-	slice := ElementSlice[T, E]{slice: elements}
-	return &iters.Delegator[Element[T]]{Delegate: &slice}
+	e := elementsAction[T, E]{elements: elements}
+
+	return &Elements[T, E]{
+		elementsAction: &e,
+		Delegator:      *iters.NewDelegator(e.delegateAction),
+	}
 }
 
-func (iter *ElementSlice[T, E]) Next(isSame iters.NextAction) (value Element[T], hasValue bool) {
-	iter.lock.Lock()
-	defer iter.lock.Unlock()
+// delegateAction finds the next or the same value. Thread-safe
+//   - isSame == IsSame means first or same value should be returned
+//   - value is the sought value or the T type’s zero-value if no value exists
+//   - hasValue true means value was assigned a valid T value
+func (i *elementsAction[T, E]) delegateAction(isSame iters.NextAction) (value Element[T], hasValue bool) {
 
-	// if next operation has not completed, we do not know if a value exist,
-	// and next operation must be completed.
-	// if next has completed and we seek the same value, next operation should not be done.
-	if !iter.didNext || isSame != iters.IsSame {
-
-		// find slice index to use
-		if iter.hasValue {
-			// if a value has been found and is valid, advance index.
-			// the final value for iter.index is len(iter.slice)
-			iter.index++
-		}
-
-		// check if the new index is within available slice values
-		// when iter.index has reached len(iter.slice), iter.hasValue is always false.
-		// when hasValue is false, iter.index will no longer be incremented.
-		iter.hasValue = iter.index < len(iter.slice)
-
-		// indicate that iter.hasValue is now valid
-		if !iter.didNext {
-			iter.didNext = true
-		}
+	// fast outside-lock value-check
+	if i.noValuesAvailable.Load() {
+		return // no more values return
 	}
 
-	// get the value if it is valid, otherwise zero-value
-	if hasValue = iter.hasValue; hasValue {
-		var ePointer *E = &iter.slice[iter.index]
-		var a any = ePointer
-		var ok bool
-		if value, ok = a.(Element[T]); !ok {
-			// this is checked in NewElements: should never happen
-			panic(perrors.ErrorfPF("type assertion failed: %T %T", ePointer, value))
-		}
+	i.publicsLock.Lock()
+	defer i.publicsLock.Unlock()
+
+	// inside-lock value-check
+	if i.noValuesAvailable.Load() {
+		return // no more values return
 	}
 
-	return // value and hasValue indicates availability
+	// for IsSame operation the first value must be sought
+	//	- therefore, if the first value has not been sought, seek it now or
+	//	- if not IsSame operation, advance to the next value
+	if i.didNext {
+		if isSame == iters.IsNext {
+			// find slice index to use
+			//	- advance index until final value len(i.slice)
+			if i.index < len(i.elements) {
+				i.index++
+			}
+		}
+	} else {
+		// note that first value has been sought
+		i.didNext = true
+	}
+
+	// check if the new index is within available slice values
+	if hasValue = i.index < len(i.elements); !hasValue {
+		i.noValuesAvailable.CompareAndSwap(false, true)
+		return // no values return
+	}
+
+	// a is any but runtime type is *E, pointer to a concrete type, likely *struct
+	var ePointer any = &i.elements[i.index]
+
+	// do type assertion of ePointer to interface Element[T]
+	var ok bool
+	if value, ok = ePointer.(Element[T]); !ok {
+		// this type assertion was checked by NewElements: should never happen
+		panic(perrors.ErrorfPF("type assertion failed: %T %T", ePointer, value))
+	}
+
+	return // hasValue true, value valid return
 }
 
-func (iter *ElementSlice[T, E]) Cancel() (err error) {
-	iter.lock.Lock()
-	defer iter.lock.Unlock()
-
-	iter.hasValue = false // invalidate iter.value
-	iter.slice = nil      // prevent any next operation
+// Cancel release resources for this iterator. Thread-safe
+//   - not every iterator requires a Cancel invocation
+func (i *elementsAction[T, E]) Cancel() (err error) {
+	i.noValuesAvailable.CompareAndSwap(false, true)
 	return
 }

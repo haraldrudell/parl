@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// 1 is Go.Register/Go/SubGo/SubGroup/AddError/Done
-	// 1 is checkState
+	// counts public method: Go.Register/Go/SubGo/SubGroup/AddError/Done
+	// and [Go.checkState]
 	grCheckThreadFrames = 2
 )
 
@@ -30,128 +30,135 @@ const (
 //   - SubGroup creates a subordinate thread-group with its own error channel.
 //     Fatal-error thread-exits in SubGroup can be recovered locally in that thread-group
 type Go struct {
-	goEntityID
-	goParent        // Cancel() Context()
-	creatorThreadId parl.ThreadID
-	thread          ThreadSafeThreadData
-	// endCh is a channel that closes when this threadGroup ends
-	//	- endCh.Ch() is awaitable channel
-	//	- endCh.IsClosed() indicates ended
-	endCh parl.ClosableChan[struct{}]
+	goEntityID                    // EntityID(), uniquely identifies Go object
+	goParent                      // Cancel() Context()
+	creatorThreadId parl.ThreadID // the thread ID of the goroutine creating this thread
+	// tis thread’s Thread ID, creator location, go-function and
+	// possible printable thread-name
+	thread *ThreadSafeThreadData
+	endCh  parl.Awaitable // channel that closes when this Go ends
 }
 
-// newGo returns a Go object for a thread operating in a Go thread-group. Thread-safe.
+// newGo returns a Go object providing functions to a thread operating in a
+// Go thread-group. Thread-safe
+//   - parent is a GoGroup type configured as GoGroup, SubGo or SubGroup
+//   - goInvocation is the invoker of Go, ie. the parent thread
+//   - returns Go entity ID and thread data since the parent will
+//     immediately need those
 func newGo(parent goParent, goInvocation *pruntime.CodeLocation) (
 	g0 parl.Go,
-	goEntityID GoEntityID,
+	goEntityID parl.GoEntityID,
 	threadData *ThreadData) {
 	if parent == nil {
 		panic(perrors.NewPF("parent cannot be nil"))
 	}
 	g := Go{
-		goEntityID: *newGoEntityID(),
-		goParent:   parent,
+		goEntityID:      *newGoEntityID(),
+		goParent:        parent,
+		endCh:           *parl.NewAwaitable(),
+		creatorThreadId: goid.GoID(),
+		thread:          NewThreadSafeThreadData(),
 	}
-	g.wg.Add(1)
-	g.creatorThreadId = goid.GoID()
 	g.thread.SetCreator(goInvocation)
 
+	// return values
 	g0 = &g
-	goEntityID = g.G0ID()
+	goEntityID = g.EntityID()
 	threadData = g.thread.Get()
+
 	return
 }
 
-func (g0 *Go) Register(label ...string) (g00 parl.Go) { return g0.checkState(false, label...) }
-func (g0 *Go) Go() (g00 parl.Go)                      { return g0.checkState(false).goParent.FromGoGo() }
-func (g0 *Go) SubGo(onFirstFatal ...parl.GoFatalCallback) (subGo parl.SubGo) {
-	return g0.checkState(false).goParent.FromGoSubGo(onFirstFatal...)
+func (g *Go) Register(label ...string) (g00 parl.Go) { return g.ensureThreadData(label...) }
+func (g *Go) Go() (g00 parl.Go)                      { return g.ensureThreadData().goParent.FromGoGo() }
+func (g *Go) SubGo(onFirstFatal ...parl.GoFatalCallback) (subGo parl.SubGo) {
+	return g.ensureThreadData().goParent.FromGoSubGo(onFirstFatal...)
 }
-func (g0 *Go) SubGroup(onFirstFatal ...parl.GoFatalCallback) (subGroup parl.SubGroup) {
-	return g0.checkState(false).goParent.FromGoSubGroup(onFirstFatal...)
+func (g *Go) SubGroup(onFirstFatal ...parl.GoFatalCallback) (subGroup parl.SubGroup) {
+	return g.ensureThreadData().goParent.FromGoSubGroup(onFirstFatal...)
 }
 
-func (g0 *Go) AddError(err error) {
-	g0.checkState(false)
+// AddError emits a non-fatal errors
+func (g *Go) AddError(err error) {
+	g.ensureThreadData()
 
 	if err == nil {
 		return // nil error return
 	}
 
-	g0.ConsumeError(NewGoError(perrors.Stack(err), parl.GeNonFatal, g0))
+	g.ConsumeError(NewGoError(perrors.Stack(err), parl.GeNonFatal, g))
 }
 
 // Done handles thread exit. Deferrable
-func (g0 *Go) Done(errp *error) {
-	g0.checkState(true)
-	var didClose, _ = g0.endCh.Close()
-	if !didClose {
+//   - *errp contains possible fatalk thread error
+//   - errp can be nil
+func (g *Go) Done(errp *error) {
+	if !g.ensureThreadData().endCh.Close() {
 		panic(perrors.ErrorfPF("Go received multiple Done: ", perrors.ErrpString(errp)))
 	}
 
-	// obtain error and ensure it has stack
+	// obtain fatal error and ensure it has stack
 	var err error
 	if errp != nil {
 		err = perrors.Stack(*errp)
 	}
 
-	g0.goParent.GoDone(g0, err)
-	g0.wg.Done()
+	// notify parent of exit
+	g.goParent.GoDone(g, err)
 }
 
-func (g0 *Go) ThreadInfo() (threadData parl.ThreadData) { return g0.thread.Get() }
-func (g0 *Go) GoID() (threadID parl.ThreadID)           { return g0.thread.ThreadID() }
-func (g0 *Go) Creator() (threadID parl.ThreadID, createLocation *pruntime.CodeLocation) {
-	threadID = g0.creatorThreadId
-	var threadData = g0.thread.Get()
+func (g *Go) ThreadInfo() (threadData parl.ThreadData) { return g.thread.Get() }
+func (g *Go) GoID() (threadID parl.ThreadID)           { return g.thread.ThreadID() }
+func (g *Go) Creator() (threadID parl.ThreadID, createLocation *pruntime.CodeLocation) {
+	threadID = g.creatorThreadId
+	var threadData = g.thread.Get()
 	createLocation = &threadData.createLocation
 	return
 }
-func (g0 *Go) GoRoutine() (threadID parl.ThreadID, goFunction *pruntime.CodeLocation) {
-	var threadData = g0.thread.Get()
+func (g *Go) GoRoutine() (threadID parl.ThreadID, goFunction *pruntime.CodeLocation) {
+	var threadData = g.thread.Get()
 	threadID = threadData.threadID
 	goFunction = &threadData.funcLocation
 	return
 }
+func (g *Go) Wait()                         { <-g.endCh.Ch() }
+func (g *Go) WaitCh() (ch parl.AwaitableCh) { return g.endCh.Ch() }
 
-func (g0 *Go) Wait() {
-	<-g0.endCh.Ch()
-}
+// ensureThreadData is invoked by Go’s public methods ensuring that
+// the thread’s information is collected
+//   - label is an optional printable thread-name
+//   - ensureThreadData supports functional chaining
+func (g *Go) ensureThreadData(label ...string) (g1 *Go) {
+	g1 = g
 
-// checkState is invoked by public methods ensuring that terminated
-// objects are not being used
-//   - checkState also collects data on the new thread
-func (g0 *Go) checkState(skipTerminated bool, label ...string) (g *Go) {
-	g = g0
-	if !skipTerminated && g0.endCh.IsClosed() {
-		panic(perrors.NewPF("operation on terminated Go thread object"))
+	// if thread-data has already been collected, do nothing
+	if g.thread.HaveThreadID() {
+		return // already have thread-data return
 	}
 
-	// ensure we have a threadID
-	if g0.thread.HaveThreadID() {
-		return
-	}
-
-	// update thread information
+	// optional printable thread name
 	var label0 string
 	if len(label) > 0 {
 		label0 = label[0]
 	}
+
+	// get stack that contains thread ID, go function, go-function invoker
+	// for the new thread
 	var stack = pdebug.NewStack(grCheckThreadFrames)
 	if stack.IsMain() {
 		return // this should not happen, called by Main
 	}
 	// creator has already been set
-	g0.thread.Update(stack.ID(), nil, stack.GoFunction(), label0)
+	g.thread.Update(stack.ID(), nil, stack.GoFunction(), label0)
 
-	// propagate thread information
-	threadData := g0.thread.Get()
-	g0.UpdateThread(g0.G0ID(), threadData)
+	// propagate thread information to parent
+	g.UpdateThread(g.EntityID(), g.thread.Get())
+
 	return
 }
 
 // g1ID:4:g0.(*g1WaitGroup).Go-g1-thread-group.go:63
-func (g0 *Go) String() (s string) {
-	td := g0.thread.Get()
+func (g *Go) String() (s string) {
+	td := g.thread.Get()
 	return parl.Sprintf("go:%s:%s", td.threadID, td.createLocation.Short())
 }

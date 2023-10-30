@@ -86,7 +86,7 @@ func (sdo *SerialDoCore) Wait(at time.Time) {
 }
 
 func (sdo *SerialDoCore) doThread(at time.Time) {
-	defer Recover(Annotation(), nil, sdo.errFn)
+	defer Recover("", nil, sdo.errFn)
 
 	for {
 		sdo.invokeThunk(at)
@@ -122,7 +122,7 @@ func (sdo *SerialDoCore) checkForMoreDo() (at time.Time) {
 }
 
 func (sdo *SerialDoCore) invokeThunk(at time.Time) {
-	defer Recover(Annotation(), nil, sdo.errFn)
+	defer Recover("", nil, sdo.errFn)
 
 	sdo.thunk(at)
 }

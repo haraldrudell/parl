@@ -15,7 +15,7 @@ import (
 // Closer handles panics.
 // if errp is non-nil, panic values updates it using errors.AppendError.
 func Closer[T any](ch chan T, errp *error) {
-	defer Recover(Annotation(), errp, NoOnError)
+	defer Recover("", errp, NoOnError)
 
 	close(ch)
 }
@@ -24,7 +24,7 @@ func Closer[T any](ch chan T, errp *error) {
 // CloserSend handles panics.
 // if errp is non-nil, panic values updates it using errors.AppendError.
 func CloserSend[T any](ch chan<- T, errp *error) {
-	defer Recover(Annotation(), errp, NoOnError)
+	defer Recover("", errp, NoOnError)
 
 	close(ch)
 }
@@ -33,7 +33,7 @@ func CloserSend[T any](ch chan<- T, errp *error) {
 // Close handles panics.
 // if errp is non-nil, panic values updates it using errors.AppendError.
 func Close(closable io.Closer, errp *error) {
-	defer Recover(Annotation(), errp, NoOnError)
+	defer Recover("", errp, NoOnError)
 
 	if e := closable.Close(); e != nil {
 		*errp = perrors.AppendError(*errp, e)

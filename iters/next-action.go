@@ -5,23 +5,14 @@ All rights reserved
 
 package iters
 
-import "strconv"
+import "fmt"
 
-const (
-	IsSame NextAction = 0 // IsSame indicates to Delegate.Next that this is a Same-type incovation
-	IsNext NextAction = 1 // IsNext indicates to Delegate.Next that this is a Next-type incovation
-)
-
-// NextAction is a unique named type that indicates whether
-// the next or the same value again is sought by Delegate.Next
-type NextAction uint8
-
-func (na NextAction) String() (s string) {
+func (a NextAction) String() (s string) {
 	var ok bool
-	if s, ok = nextActionSet[na]; ok {
+	if s, ok = nextActionSet[a]; ok {
 		return
 	}
-	s = "?\x27" + strconv.Itoa(int(na)) + "\x27"
+	s = fmt.Sprintf("?“%d”", a)
 	return
 }
 

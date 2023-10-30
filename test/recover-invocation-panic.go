@@ -49,7 +49,7 @@ func RecoverInvocationPanic(fn func(), errp *error) {
 	if errp == nil {
 		panic(perrors.ErrorfPF("%w", ErrErrpNil))
 	}
-	defer Recover(Annotation(), errp, NoOnError)
+	defer Recover("", errp, NoOnError)
 
 	fn()
 }

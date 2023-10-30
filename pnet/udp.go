@@ -79,7 +79,7 @@ func (udp *UDP) listenThread() {
 			udp.StartingListen.Done()
 		}
 	}()
-	defer parl.Recover2(parl.Annotation(), nil, func(e error) { errCh <- e }) // capture panics
+	defer parl.Recover2("", nil, func(e error) { errCh <- e }) // capture panics
 
 	// listen
 	var netUDPConn *net.UDPConn // represents a network file descriptor

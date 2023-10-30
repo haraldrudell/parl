@@ -109,7 +109,7 @@ func (sdt *SlowDetectorThread) Stop(sdi *SlowDetectorInvocation) {
 func (sdt *SlowDetectorThread) thread(g0 Go) {
 	var err error
 	defer g0.Register("SlowDetectorThread" + goID().String()).Done(&err)
-	defer Recover(Annotation(), &err, NoOnError)
+	defer PanicToErr(&err)
 
 	ticker := time.NewTicker(slowScanPeriod)
 	defer ticker.Stop()

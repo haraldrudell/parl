@@ -12,24 +12,24 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-func GoChain(g0 parl.GoGen) (s string) {
+func GoChain(g parl.GoGen) (s string) {
 	for {
-		var s0 = GoNo(g0)
+		var s0 = GoNo(g)
 		if s == "" {
 			s = s0
 		} else {
 			s += "—" + s0
 		}
-		if g0 == nil {
+		if g == nil {
 			return
-		} else if g0 = Parent(g0); g0 == nil {
+		} else if g = Parent(g); g == nil {
 			return
 		}
 	}
 }
 
-func Parent(g0 parl.GoGen) (parent parl.GoGen) {
-	switch g := g0.(type) {
+func Parent(g parl.GoGen) (parent parl.GoGen) {
+	switch g := g.(type) {
 	case *Go:
 		parent = g.goParent.(parl.GoGen)
 	case *GoGroup:
@@ -44,23 +44,23 @@ func ContextID(ctx context.Context) (contextID string) {
 	return fmt.Sprintf("%x", parl.Uintptr(ctx))
 }
 
-func GoNo(g0 parl.GoGen) (goNo string) {
-	switch g := g0.(type) {
+func GoNo(g parl.GoGen) (goNo string) {
+	switch g1 := g.(type) {
 	case *Go:
-		goNo = "Go" + g.id.String() + ":" + g.GoID().String()
+		goNo = "Go" + g1.id.String() + ":" + g1.GoID().String()
 	case *GoGroup:
-		if !g.hasErrorChannel.Load() {
+		if !g1.hasErrorChannel {
 			goNo = "SubGo"
-		} else if g.parent != nil {
+		} else if g1.parent != nil {
 			goNo = "SubGroup"
 		} else {
 			goNo = "GoGroup"
 		}
-		goNo += g.id.String()
+		goNo += g1.id.String()
 	case nil:
 		goNo = "nil"
 	default:
-		goNo = fmt.Sprintf("?type:%T", g0)
+		goNo = fmt.Sprintf("?type:%T", g)
 	}
 	return
 }

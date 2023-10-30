@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	dataWaiterAfterClose = true
+// dataWaiterAfterClose = true
 )
 
 // Close orders the channel to close once pending sends complete.

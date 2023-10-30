@@ -316,7 +316,7 @@ func theThread(
 	timer *time.Timer,
 	cancelCh chan struct{},
 ) {
-	defer parl.Recover(parl.Annotation(), nil, parl.Infallible)
+	defer parl.Recover("", nil, parl.Infallible)
 
 	// 230718 there was a memory leak
 	//	- abandoned threads are stuck at the select

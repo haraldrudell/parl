@@ -20,13 +20,8 @@ func (v *V) String() (s string) {
 	return strconv.Itoa(v.value)
 }
 
-func testCmp(a, b *V) (result int) {
-	if a.value < b.value {
-		return -1
-	} else if a.value > b.value {
-		return 1
-	}
-	return 0
+func testLess(a, b *V) (aBeforeB bool) {
+	return a.value < b.value
 }
 
 func TestNewOrderedMapFunc(t *testing.T) {
@@ -39,7 +34,7 @@ func TestNewOrderedMapFunc(t *testing.T) {
 	var m OrderedMapFunc[int, *V]
 	var vPointers []*V
 
-	m = *NewOrderedMapFunc[int, *V](testCmp)
+	m = *NewOrderedMapFunc[int, *V](testLess)
 	// put in order 2, 3, 1
 	m.Put(v2.value, &v2)
 	t.Logf("%v", m.List())
@@ -54,9 +49,9 @@ func TestNewOrderedMapFunc(t *testing.T) {
 
 	// vPointers: [1 3]
 	if debug {
-		var mapContents = make([]string, len(m.Map.m))
+		var mapContents = make([]string, len(m.m2.m))
 		var i = 0
-		for key, value := range m.Map.m {
+		for key, value := range m.m2.m {
 			mapContents[i] = fmt.Sprintf("%d: %d", key, value.value)
 			i++
 		}

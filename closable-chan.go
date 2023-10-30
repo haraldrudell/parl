@@ -6,7 +6,6 @@ ISC License
 package parl
 
 import (
-	"sync"
 	"sync/atomic"
 )
 
@@ -29,14 +28,23 @@ import (
 //	  defer errCh.Close(&err) // will not terminate the process
 //	  errCh.Ch() <- err
 type ClosableChan[T any] struct {
-	hasChannel atomic.Bool // hasChannel provides thread-safe lock-free read of ch
-	chLock     sync.Mutex
-	// ch is the channel object
-	//	- outside the new function, ch is written behind chLock
-	ch chan T
+	// ch0 is the channel object
+	//	- ability to initialize ch0 in the constructor
+	//	- ability to update ch0 after creation
+	//	- ch0 therefore must be pointer
+	//	- ch0 must offer thread-safe access and update
 
-	isCloseInvoked atomic.Bool // indicates the channel being closed or about to close
-	closeOnce      Once        // [parl.Once] is an observable sync.Once
+	// ch0 as provided by contructor or nil
+	ch0 chan T
+	// ch0 provided post-constructor because ch0 nil
+	chp atomic.Pointer[chan T]
+
+	// indicates the channel about to close or closed
+	//	- because the channel may transfer data, it cannot be inspected for being closed
+	isCloseInvoked atomic.Bool
+	// [parl.Once] is an observable sync.Once
+	//	- indicates that the channel is closed
+	closeOnce Once
 }
 
 // NewClosableChan returns a channel with idempotent panic-free observable close
@@ -44,40 +52,43 @@ type ClosableChan[T any] struct {
 //   - if ch is not present, an unbuffered channel will be created
 //   - cannot use lock in new function
 //   - if an unbuffered channel is used, NewClosableChan is not required
-func NewClosableChan[T any](ch ...chan T) (cl *ClosableChan[T]) {
-	c := ClosableChan[T]{}
+func NewClosableChan[T any](ch ...chan T) (closable *ClosableChan[T]) {
+	var ch0 chan T
 	if len(ch) > 0 {
-		if c.ch = ch[0]; c.ch != nil {
-			c.hasChannel.Store(true)
-		}
+		ch0 = ch[0] // if ch is present, apply it
 	}
-	return &c
+	return &ClosableChan[T]{ch0: ch0}
 }
 
-// Ch retrieves the channel. Thread-safe
+// Ch retrieves the channel as bi-directional. Thread-safe
 //   - nil is never returned
-//   - the channel may already be closed
-//   - do not close the channel other than using the Close method
+//   - the channel may be closed, use IsClosed to determine
+//   - do not close the channel other than using Close method
 //   - per Go channel close, if one thread is blocked in channel send
 //     while another thread closes the channel, a data race occurs
+//   - thread-safe solution is to set an additional indicator of
+//     close requested and then reading the channel which
+//     releases the sending thread
 func (c *ClosableChan[T]) Ch() (ch chan T) {
 	return c.getCh()
 }
 
-// ReceiveCh retrieves the channel. Thread-safe
+// ReceiveCh retrieves the channel as receive-only. Thread-safe
 //   - nil is never returned
 //   - the channel may already be closed
-//   - do not close the channel other than using the Close method
 func (c *ClosableChan[T]) ReceiveCh() (ch <-chan T) {
 	return c.getCh()
 }
 
-// SendCh retrieves the channel. Thread-safe
+// SendCh retrieves the channel as send-only. Thread-safe
 //   - nil is never returned
 //   - the channel may already be closed
 //   - do not close the channel other than using the Close method
 //   - per Go channel close, if one thread is blocked in channel send
 //     while another thread closes the channel, a data race occurs
+//   - thread-safe solution is to set an additional indicator of
+//     close requested and then reading the channel which
+//     releases the sending thread
 func (c *ClosableChan[T]) SendCh() (ch chan<- T) {
 	return c.getCh()
 }
@@ -98,11 +109,12 @@ func (c *ClosableChan[T]) IsClosed(includePending ...bool) (isClosed bool) {
 // Close ensures the channel is closed
 //   - Close does not return until the channel is closed.
 //   - thread-safe panic-free deferrable observable
-//   - all invocations have close result in err
+//   - all invocations have the same close result in err
 //   - didClose indicates whether this invocation closed the channel
 //   - if errp is non-nil, it will receive the close result
 //   - per Go channel close, if one thread is blocked in channel send
 //     while another thread closes the channel, a data race occurs
+//   - thread-safe, panic-free, deferrable, idempotent
 func (cl *ClosableChan[T]) Close(errp ...*error) (didClose bool, err error) {
 
 	// ensure isCloseInvoked true: channel is about to close
@@ -131,29 +143,27 @@ func (cl *ClosableChan[T]) Close(errp ...*error) (didClose bool, err error) {
 }
 
 // getCh gets or initializes the channel object [ClosableChan.ch]
-func (cl *ClosableChan[T]) getCh() (ch chan T) {
-
-	// wrap lock in performance-friendly atomic
-	//	- by reading hasChannel cl.ch access is thread-safe
-	//	- if channel is closed, return whatever ch is
-	if cl.hasChannel.Load() || cl.closeOnce.IsDone() {
-		return cl.ch
+func (c *ClosableChan[T]) getCh() (ch chan T) {
+	if ch = c.ch0; ch != nil {
+		return // channel from constructor return
 	}
-
-	// ensure a channel is present
-	cl.chLock.Lock()
-	defer cl.chLock.Unlock()
-
-	if ch = cl.ch; ch == nil {
-		ch = make(chan T)
-		cl.ch = ch
-		cl.hasChannel.Store(true)
+	for {
+		if chp := c.chp.Load(); chp != nil {
+			ch = *chp
+			return // chp was present return
+		}
+		if ch == nil {
+			ch = make(chan T)
+		}
+		if c.chp.CompareAndSwap(nil, &ch) {
+			return // chp updated return
+		}
 	}
-	return
 }
 
 // doClose is behind [ClosableChan.closeOnce] and
 // is therefore only invoked once
+//   - separate function because provided to Once
 func (cl *ClosableChan[T]) doClose() (err error) {
 
 	// ensure a channel exists and close it

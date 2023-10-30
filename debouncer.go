@@ -79,7 +79,7 @@ func (d *Debouncer[T]) Wait() {
 // debouncerThread debounces the in channel until it closes or context cancel
 func (d *Debouncer[T]) inputThread() {
 	defer close(d.inputEndCh)
-	defer Recover(Annotation(), nil, d.errFn)
+	defer Recover("", nil, d.errFn)
 
 	// read input channel save in buffer and reset timer
 	var noShutdown = true
@@ -114,7 +114,7 @@ func (d *Debouncer[T]) inputThread() {
 // debouncerThread debounces the in channel until it closes or context cancel
 func (d *Debouncer[T]) outputThread() {
 	defer close(d.outputEndCh)
-	defer Recover(Annotation(), nil, d.errFn)
+	defer Recover("", nil, d.errFn)
 
 	// wait for timer to elapse or input thread to exit
 	var inputThreadOK = true

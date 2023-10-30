@@ -9,11 +9,8 @@ package iters
 type EmptyIterator[T any] struct{}
 
 // NewEmptyIterator returns an empty iterator of values type T.
-// EmptyIterator is thread-safe.
-func NewEmptyIterator[T any]() (iterator Iterator[T]) {
-	return &EmptyIterator[T]{}
-}
-
+//   - EmptyIterator is thread-safe.
+func NewEmptyIterator[T any]() (iterator Iterator[T])         { return &EmptyIterator[T]{} }
 func (iter *EmptyIterator[T]) Next() (value T, hasValue bool) { return }
 func (iter *EmptyIterator[T]) HasNext() (ok bool)             { return }
 func (iter *EmptyIterator[T]) NextValue() (value T)           { return }

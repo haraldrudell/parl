@@ -49,7 +49,7 @@ func NewHaltDetector(reportingThreshold ...time.Duration) (haltDetector *HaltDet
 func (h *HaltDetector) Thread(g0 parl.Go) {
 	var err error
 	defer g0.Register().Done(&err)
-	defer parl.Recover(parl.Annotation(), &err, parl.NoOnError)
+	defer parl.PanicToErr(&err)
 
 	timeTicker := time.NewTicker(time.Millisecond)
 	defer timeTicker.Stop()

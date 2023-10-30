@@ -47,6 +47,7 @@ func (i *invokeTimerInvo) deferFunc() {
 }
 
 // oldestFirst is an order function sorting the oldest invocation first
-func (i *invokeTimerInvo) oldestFirst(a, b *invokeTimerInvo) (result int) {
-	return a.t0.Compare(b.t0)
+//   - oldest is before other times
+func (i *invokeTimerInvo) oldestFirst(a, b *invokeTimerInvo) (aBeforeB bool) {
+	return a.t0.Compare(b.t0) == -1
 }

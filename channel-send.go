@@ -49,7 +49,7 @@ func ChannelSend[T any](ch chan<- T, value T, nonBlocking ...bool) (didSend, isN
 //   - the only way to determine closed channel is to send, which panics
 //   - a separate function to recover the panic
 func channelSend[T any](ch chan<- T, value T, sendNb bool) (didSend bool, err error) {
-	defer Recover(Annotation(), &err, NoOnError)
+	defer PanicToErr(&err)
 
 	// send non-blocking
 	if sendNb {
