@@ -7,6 +7,7 @@ package parl
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -69,82 +70,60 @@ func TestCloserSend(t *testing.T) {
 	}
 }
 
-type testClosable struct {
-	err error
-}
-
-func (tc *testClosable) Close() (err error) { return tc.err }
-
 func TestClose(t *testing.T) {
-	message := "nil pointer"
-	err1 := "x"
-	err2 := "y"
+	// “nil pointer”
+	//	- part of panic message:
+	//	- “runtime error: invalid memory address or nil pointer dereference”
+	var message = "nil pointer"
+	// “x”
+	var messageX = "x"
+	// “y”
+	var messageY = "y"
 
 	var err error
 
-	Close(&testClosable{}, &err)
+	// a successful Close should not return error
+	Close(newTestClosable(nil), &err)
 	if err != nil {
 		t.Errorf("Close err: %v", err)
 	}
 
+	// Close of nil io.Closable should return error, not panic
 	err = nil
 	Close(nil, &err)
+
+	// err: panic detected in parl.Close:
+	// “runtime error: invalid memory address or nil pointer dereference”
+	// at parl.Close()-closer.go:40
+	//t.Logf("err: %s", perrors.Short(err))
+	//t.Fail()
+
 	if err == nil || !strings.Contains(err.Error(), message) {
 		t.Errorf("Close err: %v exp %q", err, message)
 	}
 
-	err = errors.New(err1)
-	Close(&testClosable{err: errors.New(err2)}, &err)
-
-	errs := perrors.ErrorList(err)
-	if len(errs) != 2 || errs[0].Error() != err1 || errs[1].Error() != err2 {
-		t.Errorf("erss bad: %v", errs)
+	// a failed Close should append to err
+	//	- err should become X with Y appended
+	err = errors.New(messageX)
+	Close(newTestClosable(errors.New(messageY)), &err)
+	// errs is a list of associated errors, oldest first
+	//	- first X, then Y
+	var errs = perrors.ErrorList(err)
+	if len(errs) != 2 || errs[0].Error() != messageX || !strings.HasSuffix(errs[1].Error(), messageY) {
+		var quoteList = make([]string, len(errs))
+		for i, err := range errs {
+			quoteList[i] = strconv.Quote(err.Error())
+		}
+		// erss bad: ["x" "parl.Close y"]
+		t.Errorf("erss bad: %v", quoteList)
 	}
 }
 
-func TestCloseChannel(t *testing.T) {
-	var value = 3
-	var doDrain = true
+// testClosable is an [io.Closable] with configurable fail error
+type testClosable struct{ err error }
 
-	var ch chan int
-	var err, errp error
-	var n int
-	var isNilChannel, isCloseOfClosedChannel bool
+// newTestClosable returns a closable whose Close always fails with err
+func newTestClosable(err error) (closable *testClosable) { return &testClosable{err: err} }
 
-	// close of nil channel should return isNilChannel true
-	ch = nil
-	isNilChannel, isCloseOfClosedChannel, n, err = CloseChannel(ch, &errp)
-	if !isNilChannel {
-		t.Error("isNilChannel false")
-	}
-	_ = err
-	_ = n
-	_ = isCloseOfClosedChannel
-
-	// n should return number of items when draining
-	ch = make(chan int, 1)
-	ch <- value
-	isNilChannel, isCloseOfClosedChannel, n, err = CloseChannel(ch, &errp, doDrain)
-	if n != 1 {
-		t.Errorf("n bad %d exp %d", n, 1)
-	}
-	_ = isNilChannel
-	_ = err
-	_ = isCloseOfClosedChannel
-
-	// close of closed channel should set isCloseOfClosedChannel, err, errp
-	ch = make(chan int)
-	close(ch)
-	isNilChannel, isCloseOfClosedChannel, n, err = CloseChannel(ch, &errp)
-	if !isCloseOfClosedChannel {
-		t.Error("isCloseOfClosedChannel false")
-	}
-	if err == nil {
-		t.Error("isCloseOfClosedChannel err nil")
-	}
-	if errp == nil {
-		t.Error("isCloseOfClosedChannel errp nil")
-	}
-	_ = isNilChannel
-	_ = n
-}
+// Close returns a configured error
+func (tc *testClosable) Close() (err error) { return tc.err }

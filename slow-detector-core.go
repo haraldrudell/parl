@@ -37,12 +37,19 @@ type SlowDetectorCore struct {
 	average   ptime.Averager[time.Duration]
 }
 
+// NewSlowDetectorCore returns an object tracking nonm-returning or slow function invocations
+//   - callback receives offending slow-detector invocations, cannot be nil
+//   - slowTyp configures whether the support-thread is shared
+//   - goGen is used for a possible deferred thread-launch
+//   - optional values are:
+//   - — nonReturnPeriod: how often non-returning invocations are reported, default once per minute
+//   - — minimum slowness duration that is being reported, default 100 ms
 func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen, nonReturnPeriod ...time.Duration) (slowDetector *SlowDetectorCore) {
 	if callback == nil {
 		panic(perrors.NewPF("callback cannot be nil"))
 	}
 
-	// threshold 1: time between non-return reports, default 1 minute
+	// nonReturnPeriod[0]: time between non-return reports, default 1 minute
 	var nonReturnPeriod0 time.Duration
 	if len(nonReturnPeriod) > 0 {
 		nonReturnPeriod0 = nonReturnPeriod[0]
@@ -50,26 +57,21 @@ func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen,
 		nonReturnPeriod0 = defaultNonReturnPeriod
 	}
 
+	// nonReturnPeriod[1]: minimum duration for slowness to be reported, default 100 ms
+	var minReportedDuration time.Duration
+	if len(nonReturnPeriod) > 1 {
+		minReportedDuration = nonReturnPeriod[1]
+	} else {
+		minReportedDuration = defaultMinReportDuration
+	}
+
 	return &SlowDetectorCore{
 		ID:       slowIDGenerator.ID(),
 		callback: callback,
 		thread:   NewSlowDetectorThread(slowTyp, nonReturnPeriod0, goGen),
-		max:      *NewAtomicMax[time.Duration](),
+		max:      *NewAtomicMax[time.Duration](minReportedDuration),
 		average:  *ptime.NewAverager[time.Duration](),
 	}
-}
-
-func (s *SlowDetectorCore) Init(threshold ...time.Duration) (slowDetector *SlowDetectorCore) {
-	slowDetector = s
-	// threshold0: minimum slowness to report, default 100 ms
-	var threshold0 time.Duration
-	if len(threshold) > 0 {
-		threshold0 = threshold[0]
-	} else {
-		threshold0 = defaultMinReportDuration
-	}
-	s.max.Init(threshold0)
-	return
 }
 
 // Start returns the effective start time for a new timing cycle

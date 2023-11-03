@@ -5,31 +5,56 @@ ISC License
 
 package errorglue
 
-import "errors"
+import (
+	"errors"
 
-// ErrorList returns all error instances from a possible error chain.
-// — If err is nil an empty slice is returned.
-// — If err does not have associated errors, a slice of err, length 1, is returned.
-// — otherwise, the first error of the returned slice is err followed by
-//
-//		other errors oldest first.
-//	- Cyclic error values are dropped
+	"golang.org/x/exp/slices"
+)
+
+// ErrorList returns the list of associated errors enclosed in all error chains of err
+//   - the returned slice is a list of error chains beginning with err,
+//     then any associated errors
+//   - If err is nil, a nil slice is returned
+//   - order is:
+//   - — associated errors from err’s error chain, oldest first
+//   - — then associated errors from other error chain, oldest associated error first,
+//     and last found error chain first
+//   - —
+//   - associated errors are independent error chains that allows a single error
+//     to enclose addditional errors not part of its error chain
+//   - cyclic error values are filtered out so that no error instance is returned more than once
 func ErrorList(err error) (errs []error) {
 	if err == nil {
-		return
+		return // nil error return: nil slice
 	}
-	err0 := err
-	errMap := map[error]bool{err: true}
-	for err != nil {
-		if e, ok := err.(RelatedError); ok {
-			if e2 := e.AssociatedError(); e2 != nil {
-				if _, ok := errMap[e2]; !ok {
-					errs = append([]error{e2}, errs...)
-					errMap[e2] = true
+	// errMap ensures that no error instance occurs more than once
+	var errMap = map[error]bool{err: true}
+
+	// process all error chains in err
+	for errorChains := []error{err}; len(errorChains) > 0; errorChains = errorChains[1:] {
+		// traverse error chain
+		for errorChain := errorChains[0]; errorChain != nil; errorChain = errors.Unwrap(errorChain) {
+
+			// find any associated error not found before
+			if relatedError, ok := errorChain.(RelatedError); ok {
+				if associatedError := relatedError.AssociatedError(); associatedError != nil {
+					if _, ok := errMap[associatedError]; !ok {
+
+						// store associated error, newest first
+						errs = append(errs, associatedError)
+						// store the error chain for scanning, first found first
+						errorChains = append(errorChains, associatedError)
+						// store associateed error to ensure uniqueness
+						errMap[associatedError] = true
+					}
 				}
 			}
 		}
-		err = errors.Unwrap(err)
 	}
-	return append([]error{err0}, errs...)
+
+	// errs begins with err, then associated errors, oldest first
+	slices.Reverse(errs)
+	errs = append([]error{err}, errs...)
+
+	return
 }

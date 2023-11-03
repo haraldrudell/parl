@@ -49,15 +49,7 @@ func NewSlowDetector(label string, slowTyp slowType, printf PrintfFunc, goGen Go
 		label:  label,
 		printf: printf,
 	}
-	var threshold0, nonReturnPeriod []time.Duration
-	if len(threshold) > 0 {
-		threshold0 = threshold[0:1]
-		if len(threshold) > 1 {
-			nonReturnPeriod = threshold[1:2]
-		}
-	}
-	sd.sd = *NewSlowDetectorCore(sd.callback, slowTyp, goGen, nonReturnPeriod...)
-	sd.sd.Init(threshold0...)
+	sd.sd = *NewSlowDetectorCore(sd.callback, slowTyp, goGen, threshold...)
 	return &sd
 }
 
