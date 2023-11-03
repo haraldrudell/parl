@@ -17,10 +17,13 @@ const (
 //   - one-to-many, happens-before
 //   - the synchronization mechanic is closing channel, allowing threads to await
 //     multiple events
-//   - status can be inspected in a thread-safe manner: isClosed, isAboutToClose
-//     allows for race-free consumers
-//   - Close is idempotent, panic-free
-//   - if atomic.Pointer[Awaitable] is used for retrieval, a cyclic semaphore is achieved
+//   - IsClosed provides thread-safe observability
+//   - Close is idempotent, thread-safe, deferrable and panic-free
+//   - Open means event is pending, Close means event has triggered
+//   - —
+//   - because Awaitable is renewed, access is via atomic Pointer
+//   - because Pointer is used in new-function,
+//     field is pointer to ensure integrity
 type CyclicAwaitable struct{ *atomic.Pointer[Awaitable] }
 
 // NewCyclicAwaitable returns an awaitable that can be re-initialized

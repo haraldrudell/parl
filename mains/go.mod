@@ -7,7 +7,7 @@ toolchain go1.21.3
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.118
+	github.com/haraldrudell/parl v0.4.119
 	golang.org/x/sys v0.13.0
 )
 

@@ -5,23 +5,66 @@ ISC License
 
 package parl
 
-import "errors"
+import (
+	"fmt"
 
-// ErrNilValue indicates that a panic was caused by a value such as a
-// function argument was nil that cannot be nil.
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
+)
+
+const (
+	// count frame of [parl.NilError]
+	nilErrorFrames = 1
+)
+
+// ErrNil is used with [errors.Is] to detect that a panic or error value was caused
+// by a value that cannot be nil, such as a function argument to a new function,
+// was nil
+//   - —
+//   - a nilValue type implements:
+//   - — a dummy NilValueError method
+//   - — an Is method returning true for errors implementing a NilValueError method
 //
 // Usage:
-//	if errors.Is(err, parl.ErrNilValue) { …
-var ErrNilValue = NilValueError(errors.New("end callbacks error"))
+//
+//	if errors.Is(err, parl.ErrNil) { …
+var ErrNil = &nilValue{"value"}
 
-func NilValueError(err error) (err2 error) {
-	return nilValue{err}
+// NilError returns an error used with panic() indicating that a value that cannot be nil,
+// such as a function argument to a new function, was nil
+//   - such panics typically indicate compile-time issues with code
+//
+// Usage:
+//
+//	func NewX(xValue *int) (x *X) {
+//	  if xValue == nil {
+//	    panic(parl.NilError("xValue")) // “somePackage.NewX xValue cannot be nil”
+func NilError(valueName string) (err error) {
+	var cL = pruntime.NewCodeLocation(nilErrorFrames)
+	return perrors.Stackn(&nilValue{
+		s: fmt.Sprintf("%s %s cannot be nil",
+			cL.PackFunc(), // “somePackage.NewX”
+			valueName,     // “xValue”
+		)}, nilErrorFrames)
 }
 
-type nilValue struct{ error }
+var _ nilValueIface = &nilValue{}
 
-func (ec *nilValue) Is(err error) (is bool) {
-	_, is = err.(interface{ NilValueError() })
+// nilValue is the type for NilError errors
+type nilValue struct{ s string }
+
+// nilValueIface looks for the NilValueError method
+type nilValueIface interface{ NilValueError() }
+
+// Error return the error message
+//   - allows nilValue to implement the error interface
+func (e *nilValue) Error() (message string) { return e.s }
+
+// Is method allowing for nilValue values to detect other nilValues
+func (e *nilValue) Is(err error) (is bool) {
+	_, is = err.(nilValueIface)
 	return
 }
-func (ec *endCallbacks) NilValueError() {}
+
+// dummy method NilValueError
+func (e *nilValue) NilValueError() {}

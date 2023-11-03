@@ -18,7 +18,7 @@ type AtomicMax[T constraints.Integer] struct {
 	//	- valid if greater than 0
 	threshold uint64
 	// whether [AtomicMax.Value] has been invoked
-	didValue atomic.Bool
+	hasValue atomic.Bool
 	// value is current max or 0 if no value is present
 	value atomic.Uint64
 }
@@ -46,7 +46,7 @@ func (m *AtomicMax[T]) Value(value T) (isNewMax bool) {
 	}
 
 	// 0 as max case
-	if isNewMax = m.didValue.CompareAndSwap(false, true) && value == 0; isNewMax {
+	if isNewMax = m.hasValue.CompareAndSwap(false, true) && value == 0; isNewMax {
 		return // first invocation with 0: isNewMax true
 	}
 
@@ -73,7 +73,7 @@ func (m *AtomicMax[T]) Value(value T) (isNewMax bool) {
 //   - Thread-safe
 func (m *AtomicMax[T]) Max() (value T, hasValue bool) {
 	value = T(m.value.Load())
-	hasValue = m.didValue.Load()
+	hasValue = m.hasValue.Load()
 	return
 }
 

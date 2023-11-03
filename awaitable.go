@@ -7,14 +7,17 @@ package parl
 
 import "sync/atomic"
 
-// Awaitable is a semaphore that allows any number of threads to inspect
+// Awaitable is a semaphore allowing any number of threads to observe
 // and await an event
 //   - one-to-many, happens-before
 //   - the synchronization mechanic is closing channel, allowing consumers to await
 //     multiple events
 //   - IsClosed provides thread-safe observability
-//   - Close is idempotent and panic-free
+//   - Close is idempotent, thread-safe, deferrable and panic-free
 //   - [parl.CyclicAwaitable] is re-armable, cyclic version
+//   - —
+//   - alternative low-blocking inter-thread mechanics are [sync.WaitGroup] and [sync.RWMutex]
+//     but those are less performant for the managing thread
 type Awaitable struct {
 	isClosed atomic.Bool
 	ch       chan struct{}
@@ -31,7 +34,6 @@ func (a *Awaitable) Ch() (ch AwaitableCh) {
 }
 
 // isClosed inspects whether the awaitable has been triggered
-//   - isClosed indicates that the channel is closed
 //   - Thread-safe
 func (a *Awaitable) IsClosed() (isClosed bool) {
 	select {
@@ -44,10 +46,10 @@ func (a *Awaitable) IsClosed() (isClosed bool) {
 
 // Close triggers awaitable by closing the channel
 //   - upon return, the channel is guaranteed to be closed
-//   - idempotent, panic-free, thread-safe
+//   - idempotent, deferrable, panic-free, thread-safe
 func (a *Awaitable) Close() (didClose bool) {
 	if didClose = a.isClosed.CompareAndSwap(false, true); !didClose {
-		<-a.ch // wait to make certain the channel is closed
+		<-a.ch // prevent returning before channel close
 		return // already closed return
 	}
 	close(a.ch)

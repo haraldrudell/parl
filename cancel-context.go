@@ -8,91 +8,38 @@ package parl
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pruntime"
-)
-
-const (
-	cancelNotifierFrames = 1
 )
 
 // ErrNotCancelContext indicates that InvokeCancel was provided a context
 // not a return value from NewCancelContext or NewCancelContextFunc.
 //
-// Tets for ErrNotCancelContext:
+// Test for ErrNotCancelContext:
 //
 //	if errors.Is(err, parl.ErrNotCancelContext) …
 var ErrNotCancelContext = errors.New("context chain does not have CancelContext")
 
-// cancelContextKey is a unique named type used for access-function context.Context.Value.
-// Because the cancelContextKey type is unique, there is no conflict with other values.
-// cancelContextKey is used to store a context cancellation function as a context value
-// so that Cancel can be invoked from a single context value.
+// cancelContextKey is a unique named for storing and retrieving cancelFunc
+//   - used with [context.WithValue]
 type cancelContextKey string
 
-// cancelKey is the value used for storing the cancel function with context.WIthValue.
-var cancelKey cancelContextKey
+// cancelKey is a unique value for storing and retrieving cancelFunc
+//   - used with [context.WithValue]
+var cancelKey cancelContextKey = "parl.NewCancelContext"
 
-type cancelNotifier string
-
-var notifierKey cancelNotifier
-
-type cancel1Notifier string
-
-var notifier1Key cancel1Notifier
-
-type NotifierFunc func(slice pruntime.StackSlice)
-
-type atomicList *atomic.Pointer[[]NotifierFunc]
-
-// AddNotifier adds a function that is invoked when any context is canceled
-func AddNotifier(ctx context.Context, notifier NotifierFunc) (ctx2 context.Context) {
-	return addNotifier(true, ctx, notifier)
-}
-
-// AddNotifier1 adds a function that is invoked when a child context is canceled
-func AddNotifier1(ctx context.Context, notifier NotifierFunc) (ctx2 context.Context) {
-	return addNotifier(false, ctx, notifier)
-}
-
-func addNotifier(allCancels bool, ctx context.Context, notifier NotifierFunc) (
-	ctx2 context.Context) {
-	if ctx == nil {
-		panic(perrors.NewPF("ctx cannot be nil"))
-	} else if notifier == nil {
-		panic(perrors.NewPF("notifier cannot be nil"))
-	}
-	if !allCancels {
-		return context.WithValue(ctx, notifier1Key, notifier)
-	}
-	atomp, ok := ctx.Value(notifierKey).(atomicList)
-	if ok {
-		for {
-			var notifiersp = (*atomp).Load()
-			var notifiers = append(*notifiersp, notifier)
-			if (*atomp).CompareAndSwap(notifiersp, &notifiers) {
-				return ctx
-			}
-		}
-	}
-	var notifiers = []NotifierFunc{notifier}
-	var atomSlice atomic.Pointer[[]NotifierFunc]
-	atomSlice.Store(&notifiers)
-	atomp = &atomSlice
-	return context.WithValue(ctx, notifierKey, atomp)
-}
-
-// NewCancelContext creates a context that can be provided to InvokeCancel.
-// the return value encapsulates a cancel function.
+// NewCancelContext creates a cancelable context without managing a CancelFunction value
+//   - NewCancelContext is like [context.WithCancel] but has the CancelFunc embedded.
+//   - after use, [InvokeCancel] must be invoked with cancelCtx as argument to
+//     release resources
+//   - —
+//   - for unexported code in context package to work, a separate type cannot be used
 //
-//   - NewCancelContext is like [context.WithCancel] but with the CancelFunc embedded
-//     instead, [InvokeCancel] is used  with cancelCtx as argument.
+// Usage:
 //
-//     ctx := NewCancelContext(context.Background())
-//     …
-//     InvokeCancel(ctx)
+//	ctx := NewCancelContext(context.Background())
+//	…
+//	InvokeCancel(ctx)
 func NewCancelContext(ctx context.Context) (cancelCtx context.Context) {
 	return NewCancelContextFunc(context.WithCancel(ctx))
 }
@@ -103,6 +50,8 @@ func NewCancelContextFunc(ctx context.Context, cancel context.CancelFunc) (cance
 	return context.WithValue(ctx, cancelKey, cancel)
 }
 
+// HasCancel return if ctx can be used with [parl.InvokeCancel]
+//   - such contextx are returned by [parl.NewCancelContext]
 func HasCancel(ctx context.Context) (hasCancel bool) {
 	if ctx == nil {
 		return
@@ -111,15 +60,20 @@ func HasCancel(ctx context.Context) (hasCancel bool) {
 	return cancel != nil
 }
 
-// InvokeCancel finds the cancel method in the context chain and invokes it.
-// ctx must have been returned by either NewCancelContext or NewCancelContextFunc.
+// InvokeCancel cancels the last CancelContext in ctx’ chain of contexts
+//   - ctx must have been returned by either NewCancelContext or NewCancelContextFunc
 //   - ctx nil is panic
 //   - ctx not from NewCancelContext or NewCancelContextFunc is panic
-//   - thread-safe, idempotent
+//   - thread-safe, idempotent, deferrable
 func InvokeCancel(ctx context.Context) {
 	invokeCancel(ctx)
 }
 
+// invokeCancel is one extra stack frame from invoker
+//   - invoked via:
+//   - — [parl.InvokeCancel]
+//   - — [parl.CancelOnError]
+//   - — [parl.OnceWaiter.Cancel]
 func invokeCancel(ctx context.Context) {
 	if ctx == nil {
 		panic(perrors.NewPF("ctx cannot be nil"))
@@ -129,40 +83,19 @@ func invokeCancel(ctx context.Context) {
 	var cancel context.CancelFunc
 	var ok bool
 	if cancel, ok = ctx.Value(cancelKey).(context.CancelFunc); !ok {
-		panic(perrors.Errorf("%v", ErrNotCancelContext))
+		panic(perrors.ErrorfPF("%w", ErrNotCancelContext))
 	}
+
 	// invoke the function canceling the context.valueCtx parent that is context.cancelCtx
 	//	- and all its child contexts
 	cancel()
 
-	// fetch the nearest notify1 function
-	var notifier, _ = ctx.Value(notifier1Key).(NotifierFunc)
-
-	// fetch any notifyall list
-	var notifiers []NotifierFunc
-	if atomp, ok := ctx.Value(notifierKey).(atomicList); ok {
-		notifiers = *(*atomp).Load()
-	}
-
-	if notifier == nil && len(notifiers) == 0 {
-		return // no notifiers return
-	}
-
-	// stack trace for notifiers
-	var cl = pruntime.NewStackSlice(cancelNotifierFrames)
-
-	// invoke all notifier functions
-	if notifier != nil {
-		notifier(cl)
-	}
-	for _, n := range notifiers {
-		n(cl)
-	}
+	handleContextNotify(ctx)
 }
 
 // CancelOnError invokes InvokeCancel if errp has an error.
-// CancelOnError is deferrable and thread-safe.
-// ctx must have been returned by either NewCancelContext or NewCancelContextFunc.
+//   - CancelOnError is deferrable and thread-safe.
+//   - ctx must have been returned by either NewCancelContext or NewCancelContextFunc.
 //   - errp == nil or *errp == nil means no error
 //   - ctx nil is panic
 //   - ctx not from NewCancelContext or NewCancelContextFunc is panic
