@@ -23,7 +23,12 @@ type Once struct {
 	hasResult atomic.Bool // hasResult is true when Once has been completed by DoErr
 	// result is the outcome of a possible DoErr invocation
 	//	- thread-safe by hasResult atomic
-	result InvokeResult
+	result invokeResult
+}
+
+type invokeResult struct {
+	IsPanic bool
+	Err     error
 }
 
 // Do calls the function if and only if Do or DoErr is being called for the first time

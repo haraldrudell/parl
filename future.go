@@ -6,59 +6,48 @@ ISC License
 package parl
 
 import (
-	"sync"
 	"sync/atomic"
+
+	"github.com/haraldrudell/parl/perrors"
 )
 
-// Future contains an awaitable calculation using performant
-// sync.RWMutex and atomics. Thread-safe
+// Future is a container for an awaitable calculation result
 type Future[T any] struct {
-	// isCompleted makes lock atomic-access observable
-	isCompleted atomic.Bool
-
-	// lock’s write lock is held by the calculating thread until the calculation completes
-	//	- other threads are held waiting in Result using RLock for the calculation to complete
-	lock sync.RWMutex
-	// isValid indicates whether the calculation succeeded
-	isValid bool
+	await Awaitable // one-to-many wait mechanic based on channel
 	// result holds any successful result of calculation
 	//	- result value is the time calculating began
 	//	- result holds zero-value if the calculation failed
 	//	- result is updated by the winner thread prior to lock.Unlock
-	result T // behind lock
+	result atomic.Pointer[TResult[T]]
 }
 
-// NewFuture returns an awaitable calculation using performant
-// sync.RWMutex and atomics. Thread-safe
-func NewFuture[T any]() (calculation *Future[T]) {
-	c := Future[T]{}
-	c.lock.Lock()
-	return &c
-}
+// NewFuture returns an awaitable calculation
+func NewFuture[T any]() (calculation *Future[T]) { return &Future[T]{await: *NewAwaitable()} }
 
 // IsCompleted returns whether the calculation is complete. Thread-safe
-func (cn *Future[T]) IsCompleted() (isCompleted bool) {
-	return cn.isCompleted.Load()
-}
+func (f *Future[T]) IsCompleted() (isCompleted bool) { return f.await.IsClosed() }
+
+// Ch returns an awaitable channel
+func (f *Future[T]) Ch() (ch AwaitableCh) { return f.await.Ch() }
 
 // Result retrieves the calculation’s result. May block. Thread-safe
-func (cn *Future[T]) Result() (result T, isValid bool) {
-	cn.lock.RLock() // invokers block here
-	defer cn.lock.RUnlock()
-
-	result = cn.result
-	isValid = cn.isValid
+func (f *Future[T]) Result() (result T, isValid bool) {
+	<-f.await.Ch()
+	if rp := f.result.Load(); rp != nil {
+		result = rp.Value
+		isValid = rp.Err == nil
+	}
 	return
 }
 
 // End writes the result of the calculation, deferrable
-//   - result is considered valid if errp is nil or *errp is nil
-func (cn *Future[T]) End(result *T, errp *error) {
-	defer cn.lock.Unlock()
-	defer cn.isCompleted.Store(true)
-
-	// store value if calculation successful
-	if cn.isValid = errp == nil || *errp == nil; cn.isValid {
-		cn.result = *result
+//   - value is considered valid if errp is nil or *errp is nil
+//   - End can only be invoked once
+//   - value isPanic errp can be nil
+func (f *Future[T]) End(value *T, isPanic *bool, errp *error) {
+	var result = NewTResult3(value, isPanic, errp)
+	if !f.result.CompareAndSwap(nil, result) {
+		panic(perrors.NewPF("End invoked multiple times"))
 	}
+	f.await.Close()
 }

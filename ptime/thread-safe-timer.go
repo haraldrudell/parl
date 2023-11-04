@@ -11,14 +11,16 @@ import (
 )
 
 const (
+	// if new-function is invoked with zero default duration,
+	// default default-duration is 1 second
 	defaultDefaultDuration = time.Second
 )
 
-// ThreadSafeTimer is a timer that is used by multiple threads
-//   - ThreadSafeTimer is a timer with Reset method thread-safe
+// ThreadSafeTimer is a timer that can be Reset by multiple threads
+//   - a [time.Timer] with thread-safe Reset method and default Reset duration
+//   - fields and method signatures identical to [time.Timer]
 //   - —
 //   - [time.Timer] public methods and fields: C Reset Stop
-//   - signatures identical to [time.Timer]
 type ThreadSafeTimer struct {
 	// the default duration for Reset method
 	defaultDuration time.Duration
@@ -55,9 +57,9 @@ func NewThreadSafeTimer(defaultDuration ...time.Duration) (timer *ThreadSafeTime
 //   - has default duration for duration == 0
 //   - works with concurrent channel read
 //   - works with concurrent timer.Stop
-//   - supports functional chaining
 //   - —
 //   - thread-safety is obtained by making the Stop-drain-Reset sequence atomic
+//   - unsynchronized Reset will cause memory leaks
 func (t *ThreadSafeTimer) Reset(duration time.Duration) {
 	if duration <= 0 {
 		duration = t.defaultDuration

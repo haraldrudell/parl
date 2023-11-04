@@ -88,11 +88,17 @@ type debouncerOut[T any] struct {
 }
 
 // NewDebouncer returns a channel debouncer
+//   - values incoming faster than debounceInterval are aggregated
+//     into slices
+//   - values are not kept waiting longer than maxDelay
 //   - debounceInterval is only used if > 0 ns
 //   - if debounceInterval is not used and maxDelay is 0,
-//     maxDelay defaults to 1 s
+//     maxDelay defaults to 1 s to avoid a hanging debouncer
 //   - sender should not be long-running or blocking
 //   - inputCh sender errFn cannot be nil
+//   - close of input channel or Shutdown is required to release resources
+//   - errFn should not receive any errors but will receive possible runtime panics
+//   - —
 //   - NewDebouncer launches two threads prior to return
 func NewDebouncer[T any](
 	debounceInterval, maxDelay time.Duration,
@@ -163,6 +169,7 @@ func NewDebouncer[T any](
 
 // Shutdown shuts down the debouncer
 //   - Shutdown does not return until resources have been released
+//   - buffered values are discarded and input channle is not read to end
 func (d *Debouncer[T]) Shutdown() {
 	d.isShutdown.Close()
 	d.Wait()

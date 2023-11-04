@@ -34,7 +34,7 @@ func TestAwaitableCalculation(t *testing.T) {
 		t.Error("calculation.IsCompleted true")
 	}
 
-	calculation.End(&value, nil)
+	calculation.End(&value, nil, nil)
 	if !calculation.IsCompleted() {
 		t.Error("calculation.IsCompleted false")
 	}
