@@ -255,10 +255,7 @@ func (g *GoGroup) GoDone(thread parl.Go, err error) {
 		// onFirstFatal callback
 		if g.onFirstFatal != nil {
 			var errPanic error
-			parl.RecoverInvocationPanic(func() {
-				g.onFirstFatal(g)
-			}, &errPanic)
-			if errPanic != nil {
+			if errPanic = g.invokeOnFirstFatal(); errPanic != nil {
 				g.ConsumeError(NewGoError(
 					perrors.ErrorfPF("onFatal callback: %w", errPanic), parl.GeNonFatal, thread))
 			}
@@ -623,4 +620,12 @@ func (g *GoGroup) String() (s string) {
 		g.goContext.wg.String(),
 		g.creator.Short(),
 	)
+}
+
+func (g *GoGroup) invokeOnFirstFatal() (err error) {
+	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
+
+	g.onFirstFatal(g)
+
+	return
 }

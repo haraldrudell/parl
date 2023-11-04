@@ -59,20 +59,26 @@ func (tw *TeeWriter) Write(p []byte) (n int, err error) {
 	return // good write return
 }
 
-func (tw *TeeWriter) Close() (err error) {
+func (w *TeeWriter) Close() (err error) {
 
 	// prevent multiple Close invocations
-	if !tw.isClosed.CompareAndSwap(false, true) {
+	if !w.isClosed.CompareAndSwap(false, true) {
 		err = perrors.NewPF("Second Close invocation")
 		return
 	}
 
 	// invoke callback if there is one
-	if tw.closeCallback != nil {
-		parl.RecoverInvocationPanic(func() {
-			err = tw.closeCallback()
-		}, &err)
+	if w.closeCallback != nil {
+		err = w.invokeCallback()
 	}
+
+	return
+}
+
+func (w *TeeWriter) invokeCallback() (err error) {
+	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
+
+	err = w.closeCallback()
 
 	return
 }

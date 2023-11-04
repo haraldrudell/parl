@@ -98,7 +98,9 @@ func (d *doErrData) invokeFErr() {
 	defer d.updateResult()
 
 	*d.didOnce = true
-	*d.isPanic, *d.errp = RecoverInvocationPanicErr(d.fErr)
+	defer RecoverErr(func() DA { return A() }, d.errp, d.isPanic)
+
+	*d.errp = d.fErr()
 }
 
 func (d *doErrData) updateResult() {

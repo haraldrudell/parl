@@ -120,13 +120,17 @@ func Test_newDatapoint(t *testing.T) {
 	_ = n
 
 	// newDatapoint zero period panic
-	err = nil
-	parl.RecoverInvocationPanic(func() {
-		newDatapoint(0)
-	}, &err)
-	if err == nil {
+	if err = invokeNewDatapoint(); err == nil {
 		t.Error("RecoverInvocationPanic exp panic missing")
 	} else if !strings.Contains(err.Error(), messagePeriod) {
 		t.Errorf("RecoverInvocationPanic bad err: %q exp %q", err.Error(), messagePeriod)
 	}
+}
+
+func invokeNewDatapoint() (err error) {
+	defer parl.PanicToErr(&err)
+
+	newDatapoint(0)
+
+	return
 }

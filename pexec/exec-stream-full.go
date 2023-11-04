@@ -153,9 +153,7 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 	isStart = true
 	if startCallback != nil {
 		var e error
-		if parl.RecoverInvocationPanic(func() {
-			startCallback(execCmd, err)
-		}, &e); e != nil {
+		if e = invokeStart(startCallback, execCmd, err); e != nil {
 			err = perrors.AppendError(err, perrors.ErrorfPF("startCallback %w", e))
 		}
 	}
@@ -186,4 +184,12 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 		return // Wait() error return
 	}
 	return // command completed successfully return
+}
+
+func invokeStart(startCallback StartCallback, execCmd *exec.Cmd, e error) (err error) {
+	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
+
+	startCallback(execCmd, e)
+
+	return
 }

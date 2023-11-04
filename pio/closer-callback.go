@@ -30,19 +30,14 @@ type CloserCallbacker struct {
 	wg            sync.WaitGroup
 }
 
-func (cc *CloserCallbacker) Close(closer io.Closer) (err error) {
-	parl.RecoverInvocationPanic(func() {
-		err = closer.Close()
-	}, &err)
-	if cc.isClosed.CompareAndSwap(false, true) {
-		if cc.closeCallback != nil {
-			var e error
-			parl.RecoverInvocationPanic(func() {
-				e = cc.closeCallback(err)
-			}, &e)
+func (c *CloserCallbacker) Close(closer io.Closer) (err error) {
+	err = invokeClose(closer.Close)
+	if c.isClosed.CompareAndSwap(false, true) {
+		if c.closeCallback != nil {
+			var e = c.invokeCloseCallback(err)
 			err = perrors.AppendError(err, e)
 		}
-		cc.wg.Done()
+		c.wg.Done()
 	}
 	return
 }
@@ -53,6 +48,22 @@ func (cc *CloserCallbacker) IsClosed() (isClosed bool) {
 
 func (cc *CloserCallbacker) Wait() {
 	cc.wg.Wait()
+}
+
+func invokeClose(close func() (err error)) (err error) {
+	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
+
+	err = close()
+
+	return
+}
+
+func (c *CloserCallbacker) invokeCloseCallback(e error) (err error) {
+	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
+
+	err = c.closeCallback(e)
+
+	return
 }
 
 type WriteCloserCallbacker struct {

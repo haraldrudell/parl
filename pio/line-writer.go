@@ -72,24 +72,22 @@ func (wc *LineWriter) Write(p []byte) (n int, err error) {
 	return // good write return
 }
 
-func (wc *LineWriter) processLine() (err error) {
+func (w *LineWriter) processLine() (err error) {
 
 	// apply filter
-	if wc.filter != nil {
+	if w.filter != nil {
 		var skipLine bool
-		if parl.RecoverInvocationPanic(func() {
-			skipLine, err = wc.filter(&wc.data, wc.isClosed)
-		}, &err); err != nil || skipLine {
+		if skipLine, err = w.invokeFilter(); err != nil || skipLine {
 			return
 		}
 	}
 
 	// write line to writeCloser
-	length := len(wc.data)
+	length := len(w.data)
 	var n int
 	for n < length {
 		var n0 int
-		if n0, err = wc.writeCloser.Write(wc.data[n:]); err != nil {
+		if n0, err = w.writeCloser.Write(w.data[n:]); err != nil {
 			return
 		}
 		n += n0
@@ -112,6 +110,14 @@ func (wc *LineWriter) Close() (err error) {
 	if len(wc.data) > 0 {
 		err = wc.processLine()
 	}
+
+	return
+}
+
+func (w *LineWriter) invokeFilter() (skipLine bool, err error) {
+	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
+
+	skipLine, err = w.filter(&w.data, w.isClosed)
 
 	return
 }

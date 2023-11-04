@@ -155,7 +155,9 @@ func (ww *WinOrWaiterCore) winnerFunc() (err error) {
 	// calculate
 	result := time.Now()
 	defer calculation.End(&result, nil, &err)
-	_, err = RecoverInvocationPanicErr(ww.calculator)
+	defer RecoverErr(func() DA { return A() }, &err)
+
+	err = ww.calculator()
 
 	return
 }
