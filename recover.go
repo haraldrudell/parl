@@ -37,6 +37,7 @@ func NoOnError(err error) {}
 var noIsPanic *bool
 
 // Recover recovers from panic invoking onError exactly once with an aggregate error value
+//   - in most cases, use RecoverErr or RecoverDA with better-performing cached annotation
 //   - annotation may be empty, errp and onError may be nil
 //   - errors in *errp and panic are aggregated into a single error value
 //   - if onError non-nil, the function is invoked once with the aggregate error
@@ -49,6 +50,7 @@ func Recover(annotation string, errp *error, onError OnError) {
 }
 
 // Recover2 recovers from panic invoking onError for any eror in *errp and any panic
+//   - in most cases, use RecoverDA2 with better-performing cached annotation
 //   - annotation may be empty, errp and onError may be nil
 //   - if onError non-nil, the function is invoked with any error in *errp and any panic
 //   - if onError nil, the errors are logged to standard error

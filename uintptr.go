@@ -9,6 +9,8 @@ import "unsafe"
 
 // Uintptr returns v as a pointer
 //   - usable with [fmt.Printf] %x
+//   - if uintptr is not used, Printf may go off interpreting the value pointed to,
+//     depending on its type
 //
 // Usage:
 //

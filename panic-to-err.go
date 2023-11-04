@@ -8,6 +8,8 @@ package parl
 import "github.com/haraldrudell/parl/perrors"
 
 // PanicToErr recovers active panic, aggregating errors in errp
+//   - PanicToErr does not provide enclosing function. For that,
+//     use RecoverErr: “recover from panic in pack.Func…”
 //   - errp cannot be nil
 //   - if isPanic is non-nil and active panic, it is set to true
 //

@@ -31,15 +31,27 @@ var notifierKey cancelContextKey = "notifyAll"
 type atomicList *atomic.Pointer[[]NotifierFunc]
 
 // AddNotifier adds a function that is invoked when any context is canceled
-//   - invoked for the root context
-//   - any InvokeCancel in the context three cause notification
-//   - notifier receives a stack trace of the invocation
+//   - AddNotifier is typically invoked on the root context
+//   - any InvokeCancel in the context tree below the top AddNotifier
+//     invocation causes notification
+//   - invocation is immediately after context cancel completes
+//   - implemented by inserting a thread-safe slice value into the context chain
+//   - notifier receives a stack trace of the cancel invocation,
+//     typically beginning with [parl.InvokeCancel]
+//   - notifier should be thread-safe and not long running
+//   - typical usage is debug of unexpected context cancel
 func AddNotifier(ctx context.Context, notifier NotifierFunc) (ctx2 context.Context) {
 	return addNotifier(true, ctx, notifier)
 }
 
 // AddNotifier1 adds a function that is invoked when a child context is canceled
+//   - child contexts with their own AddNotifier1 are not detected
+//   - invocation is immediately after context cancel completes
 //   - implemented by inserting a value into the context chain
+//   - notifier receives a stack trace of the cancel invocation,
+//     typically beginning with [parl.InvokeCancel]
+//   - notifier should be thread-safe and not long running
+//   - typical usage is debug of unexpected context cancel
 func AddNotifier1(ctx context.Context, notifier NotifierFunc) (ctx2 context.Context) {
 	return addNotifier(false, ctx, notifier)
 }
@@ -83,6 +95,7 @@ func addNotifier(allCancels bool, ctx context.Context, notifier NotifierFunc) (
 	return context.WithValue(ctx, notifierKey, atomp)
 }
 
+// handleContextNotify is invoked for all CancelContext cancel invocations
 func handleContextNotify(ctx context.Context) {
 	// fetch the nearest notify1 function
 	//	- notify1 are created by [parl.AddNotifier1] and are notified of
@@ -99,7 +112,7 @@ func handleContextNotify(ctx context.Context) {
 		return // no notifiers return
 	}
 
-	// stack trace for notifiers
+	// stack trace for notifiers: expensive
 	var cl = pruntime.NewStackSlice(cancelNotifierFrames)
 
 	// invoke all notifier functions

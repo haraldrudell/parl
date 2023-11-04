@@ -43,6 +43,11 @@ func RecoverErr(deferredLocation func() DA, errp *error, isPanic ...*bool) {
 }
 
 // RecoverDA2 recovers panic using deferred annotation
+//
+// Usage:
+//
+//	func someFunc() (err error) {
+//	  defer parl.RecoverDA2(func() parl.DA { return parl.A() }, &err, parl.NoOnError)
 func RecoverDA2(deferredLocation func() DA, errp *error, onError OnError) {
 	doRecovery("", deferredLocation, errp, onError, recover2OnErrrorMultiple, noIsPanic, recover())
 }

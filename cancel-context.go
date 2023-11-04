@@ -20,7 +20,7 @@ import (
 //	if errors.Is(err, parl.ErrNotCancelContext) …
 var ErrNotCancelContext = errors.New("context chain does not have CancelContext")
 
-// cancelContextKey is a unique named for storing and retrieving cancelFunc
+// cancelContextKey is a unique named type for storing and retrieving cancelFunc
 //   - used with [context.WithValue]
 type cancelContextKey string
 
@@ -51,7 +51,7 @@ func NewCancelContextFunc(ctx context.Context, cancel context.CancelFunc) (cance
 }
 
 // HasCancel return if ctx can be used with [parl.InvokeCancel]
-//   - such contextx are returned by [parl.NewCancelContext]
+//   - such contexts are returned by [parl.NewCancelContext]
 func HasCancel(ctx context.Context) (hasCancel bool) {
 	if ctx == nil {
 		return
@@ -66,6 +66,20 @@ func HasCancel(ctx context.Context) (hasCancel bool) {
 //   - ctx not from NewCancelContext or NewCancelContextFunc is panic
 //   - thread-safe, idempotent, deferrable
 func InvokeCancel(ctx context.Context) {
+	invokeCancel(ctx)
+}
+
+// CancelOnError invokes InvokeCancel if errp has an error.
+//   - CancelOnError is deferrable and thread-safe.
+//   - ctx must have been returned by either NewCancelContext or NewCancelContextFunc.
+//   - errp == nil or *errp == nil means no error
+//   - ctx nil is panic
+//   - ctx not from NewCancelContext or NewCancelContextFunc is panic
+//   - thread-safe, idempotent
+func CancelOnError(errp *error, ctx context.Context) {
+	if errp == nil || *errp == nil {
+		return // there was no error
+	}
 	invokeCancel(ctx)
 }
 
@@ -91,18 +105,4 @@ func invokeCancel(ctx context.Context) {
 	cancel()
 
 	handleContextNotify(ctx)
-}
-
-// CancelOnError invokes InvokeCancel if errp has an error.
-//   - CancelOnError is deferrable and thread-safe.
-//   - ctx must have been returned by either NewCancelContext or NewCancelContextFunc.
-//   - errp == nil or *errp == nil means no error
-//   - ctx nil is panic
-//   - ctx not from NewCancelContext or NewCancelContextFunc is panic
-//   - thread-safe, idempotent
-func CancelOnError(errp *error, ctx context.Context) {
-	if errp == nil || *errp == nil {
-		return // there was no error
-	}
-	invokeCancel(ctx)
 }

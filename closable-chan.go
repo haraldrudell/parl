@@ -7,6 +7,8 @@ package parl
 
 import (
 	"sync/atomic"
+
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // ClosableChan wraps a channel with thread-safe idempotent panic-free observable close.
@@ -43,7 +45,10 @@ type ClosableChan[T any] struct {
 	//	- because the channel may transfer data, it cannot be inspected for being closed
 	isCloseInvoked atomic.Bool
 	// [parl.Once] is an observable sync.Once
-	//	- indicates that the channel is closed
+	//	- caches close result
+	//	- provides atomic-performance done-flag
+	//	- ensures no return prior to channel close complete
+	//	- ensures exactly one close invocation
 	closeOnce Once
 }
 
@@ -107,14 +112,17 @@ func (c *ClosableChan[T]) IsClosed(includePending ...bool) (isClosed bool) {
 }
 
 // Close ensures the channel is closed
-//   - Close does not return until the channel is closed.
-//   - thread-safe panic-free deferrable observable
+//   - Close does not return until the channel is closed
 //   - all invocations have the same close result in err
 //   - didClose indicates whether this invocation closed the channel
 //   - if errp is non-nil, it will receive the close result
 //   - per Go channel close, if one thread is blocked in channel send
 //     while another thread closes the channel, a data race occurs
-//   - thread-safe, panic-free, deferrable, idempotent
+//   - thread-safe, panic-free, deferrable, idempotent, observable
+//   - Close does not feature deferred close indication
+//   - — caller must ensure no channel send is in progress
+//   - — channel send after Close will fail
+//   - — a buffered channel can be read to empty after Close
 func (cl *ClosableChan[T]) Close(errp ...*error) (didClose bool, err error) {
 
 	// ensure isCloseInvoked true: channel is about to close
@@ -135,7 +143,7 @@ func (cl *ClosableChan[T]) Close(errp ...*error) (didClose bool, err error) {
 	// update errp if present
 	if len(errp) > 0 {
 		if errp0 := errp[0]; errp0 != nil {
-			*errp0 = err
+			*errp0 = perrors.AppendError(*errp0, err)
 		}
 	}
 
