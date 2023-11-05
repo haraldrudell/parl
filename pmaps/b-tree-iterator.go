@@ -10,47 +10,100 @@ import (
 	"os"
 
 	"github.com/google/btree"
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pslices"
 )
 
+// BtreeIteratorFunc is a function that converts B-tree V-values
+// to slice storage T values
+//   - valueToStore nil: ignore the value
+type BtreeIteratorFunc[V any, T any] func(value V) (valueToStore T, err error)
+
 // BtreeIterator retrieves B-tree values in order
-type BtreeIterator[V any] struct {
-	tree      *btree.BTreeG[V]
-	list      []V
-	listIndex int
+//   - V the type of values tree holds
+//   - T the type of values in the returned list
+type BtreeIterator[V any, T any] struct {
+	tree      *btree.BTreeG[V]        // the tree to iterate over
+	converter BtreeIteratorFunc[V, T] // optional converter function
+	// the list where to store values
+	//	- slice length is how many values should be returned
+	list      []T
+	listIndex int // next storage position in list
+	err       error
 }
 
 // NewBtreeIterator returns an object that can retrieve elements in order
-func NewBtreeIterator[V any](tree *btree.BTreeG[V]) (iterator *BtreeIterator[V]) {
-	return &BtreeIterator[V]{tree: tree}
+//   - V the type of values tree holds
+//   - T the type of values in the returned list
+func NewBtreeIterator[V any, T any](
+	tree *btree.BTreeG[V], // the tree to iterate over
+	converter ...BtreeIteratorFunc[V, T], // optionl converter function
+) (iterator *BtreeIterator[V, T]) {
+	var c BtreeIteratorFunc[V, T]
+	if len(converter) > 0 {
+		c = converter[0]
+	}
+	return &BtreeIterator[V, T]{
+		tree:      tree,
+		converter: c,
+	}
 }
 
 // func(item T) bool
 var _ btree.ItemIteratorG[int]
 
 // Iterate returns a sorted list of the first n elements
-func (b *BtreeIterator[V]) Iterate(n int) (list []V) {
+//   - n is how many items will be returned
+//   - list is an optional list where to store results
+//   - results is populated list
+func (i *BtreeIterator[V, T]) Iterate(n int, list ...[]T) (results []T, err error) {
+	if n == 0 {
+		return // n 0 return: results nil
+	}
+	i.list = nil
+	i.listIndex = 0
 
-	// create list
-	list = make([]V, n)
-	b.list = list
+	// ensure results list of length n
+	if len(list) > 0 {
+		i.list = list[0] // use provided list
+	}
+	if i.list == nil {
+		i.list = make([]T, n) // create slice of correct length
+	} else if len(i.list) < n {
+		pslices.SetLength(&i.list, n) // ensure slice of correct capacity and length
+	}
 
 	// traverse
-	b.listIndex = 0
-	b.tree.Ascend(b.iterator)
+	i.tree.Ascend(i.iterator)
+	results = i.list
+	i.list = nil
 
 	return
 }
 
-// iterator receives elements from the B-tree
-func (b *BtreeIterator[V]) iterator(value V) (keepGoing bool) {
-	if b.listIndex >= len(b.list) {
-		fmt.Fprintf(os.Stderr, "pmaps.BtreeIterator[…].iterator %d >= %d", b.listIndex, len(b.list))
-		return
+// iterator receives elements of type V from the B-tree
+func (i *BtreeIterator[V, T]) iterator(value V) (keepGoing bool) {
+	if i.listIndex >= len(i.list) {
+		fmt.Fprintf(os.Stderr, "pmaps.BtreeIterator[…].iterator %d >= %d", i.listIndex, len(i.list))
+		return // invoked after false returned error
 	}
 
-	b.list[b.listIndex] = value
-	b.listIndex++
+	// convert V to T
+	var result T
+	if f := i.converter; f != nil {
+		result, i.err = f(value)
+	} else {
+		var v any = value
+		var ok bool
+		if result, ok = v.(T); !ok {
+			i.err = perrors.ErrorfPF("cannot convert %T to %T", value, result)
+			return // bad conversion return: keepGoin false
+		}
+	}
 
-	keepGoing = b.listIndex < len(b.list)
+	i.list[i.listIndex] = result
+	i.listIndex++
+	keepGoing = i.listIndex < len(i.list)
+
 	return
 }

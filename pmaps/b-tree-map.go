@@ -132,7 +132,10 @@ func (m *BTreeMap[K, V]) List(n ...int) (list []V) {
 		nUse = length
 	}
 
-	list = NewBtreeIterator(m.tree).Iterate(nUse)
+	var err error
+	if list, err = NewBtreeIterator[V, V](m.tree).Iterate(nUse); err != nil {
+		panic(err)
+	}
 
 	return
 }

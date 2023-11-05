@@ -18,9 +18,9 @@ import (
 //   - EndCallbacks creates an ErrEndCallbacks value basd on another error
 //   - —
 //   - an ErrEndCallbacks type implements:
-//   - — a dummy EndCallbacks method
-//   - parl.endCallbacks additionally implements:
 //   - — an Is method returning true for errors implementing a EndCallbacks method
+//   - parl.ErrEndCallbacks additionally implements:
+//   - — a dummy EndCallbacks method
 //
 // Usage:
 //

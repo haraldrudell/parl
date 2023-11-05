@@ -13,6 +13,19 @@ import (
 )
 
 const (
+	// disables the debounce time
+	//	- debounce time holds incoming items until
+	//		debounce time elapses with no additional items
+	//	- when disabled max delay defaults to1 s and
+	//		items are sent when maxDelay reached
+	NoDebounceTime time.Duration = 0
+	// disables debouncer max delay function
+	//	- when debounce timer holds items, those items
+	//		are sent when age reaches maxDelay
+	//	- when debounce time disabled, defaults to 1 s.
+	//		otherwise no default
+	NoDebounceMaxDelay time.Duration = 0
+	// maxDelay when debounce-time disabled
 	defaultDebouncerMaxDelay = time.Second
 )
 

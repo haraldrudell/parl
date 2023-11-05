@@ -112,7 +112,10 @@ func (m *KeyOrderedMap[K, V]) List(n ...int) (list []K) {
 		nUse = length
 	}
 
-	list = NewBtreeIterator(m.tree).Iterate(nUse)
+	var err error
+	if list, err = NewBtreeIterator[K, K](m.tree).Iterate(nUse); err != nil {
+		panic(err)
+	}
 
 	return
 }

@@ -10,6 +10,7 @@ import (
 )
 
 // ThreadSafeInsOrderedMap is a mapping whose values are provided in insertion order. Thread-safe.
+//   - implemented with RWMutex controlling InsOrderMap
 type ThreadSafeInsOrderedMap[K comparable, V any] struct {
 	lock sync.RWMutex
 	InsOrderedMap[K, V]
@@ -19,74 +20,72 @@ func NewThreadSafeInsOrderedMap[K comparable, V any]() (orderedMap *ThreadSafeIn
 	return &ThreadSafeInsOrderedMap[K, V]{InsOrderedMap: *NewInsOrderedMap[K, V]()}
 }
 
-func (mp *ThreadSafeInsOrderedMap[K, V]) Get(key K) (value V, ok bool) {
-	mp.lock.RLock()
-	defer mp.lock.RUnlock()
+func (m *ThreadSafeInsOrderedMap[K, V]) Get(key K) (value V, ok bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
-	return mp.InsOrderedMap.Get(key)
+	return m.InsOrderedMap.Get(key)
 }
 
 // Put saves or replaces a mapping
-func (mp *ThreadSafeInsOrderedMap[K, V]) Put(key K, value V) {
-	mp.lock.Lock()
-	defer mp.lock.Unlock()
+func (m *ThreadSafeInsOrderedMap[K, V]) Put(key K, value V) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	mp.InsOrderedMap.Put(key, value)
+	m.InsOrderedMap.Put(key, value)
 }
 
 // Put saves or replaces a mapping
-func (mp *ThreadSafeInsOrderedMap[K, V]) PutIf(key K, value V, putIf func(value V) (doPut bool)) (wasNewKey bool) {
-	mp.lock.Lock()
-	defer mp.lock.Unlock()
+func (m *ThreadSafeInsOrderedMap[K, V]) PutIf(key K, value V, putIf func(value V) (doPut bool)) (wasNewKey bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	existing, keyExists := mp.InsOrderedMap.Get(key)
+	existing, keyExists := m.InsOrderedMap.Get(key)
 	wasNewKey = !keyExists
 	if keyExists && putIf != nil && !putIf(existing) {
 		return // putIf false return: this value should not be updated
 	}
-	mp.InsOrderedMap.Put(key, value)
+	m.InsOrderedMap.Put(key, value)
 
 	return
 }
 
 // Delete removes mapping using key K.
 //   - if key K is not mapped, the map is unchanged.
-//   - O(log n)
-func (mp *ThreadSafeInsOrderedMap[K, V]) Delete(key K) {
-	mp.lock.Lock()
-	defer mp.lock.Unlock()
+func (m *ThreadSafeInsOrderedMap[K, V]) Delete(key K) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	mp.InsOrderedMap.Delete(key)
+	m.InsOrderedMap.Delete(key)
 }
 
 // Clear empties the map
-func (mp *ThreadSafeInsOrderedMap[K, V]) Clear() {
-	mp.lock.Lock()
-	defer mp.lock.Unlock()
+func (m *ThreadSafeInsOrderedMap[K, V]) Clear() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	mp.InsOrderedMap.Clear()
+	m.InsOrderedMap.Clear()
 }
 
-func (mp *ThreadSafeInsOrderedMap[K, V]) Length() (length int) {
-	mp.lock.RLock()
-	defer mp.lock.RUnlock()
+func (m *ThreadSafeInsOrderedMap[K, V]) Length() (length int) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
-	return mp.InsOrderedMap.Length()
+	return m.InsOrderedMap.Length()
 }
 
 // Clone returns a shallow clone of the map
-func (mp *ThreadSafeInsOrderedMap[K, V]) Clone() (clone *ThreadSafeInsOrderedMap[K, V]) {
-	mp.lock.Lock()
-	defer mp.lock.Unlock()
+func (m *ThreadSafeInsOrderedMap[K, V]) Clone() (clone *ThreadSafeInsOrderedMap[K, V]) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	return &ThreadSafeInsOrderedMap[K, V]{InsOrderedMap: *mp.InsOrderedMap.Clone()}
+	return &ThreadSafeInsOrderedMap[K, V]{InsOrderedMap: *m.InsOrderedMap.Clone()}
 }
 
 // List provides the mapped values in order
-//   - O(n)
-func (mp *ThreadSafeInsOrderedMap[K, V]) List(n ...int) (list []V) {
-	mp.lock.RLock()
-	defer mp.lock.RUnlock()
+func (m *ThreadSafeInsOrderedMap[K, V]) List(n ...int) (list []V) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
-	return mp.InsOrderedMap.List(n...)
+	return m.InsOrderedMap.List(n...)
 }
