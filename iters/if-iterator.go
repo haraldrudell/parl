@@ -6,6 +6,13 @@ All rights reserved
 package iters
 
 // Iterator allows traversal of values.
+//   - iterate over an unimported type using an iterator returning
+//     a derived value such as an interface type
+//   - convert a slice value-by-value, ie. return interface-type values from
+//     a struct slice
+//   - iterate over pointers to slice values
+//   - iterate over function
+//   - obtain errors occurring in the iterator or release iterator resources
 //
 // The iterator interface is optimized for use in the Go “for” clause.
 // Iterators in the iters package are thread-safe but

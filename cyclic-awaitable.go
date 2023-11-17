@@ -24,18 +24,32 @@ const (
 //   - because Awaitable is renewed, access is via atomic Pointer
 //   - because Pointer is used in new-function,
 //     field is pointer to ensure integrity
-type CyclicAwaitable struct{ *atomic.Pointer[Awaitable] }
+type CyclicAwaitable struct{ atomic.Pointer[Awaitable] }
 
 // NewCyclicAwaitable returns an awaitable that can be re-initialized
 //   - if argument [task.CyclicAwaitableClosed] is provided, the initial state
 //     of the CyclicAwaitable is triggered
+//   - writes to non-pointer atomic fields
 func NewCyclicAwaitable(initiallyClosed ...bool) (awaitable *CyclicAwaitable) {
-	c := CyclicAwaitable{Pointer: &atomic.Pointer[Awaitable]{}}
+	c := CyclicAwaitable{}
 	c.Store(NewAwaitable())
 	if len(initiallyClosed) > 0 && initiallyClosed[0] {
 		c.Close()
 	}
 	return &c
+}
+
+// NewCyclicAwaitable returns an awaitable that can be re-initialized
+//   - fieldp allows for intializing a non-pointer field
+//   - if argument [task.CyclicAwaitableClosed] is provided, the initial state
+//     of the CyclicAwaitable is triggered
+//   - writes to non-pointer atomic fields
+func NewCyclicAwaitableField(fieldp *CyclicAwaitable, initiallyClosed ...bool) (awaitable *CyclicAwaitable) {
+	fieldp.Store(NewAwaitable())
+	if len(initiallyClosed) > 0 && initiallyClosed[0] {
+		fieldp.Close()
+	}
+	return fieldp
 }
 
 // Ch returns an awaitable channel. Thread-safe

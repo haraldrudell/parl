@@ -8,12 +8,10 @@ package iters
 import (
 	"github.com/haraldrudell/parl/internal/cyclebreaker"
 	"github.com/haraldrudell/parl/perrors"
-	"golang.org/x/exp/constraints"
 )
 
-// converterIterator is an enclosed implementation type for
-// ConverterIterator[K, V]
-type converterIterator[K constraints.Ordered, V any] struct {
+// ConverterIterator traverses another iterator and returns converted values
+type ConverterIterator[K any, V any] struct {
 	// keyIterator provides the key values converterFunction uses to
 	// return values
 	keyIterator Iterator[K]
@@ -28,14 +26,7 @@ type converterIterator[K constraints.Ordered, V any] struct {
 	//   - ConverterFunction must be thread-safe
 	//   - ConverterFunction is invoked by at most one thread at a time
 	converterFunction ConverterFunction[K, V]
-}
-
-// ConverterIterator traverses another iterator and returns converted values. Thread-safe.
-type ConverterIterator[K constraints.Ordered, V any] struct {
-	// converterIterator implements the invokeConverterFunction method
-	//	- pointer since invokeConverterFunction method is provided to
-	//		BaseIterator
-	*converterIterator[K, V]
+	simpleConverter   func(key K) (value V)
 	// BaseIterator implements Cancel and the DelegateAction[T] function required by
 	// Delegator[T]
 	//	- receives invokeConverterFunction function
@@ -49,8 +40,10 @@ type ConverterIterator[K constraints.Ordered, V any] struct {
 }
 
 // NewConverterIterator returns a converting iterator.
+//   - converterFunction receives cancel and can return error
 //   - ConverterIterator is thread-safe and re-entrant.
-func NewConverterIterator[K constraints.Ordered, V any](
+//   - stores self-referencing pointers
+func NewConverterIterator[K any, V any](
 	keyIterator Iterator[K],
 	converterFunction ConverterFunction[K, V],
 ) (iterator Iterator[V]) {
@@ -60,17 +53,51 @@ func NewConverterIterator[K constraints.Ordered, V any](
 		panic(perrors.NewPF("keyIterator cannot be nil"))
 	}
 
-	c := converterIterator[K, V]{
+	c := ConverterIterator[K, V]{
 		keyIterator:       keyIterator,
 		converterFunction: converterFunction,
 	}
-
 	var delegateAction DelegateAction[V]
-	return &ConverterIterator[K, V]{
-		converterIterator: &c,
-		BaseIterator:      *NewBaseIterator(c.invokeConverterFunction, &delegateAction),
-		Delegator:         *NewDelegator(delegateAction),
+	c.BaseIterator = *NewBaseIterator(c.invokeConverterFunction, &delegateAction)
+	c.Delegator = *NewDelegator(delegateAction)
+
+	return &c
+}
+
+// NewConverterIteratorField returns a converting iterator
+//   - if fieldp is non-nil, this field is initialized
+//   - either converterFunction or simpleConverter must be non-nil
+//   - if simpleConverter is non-nil it is used.
+//     simpleConverter is simplified in that it cannot return error and has no concept of cancel.
+//     simpleConverter must on each invocation return the value corresponding to the key provided
+//   - converterFunction receives cancel and can return error
+//   - ConverterIterator is thread-safe and re-entrant.
+//   - stores self-referencing pointers
+func NewConverterIteratorField[K any, V any](
+	fieldp *ConverterIterator[K, V],
+	keyIterator Iterator[K],
+	converterFunction ConverterFunction[K, V],
+	simpleConverter func(key K) (value V),
+) (iterator Iterator[V]) {
+	if converterFunction == nil && simpleConverter == nil {
+		panic(perrors.NewPF("converterFunction and simpleConverter cannot both be nil"))
+	} else if keyIterator == nil {
+		panic(perrors.NewPF("keyIterator cannot be nil"))
 	}
+	var c *ConverterIterator[K, V]
+	if fieldp != nil {
+		c = fieldp
+	} else {
+		c = &ConverterIterator[K, V]{}
+	}
+	iterator = c
+	c.keyIterator = keyIterator
+	c.converterFunction = converterFunction
+	c.simpleConverter = simpleConverter
+	var delegateAction DelegateAction[V]
+	c.BaseIterator = *NewBaseIterator(c.invokeConverterFunction, &delegateAction)
+	c.Delegator = *NewDelegator(delegateAction)
+	return
 }
 
 // Init implements the right-hand side of a short variable declaration in
@@ -86,7 +113,7 @@ func (i *ConverterIterator[K, T]) Init() (iterationVariable T, iterator Iterator
 //   - if err is nil, value is valid and isPanic false.
 //     Otherwise, err is non-nil and isPanic may be set.
 //     value is zero-value
-func (i *converterIterator[K, T]) invokeConverterFunction(isCancel bool) (
+func (i *ConverterIterator[K, T]) invokeConverterFunction(isCancel bool) (
 	value T,
 	didCancel bool,
 	isPanic bool,
@@ -103,11 +130,19 @@ func (i *converterIterator[K, T]) invokeConverterFunction(isCancel bool) (
 		didCancel = !hasKey
 	}
 
+	// simple converter case: no cancel, value always returned
+	if simpleConverter := i.simpleConverter; simpleConverter != nil {
+		if !isCancel {
+			value = simpleConverter(key)
+		}
+		return
+	}
+
 	var v T
 	// invoke converter function
 	v, err = i.converterFunction(key, isCancel)
 
-	// determine iof value is valid
+	// determine if value is valid
 	if err == nil && !isCancel {
 		value = v
 	}

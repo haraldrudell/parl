@@ -21,6 +21,8 @@ import (
 //     insertion order
 //   - native Go Map functions: Get Put Delete Length Range
 //   - convenience functions: Clear Clone
+//   - order function: List
+//   - debug function: Dump
 //   - —
 //   - ability to return values in insertion order
 //   - — can be achieved by retaining keys or values
@@ -30,7 +32,8 @@ import (
 //   - a slice is not optimal because delete leads to large memory copy
 //   - therefore:
 //   - — as map value, have data value and insertion-order index
-//   - — B-tree provides order of those combined values
+//   - — B-tree provides insertion order for those combined values
+//   - — delete by key is fast in map and B-tree
 type InsOrderedMap[K comparable, V any] struct {
 	// store pointer to mapValue so that
 	// V can be updated
@@ -44,8 +47,8 @@ type InsOrderedMap[K comparable, V any] struct {
 
 // the map stores pointers to mapValue
 type mapValue[V any] struct {
-	valuep         atomic.Pointer[V]
-	insertionIndex uint64
+	valuep         atomic.Pointer[V] // thread-safe updatable value
+	insertionIndex uint64            // insertion order when mapping was created
 }
 
 // NewInsOrderedMap is a mapping whose keys are provided in insertion order.
@@ -148,6 +151,8 @@ func (m *InsOrderedMap[K, V]) Clone() (clone *InsOrderedMap[K, V]) {
 }
 
 // List provides the mapped values in order
+//   - if n is missing or zero, the entire map
+//   - otherwise, the first n elements capped by length
 func (m *InsOrderedMap[K, V]) List(n ...int) (list []V) {
 
 	// determine length of returned slice
@@ -161,15 +166,18 @@ func (m *InsOrderedMap[K, V]) List(n ...int) (list []V) {
 		nToUse = length
 	}
 
+	// create list slice
 	var err error
 	if list, err = NewBtreeIterator(m.tree, m.convert).Iterate(nToUse); err != nil {
-		// error i converter or nil value pointer
+		// error in converter or nil value pointer
+		//	- should never happen
 		panic(err)
 	}
 
-	return
+	return // good return
 }
 
+// Dump returns a debug string of ordered values
 func (m *InsOrderedMap[K, V]) Dump() (s string) {
 	var list = m.List()
 	s = "list" + strconv.Itoa(len(list)) + ":"
@@ -184,6 +192,7 @@ func (m *InsOrderedMap[K, V]) Dump() (s string) {
 	return
 }
 
+// convert returns value type V from mapping value type *mapValue[V]
 func (m *InsOrderedMap[K, V]) convert(value *mapValue[V]) (result V, err error) {
 	if vp := value.valuep.Load(); vp != nil {
 		result = *vp

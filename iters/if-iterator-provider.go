@@ -5,8 +5,6 @@ All rights reserved
 
 package iters
 
-import "golang.org/x/exp/constraints"
-
 // when the iterator function receives this value, it means cancel
 const FunctionIteratorCancel int = -1
 
@@ -33,7 +31,7 @@ type IteratorFunction[T any] func(isCancel bool) (value T, err error)
 //     Any returned value is not used
 //   - ConverterFunction must be thread-safe
 //   - ConverterFunction is invoked by at most one thread at a time
-type ConverterFunction[K constraints.Ordered, V any] func(key K, isCancel bool) (value V, err error)
+type ConverterFunction[K any, V any] func(key K, isCancel bool) (value V, err error)
 
 // InvokeFunc is the signature used by NewBaseIterator
 //   - isCancel is a request to cancel iteration. No more invocations
