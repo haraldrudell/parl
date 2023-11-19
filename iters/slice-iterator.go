@@ -48,6 +48,11 @@ func NewSliceIterator[T any](slice []T) (iterator Iterator[T]) {
 
 // Init implements the right-hand side of a short variable declaration in
 // the init statement for a Go “for” clause
+//
+// Usage:
+//
+//		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
+//	   // i is pointer to slice element
 func (i *SliceIterator[T]) Init() (iterationVariable T, iterator Iterator[T]) {
 	iterator = i
 	return
@@ -58,6 +63,11 @@ func (i *SliceIterator[T]) Init() (iterationVariable T, iterator Iterator[T]) {
 //     iterationVariable cannot be nil
 //   - errp is an optional error pointer receiving any errors during iterator execution
 //   - condition is true if iterationVariable was assigned a value and the iteration should continue
+//
+// Usage:
+//
+//		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
+//	   // i is pointer to slice element
 func (i *SliceIterator[T]) Cond(iterationVariablep *T, errp ...*error) (condition bool) {
 	if iterationVariablep == nil {
 		perrors.NewPF("iterationVariablep cannot bee nil")

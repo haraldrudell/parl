@@ -46,11 +46,13 @@ func (a *CountingAwaitable) IsTriggered() (isTriggered bool) {
 }
 
 // Count returns the current count and may also adjust the counter
-//   - if delta is missing, no panic, returns counter
+//   - counter is current remaining count
+//   - adds is cumulative positive adds
+//   - if delta is present and the awaitable is triggered, this is panic
+//   - state can be retrieved without panic by omitting delta
 //   - if delta is negative and result is zero: trig
 //   - if delta is negative and result is negative: panic
-//   - Add on triggered or negative is panic
-//   - similar to sync.WaitGroup.Add
+//   - similar to sync.WaitGroup.Add Done
 func (a *CountingAwaitable) Count(delta ...int) (counter, adds int) {
 	var hasDelta = len(delta) > 0
 	if !hasDelta {

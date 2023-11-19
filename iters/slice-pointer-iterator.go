@@ -78,6 +78,11 @@ func (i *SlicePointerIterator[E]) Init() (iterationVariable *E, iterator Iterato
 //     iterationVariable cannot be nil
 //   - errp is an optional error pointer receiving any errors during iterator execution
 //   - condition is true if iterationVariable was assigned a value and the iteration should continue
+//
+// Usage:
+//
+//		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
+//	   // i is pointer to slice element
 func (i *SlicePointerIterator[E]) Cond(iterationVariablep **E, errp ...*error) (condition bool) {
 	if iterationVariablep == nil {
 		perrors.NewPF("iterationVariablep cannot bee nil")

@@ -54,12 +54,22 @@ func NewSliceInterfaceIterator[I any, E any](slice []E) (iterator Iterator[I]) {
 }
 
 // Init initializes I interface values and returns an I iterator
+//
+// Usage:
+//
+//		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
+//	   // i is pointer to slice element
 func (i *SliceInterfaceIterator[I, E]) Init() (iterationVariable I, iterator Iterator[I]) {
 	iterator = i
 	return
 }
 
 // Cond updates I interface pointers
+//
+// Usage:
+//
+//		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
+//	   // i is pointer to slice element
 func (i *SliceInterfaceIterator[I, E]) Cond(iterationVariablep *I, errp ...*error) (condition bool) {
 	var ep *E
 	if condition = i.SlicePointerIterator.Cond(&ep); !condition {

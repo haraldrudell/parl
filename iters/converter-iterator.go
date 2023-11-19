@@ -102,6 +102,11 @@ func NewConverterIteratorField[K any, V any](
 
 // Init implements the right-hand side of a short variable declaration in
 // the init statement for a Go “for” clause
+//
+// Usage:
+//
+//		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
+//	   // i is pointer to slice element
 func (i *ConverterIterator[K, T]) Init() (iterationVariable T, iterator Iterator[T]) {
 	iterator = i
 	return
