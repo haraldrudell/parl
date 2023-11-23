@@ -29,6 +29,9 @@ func Stat(path string) (fileInfo fs.FileInfo, err error) {
 	return
 }
 
+// IsDirectory determines if path exists, is a directory or other entry
+//   - flags: IsDirectoryNonExistentIsError
+//   - flags: IsDirectoryNotDirIsError
 func IsDirectory(path string, flags IsDirectoryArg) (isDirectory bool, err error) {
 	fileInfo := Exists(path)
 	if fileInfo == nil {

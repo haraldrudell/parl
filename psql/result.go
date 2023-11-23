@@ -18,8 +18,8 @@ import (
 // sql.Result is an interface with methods LastInsertId and RowsAffected.
 // each driver provides an sql.Result implementation.
 type ExecResult struct {
-	ID   int64
-	rows int64
+	ID   int64 // last insert ID, 0 if none like UPDATE
+	rows int64 // number of rows affected
 }
 
 func NewExecResult(execResult sql.Result, e error) (result parl.ExecResult, err error) {

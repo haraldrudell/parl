@@ -143,13 +143,11 @@ func (i *ConverterIterator[K, T]) invokeConverterFunction(isCancel bool) (
 		return
 	}
 
-	var v T
 	// invoke converter function
-	v, err = i.converterFunction(key, isCancel)
+	value, err = i.converterFunction(key, isCancel)
 
-	// determine if value is valid
-	if err == nil && !isCancel {
-		value = v
+	if err != nil {
+		err = perrors.Stack(err)
 	}
 
 	return

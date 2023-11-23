@@ -27,3 +27,17 @@ func Exists(path string) (fileInfo fs.FileInfo /* interface */) {
 	}
 	panic(perrors.Errorf("os.Stat: '%w'", err))
 }
+
+// Exists2 determines if a path exists
+//   - fileInfo non-nil: does exist
+//   - isNotExists true, fileInfo nil, err non-nil: does not exist
+//   - isNotExist false, fileInfo nil, err non-nil: some error
+func Exists2(path string) (fileInfo fs.FileInfo, isNotExist bool, err error) {
+	if fileInfo, err = os.Stat(path); err == nil {
+		return // does exist return : fileInfo non-nil, error nil
+	}
+	isNotExist = os.IsNotExist(err)
+	err = perrors.ErrorfPF("os.Stat %w", err)
+
+	return
+}

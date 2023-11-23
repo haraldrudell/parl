@@ -21,9 +21,7 @@ import (
 //	if errors.Is(err, parl.ErrEndCallbacks) { …
 var ErrEndCallbacks = EndCallbacks(errors.New("end callbacks error"))
 
-func EndCallbacks(err error) (err2 error) {
-	return endCallbacks{err}
-}
+func EndCallbacks(err error) (err2 error) { return &endCallbacks{err} }
 
 type endCallbacks struct{ error }
 

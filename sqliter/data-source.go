@@ -16,31 +16,40 @@ import (
 )
 
 const (
+	// name of the SQLite3 database driver
+	//	- “modernc.org/sqlite”
 	sqLiteDriverName = "sqlite"
 	sqStatement      = "stmt"
 )
 
+// DataSource represents a SQL database that can prepare generic SQL queries
+//   - implements [parl.DataSource] for SQLite3
 type DataSource struct {
+	// DB represents a generic SQL database that can:
+	//	- offer connections
+	//	- execute generuic SQL queries
 	*sql.DB
 	counters parl.Counters
 }
 
-// NewDB get a DB object that repreents the databases in a directory
-func NewDataSource(dataSourceName string) (dataSource parl.DataSource, err error) {
+// NewDB get a DB object that represents the databases in a directory
+//   - the driver’s methods are promoted like Query
+//   - implements parl’s [DataSourceNamer.DataSource] for SQLite3
+func OpenDataSource(dataSourceName parl.DataSourceName) (dataSource parl.DataSource, err error) {
+
 	d := DataSource{
 		counters: counter.CountersFactory.NewCounters(true, nil), // nil: no rate counters
 	}
-
-	if d.DB, err = sql.Open(sqLiteDriverName, dataSourceName); err != nil {
-		err = perrors.Errorf("sql.Open(%s %s): %w", sqLiteDriverName, dataSourceName, err)
+	if d.DB, err = sql.Open(sqLiteDriverName, string(dataSourceName)); perrors.IsPF(&err, "sql.Open(%s %s): %w", sqLiteDriverName, dataSourceName, err) {
 		return
 	}
-
 	dataSource = &d
+
 	return
 }
 
 // PrepareContext returns a sql.Stmt that does retries on 5 SQLITE_BUSY
+//   - this is used by [parl.psql]
 func (ds *DataSource) WrapStmt(stmt *sql.Stmt) (stm psql.Stmt) {
 	return &Stmt{Stmt: stmt, ds: ds}
 }

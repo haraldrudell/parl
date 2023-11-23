@@ -33,9 +33,7 @@ import (
 var ErrEndCallbacks = EndCallbacks(errors.New("end callbacks error"))
 
 // EndCallbacks creates a EndCallbacks error based on another error
-func EndCallbacks(err error) (err2 error) {
-	return endCallbacks{err}
-}
+func EndCallbacks(err error) (err2 error) { return &endCallbacks{err} }
 
 // endCallbacks is the named type of [parl.ErrEndCallbacks] value
 type endCallbacks struct{ error }

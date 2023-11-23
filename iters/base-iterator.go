@@ -12,7 +12,6 @@ import (
 
 	"github.com/haraldrudell/parl/internal/cyclebreaker"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/plog"
 )
 
 const (
@@ -285,10 +284,6 @@ func (i *baseIterator[T]) updateState(cancelStatep *cancelStates, didCancelp *bo
 	var didCancel = *didCancelp
 	// possible error returned by i.invokeFn or result of panic
 	var err = *errp
-
-	plog.D("updateState: cancelState %s didCancel %t err %s",
-		cancelState, didCancel, perrors.Short(err),
-	)
 
 	// determine next state and ignore ErrEndCallbacks
 	var nextState = notCanceled

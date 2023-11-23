@@ -6,6 +6,8 @@ All rights reserved
 package iters
 
 import (
+	"errors"
+
 	"github.com/haraldrudell/parl/internal/cyclebreaker"
 	"github.com/haraldrudell/parl/perrors"
 )
@@ -56,7 +58,7 @@ func NewFunctionIterator[T any](
 	var delegateAction DelegateAction[T]
 	return &FunctionIterator[T]{
 		functionIterator: &f,
-		BaseIterator:     *NewBaseIterator[T](f.invokeFn, &delegateAction),
+		BaseIterator:     *NewBaseIterator[T](f.baseIteratorRequest, &delegateAction),
 		// NewDelegator must be after NewBaseIterator
 		Delegator: *NewDelegator[T](delegateAction),
 	}
@@ -74,14 +76,14 @@ func (i *FunctionIterator[T]) Init() (iterationVariable T, iterator Iterator[T])
 	return
 }
 
-// invokeFn invokes fn recovering a possible panic
+// baseIteratorRequest invokes fn recovering a possible panic
 //   - if cancelState == notCanceled, a new value is requested.
 //     Otherwise, iteration cancel is requested
 //   - if err is nil, value is valid and isPanic false.
 //     Otherwise, err is non-nil and isPanic may be set.
 //     value is zero-value
 //   - thread-safe but invocations must be serialized
-func (i *functionIterator[T]) invokeFn(isCancel bool) (
+func (i *functionIterator[T]) baseIteratorRequest(isCancel bool) (
 	value T,
 	didCancel bool,
 	isPanic bool,
@@ -89,9 +91,20 @@ func (i *functionIterator[T]) invokeFn(isCancel bool) (
 ) {
 	defer cyclebreaker.RecoverErr(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, &isPanic)
 
-	var v T
-	if v, err = i.iteratorFunction(isCancel); err == nil && !isCancel {
-		value = v
+	value, err = i.iteratorFunction(isCancel)
+
+	// baseIterator will filter value based on validity
+
+	// iteratorFunction may return ErrEndCallback
+	//	- other delegates of baseIterator does not do this,
+	//		has to be handled here
+	if err != nil {
+		if errors.Is(err, cyclebreaker.ErrEndCallbacks) {
+			didCancel = true // iterator function did cancel
+			err = nil        // ignore the error
+		} else {
+			err = perrors.Stack(err)
+		}
 	}
 
 	return

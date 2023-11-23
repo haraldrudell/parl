@@ -46,7 +46,7 @@ func NewSliceInterfaceIterator[I any, E any](slice []E) (iterator Iterator[I]) {
 
 	// wrap a slice-pointer iterator in a type assertion shim
 	i := SliceInterfaceIterator[I, E]{}
-	// the delegator provides method based on the interface type
+	// the delegator provides methods based on the interface type
 	i.Delegator = *NewDelegator[I](i.delegateAction)
 	// the iterator returns *E values
 	NewSlicePointerIteratorField(&i.SlicePointerIterator, slice)
@@ -71,12 +71,13 @@ func (i *SliceInterfaceIterator[I, E]) Init() (iterationVariable I, iterator Ite
 //		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
 //	   // i is pointer to slice element
 func (i *SliceInterfaceIterator[I, E]) Cond(iterationVariablep *I, errp ...*error) (condition bool) {
-	var ep *E
-	if condition = i.SlicePointerIterator.Cond(&ep); !condition {
-		var iValue I
-		*iterationVariablep = iValue // assign zero-value
-		return                       // pointer assigned nil, condition: false
+	var ep *E // getting *E but must be type asserted for Go to understand it’s interface I
+	if condition = i.SlicePointerIterator.Cond(&ep, errp...); !condition || ep == nil {
+		var iZeroValue I
+		*iterationVariablep = iZeroValue // assign zero-value
+		return                           // pointer assigned nil, condition: valid
 	}
+	// ep is not nil, so assertion does not create typed nil
 	*iterationVariablep = any(ep).(I)
 	return // pointer assigned asserted &E, condition: true
 }
@@ -84,15 +85,15 @@ func (i *SliceInterfaceIterator[I, E]) Cond(iterationVariablep *I, errp ...*erro
 // delegateAction returns I values to the delegator
 // by type asserting *E values from the slice pointer-iterator
 func (i *SliceInterfaceIterator[I, E]) delegateAction(isSame NextAction) (value I, hasValue bool) {
-	var ep *E
-	if ep, hasValue = i.SlicePointerIterator.delegateAction(isSame); !hasValue {
+	var ep *E // getting *E but must be type asserted for Go to understand it’s interface I
+	if ep, hasValue = i.SlicePointerIterator.delegateAction(isSame); !hasValue || ep == nil {
 		return
 	}
 
 	// here we want value to be *E
 	//	- if ep is nil, asserting it will cause a typed nil
 	//	- in Go, typed nil does not equal nil, so this must be avoided
-	value = any(ep).(I) // check to not panic in new function
+	value = any(ep).(I) // type assertion was checked to not panic in new function
 
 	return
 }

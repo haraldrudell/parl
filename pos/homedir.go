@@ -17,8 +17,9 @@ import (
 )
 
 // UserHomeDir obtains the absolute path to the process owning user’s
-// home directory.
-// This should never fail, when it does, panic is thrown
+// home directory
+//   - does not rely on environment
+//   - should never fail. if it does, panic is thrown
 func UserHomeDir() (homeDir string) {
 
 	// try getting home directory from account configuration
@@ -34,6 +35,16 @@ func UserHomeDir() (homeDir string) {
 		if homeDir == "" {
 			panic(perrors.New("failed to obtain home directory"))
 		}
+	}
+	return
+}
+
+// UserHome obtains the absolute path to the process owning user’s
+// home directory
+//   - does not rely on environment
+func UserHome() (homeDir string, err error) {
+	if homeDir = getProcessOwnerHomeDir(); homeDir == "" {
+		err = perrors.NewPF("failed to obtain user ID or userData")
 	}
 	return
 }
