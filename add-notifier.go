@@ -9,7 +9,6 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
@@ -18,17 +17,39 @@ const (
 	cancelNotifierFrames = 2
 )
 
+// a NotifierFunc receives a stack trace of function causing cancel
+//   - typically stack trace begins with [parl.InvokeCancel]
+type NotifierFunc func(slice pruntime.StackSlice)
+
 // notifier1Key is the context value key for child-context notifiers
 var notifier1Key cancelContextKey = "notifyChild"
 
-// a NotifierFunc receives a stack trace of function causing cancel
-type NotifierFunc func(slice pruntime.StackSlice)
+// notifierAllKey is the context value key for all-context notifiers
+var notifierAllKey cancelContextKey = "notifyAll"
 
-// notifierKey is the context value key for all-context notifiers
-var notifierKey cancelContextKey = "notifyAll"
+// threadSafeList is a thread-safe slice for all-cancel notifers
+type threadSafeList struct {
+	// - atomic.Pointer.Load for thread-safe read
+	// - CompareAndSwap of cloned list for thread-safe write
+	notifiers atomic.Pointer[[]NotifierFunc]
+}
 
-// atomicList is the type of context-value stored for all-cancel notifers
-type atomicList *atomic.Pointer[[]NotifierFunc]
+// AddNotifier1 adds a function that is invoked when a child context is canceled
+//   - child contexts with their own AddNotifier1 are not detected
+//   - invocation is immediately after context cancel completes
+//   - implemented by inserting a value into the context chain
+//   - notifier receives a stack trace of the cancel invocation,
+//     typically beginning with [parl.InvokeCancel]
+//   - notifier should be thread-safe and not long running
+//   - typical usage is debug of unexpected context cancel
+func AddNotifier1(ctx context.Context, notifier NotifierFunc) (ctx2 context.Context) {
+	if ctx == nil {
+		panic(NilError("ctx"))
+	} else if notifier == nil {
+		panic(NilError("notifier"))
+	}
+	return context.WithValue(ctx, notifier1Key, notifier)
+}
 
 // AddNotifier adds a function that is invoked when any context is canceled
 //   - AddNotifier is typically invoked on the root context
@@ -41,58 +62,34 @@ type atomicList *atomic.Pointer[[]NotifierFunc]
 //   - notifier should be thread-safe and not long running
 //   - typical usage is debug of unexpected context cancel
 func AddNotifier(ctx context.Context, notifier NotifierFunc) (ctx2 context.Context) {
-	return addNotifier(true, ctx, notifier)
-}
-
-// AddNotifier1 adds a function that is invoked when a child context is canceled
-//   - child contexts with their own AddNotifier1 are not detected
-//   - invocation is immediately after context cancel completes
-//   - implemented by inserting a value into the context chain
-//   - notifier receives a stack trace of the cancel invocation,
-//     typically beginning with [parl.InvokeCancel]
-//   - notifier should be thread-safe and not long running
-//   - typical usage is debug of unexpected context cancel
-func AddNotifier1(ctx context.Context, notifier NotifierFunc) (ctx2 context.Context) {
-	return addNotifier(false, ctx, notifier)
-}
-
-// addNotifier adds a notify context-value
-func addNotifier(allCancels bool, ctx context.Context, notifier NotifierFunc) (
-	ctx2 context.Context) {
 	if ctx == nil {
-		panic(perrors.NewPF("ctx cannot be nil"))
+		panic(NilError("ctx"))
 	} else if notifier == nil {
-		panic(perrors.NewPF("notifier cannot be nil"))
+		panic(NilError("notifier"))
 	}
-
-	// case for only child contexts
-	if !allCancels {
-		return context.WithValue(ctx, notifier1Key, notifier)
-	}
-
-	// append to static notifier list
 
 	// if this context-chain has static notifier, append to it
-	var atomp atomicList
-	var ok bool
-	atomp, ok = ctx.Value(notifierKey).(atomicList)
-	if ok {
+	if list, ok := ctx.Value(notifierAllKey).(*threadSafeList); ok { // ok only if non-nil
 		for {
-			var notifiersp = (*atomp).Load()
-			var notifiers = append(*notifiersp, notifier)
-			if (*atomp).CompareAndSwap(notifiersp, &notifiers) {
-				return ctx // appended: done
+			// currentSlicep is read-only to be thread-safe
+			var currentSlicep = list.notifiers.Load()
+			// clone and append
+			var newSlice = append(append([]NotifierFunc{}, *currentSlicep...), notifier)
+			if list.notifiers.CompareAndSwap(currentSlicep, &newSlice) {
+				ctx2 = ctx // appended: ctx does not change
+				return     // append return
 			}
 		}
 	}
 
 	// create a new list
-	var atomSlice atomic.Pointer[[]NotifierFunc]
-	atomSlice.Store(&[]NotifierFunc{notifier})
+	var newList threadSafeList
+	var newSlice = []NotifierFunc{notifier}
+	newList.notifiers.Store(&newSlice)
 
 	// insert list pointer into context chain
-	atomp = &atomSlice
-	return context.WithValue(ctx, notifierKey, atomp)
+	ctx2 = context.WithValue(ctx, notifierAllKey, &newList)
+	return // insert context value return, ctx2 new value
 }
 
 // handleContextNotify is invoked for all CancelContext cancel invocations
@@ -104,8 +101,8 @@ func handleContextNotify(ctx context.Context) {
 
 	// fetch any notifyall list
 	var notifiers []NotifierFunc
-	if atomp, ok := ctx.Value(notifierKey).(atomicList); ok {
-		notifiers = *(*atomp).Load()
+	if list, ok := ctx.Value(notifierAllKey).(*threadSafeList); ok {
+		notifiers = *list.notifiers.Load()
 	}
 
 	if notifier == nil && len(notifiers) == 0 {

@@ -4,9 +4,6 @@ ISC License
 */
 
 // goid.GoID() provides a unique goroutine identifier.
-//
-//	m := map[goid.ThreadID]SomeInterface{}
-//	m[goid.GoID()] = …
 package goid
 
 import (
@@ -16,8 +13,19 @@ import (
 )
 
 // GoID obtains a numeric string that as of Go1.18 is
-// assigned to each goroutine. This number is an increasing
-// unsigned integer beginning at 1 for the main invocation
+// assigned to each goroutine
+//   - [goid] 64-bit integer number incremented from
+//     1 for the main invocation thread
+//   - cache this value, it is expensive at 1.7 parallel mutex Lock/Unlock
+//     via pruntime.FirstStackLine
+//
+// Usage:
+//
+//	m := map[goid.ThreadID]SomeInterface{}
+//	cachedGoID := goid.GoID()
+//	m[cachedGoID] = …
+//
+// [goid]: https://go.googlesource.com/go/+/go1.13/src/runtime/runtime2.go#409
 func GoID() (threadID parl.ThreadID) {
 	var err error
 	if threadID, _, err = pdebug.ParseFirstLine(pruntime.FirstStackLine()); err != nil {

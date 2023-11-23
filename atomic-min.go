@@ -13,6 +13,11 @@ import (
 )
 
 // AtomicMin is a thread-safe container for a minimum value of any integer type
+//   - hasValue indicator
+//   - generic for any underlying Integer type
+//   - if type is signed, min may be negative
+//   - lock for first Value invocation
+//   - initialization-free
 type AtomicMin[T constraints.Integer] struct {
 	isInitialized atomic.Bool   // whether a value is present
 	value         atomic.Uint64 // current min value as uint64

@@ -13,11 +13,15 @@ import (
 )
 
 // AtomicMax is a thread-safe max container
+//   - threshold for minimum accepted max value
+//   - hasValue indicator
+//   - generic for any underlying Integer type
 type AtomicMax[T constraints.Integer] struct {
 	// threshold is an optional minimum value for a new max
 	//	- valid if greater than 0
 	threshold uint64
 	// whether [AtomicMax.Value] has been invoked
+	// with value equal or greater to threshold
 	hasValue atomic.Bool
 	// value is current max or 0 if no value is present
 	value atomic.Uint64

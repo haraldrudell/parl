@@ -234,7 +234,7 @@ func TestStackString(t *testing.T) {
 }
 
 func TestParseFirstStackLine(t *testing.T) {
-	input := "goroutine 19 [running]:\ngarbage"
+	input := []byte("goroutine 19 [running]:\ngarbage")
 	expID := parl.ThreadID(19)
 	expStatus := parl.ThreadStatus("running")
 

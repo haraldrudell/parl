@@ -25,7 +25,9 @@ type CountingAwaitable struct {
 
 // NewCountingAwaitable returns a counting awaitable
 //   - similar to sync.WaitGroup but wait-mechanic is closing channel
-//   - observable via Count method
+//   - observable via Count method.
+//     Count with missing delta will not panic
+//   - —
 //   - state is determined by counter.
 //     Guaranteed state is returned by Count IsTriggered
 //   - IsClosed is eventually consistent.
@@ -35,6 +37,7 @@ type CountingAwaitable struct {
 //     For race-sensitive code, synchronize or rely on Count
 //   - similarly, a parallel Count invocation may reflect triggered state
 //     prior to the Awaitable channel actually closing
+//   - mechanic is atomic.Int64.CompareAndSwap
 func NewCountingAwaitable() (awaitable *CountingAwaitable) {
 	return &CountingAwaitable{Awaitable: *NewAwaitable()}
 }

@@ -8,6 +8,7 @@ package pruntime
 import _ "unsafe"
 
 // CpuTick is a 32-bit pseudo-random number increasing every ns
+//   - consider prand functions based on 2 ns 32-bit thread-local runtime.fastrand
 //   - invocation time 16 ns, similar to an uncontended sync.Mutex.Lock
 //   - wraps around every 4 s
 //   - getting a random number is 4 ns

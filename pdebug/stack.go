@@ -6,6 +6,7 @@ ISC License
 package pdebug
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -14,42 +15,55 @@ import (
 )
 
 const (
-	runtDebugAndStackFrames   = 2
-	runtStatusAndCreatorLines = 3
-	runtLinesPerFrame         = 2
-	// runtStatusLines is a single line at the beginning of the stack trace
-	runtStatusLines = 1
-	// runtDebugStackLines are lines for the debug.Stack stack frame
-	runtDebugStackLines = 2
-	// runtNewStackLines are lines for the goid.NewStack stack frame
-	runtNewStackLines = 2
-	// runtCreatorLines are 2 optional lines at the end of the stack trace
-	runtCreatorLines = 2
+	// each stack frame is two lines:
+	//	- function line
+	//	- filename line with leading tab, line number and byte-offset
+	runtLinesPerFrame = 2
+	// the filename line is 1 line after function line
+	runtFileLineOffset = 1
+	// runtStatus is a single line at the beginning of the stack trace
+	runtStatus = 1
+	// runtPdebugStack are lines for the [pdebug.Stack] stack frame
+	runtPdebugStack = runtLinesPerFrame
+	// runtPruntimeStackTrace are lines for the [pruntime.StackTrace] stack frame
+	runtPruntimeStackTrace = runtLinesPerFrame
+	// runtCreator are 2 optional lines at the end of the stack trace
+	runtCreator = runtLinesPerFrame
+	// runtGoFunction are 2 optional lines that precedes runtCreator
+	runtGoFunction = runtLinesPerFrame
 )
 
+//   - Go stack traces are created by [runtime.Stack] and is a byte slice
+//   - [debug.Stack] repeatedly calls [runtime.Stack] with an increased
+//     buffer size that is eventually returned
+//   - [debug.PrintStack] writes the byte stream to [os.Stderr]
+//   - interning large strings is a temporary memory leak.
+//     Converting the entire byte-slice stack-trace to string
+//     retains the memory for as long as there is a reference to any one character.
+//     This leads to megabytes of memory leaks
 type Stack struct {
 	// ThreadID is a unqique ID associated with this thread.
 	// typically numeric string “1”…
-	//	- Ordered so can be used as map key
-	//	- .String converts o string value
-	//	- .IsValid determines if not zero-value
+	//	- Ordered so it can be used as map key and sorted
+	//	- String method converts to string value
+	//	- IsValid method determines if not zero-value
 	threadID parl.ThreadID
 	// Status is typically word “running”
 	status parl.ThreadStatus
 	// isMainThread indicates if this is the thread that launched main.main
-	//	- if false, the stack trace is for a gorotuine
+	//	- if false, the stack trace is for a goroutine
 	isMainThread bool
 	// Frames is a list of code locations for this thread.
-	//	- [0] is the most recent code location, typically the invoker of goid.NewStack().
-	//	- last is the function starting this thread.
-	//	- Frame.Args is invocation values like "(0x14000113040)".
+	//	- [0] is the most recent code location, typically the invoker of [pdebug.Stack]
+	//	- last is the function starting this thread or in the Go runtime
+	//	- Frame.Args is invocation values like "(0x14000113040)"
 	frames []parl.Frame
-	// goFunction is the funciton that a goroutine launched
-	//	- is isMain is true, it ios the zero-value
+	// goFunction is the function used in a go statement
+	//	- if isMain is true, it is the zero-value
 	goFunction pruntime.CodeLocation
 	// Creator is the code location of the go statement launching
-	// this thread.
-	// FuncName is "main.main()" for main thread
+	// this thread
+	//	- FuncName is "main.main()" for main thread
 	creator pruntime.CodeLocation
 }
 
@@ -60,70 +74,79 @@ func NewStack(skipFrames int) (stack parl.Stack) {
 	if skipFrames < 0 {
 		skipFrames = 0
 	}
+	// result of parsing to be returned
 	var s Stack
 
-	// trace is a stack trace as a string with final newline removed split into lines
-	/*
-		goroutine 18 [running]:
-		runtime/debug.Stack()
-			/opt/homebrew/Cellar/go/1.18/libexec/src/runtime/debug/stack.go:24 +0x68
-		github.com/haraldrudell/parl/pruntime.NewStack()
-		…
-		created by testing.(*T).Run
-			/opt/homebrew/Cellar/go/1.18/libexec/src/testing/testing.go:1486 +0x300
-	*/
-	// line 1 is status line
-	// line 2 is debug.Stack frame
-	// created by is 2 optional lines at end
-	//	- convert to string
-	//	- remove final newline
-	//	- split into lines
-	trace := strings.Split(strings.TrimSuffix(string(pruntime.StackTrace()), "\n"), "\n")
-	traceLen := len(trace)
-	skipAtStart := runtStatusLines + runtDebugStackLines + runtNewStackLines
-	skipAtEnd := 0
+	// [pruntime.StackTrace] returns a stack trace with final newline:
+	// goroutine␠18␠[running]:
+	// github.com/haraldrudell/parl/pruntime.StackTrace()
+	// ␉/opt/sw/parl/pruntime/stack-trace.go:24␠+0x50
+	// github.com/haraldrudell/parl/pruntime.TestStackTrace(0x14000122820)
+	// ␉/opt/sw/parl/pruntime/stack-trace_test.go:14␠+0x20
+	// testing.tRunner(0x14000122820,␠0x104c204c8)
+	// ␉/opt/homebrew/Cellar/go/1.21.4/libexec/src/testing/testing.go:1595␠+0xe8
+	// created␠by␠testing.(*T).Run␠in␠goroutine␠1
+	// ␉/opt/homebrew/Cellar/go/1.21.4/libexec/src/testing/testing.go:1648␠+0x33c
 
-	// parse possible "created by"
-	//	- gogorutine creator may be in the two last text lines of the stack trace
-	if traceLen >= runtCreatorLines {
-		// populate s.IsMainThread s.Creator
-		// last 2 lines
-		var isMainThread bool
+	// trace is array of byte-slice lines: removed final newline and split on newline
+	//	- trace[0] is status line “goroutine␠18␠[running]:”
+	//	- trace[1…2] is [pruntime.StackTrace] frame
+	//	- trace[3…4] is [pdebug.Stack] frame
+	//	- final newline is removed, so last line is non-empty
+	//	- created by is 2 optional lines at end
+	//	- if created by is present, the two preceding lines is the goroutine function
+	var trace = bytes.Split(bytes.TrimSuffix(pruntime.StackTrace(), []byte{'\n'}), []byte{'\n'})
+	var nonEmptyLineCount = len(trace)
+	var skipAtStart = runtStatus + runtPdebugStack + runtPruntimeStackTrace
+	var skipAtEnd = 0
+
+	// parse possible “created by” line-pair at end
+	//	- goroutine creator may be in the two last text lines of the stack trace
+	if nonEmptyLineCount-skipAtStart >= runtCreator {
+		// the index in trace of created-by line
+		var creatorIndex = nonEmptyLineCount - runtCreator
+		// temporary creator code location
 		var creator pruntime.CodeLocation
-		if creator.FuncName, isMainThread = ParseCreatedLine(trace[traceLen-2]); !isMainThread {
-			skipAtEnd += runtCreatorLines
-			creator.File, creator.Line = ParseFileLine(trace[traceLen-1])
+		// determine s.isMainThread
+		creator.FuncName, s.isMainThread = ParseCreatedLine(trace[creatorIndex])
+		// if a goroutine, store creator
+		if !s.isMainThread {
+			s.creator = creator
+			skipAtEnd += runtCreator
+			creator.File, creator.Line = ParseFileLine(trace[creatorIndex+runtFileLineOffset])
 		}
-		s.SetCreator(&creator, isMainThread)
 
-		if !isMainThread && traceLen >= 5 {
-			s.goFunction.FuncName, _ = ParseFuncLine(trace[traceLen-4])
-			s.goFunction.File, s.goFunction.Line = ParseFileLine(trace[traceLen-3])
+		// if not main thread, store goroutine function
+		if !s.isMainThread && creatorIndex >= skipAtStart+runtGoFunction {
+			// the trace index for goroutine function
+			var goIndex = creatorIndex - runtGoFunction
+			s.goFunction.FuncName, _ = ParseFuncLine(trace[goIndex])
+			s.goFunction.File, s.goFunction.Line = ParseFileLine(trace[goIndex+runtFileLineOffset])
 		}
 	}
 
 	// check trace length: must be at least one frame available
-	minLines := skipAtStart + skipAtEnd + // skip lines at beginning and end
+	var minLines = skipAtStart + skipAtEnd + // skip lines at beginning and end
 		runtLinesPerFrame // one frame available
-	if traceLen < minLines || traceLen&1 == 0 {
+	if nonEmptyLineCount < minLines || nonEmptyLineCount&1 == 0 {
 		panic(fmt.Errorf("pdebug.Stack trace less than %d[%d–%d] lines or even: %d\nTRACE: %s%s",
 			minLines, skipAtStart, skipAtEnd, len(trace),
-			strings.Join(trace, "\n"),
+			string(bytes.Join(trace, []byte{'\n'})),
 			"\n",
 		))
 	}
 
 	// check skipFrames
-	maxSkipFrames := (traceLen - minLines) / runtLinesPerFrame
+	var maxSkipFrames = (nonEmptyLineCount - minLines) / runtLinesPerFrame
 	if skipFrames > maxSkipFrames {
 		panic(fmt.Errorf("pruntime.Stack bad skipFrames: %d trace-length: %d[%d–%d] max-skipFrames: %d\nTRACE: %s%s",
-			skipFrames, traceLen, skipAtStart, skipAtEnd, maxSkipFrames,
-			strings.Join(trace, "\n"),
+			skipFrames, nonEmptyLineCount, skipAtStart, skipAtEnd, maxSkipFrames,
+			string(bytes.Join(trace, []byte{'\n'})),
 			"\n",
 		))
 	}
 	skipAtStart += skipFrames * runtLinesPerFrame // remove frames from skipFrames
-	skipIndex := traceLen - skipAtEnd             // limit index at end
+	var skipIndex = nonEmptyLineCount - skipAtEnd // limit index at end
 
 	// parse first line: s.ID s.Status
 	var threadID parl.ThreadID
@@ -210,11 +233,16 @@ func (s *Stack) Shorts(prepend string) (shorts string) {
 	return strings.Join(sL, "\n")
 }
 
+// SetID updates goroutine ID and thread status from the stack trace
+// status line
 func (s *Stack) SetID(threadID parl.ThreadID, status parl.ThreadStatus) {
 	s.threadID = threadID
 	s.status = status
 }
 
+// SetCreator is used if Stack is for a goroutine
+//   - describing whether it is the main thread
+//   - if a gouroutine, where the launching go statement was located
 func (s *Stack) SetCreator(creator *pruntime.CodeLocation, isMainThread bool) {
 	s.creator = *creator
 	s.isMainThread = isMainThread
