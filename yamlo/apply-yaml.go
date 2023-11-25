@@ -11,7 +11,6 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pflags"
-	"github.com/haraldrudell/parl/yamler"
 )
 
 const (
@@ -39,7 +38,7 @@ const (
 //   - -verbose=yamlo.ApplyYaml “github.com/haraldrudell/parl/yamlo.ApplyYaml”
 func ApplyYaml(
 	program, yamlFile, yamlDictionaryKey string, doYaml bool,
-	genericYaml yamler.GenericYaml,
+	genericYaml GenericYaml,
 	optionData []pflags.OptionData,
 ) (err error) {
 	if genericYaml == nil {

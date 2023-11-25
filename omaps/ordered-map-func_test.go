@@ -4,7 +4,7 @@ ISC License
 */
 
 // OrderedMapFunc is a mapping whose values are provided in custom order.
-package pmaps
+package omaps
 
 import (
 	"fmt"
@@ -49,12 +49,13 @@ func TestNewOrderedMapFunc(t *testing.T) {
 
 	// vPointers: [1 3]
 	if debug {
-		var mapContents = make([]string, len(m.m2.m))
+		var mapContents = make([]string, m.m2.Length())
 		var i = 0
-		for key, value := range m.m2.m {
+		m.m2.Range(func(key int, value *V) (keepGoing bool) {
 			mapContents[i] = fmt.Sprintf("%d: %d", key, value.value)
 			i++
-		}
+			return true
+		})
 		slices.Sort(mapContents)
 		t.Logf("map: %v", strings.Join(mapContents, "\x20"))
 		t.Logf("vPointers: %v", vPointers)

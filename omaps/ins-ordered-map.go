@@ -4,7 +4,7 @@ ISC License
 */
 
 // KeyInsOrderedMap is a mapping whose keys are provided in insertion order.
-package pmaps
+package omaps
 
 import (
 	"fmt"

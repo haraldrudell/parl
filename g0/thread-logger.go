@@ -12,6 +12,8 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pmaps"
+	"github.com/haraldrudell/parl/pslices"
 )
 
 const (
@@ -134,14 +136,27 @@ func (t *ThreadLogger) printThread() {
 
 		// multi-line string of all threads
 		var threadLines string
-		// threads ordered by goEntityID
-		var orderedMap = g.ThreadsInternal()
+
+		// unsorted map:
+		//	- key: internal parl.GoEntityID
+		//	- value: *ThreadData, has no GoEntityID
+		//	- keys must be retrieved for order
+		//	- values must be retrieved for printing
+		var m = g.ThreadsInternal() // unordered list parl.ThreadData
+		// get implementation that has Range method
+		var rwm = m.(*pmaps.RWMap[parl.GoEntityID, *ThreadData])
+		// assemble sorted list of keys
+		var goEntityOrder = make([]parl.GoEntityID, m.Length())[:0]
+		rwm.Range(func(key parl.GoEntityID, value *ThreadData) (keepGoing bool) {
+			goEntityOrder = pslices.InsertOrdered(goEntityOrder, key)
+			return true
+		})
+
 		// printable string representation of all threads
-		var ts = make([]string, orderedMap.Length())
-		for i, goEntityId := range orderedMap.List() {
-			var threadData, _ = orderedMap.Get(goEntityId)
-			var _ parl.ThreadData
-			ts[i] = threadData.(*ThreadData).LabeledString() + " G" + goEntityId.String()
+		var ts = make([]string, len(goEntityOrder))
+		for i, goEntityId := range goEntityOrder {
+			var threadData, _ = m.Get(goEntityId)
+			ts[i] = threadData.LabeledString() + " G" + goEntityId.String()
 		}
 		threadLines = strings.Join(ts, "\n")
 
@@ -149,11 +164,11 @@ func (t *ThreadLogger) printThread() {
 		//	- 230622 16:51:28-07 ThreadLogger: GoGen: goGroup#1_threads:316(325)_
 		//		New:main.main()-graffick.go:111 threads: 317
 		log("%s %s: GoGen: %s threads: %d\n%s",
-			parl.ShortSpace(),   // 230622 16:51:26-07
-			threadLoggerLabel,   // ThreadLogger
-			g,                   // GoGen: goGroup#1…
-			orderedMap.Length(), // threads: 317
-			threadLines,         // one line for each thread
+			parl.ShortSpace(),  // 230622 16:51:26-07
+			threadLoggerLabel,  // ThreadLogger
+			g,                  // GoGen: goGroup#1…
+			len(goEntityOrder), // threads: 317
+			threadLines,        // one line for each thread
 		)
 
 		// exit if thread-group done

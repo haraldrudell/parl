@@ -442,15 +442,9 @@ func (g *GoGroup) CascadeEnableTermination(delta int) {
 	}
 }
 
-// the available data for all threads as a map
-func (g *GoGroup) ThreadsInternal() (orderedMap pmaps.KeyOrderedMap[parl.GoEntityID, parl.ThreadData]) {
-	orderedMap = *pmaps.NewKeyOrderedMap[parl.GoEntityID, parl.ThreadData]()
-	var rwm = g.gos.(*pmaps.RWMap[parl.GoEntityID, *ThreadData])
-	rwm.Range(func(key parl.GoEntityID, value *ThreadData) (kepGoing bool) {
-		orderedMap.Put(key, value)
-		return true
-	})
-	return
+// ThreadsInternal returns values with the internal parl.GoEntityID key
+func (g *GoGroup) ThreadsInternal() parli.ThreadSafeMap[parl.GoEntityID, *ThreadData] {
+	return g.gos.Clone()
 }
 
 // the available data for all threads

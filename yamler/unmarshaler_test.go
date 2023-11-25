@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/yamlo"
 	"golang.org/x/exp/maps"
 )
 
@@ -38,7 +39,7 @@ options:
 		&y.P.FieldThree: "fieldthree",
 	}
 
-	var unmarshaler GenericYaml
+	var unmarshaler yamlo.GenericYaml
 	var yamlVisistedReferences map[any]string
 	var err error
 

@@ -3,7 +3,7 @@
 ISC License
 */
 
-package yamler
+package yamlo
 
 // GenericYaml is a wrapper for [yamlo.Unmarshaler] that allows the
 // yamlo package to unmarshal yaml to an unimported type

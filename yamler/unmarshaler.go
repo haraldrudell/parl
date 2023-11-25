@@ -8,6 +8,7 @@ package yamler
 import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/yamlo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -21,7 +22,7 @@ type Unmarshaler[T any] struct {
 
 // NewUnmarshaler returns an object that can unmarshal yaml
 // for unimported types
-func NewUnmarshaler[T any](y *T) (unmarshaler GenericYaml) {
+func NewUnmarshaler[T any](y *T) (unmarshaler yamlo.GenericYaml) {
 	return &Unmarshaler[T]{y: y}
 }
 

@@ -13,21 +13,24 @@ import (
 )
 
 const (
+	// default is to allow 20 threads at a time
 	defaultParallelism = 20
 )
 
-/*
-ModeratorCore invokes functions at a limited level of parallelism.
-ModeratorCore is a ticketing system.
-ModeratorCore does not have a cancel feature.
-
-	m := NewModeratorCore(20, ctx)
-	m.Do(func() (err error) { // waiting here for a ticket
-	  // got a ticket!
-	  …
-	  return or panic // ticket automatically returned
-	m.String() → waiting: 2(20)
-*/
+// ModeratorCore invokes functions at a limited level of parallelism
+//   - ModeratorCore is a ticketing system
+//   - ModeratorCore does not have a cancel feature
+//   - during low contention atomic performance
+//   - during high-contention lock performance
+//
+// Usage:
+//
+//	m := NewModeratorCore(20, ctx)
+//	defer m.Ticket()() // waiting here for a ticket
+//	// got a ticket!
+//	…
+//	return or panic // ticket automatically returned
+//	m.String() → waiting: 2(20)
 type ModeratorCore struct {
 	// parallelism is the maximum number of outstanding tickets
 	parallelism uint64
@@ -175,6 +178,10 @@ func (m *ModeratorCore) Status() (parallelism, active, waiting uint64) {
 	return
 }
 
+// when tickets available: “available: 2(10)”
+//   - 10 - 2 = 8 threads operating
+//   - when threads waiting “waiting 1(10)”
+//   - 10 threads operating, 1 thread waiting
 func (m *ModeratorCore) String() (s string) {
 	var parallelism, active, waiting = m.Status()
 	if active < parallelism {

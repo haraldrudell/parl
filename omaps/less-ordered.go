@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pmaps
+package omaps
 
 import (
 	"github.com/google/btree"

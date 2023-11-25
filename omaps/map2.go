@@ -3,18 +3,20 @@
 ISC License
 */
 
-package pmaps
+package omaps
+
+import "github.com/haraldrudell/parl/pmaps"
 
 // map2 is a private promotable field only promoting
 // explicit public identifiers Get Length Range
 type map2[K comparable, V any] struct {
 	// m2 protects public identifiers from being promoted
-	m2 Map[K, V]
+	m2 pmaps.Map[K, V]
 }
 
 // map2 is a private promotable field without public identifiers
 func newMap[K comparable, V any]() (m *map2[K, V]) {
-	return &map2[K, V]{m2: *NewMap[K, V]()}
+	return &map2[K, V]{m2: *pmaps.NewMap[K, V]()}
 }
 
 func (m *map2[K, V]) Get(key K) (value V, ok bool) {
