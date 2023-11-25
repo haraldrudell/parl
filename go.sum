@@ -1,8 +1,8 @@
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/google/btree v1.1.2 h1:xf4v41cLI2Z6FxbKm+8Bu+m8ifhj15JuZ9sa0jZCMUU=
 github.com/google/btree v1.1.2/go.mod h1:qOPhT0dTNdNzV6Z/lhRX0YXUafgPLFUh+gZMl761Gm4=
-github.com/haraldrudell/parl/yamler v0.4.127 h1:QDiIKzd7azRtLugdCpa5gObsT1N1TAmjqVe/lU9ehu0=
-github.com/haraldrudell/parl/yamler v0.4.127/go.mod h1:j/DZqOHg48zZHKnPQrRp99BZQNjI9ExCDmBcRm+9VF0=
+github.com/haraldrudell/parl/yamler v0.4.128 h1:d4lfA+gi3RYfkF0NER9xb9ZCAEQlVyikkWhzrwhmSiM=
+github.com/haraldrudell/parl/yamler v0.4.128/go.mod h1:vnaLMfNNjTa3+5lR6vj965srfjLBMQdy/Cus+7t+YxA=
 github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=

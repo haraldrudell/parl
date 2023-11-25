@@ -14,33 +14,36 @@ import (
 )
 
 const (
+	// counts [pruntime.NewCodeLocation]
 	newCodeLocationStackFrames = 1
 )
 
-// CodeLocation is similar to runtime.Frame, but contains basic types
-// string and int only
+// CodeLocation represents an executing code location, ie. a code line in source code
+//   - CodeLocation is similar to the location in [runtime.Frame], but
+//     contains only basic types string and int
 type CodeLocation struct {
 	// File is the absolute path to the go source file
+	//
 	//  /opt/foxyboy/sw/privates/parl/mains/executable.go
 	File string
-	// Line is the line number in the source file
-	//  35
+	// Line is the line number in the source file, eg. 35
 	Line int
 	// FuncName is the fully qualified Go package path,
 	// a possible value or pointer receiver struct name,
 	// and the function name
+	//
 	//  github.com/haraldrudell/parl/mains.(*Executable).AddErr
 	FuncName string
 }
 
-// NewCodeLocation gets data for a single stack frame.
-// if stackFramesToSkip is 0, NewCodeLocation returns data for
-// its immediate caller.
+// NewCodeLocation gets data for a single stack frame
+//   - for stackFramesToSkip 0, NewCodeLocation returns data for
+//     its immediate caller
 func NewCodeLocation(stackFramesToSkip int) (cl *CodeLocation) {
 	if stackFramesToSkip < 0 {
 		stackFramesToSkip = 0
 	}
-	c := CodeLocation{}
+	var c = CodeLocation{}
 
 	var pc uintptr
 	var ok bool
@@ -76,14 +79,14 @@ func (cl *CodeLocation) Package() (packageName string) {
 	return
 }
 
-// PackFunc return base package name and function:
-//
-//	mains.AddErr
+// PackFunc return base package name and function “mains.AddErr”
 func (cl *CodeLocation) PackFunc() (packageDotFunction string) {
 	_, packageName, _, funcName := SplitAbsoluteFunctionName(cl.FuncName)
 	return packageName + "." + funcName
 }
 
+// FuncIdentifier return the function name identifier “AddErr”
+//   - no spaces
 func (cl *CodeLocation) FuncIdentifier() (funcIdentifier string) {
 	_, _, _, funcIdentifier = SplitAbsoluteFunctionName(cl.FuncName)
 	return
@@ -130,8 +133,10 @@ func (cl *CodeLocation) IsSet() (isSet bool) {
 	return cl.File != "" || cl.FuncName != ""
 }
 
-// File: "/opt/homebrew/Cellar/go/1.20.4/libexec/src/testing/testing.go"
-// Line: 1576 FuncName: "testing.tRunner"
+// Dump outputs all values quoted for debug purposes
+//
+//	File: "/opt/homebrew/Cellar/go/1.20.4/libexec/src/testing/testing.go"
+//	Line: 1576 FuncName: "testing.tRunner"
 func (cl *CodeLocation) Dump() (s string) {
 	return fmt.Sprintf("File: %q Line: %d FuncName: %q",
 		cl.File,
@@ -143,8 +148,8 @@ func (cl *CodeLocation) Dump() (s string) {
 // String returns a two-line string representation suitable for a multi-line stack trace.
 // Typical output:
 //
-//	github.com/haraldrudell/parl/error116.(*TypeName).FuncName\n
-//	  /opt/sw/privates/parl/error116/codelocation_test.go:20
+//	github.com/haraldrudell/parl/error116.(*TypeName).FuncName␤
+//	␠␠/opt/sw/privates/parl/error116/codelocation_test.go:20
 func (cl CodeLocation) String() string {
 	return fmt.Sprintf("%s\n\x20\x20%s:%d", cl.FuncName, cl.File, cl.Line)
 }

@@ -7,16 +7,14 @@ package pdebug
 
 import (
 	"bytes"
-	"regexp"
 	"strconv"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
-	// debug.Stack uses this prefix in the first line of the result
-	runFirstRexpT   = "^goroutine ([[:digit:]]+) [[]([^]]+)[]]:$"
 	fileLineTabRune = '\t'
 )
 
@@ -24,31 +22,17 @@ const (
 // the executing thread is a launched goroutine
 var runtCreatedByPrefix = []byte("created by ")
 
-var firstRexp = regexp.MustCompile(runFirstRexpT)
-
 // getID obtains gorutine ID, as of go1.18 a numeric string "1"…
 func ParseFirstLine(debugStack []byte) (ID parl.ThreadID, status parl.ThreadStatus, err error) {
 
-	// remove possible lines 2…
-	if index := bytes.IndexByte(debugStack, '\n'); index != -1 {
-		debugStack = debugStack[:index]
-	}
-
-	// find ID and status
-	var matches = firstRexp.FindAllSubmatch(debugStack, -1)
-	if matches == nil {
-		err = perrors.Errorf("goid.ParseFirstStackLine failed to parse: %q", debugStack)
+	var uID uint64
+	var status0 string
+	if uID, status0, err = pruntime.ParseFirstLine(debugStack); err != nil {
+		err = perrors.Stack(err)
 		return
 	}
-
-	// return values
-	var values = matches[0][1:]
-	var u64 uint64
-	if u64, err = strconv.ParseUint(string(values[0]), 10, 64); err != nil {
-		return
-	}
-	ID = parl.ThreadID(u64)
-	status = parl.ThreadStatus(string(values[1]))
+	ID = parl.ThreadID(uID)
+	status = parl.ThreadStatus(status0)
 
 	return
 }

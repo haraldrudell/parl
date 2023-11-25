@@ -43,7 +43,7 @@ func TimeToDATETIME(t time.Time) (dateTime string) {
 	return t.UTC().Format(msTimeString)
 }
 
-// DATETIMEtoTime comverts SQLite DATETIME to Go time.Time with location time.Local
+// DATETIMEtoTime converts SQLite DATETIME to Go time.Time with location time.Local
 //   - database stores as TEXT in UTC, millisecond precision
 //   - “2019-01-01 21:30:42.000 +00:00”
 func DATETIMEtoTime(sqliteText string) (t time.Time, err error) {

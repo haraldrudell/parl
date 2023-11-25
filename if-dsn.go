@@ -16,8 +16,9 @@ import (
 //     possibly partitioned,
 //     against which queries can be prepared and executed
 //   - DataSourceNamer applies to any database implementation
+//   - sqliter provides implementations for SQLite3
 type DataSourceNamer interface {
-	// DSN returns the data source name based on a partiion selector
+	// DSN returns the data source name based on a partition selector
 	DSN(partition ...DBPartition) (dataSourceName DataSourceName)
 	// DataSource returns a usable data source based on a data source name
 	DataSource(dsn DataSourceName) (dataSource DataSource, err error)
