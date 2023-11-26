@@ -15,11 +15,12 @@ import (
 )
 
 const (
-	// WinOrWaiterAnyValue causes a thread to accept any calculated value
+	// WinOrWaiterAnyValue allows a thread to accept any calculated value
 	WinOrWaiterAnyValue WinOrWaiterStrategy = iota
-	// WinOrWaiterMustBeLater forces a calculation after the last arriving thread.
-	// WinOrWaiter caclulations are serialized, ie. a new calculation does not start prior to
-	// the conlusion of the previous calulation
+	// WinOrWaiterMustBeLater forces a calculation commencing after a thread arrives
+	//	- WinOrWaiter caclulations are serialized, ie. a new calculation does not start prior to
+	//		the conclusion of the previous calulation
+	//	- thread arrival time is prior to acquiring the lock
 	WinOrWaiterMustBeLater
 )
 
@@ -28,6 +29,10 @@ const (
 //   - threads in WinOrWait while a calculation is in progress are held waiting using
 //     RWLock and atomics until the calculation completes
 //   - the calculation is completed on demand, but only by the first requesting thread
+//   - —
+//   - mechanic is closing channel inside Awaitable inside Future
+//   - threads await a renewable Future until a new-enough result occurs
+//   - of the threads requring a newer calculation, one is selected to perform the calculation
 type WinOrWaiterCore struct {
 	// calculator if the function making the calculation
 	calculator func() (err error)
@@ -112,7 +117,8 @@ func (ww *WinOrWaiterCore) WinOrWait() (err error) {
 
 		// check for valid calculation result
 		calculation = ww.calculation.Load()
-		// calculation.Result may block
+
+		// calculation.Result: block here
 		if result, isValid := calculation.Result(); isValid {
 			switch ww.strategy {
 			case WinOrWaiterAnyValue:

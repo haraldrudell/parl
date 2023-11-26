@@ -5,26 +5,137 @@ ISC License
 
 package parl
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestAtomicMax(t *testing.T) {
-	var value1 uint64 = 2
-	var value2 uint64 = 1
-	var value3 uint64 = 3
+	var threshold1, value1, value2 = 1, 1, 2
 
-	var max AtomicMax[uint64]
+	var value, zeroValue int
+	var hasValue, isNewMax, isPanic bool
+	var err error
 
-	if !max.Value(value1) {
-		t.Error("value1: not max")
+	var a AtomicMax[int]
+	_ = 1
+
+	// a new should have no value
+	a = AtomicMax[int]{}
+	value, hasValue = a.Max()
+	if value != zeroValue {
+		t.Errorf("new value %d exp %d", value, zeroValue)
 	}
-	if max.Value(value2) {
-		t.Error("value2: max")
+	if hasValue {
+		t.Error("new hasValue true")
 	}
-	if !max.Value(value3) {
-		t.Error("value3: not max")
+
+	// Value below threshold should not be a max
+	a = *NewAtomicMax(threshold1)
+	isNewMax = a.Value(zeroValue)
+	if isNewMax {
+		t.Error("below isNewMax")
 	}
-	v, _ := max.Max()
-	if v != value3 {
-		t.Errorf("max %d exp %d", v, value3)
+	value, hasValue = a.Max()
+	if value != zeroValue {
+		t.Errorf("below value %d exp %d", value, zeroValue)
 	}
+	if hasValue {
+		t.Error("below hasValue true")
+	}
+
+	// zero should be max
+	a = AtomicMax[int]{}
+	isNewMax = a.Value(zeroValue)
+	if !isNewMax {
+		t.Error("zero isNewMax false")
+	}
+	value, hasValue = a.Max()
+	if value != zeroValue {
+		t.Errorf("zero value %d exp %d", value, zeroValue)
+	}
+	if !hasValue {
+		t.Error("zero hasValue false")
+	}
+
+	// zero-zero should not be max
+	a = AtomicMax[int]{}
+	isNewMax = a.Value(zeroValue)
+	_ = isNewMax
+	isNewMax = a.Value(zeroValue)
+	if isNewMax {
+		t.Error("zero isNewMax false")
+	}
+
+	// equal to threshold should be max
+	a = *NewAtomicMax(threshold1)
+	isNewMax = a.Value(value1)
+	if !isNewMax {
+		t.Error("equal isNewMax false")
+	}
+	value, hasValue = a.Max()
+	if value != value1 {
+		t.Errorf("equal value %d exp %d", value, value1)
+	}
+	if !hasValue {
+		t.Error("equal hasValue false")
+	}
+
+	// smaller value should not be max
+	a = AtomicMax[int]{}
+	isNewMax = a.Value(value2)
+	_ = isNewMax
+	isNewMax = a.Value(value1)
+	if isNewMax {
+		t.Error("smaller isNewMax")
+	}
+	value, hasValue = a.Max()
+	if value != value2 {
+		t.Errorf("smaller value %d exp %d", value, value2)
+	}
+	if !hasValue {
+		t.Error("smaller hasValue false")
+	}
+
+	// max1 should work
+	a = AtomicMax[int]{}
+	isNewMax = a.Value(value1)
+	_ = isNewMax
+	value = a.Max1()
+	if value != value1 {
+		t.Errorf("Max1 value %d exp %d", value, value1)
+	}
+
+	// negative threshold should panic
+	isPanic, err = invokeNewAtomicMax()
+	if !isPanic {
+		t.Error("negative threshold no panic")
+	}
+	if err == nil {
+		t.Error("negative threshold no error")
+	}
+
+	// negative value should panic
+	isPanic, err = invokeAtomicMaxValue()
+	if !isPanic {
+		t.Error("negative value no panic")
+	}
+	if err == nil {
+		t.Error("negative value no error")
+	}
+}
+
+func invokeNewAtomicMax() (isPanic bool, err error) {
+	defer PanicToErr(&err, &isPanic)
+
+	NewAtomicMax(-1)
+
+	return
+}
+
+func invokeAtomicMaxValue() (isPanic bool, err error) {
+	defer PanicToErr(&err, &isPanic)
+
+	NewAtomicMax(0).Value(-1)
+
+	return
 }
