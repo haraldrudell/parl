@@ -3,13 +3,14 @@
 ISC License
 */
 
-package g0
+package g0debug
 
 import (
 	"context"
 	"testing"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/g0"
 )
 
 func ExitingGoroutine(g parl.Go) {
@@ -22,7 +23,7 @@ func ReadErrorChannelToEnd(ch <-chan parl.GoError, t *testing.T) {
 func TestThreadLogger(t *testing.T) {
 
 	// goGroup being logged
-	var goGroup parl.GoGroup = NewGoGroup(context.Background())
+	var goGroup parl.GoGroup = g0.NewGoGroup(context.Background())
 
 	// waitgroup for threadLogger end
 	var wg = NewThreadLogger(goGroup).Log()

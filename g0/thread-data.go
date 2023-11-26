@@ -35,72 +35,72 @@ type ThreadData struct {
 var _ parl.ThreadData = &ThreadData{}
 
 // Update populates this object from a stack trace.
-func (td *ThreadData) Update(
+func (t *ThreadData) Update(
 	threadID parl.ThreadID,
 	createInvocation, goFunction *pruntime.CodeLocation,
 	label string) {
-	if !td.threadID.IsValid() && threadID.IsValid() {
-		td.threadID = threadID
+	if !t.threadID.IsValid() && threadID.IsValid() {
+		t.threadID = threadID
 	}
-	if createInvocation != nil && !td.createLocation.IsSet() && createInvocation.IsSet() {
-		td.createLocation = *createInvocation
+	if createInvocation != nil && !t.createLocation.IsSet() && createInvocation.IsSet() {
+		t.createLocation = *createInvocation
 	}
-	if goFunction != nil && !td.funcLocation.IsSet() && goFunction.IsSet() {
-		td.funcLocation = *goFunction
+	if goFunction != nil && !t.funcLocation.IsSet() && goFunction.IsSet() {
+		t.funcLocation = *goFunction
 	}
-	if td.label == "" && label != "" {
-		td.label = label
+	if t.label == "" && label != "" {
+		t.label = label
 	}
 }
 
 // SetCreator gets preliminary Go identifier: the line invoking Go()
-func (td *ThreadData) SetCreator(cl *pruntime.CodeLocation) {
-	td.createLocation = *cl
+func (t *ThreadData) SetCreator(cl *pruntime.CodeLocation) {
+	t.createLocation = *cl
 }
 
 // threadID is the ID of the running thread
-func (td *ThreadData) ThreadID() (threadID parl.ThreadID) {
-	return td.threadID
+func (t *ThreadData) ThreadID() (threadID parl.ThreadID) {
+	return t.threadID
 }
 
-func (td *ThreadData) Create() (createLocation *pruntime.CodeLocation) {
-	return &td.createLocation
+func (t *ThreadData) Create() (createLocation *pruntime.CodeLocation) {
+	return &t.createLocation
 }
 
-func (td *ThreadData) Func() (funcLocation *pruntime.CodeLocation) {
-	return &td.funcLocation
+func (t *ThreadData) Func() (funcLocation *pruntime.CodeLocation) {
+	return &t.funcLocation
 }
 
-func (td *ThreadData) Name() (label string) {
-	return td.label
+func (t *ThreadData) Name() (label string) {
+	return t.label
 }
 
-func (td *ThreadData) Get() (threadID parl.ThreadID, createLocation pruntime.CodeLocation,
+func (t *ThreadData) Get() (threadID parl.ThreadID, createLocation pruntime.CodeLocation,
 	funcLocation pruntime.CodeLocation, label string) {
-	threadID = td.threadID
-	createLocation = td.createLocation
-	funcLocation = td.funcLocation
-	label = td.label
+	threadID = t.threadID
+	createLocation = t.createLocation
+	funcLocation = t.funcLocation
+	label = t.label
 	return
 }
 
 // "myThreadName:4"
-func (td *ThreadData) Short() (s string) {
+func (t *ThreadData) Short() (s string) {
 
 	// handle nil case
-	if td == nil {
+	if t == nil {
 		return ThreadDataNil // "threadData:nil"
 	}
 
 	// "[label]:[threadID]"
-	if td.label != "" {
-		s = td.label
+	if t.label != "" {
+		s = t.label
 	}
-	if td.threadID.IsValid() {
+	if t.threadID.IsValid() {
 		if s != "" {
-			s += ":" + td.threadID.String()
+			s += ":" + t.threadID.String()
 		} else {
-			s = td.threadID.String()
+			s = t.threadID.String()
 		}
 	}
 	if s != "" {
@@ -108,7 +108,7 @@ func (td *ThreadData) Short() (s string) {
 	}
 
 	// zero-value case
-	return td.String()
+	return t.String()
 }
 
 func (t *ThreadData) LabeledString() (s string) {

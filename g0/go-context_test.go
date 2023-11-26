@@ -14,9 +14,8 @@ func TestGoContext(t *testing.T) {
 	type X struct {
 		goContext
 	}
-	x := &X{
-		goContext: *newGoContext(context.Background()),
-	}
+	x := &X{}
+	newGoContext(&x.goContext, context.Background())
 	x.Context()
 	x.Cancel()
 }

@@ -3,7 +3,7 @@
 ISC License
 */
 
-package g0
+package g0debug
 
 import (
 	"strings"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/g0"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pmaps"
 	"github.com/haraldrudell/parl/pslices"
@@ -28,11 +29,15 @@ const (
 //     not exit prematurely. The WaitGroup ends when the GoGroup ends and ThreadLogger
 //     ceases output
 type ThreadLogger struct {
-	goGroup  *GoGroup
 	log      parl.PrintfFunc
 	endCh    chan struct{}
-	ErrCh    *parl.NBChan[parl.GoError]
 	isCancel atomic.Bool
+
+	goGroup            *g0.GoGroup
+	isEnd              func() bool
+	isAggregateThreads *atomic.Bool
+	setCancelListener  func(f func())
+	gEndCh             <-chan struct{}
 }
 
 var _ = parl.AggregateThread
@@ -65,10 +70,11 @@ func NewThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interfa
 
 	// obtain GoGroup
 	var ok bool
-	if t.goGroup, ok = goGen.(*GoGroup); !ok {
+	if t.goGroup, ok = goGen.(*g0.GoGroup); !ok {
 		panic(perrors.ErrorfPF("type assertion failed, need GoGroup SubGo or SubGroup, received: %T", goGen))
 	}
-	t.ErrCh = &t.goGroup.ch
+	t.isEnd, t.isAggregateThreads, t.setCancelListener, t.gEndCh = t.goGroup.Internals()
+
 	return &t
 }
 
@@ -79,15 +85,15 @@ func (t *ThreadLogger) Log() (t2 *ThreadLogger) {
 	// if threadGroup has already ended, print that
 	var g = t.goGroup
 	var log = t.log
-	if g.isEnd() {
+	if t.isEnd() {
 		log(threadLoggerLabel + ": IsEnd true")
 		close(t.endCh)
 		return // thread-group already ended
 	}
-	g.isAggregateThreads.Store(true)
+	t.isAggregateThreads.Store(true)
 
 	if g.Context().Err() == nil {
-		g.goContext.setCancelListener(t.cancelListener)
+		t.setCancelListener(t.cancelListener)
 		log(threadLoggerLabel + ": listening for Cancel")
 		return
 	}
@@ -126,12 +132,6 @@ func (t *ThreadLogger) printThread() {
 	var ticker = time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	var endCh <-chan struct{}
-	if g.hasErrorChannel {
-		endCh = g.ch.WaitForCloseCh()
-	} else {
-		endCh = g.endCh.Ch()
-	}
 	for {
 
 		// multi-line string of all threads
@@ -144,10 +144,10 @@ func (t *ThreadLogger) printThread() {
 		//	- values must be retrieved for printing
 		var m = g.ThreadsInternal() // unordered list parl.ThreadData
 		// get implementation that has Range method
-		var rwm = m.(*pmaps.RWMap[parl.GoEntityID, *ThreadData])
+		var rwm = m.(*pmaps.RWMap[parl.GoEntityID, *g0.ThreadData])
 		// assemble sorted list of keys
 		var goEntityOrder = make([]parl.GoEntityID, m.Length())[:0]
-		rwm.Range(func(key parl.GoEntityID, value *ThreadData) (keepGoing bool) {
+		rwm.Range(func(key parl.GoEntityID, value *g0.ThreadData) (keepGoing bool) {
 			goEntityOrder = pslices.InsertOrdered(goEntityOrder, key)
 			return true
 		})
@@ -172,13 +172,13 @@ func (t *ThreadLogger) printThread() {
 		)
 
 		// exit if thread-group done
-		if g.isEnd() {
+		if t.isEnd() {
 			return
 		}
 
 		// blocks here
 		select {
-		case <-endCh: // thread-group ended
+		case <-t.gEndCh: // thread-group ended
 		case <-ticker.C: // timer trig
 		}
 	}

@@ -50,7 +50,7 @@ type GoGroup struct {
 	// endCh is a channel that closes when this threadGroup ends
 	endCh parl.Awaitable
 	// provides Go entity ID, sub-object waitgroup, cancel-context
-	*goContext // Cancel() Context() EntityID()
+	goContext // Cancel() Context() EntityID()
 
 	hadFatal           atomic.Bool
 	isNoTermination    atomic.Bool
@@ -182,12 +182,12 @@ func new(
 		ctx = parent.Context()
 	}
 	g := GoGroup{
-		creator:   *pruntime.NewCodeLocation(stackOffset),
-		parent:    parent,
-		goContext: newGoContext(ctx),
-		gos:       pmaps.NewRWMap[parl.GoEntityID, *ThreadData](),
-		endCh:     *parl.NewAwaitable(),
+		creator: *pruntime.NewCodeLocation(stackOffset),
+		parent:  parent,
+		gos:     pmaps.NewRWMap[parl.GoEntityID, *ThreadData](),
+		endCh:   *parl.NewAwaitable(),
 	}
+	newGoContext(&g.goContext, ctx)
 	if parl.IsThisDebug() {
 		g.isDebug.Store(true)
 	}
@@ -443,8 +443,22 @@ func (g *GoGroup) CascadeEnableTermination(delta int) {
 }
 
 // ThreadsInternal returns values with the internal parl.GoEntityID key
-func (g *GoGroup) ThreadsInternal() parli.ThreadSafeMap[parl.GoEntityID, *ThreadData] {
+func (g *GoGroup) ThreadsInternal() (m parli.ThreadSafeMap[parl.GoEntityID, *ThreadData]) {
 	return g.gos.Clone()
+}
+
+func (g *GoGroup) Internals() (
+	isEnd func() bool,
+	isAggregateThreads *atomic.Bool,
+	setCancelListener func(f func()),
+	endCh <-chan struct{},
+) {
+	if g.hasErrorChannel {
+		endCh = g.ch.WaitForCloseCh()
+	} else {
+		endCh = g.endCh.Ch()
+	}
+	return g.isEnd, &g.isAggregateThreads, g.goContext.setCancelListener, endCh
 }
 
 // the available data for all threads

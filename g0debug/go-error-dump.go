@@ -3,7 +3,7 @@
 ISC License
 */
 
-package g0
+package g0debug
 
 import (
 	"fmt"

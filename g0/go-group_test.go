@@ -8,6 +8,7 @@ package g0
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -366,13 +367,13 @@ func TestCancel(t *testing.T) {
 	})
 
 	var threadGroup = NewGoGroup(ctx)
-	threadGroup.(*GoGroup).addNotifier(func(slice pruntime.StackSlice) {
-		t.Logf("CANCEL %s %s", GoChain(threadGroup), slice)
-	})
+	// threadGroup.(*GoGroup).addNotifier(func(slice pruntime.StackSlice) {
+	// 	t.Logf("CANCEL %s %s", GoChain(threadGroup), slice)
+	// })
 	var subGroup = threadGroup.SubGroup()
-	subGroup.(*GoGroup).addNotifier(func(slice pruntime.StackSlice) {
-		t.Logf("CANCEL %s %s", GoChain(subGroup), slice)
-	})
+	// subGroup.(*GoGroup).addNotifier(func(slice pruntime.StackSlice) {
+	// 	t.Logf("CANCEL %s %s", GoChain(subGroup), slice)
+	// })
 	t.Logf("STATE0: %t %t", threadGroup.Context().Err() != nil, subGroup.Context().Err() != nil)
 	if threadGroup.Context().Err() != nil {
 		t.Error("threadGroup canceled")
@@ -389,4 +390,53 @@ func TestCancel(t *testing.T) {
 		t.Error("subGroup did not cancel")
 	}
 	//t.Fail()
+}
+
+func GoChain(g parl.GoGen) (s string) {
+	for {
+		var s0 = GoNo(g)
+		if s == "" {
+			s = s0
+		} else {
+			s += "—" + s0
+		}
+		if g == nil {
+			return
+		} else if g = Parent(g); g == nil {
+			return
+		}
+	}
+}
+
+func Parent(g parl.GoGen) (parent parl.GoGen) {
+	switch g := g.(type) {
+	case *Go:
+		parent = g.goParent.(parl.GoGen)
+	case *GoGroup:
+		if p := g.parent; p != nil {
+			parent = p.(parl.GoGen)
+		}
+	}
+	return
+}
+
+func GoNo(g parl.GoGen) (goNo string) {
+	switch g1 := g.(type) {
+	case *Go:
+		goNo = "Go" + g1.id.String() + ":" + g1.GoID().String()
+	case *GoGroup:
+		if !g1.hasErrorChannel {
+			goNo = "SubGo"
+		} else if g1.parent != nil {
+			goNo = "SubGroup"
+		} else {
+			goNo = "GoGroup"
+		}
+		goNo += g1.id.String()
+	case nil:
+		goNo = "nil"
+	default:
+		goNo = fmt.Sprintf("?type:%T", g)
+	}
+	return
 }

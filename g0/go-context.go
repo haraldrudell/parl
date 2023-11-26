@@ -11,8 +11,6 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/pdebug"
-	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
@@ -27,27 +25,27 @@ type goContext struct {
 	goEntityID // EntityID()
 	wg         parl.WaitGroup
 	//	- updatable, therefore must be atomic access
-	//	- initialized in constructor, therefore must be pointer
-	ctxp *atomic.Pointer[context.Context]
-
-	// cancelListener is fucntion invoked immiately prior to
+	ctxp atomic.Pointer[context.Context]
+	// cancelListener is function invoked immediately prior to
 	// parl.InvokeCancel
 	cancelListener atomic.Pointer[func()]
 }
 
 // newGoContext returns a subordinate context with Cancel and Context methods
-//   - init must be invoked
-func newGoContext(ctx context.Context) (gc *goContext) {
+//   - uses non-pointer atomics
+func newGoContext(fieldp *goContext, ctx context.Context) (g *goContext) {
 	if ctx == nil {
-		panic(perrors.NewPF("ctx cannot be nil"))
+		panic(parl.NilError("ctx"))
+	}
+	if fieldp != nil {
+		g = fieldp
+		*g = goContext{goEntityID: *newGoEntityID()}
+	} else {
+		g = &goContext{goEntityID: *newGoEntityID()}
 	}
 	var ctx2 = parl.NewCancelContext(ctx)
-	var ctxp atomic.Pointer[context.Context]
-	ctxp.Store(&ctx2)
-	return &goContext{
-		goEntityID: *newGoEntityID(),
-		ctxp:       &ctxp,
-	}
+	g.ctxp.Store(&ctx2)
+	return
 }
 
 // Cancel signals shutdown to all threads of a thread-group.
@@ -77,15 +75,15 @@ func (c *goContext) Context() (ctx context.Context) {
 //	threadGroup.(*g0.GoGroup).addNotifier(func(slice pruntime.StackSlice) {
 //	  parl.D("CANCEL %s %s\n\n\n\n\n", g0.GoChain(threadGroup), slice)
 //	})
-func (c *goContext) addNotifier(notifier func(slice pruntime.StackSlice)) {
-	for {
-		var ctxp0 = c.ctxp.Load()
-		var ctx = parl.AddNotifier1(*ctxp0, notifier)
-		if c.ctxp.CompareAndSwap(ctxp0, &ctx) {
-			return
-		}
-	}
-}
+// func (c *goContext) addNotifier(notifier func(slice pruntime.StackSlice)) {
+// 	for {
+// 		var ctxp0 = c.ctxp.Load()
+// 		var ctx = parl.AddNotifier1(*ctxp0, notifier)
+// 		if c.ctxp.CompareAndSwap(ctxp0, &ctx) {
+// 			return
+// 		}
+// 	}
+// }
 
 func (c *goContext) setCancelListener(f func()) {
 	c.cancelListener.Store(&f)

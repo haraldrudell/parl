@@ -9,36 +9,33 @@ import (
 	"testing"
 )
 
-func TestCachedLocation_PackFunc(t *testing.T) {
-	var c0 CachedLocation
-	// expCL NewCodeLocation is on same line as first invocation of c0
-	var expCL = NewCodeLocation(len(c0.Short()) * 0)
+func TestCachedLocation(t *testing.T) {
+	var c CachedLocation
+	var exp string
 
-	if c0.FuncIdentifier() != expCL.FuncIdentifier() {
-		t.Errorf("FuncIdentifier: %q exp %q", c0.FuncIdentifier(), expCL.FuncIdentifier())
-	}
-	if c0.FuncIdentifier() == "" {
-		t.Errorf("FuncIdentifier: empty")
-	}
-	if c0.PackFunc() != expCL.PackFunc() {
-		t.Errorf("FuncName: %q exp %q", c0.PackFunc(), expCL.PackFunc())
-	}
-	if c0.Short() != expCL.Short() {
-		t.Errorf("Short: %q exp %q", c0.Short(), expCL.Short())
-	}
-	if c0.FuncName() != expCL.FuncName {
-		t.Errorf("FuncName: %q exp %q", c0.FuncName(), expCL.FuncName)
+	// initial Short should match CodeLocation
+	var cL, act = NewCodeLocation(0), c.Short()
+	if exp = cL.Short(); act != exp {
+		t.Errorf("initial Short: %q exp %q", act, exp)
 	}
 
-	// FuncIdentifier: TestCachedLocation_PackFunc
-	// PackFunc: pruntime.TestCachedLocation_PackFunc
-	// Short: pruntime.TestCachedLocation_PackFunc()-cached-location_test.go:15
-	// FuncName: github.com/haraldrudell/parl/pruntime.TestCachedLocation_PackFunc
-	t.Logf("FuncIdentifier: %s\nPackFunc: %s\nShort: %s\nFuncName: %s\n",
-		c0.FuncIdentifier(),
-		c0.PackFunc(),
-		c0.Short(),
-		c0.FuncName(),
-	)
-	//t.Fail()
+	// cached Short should match Code Location
+	if act, exp = c.Short(), cL.Short(); act != exp {
+		t.Errorf("cached Short: %q exp %q", act, exp)
+	}
+
+	// FuncIdentifier
+	if act, exp = c.FuncIdentifier(), cL.FuncIdentifier(); act != exp {
+		t.Errorf("FuncIdentifier: %q exp %q", act, exp)
+	}
+
+	// FuncName
+	if act, exp = c.FuncName(), cL.FuncName; act != exp {
+		t.Errorf("FuncName: %q exp %q", act, exp)
+	}
+
+	// PackFunc
+	if act, exp = c.PackFunc(), cL.PackFunc(); act != exp {
+		t.Errorf("PackFunc: %q exp %q", act, exp)
+	}
 }
