@@ -46,10 +46,11 @@ func NewAtomicMax[T constraints.Integer](threshold T) (atomicMax *AtomicMax[T]) 
 // Value updates the container with a possible max value
 //   - value cannot be negative, that is panic
 //   - isNewMax is true if:
-//   - — value is equal to or greater than threshold and
-//   - — value is the first 0 or
-//   - — value was observed to be greater than the current max
-//   - upon return, Max and Max1 are guaranteed to return valid data
+//   - — value is equal to or greater than any threshold and
+//   - — invocation recorded the first 0 or
+//   - — a new max
+//   - upon return, Max and Max1 are guaranteed to reflect the invocation
+//   - the return order of concurrent Value invocations is not guaranteed
 //   - Thread-safe
 func (m *AtomicMax[T]) Value(value T) (isNewMax bool) {
 
@@ -79,7 +80,7 @@ func (m *AtomicMax[T]) Value(value T) (isNewMax bool) {
 	for {
 
 		// try to write value to *max
-		if m.value.CompareAndSwap(current, valueU64) {
+		if isNewMax = m.value.CompareAndSwap(current, valueU64); isNewMax {
 			if !hasValue0 {
 				// may be rarely written multiple times
 				// still faster than CompareAndSwap
@@ -88,17 +89,20 @@ func (m *AtomicMax[T]) Value(value T) (isNewMax bool) {
 			return // new max written return: isNewMax true
 		}
 		if current = m.value.Load(); current >= valueU64 {
-			return // no longer a need to write return: isNewMax true
+			return // no longer a need to write return: isNewMax false
 		}
 	}
 }
 
-// Max returns current max and a flag whether a value is present
+// Max returns current max and value-present flag
+//   - hasValue true indicates that value reflects a Value invocation
+//   - hasValue false: value is zero-value
 //   - Thread-safe
-//   - values lack integrity but only matters if Max parallel with first Value
 func (m *AtomicMax[T]) Max() (value T, hasValue bool) {
+	if hasValue = m.hasValue.Load(); !hasValue {
+		return
+	}
 	value = T(m.value.Load())
-	hasValue = m.hasValue.Load()
 	return
 }
 
