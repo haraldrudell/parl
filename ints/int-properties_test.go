@@ -16,73 +16,41 @@ import (
 )
 
 func TestIntProperties(t *testing.T) {
+	//t.Fail()
 
-	// uint8
-	var isSignedU8 = false
-	var maxU8 = uint64(math.MaxUint8)
-	var maxNegativeU8 = int64(0)
-	var sizeofU8 = unsafe.Sizeof(uint8(0))
-
-	// int64
-	var isSignedI64 = true
-	var maxI64 = uint64(math.MaxInt64)
-	var maxNegativeI64 = int64(math.MinInt64)
-	var sizeofI64 = unsafe.Sizeof(int64(0))
-
-	// uint64
-	var isSignedU64 = false
-	var maxU64 = uint64(math.MaxUint64)
-	var maxNegativeU64 int64
-	var sizeofU64 = unsafe.Sizeof(uint64(0))
-
-	var isSigned bool
-	var maxPositive uint64
-	var maxNegative int64
-	var sizeof int
-
-	var u8 uint8
-	isSigned, maxPositive, maxNegative, sizeof = IntProperties(u8)
-	if isSigned != isSignedU8 {
-		t.Error("isSignedU8")
+	const cIsUnsigned, cIsSigned = false, true
+	const cMinIsZero = 0
+	type IntPropertiesFunc func() (isSigned bool, maxPositive uint64, maxNegative int64, sizeof int)
+	var typs = []struct {
+		basicTypeName     string
+		intPropertiesFunc IntPropertiesFunc
+		isSigned          bool
+		maxPositive       uint64
+		maxNegative       int64
+		sizeof            int
+	}{
+		{"uint8", func() (bool, uint64, int64, int) { return IntProperties(uint8(0)) }, cIsUnsigned, math.MaxUint8, cMinIsZero, int(unsafe.Sizeof(uint8(0)))},
+		{"int8", func() (bool, uint64, int64, int) { return IntProperties(int8(0)) }, cIsSigned, math.MaxInt8, math.MinInt8, int(unsafe.Sizeof(int8(0)))},
+		{"uint64", func() (bool, uint64, int64, int) { return IntProperties(uint64(0)) }, cIsUnsigned, math.MaxUint64, cMinIsZero, int(unsafe.Sizeof(uint64(0)))},
+		{"int64", func() (bool, uint64, int64, int) { return IntProperties(int64(0)) }, cIsSigned, math.MaxInt64, math.MinInt64, int(unsafe.Sizeof(int64(0)))},
+		{"uintptr", func() (bool, uint64, int64, int) { return IntProperties(uintptr(0)) }, cIsUnsigned, math.MaxUint64, cMinIsZero, int(unsafe.Sizeof(uintptr(0)))},
 	}
-	if maxPositive != maxU8 {
-		t.Error("maxU8")
+	for _, typ := range typs {
+		var isSigned, maxPositive, maxNegative, sizeof = typ.intPropertiesFunc()
+		t.Logf("%s maxPositive: %s maxNegative: %s", typ.basicTypeName, signedHexadecimal(maxPositive), signedHexadecimal(maxNegative))
+		if isSigned != typ.isSigned {
+			t.Errorf("%s isSigned %t", typ.basicTypeName, isSigned)
+		}
+		if maxPositive != typ.maxPositive {
+			t.Errorf("%s maxPositive %d exp %d", typ.basicTypeName, maxPositive, typ.maxPositive)
+		}
+		if maxNegative != typ.maxNegative {
+			t.Errorf("%s maxNegative %d exp %d", typ.basicTypeName, maxNegative, typ.maxNegative)
+		}
+		if sizeof != typ.sizeof {
+			t.Errorf("%s sizeof %d exp %d", typ.basicTypeName, sizeof, typ.sizeof)
+		}
 	}
-	if maxNegative != maxNegativeU8 {
-		t.Error("maxNegativeU8")
-	}
-	if sizeof != int(sizeofU8) {
-		t.Error("sizeofU8")
-	}
-
-	isSigned, maxPositive, maxNegative, sizeof = IntProperties[int64]()
-	if isSigned != isSignedI64 {
-		t.Error("isSignedI64")
-	}
-	if maxPositive != maxI64 {
-		t.Errorf("maxPositive: %s", signedHexadecimal(maxPositive))
-	}
-	if maxNegative != maxNegativeI64 {
-		t.Errorf("maxNegativeI64: %s", signedHexadecimal(maxNegative))
-	}
-	if sizeof != int(sizeofI64) {
-		t.Error("sizeofI64")
-	}
-
-	isSigned, maxPositive, maxNegative, sizeof = IntProperties[uint64]()
-	if isSigned != isSignedU64 {
-		t.Error("isSignedU64")
-	}
-	if maxPositive != maxU64 {
-		t.Errorf("maxPositive: %s", signedHexadecimal(maxU64))
-	}
-	if maxNegative != maxNegativeU64 {
-		t.Errorf("maxNegativeU64: %s", signedHexadecimal(maxNegative))
-	}
-	if sizeof != int(sizeofU64) {
-		t.Error("sizeofU64")
-	}
-
 }
 
 // signedHexadecimal returns a human-readable hexadecimal string

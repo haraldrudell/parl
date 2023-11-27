@@ -9,100 +9,128 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 )
 
 const (
+	// buffer size if no buffer provided is 1 MiB
 	copyContextBufferSize = 1024 * 1024 // 1 MiB
 )
 
-// errInvalidWrite means that a write returned an impossible count.
+// errInvalidWrite means that a write returned an impossible count
+//   - cause is buggy [io.Writer] implementation
 var ErrInvalidWrite = errors.New("invalid write result")
 
+var ErrCopyShutdown = errors.New("Copy received Shutdown")
+
+var _ = io.Copy
+
+// ContextCopier is an io.Copy cancelable via context
 type ContextCopier struct {
-	reader        io.Reader
-	readCloser    io.ReadCloser
-	writerTo      io.WriterTo
-	writer        io.Writer
-	writeCloser   io.WriteCloser
-	readerFrom    io.ReaderFrom
-	hasCloseables bool
-	buf           []byte
-	errCh         chan error
-	endCh         chan struct{}
-	ctx           context.Context
+	buf []byte
+
+	isShutdown atomic.Bool
+	cancelFunc atomic.Pointer[context.CancelFunc]
+
+	// Copy fields
+
+	readCloser  *ContextReader
+	writeCloser *ContextWriter
+	// g is error channel receiving result from the copying thread
+	g parl.GoResult
 }
 
-func NewContextCopier(dst io.Writer, src io.Reader, buf []byte, ctx context.Context) (copier *ContextCopier) {
-	if dst == nil {
-		panic(perrors.NewPF("dst cannot be nil"))
+// NewContextCopier copies src to dst aborting if context is canceled
+//   - buf is buffer that can be used
+//   - if reader implements WriteTo or writer implements ReadFrom,
+//     no buffer is required
+//   - if a buffer is reqiired ans missing, 1 MiB is allocated
+//   - Copy methods does copying
+//   - Shutdown method or context cancel aborts Copy in progress
+//   - if the runtime type of reader or writer is [io.Closable],
+//     a thread is active during copying
+func NewContextCopier(buf ...[]byte) (copier *ContextCopier) {
+	var c = ContextCopier{}
+	if len(buf) > 0 {
+		c.buf = buf[0]
 	}
-	if src == nil {
-		panic(perrors.NewPF("src cannot be nil"))
-	}
-	var cReader = NewContextReader(src, ctx)
-	var cWriter = NewContextWriter(dst, ctx)
-
-	var c = ContextCopier{
-		readCloser:    cReader,
-		writeCloser:   cWriter,
-		hasCloseables: cReader.IsCloseable() || cWriter.IsCloseable(),
-		buf:           buf,
-		errCh:         make(chan error, 1),
-		endCh:         make(chan struct{}),
-		ctx:           ctx,
-	}
-	c.writerTo, _ = src.(io.WriterTo)
-	c.readerFrom, _ = dst.(io.ReaderFrom)
 	return &c
 }
 
-func (c *ContextCopier) Configuration() (
-	hasCloseables,
-	hasWriterTo,
-	hasReaderFrom bool,
-) {
-	hasCloseables = c.hasCloseables
-	hasWriterTo = c.writerTo != nil
-	hasReaderFrom = c.readerFrom != nil
-	return
-}
-
-func (c *ContextCopier) ContextThread() {
-	var err error
-	parl.SendErr(c.errCh, &err)
-	defer parl.PanicToErr(&err)
-
-	select {
-	case <-c.ctx.Done():
-	case <-c.endCh:
+// Copy copies from src to dst until end of data, error, Shutdown or context cancel
+//   - Shutdown method or context cancel aborts copy in progress
+//   - on context cancel, error returned is [context.Canceled]
+//   - on Shutdown, error returned has ErrCopyShutdown
+//   - if the runtime type of dst or src is [io.Closable],
+//     a thread is active during copying
+//   - such reader or writer will be closed
+func (c *ContextCopier) Copy(
+	dst io.Writer,
+	src io.Reader,
+	ctx context.Context,
+) (n int64, err error) {
+	if c.readCloser != nil {
+		panic(perrors.NewPF("second invocation"))
+	} else if dst == nil {
+		panic(parl.NilError("dst"))
+	} else if src == nil {
+		panic(parl.NilError("src"))
+	} else if ctx == nil {
+		panic(parl.NilError("ctx"))
 	}
-	if r := c.readCloser; r != nil {
-		parl.Close(r, &err)
+	// check for shutdown prior to Copy
+	if c.isShutdown.Load() {
+		err = perrors.ErrorfPF("%w", ErrCopyShutdown)
+		return
 	}
-	if w := c.writeCloser; w != nil {
-		parl.Close(w, &err)
+	defer c.copyEnd(&err) // ensures context to be canceled
+
+	// store context reader writer
+	var cancelFunc context.CancelFunc
+	ctx, cancelFunc = context.WithCancel(ctx)
+	c.cancelFunc.Store(&cancelFunc)
+	c.readCloser = NewContextReader(src, ctx)
+	c.writeCloser = NewContextWriter(dst, ctx)
+
+	// if either the reader or the writer can be closed,
+	// a separate thread is used
+	//	- the thread closes in parallel on context cancel forcing an
+	//		immediate abort to copying
+	if c.readCloser.IsCloseable() || c.writeCloser.IsCloseable() {
+		c.g = parl.NewGoResult()
+		go c.contextCopierCloserThread(ctx.Done())
 	}
-}
 
-func (c *ContextCopier) WriteTo() (n int64, err error) {
-	return c.writerTo.WriteTo(c.writeCloser)
-}
+	// If the reader has a WriteTo method, use it to do the copy.
+	//   - buffer-less one-go copy
+	//   - on end of file, err is nil
+	//   - err may be read or write errors
+	//   - on context cancel, error is [context.Canceled]
+	if writerTo, ok := src.(io.WriterTo); ok {
+		return writerTo.WriteTo(c.writeCloser) // reader’s WriteTo gets the writer
+	}
 
-func (c *ContextCopier) ReadFrom() (n int64, err error) {
-	return c.readerFrom.ReadFrom(c.readCloser)
-}
+	// Similarly, if the writer has a ReadFrom method, use it to do the copy
+	//   - buffer-less one-go copy
+	//   - on end of file, err is nil
+	//   - err may be read or write errors
+	//   - on context cancel, error is [context.Canceled]
+	if readerFrom, ok := dst.(io.ReaderFrom); ok {
+		return readerFrom.ReadFrom(c.readCloser) // writer’s ReadFrom gets the reader
+	}
 
-// copy using buffer
-func (c *ContextCopier) BufCopy() (written int64, err error) {
+	// copy using an intermediate buffer
+	//   - on end of file, err is nil
+	//   - err may be read or write errors
+	//   - on context cancel, error is [context.Canceled]
 
 	// ensure buffer
 	var buf = c.buf
 	if buf == nil {
 		buf = make([]byte, copyContextBufferSize)
-		c.buf = buf
 	}
 
 	for {
@@ -121,33 +149,91 @@ func (c *ContextCopier) BufCopy() (written int64, err error) {
 			}
 
 			// handle write outcome
-			written += int64(nWritten)
+			n += int64(nWritten)
 			if errWriting != nil {
 				err = errWriting
-				return
+				return // write error return
 			}
 			if nRead != nWritten {
 				err = io.ErrShortWrite
-				return
+				return // short write error return
 			}
 		}
 
 		// handle read outcome
 		if errReading == io.EOF {
-			return
+			return // end of data return
 		} else if errReading != nil {
 			err = errReading
-			return
+			return // read error return
 		}
 	}
 }
 
-func (c *ContextCopier) ShutdownThread(errp *error) {
-	close(c.endCh)
-	parl.CollectError(c.errCh, errp)
+// Shutdown order the thread to exit and
+// wait for its result
+//   - every Copy invocation will have a Shutdown
+//     either by consumer or the deferred copyEnd method
+func (c *ContextCopier) Shutdown() {
+	if c.isShutdown.Load() {
+		return // already shutdown
+	} else if !c.isShutdown.CompareAndSwap(false, true) {
+		return // another thread shut down
+	}
+
+	// cancel the child context
+	//	- any copy in progress is aborted
+	//	- if a thread is running, this orders it to exit
+	if cfp := c.cancelFunc.Load(); cfp != nil {
+		c.cancelFunc.Store(nil)
+		(*cfp)() // invoke cancelFunc
+	}
 }
 
-func (c *ContextCopier) Close(errp *error) {
+// ContextCopierCloseThread is used when either the
+// reader or the writer is [io.Closable]
+//   - on context cancel, the thread closing reader or writer will
+//     immediately cancel copying
+func (c *ContextCopier) contextCopierCloserThread(done <-chan struct{}) {
+	var err error
+	defer c.g.SendError(&err)
+	defer parl.PanicToErr(&err)
+
+	// wait for thread exit order
+	//	- app cancel or ordered to exit
+	<-done
+
+	// close reader and writer
+	c.close(&err)
+}
+
+// copyEnd:
+//   - cancels the context,
+//   - if thread, awaits the thread to close reader or writer and collects the result
+//   - otherwise closes reader and writer
+func (c *ContextCopier) copyEnd(errp *error) {
+
+	// ensure Shutdown has been invoked
+	if c.isShutdown.Load() {
+		*errp = perrors.AppendError(*errp, perrors.ErrorfPF("%w", ErrCopyShutdown))
+	} else {
+		// cancel the context
+		// order any thread to exit
+		c.Shutdown()
+	}
+
+	// await thread doing close, or do close
+	if g := c.g; g != nil {
+		// wait for result from thread
+		g.ReceiveError(errp)
+	} else {
+		c.close(errp)
+	}
+}
+
+// close closes both reader and writer if their runtime type
+// implements [io.Closer]
+func (c *ContextCopier) close(errp *error) {
 	parl.Close(c.readCloser, errp)
 	parl.Close(c.writeCloser, errp)
 }

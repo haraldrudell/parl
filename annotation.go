@@ -18,9 +18,13 @@ const (
 	getAnnotationFrames = 1
 )
 
-// Annotation provides a default reovered-panic code annotation
+// Annotation provides a default recovered-panic code annotation
 //   - “Recover from panic in mypackage.MyFunc”
 //   - [base package].[function]: "mypackage.MyFunc"
+//   - Annotation is expensive at 0.40 parallel mutex Lock/Unlock:
+//   - — consider using deferring methods [parl.RecoverErr] [parl.RecoverDA] [parl.RecoverDA2]
+//   - — consider annotation-free [parl.PanicToErr] at less functionality
+//   - if annotation is used in defer for every function invocation, that costs 470 ns
 func Annotation() (a string) {
 	return getAnnotation(parlAnnotationFrames)
 }

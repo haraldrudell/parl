@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package ints provide manipulation of integer types.
 package ints
 
 import (
@@ -13,7 +12,10 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// can be tested: errors.Is(err, ints.ErrToLarge)
 var ErrTooLarge = errors.New("value too large")
+
+// can be tested: errors.Is(err, ints.ErrNegative)
 var ErrNegative = errors.New("negative value")
 
 // Unsigned converts integer of type T to an unsigned value that fits the size of unsigned integer U
@@ -25,7 +27,9 @@ var ErrNegative = errors.New("negative value")
 func Unsigned[U constraints.Unsigned, T constraints.Integer](integer T, label string) (unsigned U, err error) {
 
 	// check for negative value
+	//	- those come in signed integers
 	if isSigned, _, _, _ := IntProperties[T](); isSigned {
+		// whatever it is, it will fit into int64
 		if i64 := int64(integer); i64 < 0 {
 			if label == "" {
 				label = perrors.PackFunc()
@@ -34,9 +38,10 @@ func Unsigned[U constraints.Unsigned, T constraints.Integer](integer T, label st
 			return
 		}
 	}
+	// integer is a positive number of a signed or unsigned integer
 
 	// check that positive value fits
-	u64 := uint64(integer)
+	var u64 = uint64(integer)
 	_, max, _, _ := IntProperties[U]()
 	if u64 > max {
 		if label == "" {
