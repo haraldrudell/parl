@@ -142,7 +142,7 @@ func (s *SocketListener[C]) AcceptConnections(handler func(C)) {
 	}
 	defer s.acceptWait.Done() // indicate accept thread exited
 	defer s.connWait.Wait()   // wait for connection goroutines
-	defer parl.Recover2("", nil, s.errCh.AddErrorProc)
+	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errCh.AddErrorProc)
 
 	s.handler = handler
 	var err error
@@ -267,7 +267,7 @@ func (s *SocketListener[C]) close(sendError bool) (didClose bool, err error) {
 //   - invokeHandler recovers panics in handler function
 func (s *SocketListener[C]) invokeHandler(conn net.Conn) {
 	defer s.connWait.Done()
-	defer parl.Recover2("", nil, s.errCh.AddErrorProc)
+	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errCh.AddErrorProc)
 
 	var c C
 	var ok bool
@@ -295,12 +295,11 @@ func (t Network) IsValid() (isValid bool) {
 	return networkSet.IsValid(t)
 }
 
-var networkSet = sets.NewSet(sets.NewElements[Network](
-	[]sets.SetElement[Network]{
-		{ValueV: NetworkTCP, Name: "tcp"},
-		{ValueV: NetworkTCP4, Name: "tcp4"},
-		{ValueV: NetworkTCP6, Name: "tcp6"},
-	}))
+var networkSet = sets.NewSet[Network]([]sets.SetElement[Network]{
+	{ValueV: NetworkTCP, Name: "tcp"},
+	{ValueV: NetworkTCP4, Name: "tcp4"},
+	{ValueV: NetworkTCP6, Name: "tcp6"},
+})
 
 const (
 	TransportTCP = iota + 1
@@ -319,7 +318,6 @@ func (t SocketTransport) IsValid() (isValid bool) {
 	return transportSet.IsValid(t)
 }
 
-var transportSet = sets.NewSet(sets.NewElements[SocketTransport](
-	[]sets.SetElement[SocketTransport]{
-		{ValueV: TransportTCP, Name: "tcp"},
-	}))
+var transportSet = sets.NewSet[SocketTransport]([]sets.SetElement[SocketTransport]{
+	{ValueV: TransportTCP, Name: "tcp"},
+})

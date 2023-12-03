@@ -68,7 +68,7 @@ func (dir *DirectoryLister) reader() {
 	name := dir.name + "reader"
 	output := dir.output
 	defer close(output)
-	defer parl.Recover(name, nil, func(err error) { output <- GetErrorResult(err) })
+	defer parl.RecoverAnnotation(name, nil, func(err error) { output <- GetErrorResult(err) })
 
 	pinger := dir.pinger
 	for {
@@ -130,7 +130,7 @@ func (dir *DirectoryLister) read(n int) {
 func (dir *DirectoryLister) forwarder() {
 	name := dir.name + "forwarder"
 	defer close(dir.Results)
-	defer parl.Recover(name, nil, func(err error) { dir.Results <- GetErrorResult(err) })
+	defer parl.RecoverAnnotation(name, nil, func(err error) { dir.Results <- GetErrorResult(err) })
 	pinger := dir.pinger
 	defer close(pinger)
 

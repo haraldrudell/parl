@@ -8,6 +8,7 @@ package pio
 
 import (
 	"io"
+	"io/fs"
 	"sync"
 
 	"github.com/haraldrudell/parl/perrors"
@@ -38,7 +39,7 @@ func (r *ReadWriteCloserSlice) Write(p []byte) (n int, err error) {
 	defer r.dataLock.Unlock()
 
 	if r.isClosed {
-		err = perrors.ErrorfPF("%w", ErrFileAlreadyClosed)
+		err = perrors.ErrorfPF("%w", fs.ErrClosed)
 		return // closed return
 	}
 
@@ -120,7 +121,7 @@ func (r *ReadWriteCloserSlice) Close() (err error) {
 	defer r.dataLock.Unlock()
 
 	if r.isClosed {
-		err = perrors.ErrorfPF("%w", ErrFileAlreadyClosed)
+		err = perrors.ErrorfPF("%w", fs.ErrClosed)
 		return // closed return
 	}
 

@@ -7,6 +7,10 @@ package parl
 
 import "github.com/haraldrudell/parl/perrors"
 
+const (
+	panicToErrAnnotation = "recover from panic: message:"
+)
+
 // PanicToErr recovers active panic, aggregating errors in errp
 //   - PanicToErr does not provide enclosing function. For that,
 //     use RecoverErr: “recover from panic in pack.Func…”
@@ -29,7 +33,7 @@ import "github.com/haraldrudell/parl/perrors"
 //	  defer parl.PanicToErr(&err)
 func PanicToErr(errp *error, isPanic ...*bool) {
 	if errp == nil {
-		panic(perrors.NewPF("errp cannot be nil"))
+		panic(NilError("errp"))
 	}
 
 	// if no panic, noop
@@ -47,11 +51,10 @@ func PanicToErr(errp *error, isPanic ...*bool) {
 	}
 
 	// append panic to *errp
-	//	- for panic detection to work there needs to be a stack frame after runtime
-	//	- because PanicToErr is invoked directly by the runtime, eg. pruntime.gopanic,
-	//		the PanicToErr stack frame is included, therefore 0 argument
-	//		to processRecover
-	*errp = perrors.AppendError(*errp,
-		processRecover("recover from panic: message:", panicValue, 0),
-	)
+	//	- for panic detector to work there needs to be at least one stack frame after runtime’s
+	//		panic handler
+	//	- because PanicToErr is invoked directly by the runtime, possibly runtime.gopanic,
+	//		the PanicToErr stack frame must be included.
+	//		Therefore, 0 argument to processRecover
+	*errp = perrors.AppendError(*errp, processRecoverValue(panicToErrAnnotation, panicValue, 0))
 }

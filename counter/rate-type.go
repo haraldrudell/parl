@@ -16,11 +16,10 @@ func (rt RateType) String() (s string) {
 	return rateSet.StringT(rt)
 }
 
-var rateSet = sets.NewSet(sets.NewElements[RateType](
-	[]sets.SetElement[RateType]{
-		{ValueV: RateType(parl.ValueRate), Name: "value rate"},
-		{ValueV: RateType(parl.ValueMaxRate), Name: "value max rate"},
-		{ValueV: RateType(parl.RunningRate), Name: "running inc rate"},
-		{ValueV: RateType(parl.RunningMaxRate), Name: "runninc max inc rate"},
-		{ValueV: RateType(parl.RunningMaxDecRate), Name: "running max dec rate"},
-	}))
+var rateSet = sets.NewSet[RateType]([]sets.SetElement[RateType]{
+	{ValueV: RateType(parl.ValueRate), Name: "value rate"},
+	{ValueV: RateType(parl.ValueMaxRate), Name: "value max rate"},
+	{ValueV: RateType(parl.RunningRate), Name: "running inc rate"},
+	{ValueV: RateType(parl.RunningMaxRate), Name: "runninc max inc rate"},
+	{ValueV: RateType(parl.RunningMaxDecRate), Name: "running max dec rate"},
+})

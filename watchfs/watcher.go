@@ -73,7 +73,7 @@ func (w *Watcher) Shutdown() {
 
 func (w *Watcher) errorThread() {
 	w.wg.Done()
-	defer parl.Recover("", nil, parl.Infallible)
+	defer parl.Recover(func() parl.DA { return parl.A() }, nil, parl.Infallible)
 
 	errCh := w.watcher.Errors
 	for {
@@ -86,7 +86,7 @@ func (w *Watcher) errorThread() {
 }
 func (w *Watcher) eventThread() {
 	w.wg.Done()
-	defer parl.Recover("", nil, w.errFn)
+	defer parl.Recover(func() parl.DA { return parl.A() }, nil, w.errFn)
 
 	events := w.watcher.Events
 	for {
@@ -112,7 +112,7 @@ func (w *Watcher) eventThread() {
 }
 
 func (w *Watcher) sendEvent(ev *WatchEvent) {
-	defer parl.Recover("", nil, w.errFn)
+	defer parl.Recover(func() parl.DA { return parl.A() }, nil, w.errFn)
 
 	w.eventFn(ev)
 }

@@ -7,6 +7,7 @@ package pio
 
 import (
 	"io"
+	"io/fs"
 	"strings"
 	"sync"
 
@@ -33,7 +34,7 @@ func (wc *WriteCloserToChanLine) Write(p []byte) (n int, err error) {
 
 	// check for closed write stream
 	if wc.ch.DidClose() {
-		err = perrors.ErrorfPF(ErrFileAlreadyClosed.Error())
+		err = perrors.ErrorfPF(fs.ErrClosed.Error())
 		return
 	}
 

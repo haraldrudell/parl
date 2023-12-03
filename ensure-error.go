@@ -25,7 +25,7 @@ func EnsureError(panicValue any) (err error) {
 	return ensureError(panicValue, parlEnsureErrorFrames0)
 }
 
-// ensureError interprets a panic values as an error
+// ensureError returns an error from a panic value that is any
 //   - returned value is either nil or an error value with stack trace
 //   - frames is used to select the stack frame from where the stack trace begins
 //   - frames 0 is he caller of ensure Error

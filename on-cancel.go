@@ -14,7 +14,7 @@ func OnCancel(fn func(), ctx context.Context) {
 }
 
 func onCancelThread(fn func(), done <-chan struct{}) {
-	Recover("", nil, Infallible)
+	Recover(func() DA { return A() }, nil, Infallible)
 	<-done
 	fn()
 }

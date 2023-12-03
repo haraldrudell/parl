@@ -1,6 +1,6 @@
 /*
-© 2023-present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved
+© 2023–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
 */
 
 package iters
@@ -11,13 +11,8 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-type SliceInterfaceIterator[I any, E any] struct {
-	SlicePointerIterator[E]
-	// Delegator implements the value methods required by the [Iterator] interface
-	//   - Next HasNext NextValue
-	//     Same Has SameValue
-	//   - the delegate provides DelegateAction[T] function
-	Delegator[I]
+type SliceInterface[I any, E any] struct {
+	SlicePointer[E]
 }
 
 // NewSliceInterfaceIterator returns an iterator over slice []E returning those elements
@@ -45,11 +40,9 @@ func NewSliceInterfaceIterator[I any, E any](slice []E) (iterator Iterator[I]) {
 	}
 
 	// wrap a slice-pointer iterator in a type assertion shim
-	i := SliceInterfaceIterator[I, E]{}
-	// the delegator provides methods based on the interface type
-	i.Delegator = *NewDelegator[I](i.delegateAction)
+	i := SliceInterface[I, E]{}
 	// the iterator returns *E values
-	NewSlicePointerIteratorField(&i.SlicePointerIterator, slice)
+	NewSlicePointerIteratorField(&i.SlicePointer, slice)
 	return &i
 }
 
@@ -59,7 +52,7 @@ func NewSliceInterfaceIterator[I any, E any](slice []E) (iterator Iterator[I]) {
 //
 //		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
 //	   // i is pointer to slice element
-func (i *SliceInterfaceIterator[I, E]) Init() (iterationVariable I, iterator Iterator[I]) {
+func (i *SliceInterface[I, E]) Init() (iterationVariable I, iterator Iterator[I]) {
 	iterator = i
 	return
 }
@@ -70,9 +63,9 @@ func (i *SliceInterfaceIterator[I, E]) Init() (iterationVariable I, iterator Ite
 //
 //		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
 //	   // i is pointer to slice element
-func (i *SliceInterfaceIterator[I, E]) Cond(iterationVariablep *I, errp ...*error) (condition bool) {
+func (i *SliceInterface[I, E]) Cond(iterationVariablep *I, errp ...*error) (condition bool) {
 	var ep *E // getting *E but must be type asserted for Go to understand it’s interface I
-	if condition = i.SlicePointerIterator.Cond(&ep, errp...); !condition || ep == nil {
+	if condition = i.SlicePointer.Cond(&ep, errp...); !condition || ep == nil {
 		var iZeroValue I
 		*iterationVariablep = iZeroValue // assign zero-value
 		return                           // pointer assigned nil, condition: valid
@@ -82,11 +75,22 @@ func (i *SliceInterfaceIterator[I, E]) Cond(iterationVariablep *I, errp ...*erro
 	return // pointer assigned asserted &E, condition: true
 }
 
+// Next advances to next item and returns it
+//   - if hasValue true, value contains the next value
+//   - otherwise, no more items exist and value is the data type zero-value
+func (i *SliceInterface[I, E]) Next() (value I, hasValue bool) { return i.nextSame(IsNext) }
+
+// Same returns the same value again
+//   - if hasValue true, value is valid
+//   - otherwise, no more items exist and value is the data type zero-value
+//   - If Next or Cond has not been invoked, Same first advances to the first item
+func (i *SliceInterface[I, E]) Same() (value I, hasValue bool) { return i.nextSame(IsSame) }
+
 // delegateAction returns I values to the delegator
 // by type asserting *E values from the slice pointer-iterator
-func (i *SliceInterfaceIterator[I, E]) delegateAction(isSame NextAction) (value I, hasValue bool) {
+func (i *SliceInterface[I, E]) nextSame(isSame NextAction) (value I, hasValue bool) {
 	var ep *E // getting *E but must be type asserted for Go to understand it’s interface I
-	if ep, hasValue = i.SlicePointerIterator.delegateAction(isSame); !hasValue || ep == nil {
+	if ep, hasValue = i.SlicePointer.nextSame(isSame); !hasValue || ep == nil {
 		return
 	}
 

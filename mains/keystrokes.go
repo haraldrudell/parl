@@ -54,7 +54,7 @@ func (k *Keystrokes) CloseNow(errp *error) {
 func keystrokesThread(stdin *parl.NBChan[string]) {
 	var err error
 	defer parl.Debug("keystrokes.scannerThread exiting: err: %s", perrors.Short(err))
-	defer parl.Recover("", &err, parl.Infallible)
+	defer parl.Recover(func() parl.DA { return parl.A() }, &err, parl.Infallible)
 
 	var scanner = bufio.NewScanner(os.Stdin)
 	parl.Debug("keystrokes.scannerThread scanning: stdin.Ch: 0x%x", stdin.Ch())

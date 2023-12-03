@@ -258,8 +258,7 @@ func (n NBChanThreadType) String() (s string) {
 	return nbChanThreadTypeSet.StringT(n)
 }
 
-var nbChanThreadTypeSet = sets.NewSet(sets.NewElements[NBChanThreadType](
-	[]sets.SetElement[NBChanThreadType]{
-		{ValueV: NBChanAlways, Name: "alwaysCh"},
-		{ValueV: NBChanNone, Name: "noCh"},
-	}))
+var nbChanThreadTypeSet = sets.NewSet[NBChanThreadType]([]sets.SetElement[NBChanThreadType]{
+	{ValueV: NBChanAlways, Name: "alwaysCh"},
+	{ValueV: NBChanNone, Name: "noCh"},
+})

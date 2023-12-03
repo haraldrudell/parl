@@ -22,8 +22,8 @@ import (
 
 func TestExecStream(t *testing.T) {
 	messageNotFound := "executable file not found"
-	stdout := pio.NewWriteCloserToString()
-	stderr := pio.NewWriteCloserToString()
+	var stdout = pio.NewCloserBuffer()
+	var stderr = pio.NewCloserBuffer()
 	ctx := context.Background()
 	setCommand := []string{"set"}
 	sleepCommand := []string{"sleep", "1"}

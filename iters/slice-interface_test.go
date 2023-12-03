@@ -1,6 +1,6 @@
 /*
-© 2023-present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved
+© 2023–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
 */
 
 package iters
@@ -11,25 +11,8 @@ import (
 	"github.com/haraldrudell/parl/internal/cyclebreaker"
 )
 
-type siiInterface interface {
-	siiMethod()
-}
-
-type siiType struct{}
-
-func (t *siiType) siiMethod() {}
-
-var _ siiInterface = &siiType{}
-
-type siiBadType struct{}
-
-// cannot use &siiBadType{} (value of type *siiBadType)
-// as siiInterface value in variable declaration:
-// *siiBadType does not implement siiInterface (missing method siiMethod)
-// var _ siiInterface = &siiBadType{}
-
 // tests Init Cond Next Same Cancel
-func TestSliceInterfaceIterator(t *testing.T) {
+func TestSliceInterface(t *testing.T) {
 	var sliceOfConcreteType = make([]siiType, 1)
 
 	var iterator, iter Iterator[siiInterface]
@@ -178,3 +161,20 @@ func invokeNewSliceInterfaceIterator() (isPanic bool, err error) {
 	NewSliceInterfaceIterator[siiInterface](sliceOfBadType)
 	return
 }
+
+type siiInterface interface {
+	siiMethod()
+}
+
+type siiType struct{}
+
+func (t *siiType) siiMethod() {}
+
+var _ siiInterface = &siiType{}
+
+type siiBadType struct{}
+
+// cannot use &siiBadType{} (value of type *siiBadType)
+// as siiInterface value in variable declaration:
+// *siiBadType does not implement siiInterface (missing method siiMethod)
+// var _ siiInterface = &siiBadType{}

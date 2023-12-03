@@ -1,6 +1,6 @@
 /*
-© 2022-present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved
+© 2023–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
 */
 
 package iters
@@ -23,8 +23,9 @@ const (
 
 // baseIterator is a pointed-to enclosed type due to BaseIterator providing
 // baseIterator.delegateAction
+//   - provided methods: Cond Next Same Cancel
 type baseIterator[T any] struct {
-	invokeFn InvokeFunc[T]
+	iteratorAction IteratorAction[T]
 
 	// publicsLock serializes invocations of i.Next and i.Cancel
 	publicsLock sync.Mutex
@@ -74,8 +75,10 @@ type baseIterator[T any] struct {
 	err atomic.Pointer[error]
 }
 
-// BaseIterator implements the DelegateAction[T] function required by
-// Delegator[T]
+// BaseIterator implements:
+//   - the DelegateAction[T] function required by Delegator[T]
+//   - Cond and Cancel methods part of [iters.Iterator]
+//   - consumer needs to implement Init method
 type BaseIterator[T any] struct {
 	// baseIterator is a pointed-to enclosed type due to BaseIterator providing
 	// baseIterator.delegateAction
@@ -84,31 +87,30 @@ type BaseIterator[T any] struct {
 
 // NewFunctionIterator returns a parli.Iterator based on a function.
 // functionIterator is thread-safe and re-entrant.
-func NewBaseIterator[T any](
-	invokeFn InvokeFunc[T],
-	delegateActionReceiver *DelegateAction[T],
-) (iterator *BaseIterator[T]) {
-	if invokeFn == nil {
-		panic(perrors.NewPF("invokeFn cannot be nil"))
-	} else if delegateActionReceiver == nil {
-		panic(perrors.NewPF("delegateActionReceiver cannot be nil"))
+func NewBaseIterator[T any](iteratorAction IteratorAction[T]) (iterator *BaseIterator[T]) {
+	if iteratorAction == nil {
+		panic(cyclebreaker.NilError("iteratorAction"))
 	}
 
 	// pointer to baseIterator.delegateAction so this method can
 	// be provided
 	//	- also causes werrWait to be pointed to, a used non-copy struct
-	i := baseIterator[T]{invokeFn: invokeFn}
+	i := baseIterator[T]{iteratorAction: iteratorAction}
 	i.errWait.Add(1)
-	*delegateActionReceiver = i.delegateAction
 
 	return &BaseIterator[T]{baseIterator: &i}
 }
 
 // Cond implements the condition statement of a Go “for” clause
+//   - condition is true if iterationVariable was assigned a value and the iteration should continue
 //   - the iterationVariable is updated by being provided as a pointer.
 //     iterationVariable cannot be nil
 //   - errp is an optional error pointer receiving any errors during iterator execution
-//   - condition is true if iterationVariable was assigned a value and the iteration should continue
+//
+// Usage:
+//
+//	for i, iterator := iters.NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
+//	  // i is pointer to slice element
 func (i *baseIterator[T]) Cond(iterationVariablep *T, errp ...*error) (condition bool) {
 	if iterationVariablep == nil {
 		perrors.NewPF("iterationVariablep cannot bee nil")
@@ -128,15 +130,30 @@ func (i *baseIterator[T]) Cond(iterationVariablep *T, errp ...*error) (condition
 
 	// check for next value
 	var value T
-	if value, condition = i.delegateAction(IsNext); condition {
+	if value, condition = i.nextSame(IsNext); condition {
 		*iterationVariablep = value
 	}
 
 	return // condition and iterationVariablep updated, errp unchanged
 }
 
-// Cancel release resources for this iterator.
-// Not every iterator requires a Cancel invocation.
+// Next advances to next item and returns it
+//   - if hasValue true, value contains the next value
+//   - otherwise, no more items exist and value is the data type zero-value
+func (i *baseIterator[T]) Next() (value T, hasValue bool) { return i.nextSame(IsNext) }
+
+// Same returns the same value again
+//   - if hasValue true, value is valid
+//   - otherwise, no more items exist and value is the data type zero-value
+//   - If Next or Cond has not been invoked, Same first advances to the first item
+func (i *baseIterator[T]) Same() (value T, hasValue bool) { return i.nextSame(IsSame) }
+
+// Cancel stops an iteration
+//   - after Cancel invocation, Cond, Next and Same indicate no value available
+//   - Cancel returns the first error that occurred during iteration, if any
+//   - an iterator implementation may require Cancel invocation
+//     to release resources
+//   - Cancel is deferrable
 func (i *baseIterator[T]) Cancel(errp ...*error) (err error) {
 
 	// ignore if cancel alread invoked
@@ -168,11 +185,11 @@ func (i *baseIterator[T]) Cancel(errp ...*error) (err error) {
 	return
 }
 
-// delegateAction finds the next or the same value
+// nextSame finds the next or the same value
 //   - isSame true means first or same value should be returned
 //   - value is the sought value or the T type’s zero-value if no value exists
 //   - hasValue true means value was assigned a valid T value
-func (i *baseIterator[T]) delegateAction(isSame NextAction) (value T, hasValue bool) {
+func (i *baseIterator[T]) nextSame(isSame NextAction) (value T, hasValue bool) {
 
 	// fast outside-lock value-check
 	if i.noValuesAvailable.Load() {
@@ -265,9 +282,12 @@ func (i *baseIterator[T]) enqueueForFn(isCancel bool) (
 	// the value returned by invokeFn
 	var v T
 
-	v, didCancel, isPanic, err = i.invokeFn(wasCancel)
+	v, isPanic, err = i.iteratorAction(wasCancel)
 
 	// determine if value is valid
+	if didCancel = errors.Is(err, cyclebreaker.ErrEndCallbacks); didCancel {
+		err = nil
+	}
 	if err == nil && !wasCancel && !didCancel {
 		value = v
 	}

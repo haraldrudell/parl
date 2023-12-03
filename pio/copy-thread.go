@@ -32,7 +32,7 @@ func CopyThread(
 	if ctx != nil {
 		defer parl.CancelOnError(&err, ctx) // cancel the command if copyThread fails
 	}
-	defer parl.Recover("copy command i/o "+label, &err, parl.NoOnError)
+	defer parl.RecoverAnnotation("copy command i/o "+label, &err, parl.NoOnError)
 
 	if _, err = io.Copy(writer, reader); perrors.Is(&err, "%s %s %w", label, cx.PackFunc(), err) {
 

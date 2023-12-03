@@ -7,6 +7,7 @@ package pio
 
 import (
 	"io"
+	"io/fs"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
@@ -24,7 +25,7 @@ func InitWriteCloserToChan(wcp *WriteCloserToChan) {}
 
 func (wc *WriteCloserToChan) Write(p []byte) (n int, err error) {
 	if wc.ch.DidClose() {
-		err = perrors.ErrorfPF(ErrFileAlreadyClosed.Error())
+		err = perrors.ErrorfPF(fs.ErrClosed.Error())
 		return
 	}
 	wc.ch.Send(p)

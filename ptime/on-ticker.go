@@ -83,7 +83,7 @@ func (o *onTick) onTickerThread() {
 	defer o.isThreadExit.Store(true)
 	defer o.wg.Done()
 	var err error
-	defer cyclebreaker.Recover(cyclebreaker.Annotation(), &err, cyclebreaker.Infallible)
+	defer cyclebreaker.Recover(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, cyclebreaker.Infallible)
 
 	var timer = time.NewTimer(Duro(o.period, time.Now().In(o.loc)))
 	defer timer.Stop()

@@ -16,7 +16,7 @@ func (n *NBChan[T]) sendThread(value T) {
 	var endCh = *n.threadWait.Load()
 	defer close(endCh)
 	defer n.sendThreadDeferredClose()
-	defer Recover("", nil, n.sendThreadOnError)
+	defer Recover(func() DA { return A() }, nil, n.sendThreadOnError)
 
 	for { // send value loop
 

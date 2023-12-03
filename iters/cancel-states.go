@@ -1,6 +1,6 @@
 /*
-© 2022-present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved
+© 2023–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
 */
 
 package iters
@@ -34,9 +34,10 @@ var cancelStatesMap = map[cancelStates]string{
 }
 
 func (s cancelStates) String() (s2 string) {
-	s2 = cancelStatesMap[s]
-	if s2 == "" {
-		s2 = fmt.Sprintf("?badCancelState:%d", s)
+	if s2 = cancelStatesMap[s]; s2 != "" {
+		return
 	}
+	s2 = fmt.Sprintf("?badCancelState:%d", s)
+
 	return
 }

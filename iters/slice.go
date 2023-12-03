@@ -1,6 +1,6 @@
 /*
-© 2022-present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved
+© 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
 */
 
 package iters
@@ -9,11 +9,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/internal/cyclebreaker"
 )
 
-// SliceIterator traverses a slice container. thread-safe
-type SliceIterator[T any] struct {
+// Slice traverses a slice container. thread-safe
+type Slice[T any] struct {
 	slice []T // the slice providing values
 
 	// isEnd is fast outside-lock check for no values available
@@ -30,20 +30,12 @@ type SliceIterator[T any] struct {
 	// index in slice, 0…len(slice)
 	//	- behind lock
 	index int
-
-	// Delegator implements the value methods required by the [Iterator] interface
-	//   - Next HasNext NextValue
-	//     Same Has SameValue
-	//   - the delegate provides DelegateAction[T] function
-	Delegator[T]
 }
 
-// NewSliceIterator returns an empty iterator of values type T.
-// sliceIterator is thread-safe.
+// NewSliceIterator returns an iterator iterating over slice T values
+//   - thread-safe
 func NewSliceIterator[T any](slice []T) (iterator Iterator[T]) {
-	i := SliceIterator[T]{slice: slice}
-	i.Delegator = *NewDelegator(i.delegateAction)
-	return &i
+	return &Slice[T]{slice: slice}
 }
 
 // Init implements the right-hand side of a short variable declaration in
@@ -53,7 +45,7 @@ func NewSliceIterator[T any](slice []T) (iterator Iterator[T]) {
 //
 //		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
 //	   // i is pointer to slice element
-func (i *SliceIterator[T]) Init() (iterationVariable T, iterator Iterator[T]) {
+func (i *Slice[T]) Init() (iterationVariable T, iterator Iterator[T]) {
 	iterator = i
 	return
 }
@@ -68,48 +60,63 @@ func (i *SliceIterator[T]) Init() (iterationVariable T, iterator Iterator[T]) {
 //
 //		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
 //	   // i is pointer to slice element
-func (i *SliceIterator[T]) Cond(iterationVariablep *T, errp ...*error) (condition bool) {
+func (i *Slice[T]) Cond(iterationVariablep *T, errp ...*error) (condition bool) {
 	if iterationVariablep == nil {
-		perrors.NewPF("iterationVariablep cannot bee nil")
+		cyclebreaker.NilError("iterationVariablep")
 	}
 
 	// check for next value
 	var value T
-	if value, condition = i.delegateAction(IsNext); condition {
+	if value, condition = i.nextSame(IsNext); condition {
 		*iterationVariablep = value
 	}
 
 	return // condition and iterationVariablep updated, errp unchanged
 }
 
+// Next advances to next item and returns it
+//   - if hasValue true, value contains the next value
+//   - otherwise, no more items exist and value is the data type zero-value
+func (i *Slice[T]) Next() (value T, hasValue bool) { return i.nextSame(IsNext) }
+
+// Same returns the same value again
+//   - if hasValue true, value is valid
+//   - otherwise, no more items exist and value is the data type zero-value
+//   - If Next or Cond has not been invoked, Same first advances to the first item
+func (i *Slice[T]) Same() (value T, hasValue bool) { return i.nextSame(IsSame) }
+
 // Cancel release resources for this iterator. Thread-safe
 //   - not every iterator requires a Cancel invocation
-func (i *SliceIterator[T]) Cancel(errp ...*error) (err error) {
+func (i *Slice[T]) Cancel(errp ...*error) (err error) {
+	if i.isEnd.Load() {
+		return // already canceled
+	}
 	i.isEnd.CompareAndSwap(false, true)
+
 	return
 }
 
-// delegateAction finds the next or the same value. Thread-safe
+// nextSame finds the next or the same value. Thread-safe
 //   - isSame == IsSame means first or same value should be returned
 //   - value is the sought value or the T type’s zero-value if no value exists
 //   - hasValue true means value was assigned a valid T value
-func (i *SliceIterator[T]) delegateAction(isSame NextAction) (value T, hasValue bool) {
+func (i *Slice[T]) nextSame(isSame NextAction) (value T, hasValue bool) {
 
+	// outside lock check
 	if i.isEnd.Load() {
 		return // no more values return
 	}
-
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
+	// inside lock check
 	if i.isEnd.Load() {
 		return // no more values return
 	}
 
-	// for IsSame operation the first value must be sought
-	//	- therefore, if the first value has not been sought, seek it now or
-	//	- if not IsSame operation, advance to the next value
-	if !i.didNext || isSame != IsSame {
+	// IsNext always seeks the next value
+	//	- IsSame prior to any value returned also seeks the next value
+	if !i.didNext || isSame == IsNext {
 
 		// note that first value has been sought
 		if !i.didNext {
@@ -117,7 +124,7 @@ func (i *SliceIterator[T]) delegateAction(isSame NextAction) (value T, hasValue 
 		}
 
 		// find slice index to use
-		//	- if a value was found, advance index
+		//	- if a value was previously returned, advance index
 		//	- final i.index value is len(i.slice)
 		if i.hasValue {
 			i.index++
@@ -129,13 +136,13 @@ func (i *SliceIterator[T]) delegateAction(isSame NextAction) (value T, hasValue 
 		i.hasValue = i.index < len(i.slice)
 	}
 
-	// update hasValue and value
+	// update hasValue, value and i.isEnd
 	//	- get the value if it is valid, otherwise zero-value
 	if hasValue = i.hasValue; hasValue {
 		value = i.slice[i.index]
-	} else {
+	} else if !i.isEnd.Load() {
 		i.isEnd.CompareAndSwap(false, true)
 	}
 
-	return // value and hasValue indicates availability
+	return // value and hasValue valid
 }

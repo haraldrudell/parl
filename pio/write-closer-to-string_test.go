@@ -17,7 +17,7 @@ func TestWriteCloserToString(t *testing.T) {
 	var n int
 	var err error
 
-	writer = NewWriteCloserToString()
+	writer = NewCloserBuffer()
 	if err = writer.Close(); err != nil {
 		t.Errorf("NewWriteCloserToString.Close err: %v", err)
 	}

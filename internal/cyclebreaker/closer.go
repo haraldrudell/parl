@@ -12,30 +12,32 @@ import (
 )
 
 // Closer is a deferrable function that closes a channel.
-// Closer handles panics.
-// if errp is non-nil, panic values updates it using errors.AppendError.
+//   - if errp is non-nil, panic values updates it using errors.AppendError.
+//   - Closer is thread-safe, panic-free and deferrable
 func Closer[T any](ch chan T, errp *error) {
-	defer Recover("", errp, NoOnError)
+	defer PanicToErr(errp)
 
 	close(ch)
 }
 
 // CloserSend is a deferrable function that closes a send-channel.
-// CloserSend handles panics.
-// if errp is non-nil, panic values updates it using errors.AppendError.
+//   - if errp is non-nil, panic values updates it using errors.AppendError.
+//   - CloserSend is thread-safe, panic-free and deferrable
 func CloserSend[T any](ch chan<- T, errp *error) {
-	defer Recover("", errp, NoOnError)
+	defer PanicToErr(errp)
 
 	close(ch)
 }
 
-// Close is a deferrable function that closes an io.Closer object.
-// Close handles panics.
-// if errp is non-nil, panic values updates it using errors.AppendError.
+// Close closes an io.Closer object.
+//   - if errp is non-nil, panic values updates it using errors.AppendError.
+//   - Close is thread-safe, panic-free and deferrable
+//   - type Closer interface { Close() error }
 func Close(closable io.Closer, errp *error) {
-	defer Recover("", errp, NoOnError)
+	var err error
+	defer RecoverErr(func() DA { return A() }, errp)
 
-	if e := closable.Close(); e != nil {
-		*errp = perrors.AppendError(*errp, e)
+	if err = closable.Close(); perrors.IsPF(&err, "%w", err) {
+		*errp = perrors.AppendError(*errp, err)
 	}
 }

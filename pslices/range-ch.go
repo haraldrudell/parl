@@ -110,7 +110,7 @@ func (r *RangeCh[T]) State() (isCloseInvoked, isChClosed bool, exitCh <-chan str
 //   - typically writeThread will block in channel send
 func (r *threadData[T]) writeThread() {
 	var err error
-	defer cyclebreaker.Recover(cyclebreaker.Annotation(), &err, cyclebreaker.Infallible)
+	defer cyclebreaker.Recover(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, cyclebreaker.Infallible)
 	defer cyclebreaker.Closer(r.exitCh, &err)
 	defer cyclebreaker.Closer(r.ch, &err)
 

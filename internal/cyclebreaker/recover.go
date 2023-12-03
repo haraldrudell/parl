@@ -1,5 +1,5 @@
 /*
-© 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+© 2023–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 ISC License
 */
 
@@ -13,53 +13,69 @@ import (
 	"github.com/haraldrudell/parl/pruntime"
 )
 
-const (
-	panicString              = ": panic:"
-	recover2OnErrrorOnce     = false
-	recover2OnErrrorMultiple = true
-)
+// Recover recovers panic using deferred annotation
+//   - onError error receiver is invoked exactly one
+//   - errors in *errp and panic are aggregated into a single error value
+//   - if onError non-nil, the function is invoked once with the aggregate error
+//   - if onError nil, the aggregate error is logged to standard error
+//   - if onError is [Parl.NoOnErrror], logging is suppressed
+//   - if errp is non-nil, it is updated with the aggregate error
+//
+// Usage:
+//
+//	func someFunc() (err error) {
+//	  defer parl.Recover(func() parl.DA { return parl.A() }, &err, parl.NoOnError)
+func Recover(deferredLocation func() DA, errp *error, onError OnError) {
+	doRecovery("", deferredLocation, errp, onError, recover2OnErrrorOnce, noIsPanic, recover())
+}
+
+// Recover2 recovers panic using deferred annotation
+//   - if onError non-nil, the function is invoked with any error in *errp and any panic
+//   - if onError nil, the errors are logged to standard error
+//   - if onError is [Parl.NoOnErrror], logging is suppressed
+//   - if errp is non-nil, it is updated with an aggregate error
+//
+// Usage:
+//
+//	func someFunc() (err error) {
+//	  defer parl.Recover2(func() parl.DA { return parl.A() }, &err, parl.NoOnError)
+func Recover2(deferredLocation func() DA, errp *error, onError OnError) {
+	doRecovery("", deferredLocation, errp, onError, recover2OnErrrorMultiple, noIsPanic, recover())
+}
+
+// RecoverAnnotation is like Recover but with fixed-string annotation
+func RecoverAnnotation(annotation string, errp *error, onError OnError) {
+	doRecovery(annotation, noDeferredAnnotation, errp, onError, recover2OnErrrorOnce, noIsPanic, recover())
+}
 
 const (
+	// counts the frames in [parl.A]
+	parlAFrames = 1
 	// counts the stack-frame in [parl.processRecover]
 	processRecoverFrames = 1
 	// counts the stack-frame of [parl.doRecovery] and [parl.Recover] or [parl.Recover2]
 	//	- but for panic detectpr to work, there must be one frame after
 	//		runtime.gopanic, so remove one frame
 	doRecoveryFrames = 2 - 1
+	// indicates onError to be invoked once for all errors
+	recover2OnErrrorOnce = false
+	// indicates onError to be invoked once per error
+	recover2OnErrrorMultiple = true
 )
 
-// OnError is a function that receives error values from an errp error pointer or a panic
-type OnError func(err error)
+// indicates deferred annotation is not present
+var noDeferredAnnotation func() DA
 
-// NoOnError is used with Recover and Recover2 to silence the default error logging
-func NoOnError(err error) {}
+// DA is the value returned by a deferred code location function
+type DA *pruntime.CodeLocation
 
+// A is a thunk returning a deferred code location
+func A() DA { return pruntime.NewCodeLocation(parlAFrames) }
+
+// noIsPanic is a stand-in nil value when noPanic is not present
 var noIsPanic *bool
 
-// Recover recovers from panic invoking onError exactly once with an aggregate error value
-//   - annotation may be empty, errp and onError may be nil
-//   - errors in *errp and panic are aggregated into a single error value
-//   - if onError non-nil, the function is invoked once with the aggregate error
-//   - if onError nil, the aggregate error is logged to standard error
-//   - if onError is [Parl.NoOnErrror], logging is suppressed
-//   - if errp is non-nil, it is updated with the aggregate error
-//   - if annotation is empty, a default annotation is used for the immediate caller of Recover
-func Recover(annotation string, errp *error, onError OnError) {
-	doRecovery(annotation, nil, errp, onError, recover2OnErrrorOnce, noIsPanic, recover())
-}
-
-// Recover2 recovers from panic invoking onError for any eror in *errp and any panic
-//   - annotation may be empty, errp and onError may be nil
-//   - if onError non-nil, the function is invoked with any error in *errp and any panic
-//   - if onError nil, the errors are logged to standard error
-//   - if onError is [Parl.NoOnErrror], logging is suppressed
-//   - if errp is non-nil, it is updated with an aggregate error
-//   - if annotation is empty, a default annotation is used for the immediate caller of Recover
-func Recover2(annotation string, errp *error, onError OnError) {
-	doRecovery(annotation, nil, errp, onError, recover2OnErrrorMultiple, noIsPanic, recover())
-}
-
-// doRecovery implements recovery ffor Recovery andd Recovery2
+// doRecovery implements recovery for Recovery andd Recovery2
 func doRecovery(annotation string, deferredAnnotation func() DA, errp *error, onError OnError, multiple bool, isPanic *bool, recoverValue interface{}) {
 
 	// build aggregate error in err

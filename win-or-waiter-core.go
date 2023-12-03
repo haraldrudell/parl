@@ -178,8 +178,7 @@ func (ws WinOrWaiterStrategy) IsValid() (isValid bool) {
 	return winOrWaiterSet.IsValid(ws)
 }
 
-var winOrWaiterSet = sets.NewSet(sets.NewElements[WinOrWaiterStrategy](
-	[]sets.SetElement[WinOrWaiterStrategy]{
-		{ValueV: WinOrWaiterAnyValue, Name: "anyValue"},
-		{ValueV: WinOrWaiterMustBeLater, Name: "mustBeLater"},
-	}))
+var winOrWaiterSet = sets.NewSet[WinOrWaiterStrategy]([]sets.SetElement[WinOrWaiterStrategy]{
+	{ValueV: WinOrWaiterAnyValue, Name: "anyValue"},
+	{ValueV: WinOrWaiterMustBeLater, Name: "mustBeLater"},
+})

@@ -107,7 +107,7 @@ func (g GoResult) ReceiveError(errp *error, n ...int) (err error) {
 
 		err = perrors.AppendError(err, e)
 		if errp != nil {
-			*errp = perrors.AppendError(*errp, err)
+			*errp = perrors.AppendError(*errp, e)
 		}
 	}
 

@@ -155,9 +155,8 @@ func (st slowType) String() (s string) {
 	return slowTypeSet.StringT(st)
 }
 
-var slowTypeSet = sets.NewSet(sets.NewElements[slowType](
-	[]sets.SetElement[slowType]{
-		{ValueV: SlowDefault, Name: "sharedThread"},
-		{ValueV: SlowOwnThread, Name: "ownThread"},
-		{ValueV: SlowShutdownThread, Name: "shutdownThread"},
-	}))
+var slowTypeSet = sets.NewSet[slowType]([]sets.SetElement[slowType]{
+	{ValueV: SlowDefault, Name: "sharedThread"},
+	{ValueV: SlowOwnThread, Name: "ownThread"},
+	{ValueV: SlowShutdownThread, Name: "shutdownThread"},
+})

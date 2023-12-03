@@ -1,6 +1,6 @@
 /*
-© 2023-present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved
+© 2023–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
 */
 
 package iters
@@ -12,15 +12,12 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// SlicePointerIterator traverses a slice container using pointers to value. thread-safe.
+// SlicePointer traverses a slice container using pointers to value. thread-safe.
 //   - the difference is that:
 //   - instead of copying a value from the slice,
 //   - a pointer to the slice value is returned
-type SlicePointerIterator[E any] struct {
+type SlicePointer[E any] struct {
 	slice []E // the slice providing values
-
-	// isEnd is fast outside-lock check for no values available
-	isEnd atomic.Bool
 
 	// lock serializes Next and Cancel invocations
 	lock sync.Mutex
@@ -33,12 +30,9 @@ type SlicePointerIterator[E any] struct {
 	// index in slice, 0…len(slice)
 	//	- behind lock
 	index int
-
-	// Delegator implements the value methods required by the [Iterator] interface
-	//   - Next HasNext NextValue
-	//     Same Has SameValue
-	//   - the delegate provides DelegateAction[T] function
-	Delegator[*E]
+	// isEnd indicates no more values available
+	//	- written inside lock
+	isEnd atomic.Bool
 }
 
 // NewSlicePointerIterator returns an iterator of pointers to T
@@ -49,14 +43,12 @@ type SlicePointerIterator[E any] struct {
 //     must be used
 //   - uses self-referencing pointers
 func NewSlicePointerIterator[E any](slice []E) (iterator Iterator[*E]) {
-	i := SlicePointerIterator[E]{slice: slice}
-	i.Delegator = *NewDelegator(i.delegateAction)
+	i := SlicePointer[E]{slice: slice}
 	return &i
 }
 
-func NewSlicePointerIteratorField[E any](fieldp *SlicePointerIterator[E], slice []E) (iterator Iterator[*E]) {
+func NewSlicePointerIteratorField[E any](fieldp *SlicePointer[E], slice []E) (iterator Iterator[*E]) {
 	fieldp.slice = slice
-	fieldp.Delegator = *NewDelegator(fieldp.delegateAction)
 	iterator = fieldp
 	return
 }
@@ -68,7 +60,7 @@ func NewSlicePointerIteratorField[E any](fieldp *SlicePointerIterator[E], slice 
 //
 //		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
 //	   // i is pointer to slice element
-func (i *SlicePointerIterator[E]) Init() (iterationVariable *E, iterator Iterator[*E]) {
+func (i *SlicePointer[E]) Init() (iterationVariable *E, iterator Iterator[*E]) {
 	iterator = i
 	return
 }
@@ -83,23 +75,34 @@ func (i *SlicePointerIterator[E]) Init() (iterationVariable *E, iterator Iterato
 //
 //		for i, iterator := NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
 //	   // i is pointer to slice element
-func (i *SlicePointerIterator[E]) Cond(iterationVariablep **E, errp ...*error) (condition bool) {
+func (i *SlicePointer[E]) Cond(iterationVariablep **E, errp ...*error) (condition bool) {
 	if iterationVariablep == nil {
 		perrors.NewPF("iterationVariablep cannot bee nil")
 	}
 
 	// check for next value
 	var value *E
-	if value, condition = i.delegateAction(IsNext); condition {
+	if value, condition = i.nextSame(IsNext); condition {
 		*iterationVariablep = value
 	}
 
 	return // condition and iterationVariablep updated, errp unchanged
 }
 
+// Next advances to next item and returns it
+//   - if hasValue true, value contains the next value
+//   - otherwise, no more items exist and value is the data type zero-value
+func (i *SlicePointer[T]) Next() (value *T, hasValue bool) { return i.nextSame(IsNext) }
+
+// Same returns the same value again
+//   - if hasValue true, value is valid
+//   - otherwise, no more items exist and value is the data type zero-value
+//   - If Next or Cond has not been invoked, Same first advances to the first item
+func (i *SlicePointer[T]) Same() (value *T, hasValue bool) { return i.nextSame(IsSame) }
+
 // Cancel release resources for this iterator. Thread-safe
 //   - not every iterator requires a Cancel invocation
-func (i *SlicePointerIterator[E]) Cancel(errp ...*error) (err error) {
+func (i *SlicePointer[E]) Cancel(errp ...*error) (err error) {
 	i.isEnd.CompareAndSwap(false, true)
 	return
 }
@@ -108,7 +111,7 @@ func (i *SlicePointerIterator[E]) Cancel(errp ...*error) (err error) {
 //   - isSame true means first or same value should be returned
 //   - value is the sought value or the T type’s zero-value if no value exists
 //   - hasValue true means value was assigned a valid T value
-func (i *SlicePointerIterator[E]) delegateAction(isSame NextAction) (value *E, hasValue bool) {
+func (i *SlicePointer[E]) nextSame(isSame NextAction) (value *E, hasValue bool) {
 
 	if i.isEnd.Load() {
 		return // no more values return

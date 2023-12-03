@@ -6,28 +6,32 @@ ISC License
 package sets
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/haraldrudell/parl/iters"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pfmt"
 	"github.com/haraldrudell/parl/plog"
-	"golang.org/x/exp/slices"
 )
 
-// SetImpl holds a multiple-selection function argument that has printable representation.
+// Set0 holds a multiple-selection function argument that has printable representation.
 // PrintableEnum allows finite selection function arguments to have meaningful names and makes
 // those names printable.
-type SetImpl[T comparable] struct {
-	elementMap map[T]Element[T]
-	elements   []T
+type Set0[T comparable, E any] struct {
+	elementMap map[T]*E
+	elements   []E
 }
 
-// NewSet returns an enumeration of printable semantic elements.
-//   - elements implement the sets.Element[E] interface
-//   - — ValueV type is the element type E
-//   - — Name is the string value displayed for ValueV
-//   - [sets.SetElement] or [set.SetElementFull] are sample element implementations
+// NewSet returns an enumeration of printable semantic elements
+//   - elements implement the sets.Element[E] interface:
+//   - — Value method returns the comparable
+//   - — String method returns string representation
+//   - a common concrete type is [sets.SetElement]:
+//   - — ValueV field is comparable
+//   - — Name field is the string value
+//     Typically single word
+//   - another concerete type is sets.ElementFull[E]: Value, String, Description
+//   - — Description method returns a sentece-length description
 //
 // usage:
 //
@@ -36,104 +40,139 @@ type SetImpl[T comparable] struct {
 //			{ValueV: unix.AF_INET, Name: "IPv4"},
 //			{ValueV: unix.AF_INET6, Name: "IPv6"},
 //		}))
-func NewSet[T comparable](elements iters.Iterator[Element[T]]) (set Set[T]) {
-	s := SetImpl[T]{elementMap: map[T]Element[T]{}}
-	for element, _ := elements.Init(); elements.Cond(&element); {
-		valueT := element.Value()
-		if existingElement, ok := s.elementMap[valueT]; ok {
+func NewSet[T comparable, E any](elements []E) (set Set[T]) {
+	return NewSetFieldp[T](elements, nil, nil, nil)
+}
+
+func NewSetFieldp[T comparable, E any](
+	elements []E,
+	fieldp *Set0[T, E],
+	fTEp *func(comparable T) (ep *E),
+	epIteratorp *func() (iterator iters.Iterator[*E]),
+) (set Set[T]) {
+
+	// E can be concrete type or interface but must have:
+	//	- a Value method returning comparable T
+	//	- a String method returning string
+	var ep *E
+	if _, ok := any(ep).(Element[T]); !ok {
+		var eType = fmt.Sprintf("%T", ep)[1:] // get the interface type name by removing leading star
+		var i Element[T]
+		var interfaceType = fmt.Sprintf("%T", i)
+		panic(perrors.ErrorfPF("type E %s: &E does not implement interface %s",
+			eType, interfaceType,
+		))
+	}
+	var m = make(map[T]*E, len(elements))
+	for i := 0; i < len(elements); i++ {
+		var ep = &elements[i]
+		var element = any(ep).(Element[T])
+		var valueT = element.Value()
+		if existingElement, ok := m[valueT]; ok {
 			panic(perrors.ErrorfPF(
-				"duplicate set-element: type T: %T provided value: '%s' "+
-					"provided name: %q existing name: %q "+
-					"number of added values: %d",
-				valueT, pfmt.NoRecurseVPrint(valueT), element,
-				existingElement,
-				len(s.elementMap),
+				"duplicate set-element:"+
+					" comparable type T: %T duplicate value: ‘%s’"+
+					" new duplicate name: %q existing name: %q"+
+					" number of added values: %d",
+				valueT, pfmt.NoRecurseVPrint(valueT),
+				element, existingElement,
+				len(m),
 			))
 		}
-		s.elementMap[valueT] = element
-		s.elements = append(s.elements, element.Value())
+		m[valueT] = ep
 	}
-	set = &s
-	return
-}
-
-func (st *SetImpl[T]) IsValid(value T) (isValid bool) {
-	_, isValid = st.elementMap[value]
-	return
-}
-
-func (st *SetImpl[T]) Element(value T) (element Element[T]) {
-	if e, ok := st.elementMap[value]; ok {
-		element = e
+	if fieldp != nil {
+		*fieldp = Set0[T, E]{
+			elementMap: m,
+			elements:   elements,
+		}
+	} else {
+		fieldp = &Set0[T, E]{
+			elementMap: m,
+			elements:   elements,
+		}
 	}
-	return
-}
-
-func (st *SetImpl[T]) Description(value T) (full string) {
-
-	// get a pointer to the Element struct
-	var element Element[T] // interface
-	var ok bool
-	if element, ok = st.elementMap[value]; !ok {
-		return // invalid T return
+	if fTEp != nil {
+		*fTEp = fieldp.fTE
 	}
-
-	// type assert to Element with Description method
-	var elementFull ElementFull[T]
-	if elementFull, ok = element.(ElementFull[T]); !ok {
-		return // not a full element return
+	if epIteratorp != nil {
+		*epIteratorp = fieldp.epIterator
 	}
+	return fieldp
+}
 
-	full = elementFull.Description()
-
+// IsValid returns whether value is part of the set
+func (s *Set0[T, E]) IsValid(value T) (isValid bool) {
+	_, isValid = s.elementMap[value]
 	return
 }
 
-func (st *SetImpl[T]) Iterator() (iterator iters.Iterator[T]) {
-	return iters.NewSliceIterator(st.elements)
+// Iterator allows iteration over all set elements
+func (s *Set0[T, E]) Iterator() (iterator iters.Iterator[T]) {
+	return iters.NewSimpleConverterIterator(
+		iters.NewSlicePointerIterator(s.elements),
+		s.simpleConverter,
+	)
 }
 
-func (st *SetImpl[T]) Elements() (elements []T) {
-	return slices.Clone(st.elements)
-}
+func (s *Set0[T, E]) simpleConverter(element *E) (valueT T) { return any(element).(Element[T]).Value() }
 
-func PrintAsString(value any) (s string) {
-	tt := t{f: value}
-	s = plog.Sprintf("%v", tt)
-	s = strings.TrimPrefix(strings.TrimSuffix(s, "}"), "{")
-	return
-}
-
-type t struct {
-	f interface{}
-}
-
-// StringT provides a String function to a named type implementing a set
-func (st *SetImpl[T]) StringT(value T) (s string) {
+// StringT returns a string representation for an element of this set.
+// If value is not a valid element, a fmt.Printf value is output like ?'%v'
+func (s *Set0[T, E]) StringT(value T) (s2 string) {
 	// StringT is intended to be the String method of a named type implementing set.
 	// if StringT method code would somehow invoke the T.String method again,
 	// this will cause infinite recursion and stack overflow panic.
-	var e Element[T]
+	var ep *E
 	var ok bool
-	if e, ok = st.elementMap[value]; ok {
+	if ep, ok = s.elementMap[value]; ok {
+		var element = any(ep).(Element[T])
 		// e is Element interface, likely set.Element runtime type.
 		// set.Element.String() returns a value from a type string, ie. type T
 		// is not involved.
 		// This ensures no T-type String-function recursion.
-		s = e.String()
+		s2 = element.String()
 	} else {
 		// converting T to string may recurse if printf %v or %s verbs are used.
 		// ie. printf will re-enter this method and exhaust the stack.
 		// all that is known about T is that it is a comparable type
 		//p = string(value)
 
-		s = "?\x27" + PrintAsString(value) + "\x27"
+		s2 = "?\x27" + pfmt.NoRecurseVPrint(value) + "\x27"
 	}
 	return
 }
 
-func (st *SetImpl[T]) String() (s string) {
+// Description returns a more elaborate string representation
+// for an element. Description and StringT may return the same value
+func (s *Set0[T, E]) Description(value T) (full string) {
+
+	// get a pointer to the Element type
+	var ep *E
+	var ok bool
+	if ep, ok = s.elementMap[value]; !ok {
+		return // invalid T return
+	}
+
+	// type assert to Element with Description method
+	var elementDescription ElementDescription
+	if elementDescription, ok = any(ep).(ElementDescription); !ok {
+		return // not a full element return
+	}
+
+	full = elementDescription.Description()
+
+	return
+}
+
+func (s *Set0[T, E]) fTE(valueT T) (ep *E) { return s.elementMap[valueT] }
+
+func (s *Set0[T, E]) epIterator() (iterator iters.Iterator[*E]) {
+	return iters.NewSlicePointerIterator(s.elements)
+}
+
+func (s *Set0[T, E]) String() (s2 string) {
 	var t T
-	s = plog.Sprintf("%T:%d", t, len(st.elementMap))
+	s2 = plog.Sprintf("set_%T:%d", t, len(s.elementMap))
 	return
 }

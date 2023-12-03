@@ -125,7 +125,7 @@ func (t *ThreadLogger) printThread() {
 	var g = t.goGroup
 	var log = t.log
 	defer close(t.endCh)
-	defer parl.Recover("", nil, parl.Infallible)
+	defer parl.Recover(func() parl.DA { return parl.A() }, nil, parl.Infallible)
 	defer func() { log("%s %s: %s", parl.ShortSpace(), threadLoggerLabel, "thread-group ended") }()
 
 	// ticker for periodic printing

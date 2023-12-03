@@ -18,16 +18,23 @@ import (
 )
 
 const (
+	// [StatusTerminal.CopyLog] stops output for a writer
+	CopyLogRemoveFile = true
+	// [pterm.StatusTerminalFd] default file descriptor for output
+	STDefaultFd = 0
+)
+
+// [pterm.StatusTerminalFd] no write function
+var STDefaultWriter io.Writer
+
+// ANSI escape sequences
+const (
 	EraseEndOfLine         = "\x1b[K"
 	EraseEndOfDisplay      = "\x1b[J"
 	MoveCursorToColumnZero = "\r"
 	CursorUp               = "\x1b[A" // at top line does nothing
 	NewLine                = "\n"     // on last line, causes the view to scroll
 	Space                  = "\x20"
-)
-
-const (
-	CopyLogRemoveFile = true
 )
 
 // the Write signature of an io.Writer
@@ -49,71 +56,89 @@ type WriterWrite func(p []byte) (n int, err error)
 //
 // [ANSI escape codes]: https://en.wikipedia.org/wiki/ANSI_escape_code
 type StatusTerminal struct {
-	Fd    int            // file descriptor, typically os.Stderr
-	Print func(s string) // the Printf-style function used for output
+	// file descriptor, typically os.Stderr
+	Fd int
+	// the Printf-style function used for output
+	Print func(s string)
 	Write WriterWrite
 	// whether fd actually is a terminal that can display status
 	//	- true: stderr has ansi capabilities
 	//	- false: stderr is a non-terminal pipe. width cannot be determined
 	isTermTerminal bool
 
-	IsTerminal atomic.Bool  // configurable whether status texts should be output
+	// configurable whether status texts should be output
+	IsTerminal atomic.Bool
 	width      atomic.Int64 // atomic
 
-	statusEnded atomic.Bool // no more status should be output
+	// no more status should be output
+	statusEnded atomic.Bool
 
 	lock             sync.Mutex
-	displayLineCount int    // behind lock: number of terminal lines occupied by the current status
-	output           string // behind lock: the current status
-	copyLog          map[io.Writer]bool
+	displayLineCount int                // behind lock: number of terminal lines occupied by the current status
+	output           string             // behind lock: the current status
+	copyLog          map[io.Writer]bool // behind lock: log-copy streams
 }
 
-// NewStatusTerminal returns a terminal representation for logging and status output to stderr.
+// NewStatusTerminal returns a terminal representation for
+// concurrent logging and status output to standard error
+//   - stores self-referencing pointers
 func NewStatusTerminal() (statusTerminal *StatusTerminal) {
-	return &StatusTerminal{Fd: int(os.Stderr.Fd())}
+	return NewStatusTerminalFd(nil, 0, nil)
 }
 
-// NewStatusTerminalFd returns a terminal representation for logging and status output.
-//   - Fd is file descriptor used for ioctl, ie. needs to be a terminal, default stderr
+// NewStatusTerminalFd returns a terminal representation for logging and status output
+//   - Fd is file descriptor used for ioctl, ie. needs to be a terminal, default is standard error
 //   - Writer is for output, default writer for Fd
-func NewStatusTerminalFd(fd int, writer io.Writer, copyLog ...io.Writer) (statusTerminal *StatusTerminal) {
-	if fd == 0 {
-		fd = int(os.Stderr.Fd())
-	}
-	s := StatusTerminal{Fd: fd}
-	if writer != nil {
-		s.Write = writer.Write
-	}
-	if len(copyLog) > 0 {
-		s.copyLog = make(map[io.Writer]bool)
-		s.copyLog[copyLog[0]] = true
-	}
-	return &s
-}
+//   - stores self-referencing pointers
+func NewStatusTerminalFd(fieldp *StatusTerminal, fd int, writer io.Writer, copyLog ...io.Writer) (statusTerminal *StatusTerminal) {
 
-// Init adds self-referencing pointers to StatusTerminal
-//   - Fd is non-zero file descriptor
-//   - Write is non-null if writer was provided
-func (s *StatusTerminal) Init() {
-
-	if s.Write != nil {
-		s.Print = s.printWrite
+	// get statusTerminal value
+	if fieldp != nil {
+		statusTerminal = fieldp
+		*statusTerminal = StatusTerminal{}
 	} else {
-		switch s.Fd {
-		case int(os.Stderr.Fd()):
-			s.Print = s.printStderr
-		case int(os.Stderr.Fd()):
-			s.Print = s.printStdout
+		statusTerminal = &StatusTerminal{}
+	}
+
+	// get file descriptor to use for output
+	var stderrFd = int(os.Stderr.Fd())
+	if fd != 0 {
+		statusTerminal.Fd = fd
+	} else {
+		statusTerminal.Fd = stderrFd
+	}
+
+	// get Write and Print methods
+	if writer != nil {
+		statusTerminal.Write = writer.Write
+		statusTerminal.Print = statusTerminal.printWrite
+	} else {
+		var stdoutFd = int(os.Stdout.Fd())
+		switch statusTerminal.Fd {
+		case stderrFd:
+			statusTerminal.Print = statusTerminal.printStderr
+		case stdoutFd:
+			statusTerminal.Print = statusTerminal.printStdout
 		default:
-			s.Write = os.NewFile(uintptr(s.Fd), "fd").Write
-			s.Print = s.printWrite
+			statusTerminal.Write = os.NewFile(uintptr(statusTerminal.Fd), "fd").Write
+			statusTerminal.Print = statusTerminal.printWrite
 		}
 	}
 
-	// IsTerminal
-	if s.isTermTerminal = term.IsTerminal(s.Fd); s.isTermTerminal {
-		s.IsTerminal.Store(true)
+	// handle log-copy streams
+	if len(copyLog) > 0 {
+		statusTerminal.copyLog = make(map[io.Writer]bool)
+		statusTerminal.copyLog[copyLog[0]] = true
 	}
+
+	// IsTerminal
+	//	- isTermTerminal is if the stream actually is a terminal
+	//	- IsTerminal is whether the stream should be treated as a terminal
+	if statusTerminal.isTermTerminal = term.IsTerminal(statusTerminal.Fd); statusTerminal.isTermTerminal {
+		statusTerminal.IsTerminal.Store(true)
+	}
+
+	return
 }
 
 // Status updates a status area at the bottom of the display
@@ -349,9 +374,7 @@ func (s *StatusTerminal) restoreStatus() (restoreStatusSequence string) {
 
 // printWrite outputs a string to the io.Write writer
 //   - exposed as [StatusTerminal.Print]
-func (s *StatusTerminal) printWrite(str string) {
-	s.write(str, s.Write)
-}
+func (s *StatusTerminal) printWrite(str string) { s.write(str, s.Write) }
 
 // write writes a string as bytes to write-function writer
 func (s *StatusTerminal) write(str string, writer WriterWrite) {
@@ -371,11 +394,7 @@ func (s *StatusTerminal) write(str string, writer WriterWrite) {
 }
 
 // printStdout outputs to standard out via Parl, adapting the signature
-func (s *StatusTerminal) printStdout(str string) {
-	parl.Outw(str)
-}
+func (s *StatusTerminal) printStdout(str string) { parl.Outw(str) }
 
 // printStdout outputs to standard error via Parl, adapting the signature
-func (s *StatusTerminal) printStderr(str string) {
-	parl.Logw(str)
-}
+func (s *StatusTerminal) printStderr(str string) { parl.Logw(str) }

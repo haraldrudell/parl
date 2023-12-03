@@ -29,7 +29,7 @@ func copyThread(label string,
 	defer wg.Done()
 	var err error
 	defer parl.CancelOnError(&err, execCtx) // cancel the command if copyThread failes
-	defer parl.Recover("copy command i/o "+label, &err, addError)
+	defer parl.RecoverAnnotation("copy command i/o "+label, &err, addError)
 
 	if _, err = io.Copy(writer, reader); perrors.Is(&err, "%s io.Copy %w", label, err) {
 

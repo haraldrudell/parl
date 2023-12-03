@@ -120,11 +120,11 @@ func NewDebouncer[T any](
 	errFn AddError,
 ) (debouncer *Debouncer[T]) {
 	if inputCh == nil {
-		NilError("inputCh")
+		panic(NilError("inputCh"))
 	} else if sender == nil {
-		NilError("sender")
+		panic(NilError("sender"))
 	} else if errFn == nil {
-		NilError("errFn")
+		panic(NilError("errFn"))
 	}
 
 	var isShutdown = NewAwaitable()
@@ -198,7 +198,7 @@ func (d *Debouncer[T]) Wait() {
 // inputThread debounces the input channel until it closes or Shutdown
 func (d *debouncerIn[T]) inputThread() {
 	defer d.inputExit.Close()
-	defer RecoverDA(func() DA { return A() }, nil, OnError(d.errFn))
+	defer Recover(func() DA { return A() }, nil, OnError(d.errFn))
 	defer d.maxDelayTimer.Stop()
 	defer d.debounceTimer.Stop()
 	defer d.buffer.Close() // close of buffer causes output thread to eventually exit
@@ -257,7 +257,7 @@ func (d *debouncerIn[T]) inputThread() {
 func (d *debouncerOut[T]) outputThread() {
 	defer d.isShutdown.Close() // shutdown input thread if running
 	defer d.outputExit.Close()
-	defer RecoverDA(func() DA { return A() }, nil, OnError(d.errFn))
+	defer Recover(func() DA { return A() }, nil, OnError(d.errFn))
 
 	// while buffer is not closed and emptied, wait for:
 	//	- debounce timer expired triggering send,

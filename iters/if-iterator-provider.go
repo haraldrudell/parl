@@ -1,12 +1,9 @@
 /*
-© 2022-present Harald Rudell <haraldrudell@proton.me> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved
+© 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+ISC License
 */
 
 package iters
-
-// when the iterator function receives this value, it means cancel
-const FunctionIteratorCancel int = -1
 
 // IteratorFunction is the signature used by NewFunctionIterator
 //   - if isCancel true, it means this is the last invocation of IteratorFunction and
@@ -19,6 +16,8 @@ const FunctionIteratorCancel int = -1
 //   - IteratorFunction must be thread-safe
 //   - IteratorFunction is invoked by at most one thread at a time
 type IteratorFunction[T any] func(isCancel bool) (value T, err error)
+
+type SimpleIteratorFunc[T any] func() (value T, hasValue bool)
 
 // ConverterFunction is the signature used by NewConverterIterator
 //   - ConverterFunction receives a key and returns the corresponding value.
@@ -33,20 +32,27 @@ type IteratorFunction[T any] func(isCancel bool) (value T, err error)
 //   - ConverterFunction is invoked by at most one thread at a time
 type ConverterFunction[K any, V any] func(key K, isCancel bool) (value V, err error)
 
-// InvokeFunc is the signature used by NewBaseIterator
-//   - isCancel is a request to cancel iteration. No more invocations
-//     will occur. Iterator should release resources
-//   - value is valid if err is nil and isCancel was false and didCancel is false.
-//     otherwise, value is ignored
-//   - if err is non-nil an error occurred.
-//     parl.ErrEndCallbacks allows InvokeFunc to signal end of iteration values.
-//     parl.ErrEndCallbacks error is ignored.
-//   - if isCancel was false and didCancel is true, IncokeFunc took the
-//     initiative to cancel the iteration. No more invocations will occur
-//   - isPanic indicates that err is the result of a panic
-type InvokeFunc[T any] func(isCancel bool) (
+type SimpleConverter[K any, V any] func(key K) (value V)
+
+// IteratorAction is a delegated request from [iters.BaseIterator]
+//   - isCancel true requests cancel of iteration.
+//     No further invocations will occur.
+//     The iterator should release resources.
+//     The iterator may return an error
+//   - otherwise, the iterator can:
+//   - — return the next value
+//   - — return an error. No further invocations will occur
+//   - — return err == parl.ErrEndCallbacks requesting an end to iterations.
+//     No further invocations will occur
+//     ErrEndCallbacks error is not returned to the consumer
+//   - the returned value is used if:
+//   - — returned err is nil and
+//   - — provided isCancel was false and
+//   - — returned didCancel is false
+//   - isPanic indicates that err is the result of a panic.
+//     isPanic is only used if err is non-nil
+type IteratorAction[T any] func(isCancel bool) (
 	value T,
-	didCancel bool,
 	isPanic bool,
 	err error,
 )

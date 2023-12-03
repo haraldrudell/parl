@@ -1,75 +1,72 @@
 /*
-© 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+© 2023–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 ISC License
 */
 
 package sets
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/haraldrudell/parl/test"
+	"github.com/haraldrudell/parl/iters"
 )
 
-func TestNewSet(t *testing.T) {
-	value := 1
-	name := "nname"
-	notValue := 2
-	notName := "?'2'"
-	str := "int:1"
-	messageDup := "duplicate set-element"
+func TestSet(t *testing.T) {
+	var value1, value2 = 1, 2
+	var name1, name2 = "n1", "n2"
 
-	var actual string
-
-	interfaceSet := NewSet(NewElements[int](
-		[]SetElement[int]{
-			{value, name},
-		}))
-
-	if interfaceSet == nil {
-		t.Error("NewSet nil")
-		t.FailNow()
-	}
-	if actual = interfaceSet.StringT(value); actual != name {
-		t.Errorf("StringT %q exp %q", actual, name)
-	}
-	if actual = interfaceSet.StringT(notValue); actual != notName {
-		t.Errorf("StringT2 %q exp %q", actual, notName)
-	}
-	if actual = interfaceSet.String(); actual != str {
-		t.Errorf("String %q exp %q", actual, str)
+	var value1full string
+	var value1stringT = name1
+	var values = []SetElement[int]{
+		{ValueV: value1, Name: name1},
+		{ValueV: value2, Name: name2},
 	}
 
-	var err error
-	test.RecoverInvocationPanic(func() {
-		NewSet(NewElements[int](
-			[]SetElement[int]{
-				{value, name},
-				{value, name},
-			}))
-	}, &err)
-	if err == nil {
-		t.Error("set duplicate element missing error")
-	} else if !strings.Contains(err.Error(), messageDup) {
-		t.Errorf("NewSet2 err: %q exp %q", err.Error(), messageDup)
+	var isValid, hasValue bool
+	var value, zeroValue int
+	var iterator iters.Iterator[int]
+	var full string
+
+	// IsValid() Iterator() Description() StringT() String()
+	var set Set[int]
+	var reset = func() {
+		set = NewSet[int](values)
 	}
-}
 
-func TestSetDescription(t *testing.T) {
-	var value = 1
-	var name = "nname"
-	var full = "Full"
+	// IsValid of element should return true
+	reset()
+	isValid = set.IsValid(value1)
+	if !isValid {
+		t.Error("IsValid false")
+	}
 
-	var actual string
+	// IsValid of non-element should return false
+	reset()
+	isValid = set.IsValid(zeroValue)
+	if isValid {
+		t.Error("IsValid true")
+	}
 
-	var set = NewSet(NewElements[int](
-		[]SetElementFull[int]{
-			{ValueV: value, Name: name, Full: full},
-		}))
+	// Iterator should iterate
+	reset()
+	iterator = set.Iterator()
+	value, hasValue = iterator.Next()
+	_ = hasValue
+	if value != value1 {
+		t.Errorf("Iterator.Next %d exp %d", value, value1)
+	}
 
-	actual = set.Description(value)
-	if actual != full {
-		t.Errorf("set.Description: %q exp %s", actual, full)
+	// Description
+	reset()
+	full = set.Description(value1)
+	if full != value1full {
+		t.Errorf("Description %q exp %q", full, value1full)
+	}
+
+	// StringT
+	reset()
+	full = set.StringT(value1)
+	if full != value1stringT {
+		t.Errorf("StringT %q exp %q", full, value1stringT)
 	}
 }

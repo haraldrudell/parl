@@ -23,8 +23,7 @@ func (r CBReason) String() (s string) {
 }
 
 // cbReasonSet translates CBReason to string
-var cbReasonSet = sets.NewSet(sets.NewElements[CBReason](
-	[]sets.SetElement[CBReason]{
-		{ValueV: ITParallelism, Name: "max parallel"},
-		{ValueV: ITLatency, Name: "slowest"},
-	}))
+var cbReasonSet = sets.NewSet[CBReason]([]sets.SetElement[CBReason]{
+	{ValueV: ITParallelism, Name: "max parallel"},
+	{ValueV: ITLatency, Name: "slowest"},
+})

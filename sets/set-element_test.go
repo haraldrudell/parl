@@ -8,15 +8,21 @@ package sets
 import "testing"
 
 func TestSetElement(t *testing.T) {
-	value := 1
-	name := "nname"
+	var value, name = 1, "nname"
 
-	element := SetElement[int]{value, name}
+	element := SetElement[int]{
+		ValueV: value,
+		Name:   name,
+	}
 
 	if element.Value() != value {
 		t.Errorf("Value %d exp %d", element.Value(), value)
 	}
 	if element.String() != name {
 		t.Errorf("String %q exp %q", element.String(), name)
+	}
+
+	if _, ok := any(&element).(Element[int]); !ok {
+		t.Error("is not Element")
 	}
 }

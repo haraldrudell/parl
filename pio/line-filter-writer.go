@@ -3,11 +3,11 @@
 ISC License
 */
 
-// LineReader reads a stream one line per Read invocation.
 package pio
 
 import (
 	"io"
+	"io/fs"
 	"sync"
 
 	"github.com/haraldrudell/parl"
@@ -19,32 +19,41 @@ const (
 	newLineWriter = byte('\n')
 )
 
-type LineWriter struct {
+// LineFilterFunc receives lines as they are written to the writer
+//   - can modify the line
+//   - can skip the line using skipLine
+//   - can return error
+type LineFilterFunc func(line *[]byte, isLastLine bool) (skipLine bool, err error)
+
+// LineFilterWriter is a writer that filters each line using a filter function
+type LineFilterWriter struct {
 	writeCloser io.WriteCloser
-	filter      func(line *[]byte, isLastLine bool) (skipLine bool, err error)
+	filter      LineFilterFunc
 
 	dataLock sync.Mutex
 	isClosed bool
 	data     []byte
 }
 
-var _ io.WriteCloser = &LineWriter{}
+var _ io.WriteCloser = &LineFilterWriter{}
 
-func NewLineWriter(writeCloser io.WriteCloser,
-	filter func(line *[]byte, isLastLine bool) (skipLine bool, err error)) (lineWriter *LineWriter) {
+// NewLineFilterWriter is a writer that filters each line using a filter function
+func NewLineFilterWriter(writeCloser io.WriteCloser, filter LineFilterFunc) (lineWriter *LineFilterWriter) {
 	if writeCloser == nil {
-		panic(perrors.NewPF("writeCloser cannot be nil"))
+		panic(parl.NilError("writeCloser"))
+	} else if filter == nil {
+		panic(parl.NilError("filter"))
 	}
-	return &LineWriter{writeCloser: writeCloser, filter: filter}
+	return &LineFilterWriter{writeCloser: writeCloser, filter: filter}
 }
 
 // Write saves data in slice and returns all bytes written or ErrFileAlreadyClosed
-func (wc *LineWriter) Write(p []byte) (n int, err error) {
+func (wc *LineFilterWriter) Write(p []byte) (n int, err error) {
 	wc.dataLock.Lock()
 	defer wc.dataLock.Unlock()
 
 	if wc.isClosed {
-		err = perrors.ErrorfPF("%w", ErrFileAlreadyClosed)
+		err = perrors.ErrorfPF("%w", fs.ErrClosed)
 		return // closed return
 	}
 
@@ -72,7 +81,7 @@ func (wc *LineWriter) Write(p []byte) (n int, err error) {
 	return // good write return
 }
 
-func (w *LineWriter) processLine() (err error) {
+func (w *LineFilterWriter) processLine() (err error) {
 
 	// apply filter
 	if w.filter != nil {
@@ -97,12 +106,12 @@ func (w *LineWriter) processLine() (err error) {
 }
 
 // Close closes
-func (wc *LineWriter) Close() (err error) {
+func (wc *LineFilterWriter) Close() (err error) {
 	wc.dataLock.Lock()
 	defer wc.dataLock.Unlock()
 
 	if wc.isClosed {
-		err = perrors.ErrorfPF("%w", ErrFileAlreadyClosed)
+		err = perrors.ErrorfPF("%w", fs.ErrClosed)
 		return // closed return
 	}
 
@@ -114,7 +123,8 @@ func (wc *LineWriter) Close() (err error) {
 	return
 }
 
-func (w *LineWriter) invokeFilter() (skipLine bool, err error) {
+// invokeFilter captures a panic in the filter function
+func (w *LineFilterWriter) invokeFilter() (skipLine bool, err error) {
 	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
 
 	skipLine, err = w.filter(&w.data, w.isClosed)
