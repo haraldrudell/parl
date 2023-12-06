@@ -42,7 +42,7 @@ func Pragma(dataSource parl.DataSource, ctx context.Context) (pragmas map[string
 }
 
 // Pragma returns some common SQLite3 database settings
-//   - parl.DB is obtained from psql.NewDB and is a cached map of partitioned databases
+//   - parl.DB is a map of multiple DB objects facilitating partitioning
 //   - in normal use parl.DB is not available from psql.NewDBMap
 func PragmaDB(db parl.DB, partition parl.DBPartition, ctx context.Context) (pragmas map[string]string, err error) {
 

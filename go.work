@@ -2,12 +2,11 @@
 // ISC License
 go 1.21
 
-toolchain go1.21.3
-
 // go work use -r .
 use (
 	.
 	./omaps
+	./psql
 	./pterm
 	./sqliter
 	./watchfs
