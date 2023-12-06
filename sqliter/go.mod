@@ -8,7 +8,7 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/uuid v1.4.0
-	github.com/haraldrudell/parl v0.4.134
+	github.com/haraldrudell/parl v0.4.135
 	modernc.org/sqlite v1.27.0
 )
 

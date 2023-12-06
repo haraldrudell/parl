@@ -16,10 +16,15 @@ import (
 )
 
 const (
+	// SQLite3 special filename for in-memory databases
+	SQLiteMemoryDataSourceName = ":memory:"
 	// name of the SQLite3 database driver
 	//	- “modernc.org/sqlite”
-	sqLiteDriverName = "sqlite"
-	sqStatement      = "stmt"
+	SQLiteDriverName = "sqlite"
+)
+
+const (
+	sqStatement = "stmt"
 )
 
 // DataSource represents a SQL database that can prepare generic SQL queries
@@ -40,7 +45,7 @@ func OpenDataSource(dataSourceName parl.DataSourceName) (dataSource parl.DataSou
 	d := DataSource{
 		counters: counter.CountersFactory.NewCounters(true, nil), // nil: no rate counters
 	}
-	if d.DB, err = sql.Open(sqLiteDriverName, string(dataSourceName)); perrors.IsPF(&err, "sql.Open(%s %s): %w", sqLiteDriverName, dataSourceName, err) {
+	if d.DB, err = sql.Open(SQLiteDriverName, string(dataSourceName)); perrors.IsPF(&err, "sql.Open(%s %s): %w", SQLiteDriverName, dataSourceName, err) {
 		return
 	}
 	dataSource = &d

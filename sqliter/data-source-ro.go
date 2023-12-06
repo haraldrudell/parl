@@ -25,7 +25,7 @@ func OpenDataSource2(dataSourceName parl.DataSourceName) (dataSource parl.DataSo
 	d := DataSource{
 		counters: counter.CountersFactory.NewCounters(true, nil), // nil: no rate counters
 	}
-	if d.DB, err = sql.Open(sqLiteDriverName, string(dataSourceName)); perrors.IsPF(&err, "sql.Open(%s %s): %w", sqLiteDriverName, dataSourceName, err) {
+	if d.DB, err = sql.Open(SQLiteDriverName, string(dataSourceName)); perrors.IsPF(&err, "sql.Open(%s %s): %w", SQLiteDriverName, dataSourceName, err) {
 		return
 	}
 	dataSource = &d

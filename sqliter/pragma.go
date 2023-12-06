@@ -7,8 +7,10 @@ package sqliter
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/psql"
 )
 
@@ -23,6 +25,8 @@ var pragmaMap = map[string]string{
 }
 
 // Pragma returns some common SQLite3 database settings
+//   - parl.DataSource is a caching of prepared statements obatined from
+//     OpenDataSource
 func Pragma(dataSource parl.DataSource, ctx context.Context) (pragmas map[string]string, err error) {
 
 	pragmas = make(map[string]string)
@@ -38,6 +42,8 @@ func Pragma(dataSource parl.DataSource, ctx context.Context) (pragmas map[string
 }
 
 // Pragma returns some common SQLite3 database settings
+//   - parl.DB is obtained from psql.NewDB and is a cached map of partitioned databases
+//   - in normal use parl.DB is not available from psql.NewDBMap
 func PragmaDB(db parl.DB, partition parl.DBPartition, ctx context.Context) (pragmas map[string]string, err error) {
 
 	pragmas = make(map[string]string)
@@ -47,6 +53,27 @@ func PragmaDB(db parl.DB, partition parl.DBPartition, ctx context.Context) (prag
 			return
 		}
 		pragmas[key] = value
+	}
+
+	return
+}
+
+// Pragma returns some common SQLite3 database settings
+//   - sqlDB is obtained from [sql.Open]
+//   - in-memory returns: map[foreignKeys:0 journal:memory timeout:0]
+func PragmaSQL(sqlDB *sql.DB, ctx context.Context) (pragmas map[string]string, err error) {
+
+	pragmas = make(map[string]string)
+	var result string
+	var sqlRow *sql.Row
+	for _, key := range pragmaList {
+		sqlRow = sqlDB.QueryRowContext(ctx, pragmaMap[key])
+		if err = sqlRow.Err(); perrors.IsPF(&err, "Query %s: %w", key, err) {
+			return
+		} else if sqlRow.Scan(&result); perrors.IsPF(&err, "Query %s: %w", key, err) {
+			return
+		}
+		pragmas[key] = result
 	}
 
 	return

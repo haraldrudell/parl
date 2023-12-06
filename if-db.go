@@ -10,6 +10,7 @@ import (
 	"database/sql"
 )
 
+// NoPartition interacts with a data source that is not partitioned by year or otherwise
 const NoPartition DBPartition = ""
 
 // DB is a parallel database connection
