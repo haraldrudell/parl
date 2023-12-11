@@ -15,7 +15,7 @@ import (
 )
 
 var pragmaList = []string{
-	"foreignKeys", "journal", "timeout",
+	"foreignKeys", "journalMode", "busyTimeout",
 }
 
 var pragmaMap = map[string]string{

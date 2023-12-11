@@ -60,12 +60,10 @@ func (i *SimpleFunc[T]) Init() (iterationVariable T, iterator Iterator[T]) {
 //     Otherwise, err is non-nil and isPanic may be set.
 //     value is zero-value
 //   - thread-safe but invocations must be serialized
-func (i *SimpleFunc[T]) iteratorAction(isCancel bool) (value T, isPanic bool, err error) {
+func (i *SimpleFunc[T]) iteratorAction(isCancel bool) (value T, err error) {
 	if isCancel {
 		return
 	}
-	defer cyclebreaker.RecoverErr(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, &isPanic)
-
 	// func() (value T, hasValue bool)
 	var hasValue bool
 	if value, hasValue = i.iteratorFunction(); !hasValue {

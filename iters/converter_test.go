@@ -66,16 +66,6 @@ func TestConverter(t *testing.T) {
 		t.Errorf("Next value %d exp %d", value, value1)
 	}
 
-	// Same should return first value
-	reset()
-	value, hasValue = iterator.Same()
-	if !hasValue {
-		t.Error("Same hasValue false")
-	}
-	if value != value1 {
-		t.Errorf("Same value %d exp %d", value, value1)
-	}
-
 	// Cancel should return no error
 	reset()
 	err = iterator.Cancel()
@@ -145,19 +135,6 @@ func TestConverter(t *testing.T) {
 		t.Errorf("NextNextNext value %d exp %d", value, zeroValue)
 	}
 
-	// SameSame should return first value
-	reset()
-	value, hasValue = iterator.Same()
-	_ = value
-	_ = hasValue
-	value, hasValue = iterator.Same()
-	if !hasValue {
-		t.Error("SameSame hasValue false")
-	}
-	if value != value1 {
-		t.Errorf("SameSame value %d exp %d", value, value1)
-	}
-
 	// CancelCond should return false
 	reset()
 	err = iterator.Cancel()
@@ -177,18 +154,6 @@ func TestConverter(t *testing.T) {
 	}
 	if value != zeroValue {
 		t.Errorf("CancelNext value %d exp %d", value, zeroValue)
-	}
-
-	// CancelSame should return no value
-	reset()
-	err = iterator.Cancel()
-	_ = err
-	value, hasValue = iterator.Same()
-	if hasValue {
-		t.Error("CancelSame hasValue true")
-	}
-	if value != zeroValue {
-		t.Errorf("CancelSame value %d exp %d", value, zeroValue)
 	}
 }
 

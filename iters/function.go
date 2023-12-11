@@ -61,9 +61,7 @@ func (i *Function[T]) Init() (iterationVariable T, iterator Iterator[T]) {
 //     Otherwise, err is non-nil and isPanic may be set.
 //     value is zero-value
 //   - thread-safe but invocations must be serialized
-func (i *Function[T]) iteratorAction(isCancel bool) (value T, isPanic bool, err error) {
-	defer cyclebreaker.RecoverErr(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, &isPanic)
-
+func (i *Function[T]) iteratorAction(isCancel bool) (value T, err error) {
 	// func(isCancel bool) (value T, err error)
 	if value, err = i.iteratorFunction(isCancel); err != nil {
 		err = perrors.Stack(err)

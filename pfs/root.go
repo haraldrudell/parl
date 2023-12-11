@@ -12,13 +12,15 @@ import (
 // Root is a file system hierarchy
 type Root struct {
 	// path as provided that may be easier to read
-	//   - — may be implicitly relative to current directory: “subdir/file.txt”
-	//   - — may have no directory part: “README.css”
-	//   - — may be relative: “../file.txt”
-	//   - — may contain symlinks and unnecessary “.” and “..”
+	//   - may be implicitly relative to current directory: “subdir/file.txt”
+	//   - may have no directory or extension part: “README.css” “z”
+	//   - may be relative: “../file.txt”
+	//   - may contain symlinks, unnecessary “.” and “..” or
+	//		multiple separators in sequence
+	//	- may be empty string for current working directory
 	ProvidedPath string
-	// cleaned equivalent of Path
-	//	- absolute, no symlinks, no unnecessary “.” and “..” or other problems
+	// equivalent of Path: absolute, symlink-free, clean
+	//	- may not exist
 	absPath string
 	// FSEntry represents the file-system location of this root
 	//	- Directory or Entry

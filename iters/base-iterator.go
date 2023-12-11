@@ -14,57 +14,21 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-const (
-	// invoke iteratorFunction for next value
-	enqueueForFnNextItem = false
-	// invoke iteratorFunction to request cancel
-	enqueueForFnCancel = true
-)
-
-// baseIterator is a pointed-to enclosed type due to BaseIterator providing
-// baseIterator.delegateAction
-//   - provided methods: Cond Next Same Cancel
-type baseIterator[T any] struct {
+// BaseIterator implements:
+//   - [Iterator] methods [Iterator.Cond] [Iterator.Next] [Iterator.Cancel]
+//   - consumer must:
+//   - — implement [Iterator.Init] since it returns the enclosing type
+//   - — provide IteratorAction[T]
+type BaseIterator[T any] struct {
 	iteratorAction IteratorAction[T]
-
-	// publicsLock serializes invocations of i.Next and i.Cancel
-	publicsLock sync.Mutex
-
-	// Next
-
-	// didNext indicates that a Next operation has completed and that hasValue may be valid
-	//	- behind publicsLock
-	didNext bool
-	// value is a returned value from fn.
-	// value is valid when isEnd is false and hasValue is true.
-	//	- behind publicsLock
-	value T
-	// hasValue indicates that value is valid.
-	//	- behind publicsLock
-	hasValue bool
-
-	// indicates that no further values can be returned.
-	// caused by:
-	//	- error received from iterator
-	//	- iterator cancel completed
-	//	- iterator signaled end of values
-	//	- —
-	//	- written behind publicsLock
-	noValuesAvailable atomic.Bool
-
-	// enqueueForFn
 
 	// cancelState is updated by:
 	//	- Cancel() and
 	//	- enqueueForFn() inside i.publicsLock lock
+	//	- is state because Cancel is not complete until iteratorAction has returned
 	cancelState atomic.Uint32
-	// errWait waits until
-	//	- an error is received from fn
-	//	- cancel returns from fn FunctionIteratorCancel -1 invocation
-	//		without error
-	//	- fn signals end of data ny returning parl.ErrEndCallbacks
-	//	- updated by enqueueForFn() inside i.publicsLock lock
-	errWait sync.WaitGroup
+	// publicsLock serializes invocations of i.Next and i.Cancel
+	publicsLock sync.Mutex
 	// err contains any errors returned by fn other than parl.ErrEndCallbacks
 	//	- nil if fn is active
 	//	- non-nil pointer to nil error if fn completed without error
@@ -75,30 +39,12 @@ type baseIterator[T any] struct {
 	err atomic.Pointer[error]
 }
 
-// BaseIterator implements:
-//   - the DelegateAction[T] function required by Delegator[T]
-//   - Cond and Cancel methods part of [iters.Iterator]
-//   - consumer needs to implement Init method
-type BaseIterator[T any] struct {
-	// baseIterator is a pointed-to enclosed type due to BaseIterator providing
-	// baseIterator.delegateAction
-	*baseIterator[T]
-}
-
-// NewFunctionIterator returns a parli.Iterator based on a function.
-// functionIterator is thread-safe and re-entrant.
+// NewBaseIterator returns an implementation of Cond Next Cancel methods part of [iters.Iterator]
 func NewBaseIterator[T any](iteratorAction IteratorAction[T]) (iterator *BaseIterator[T]) {
 	if iteratorAction == nil {
 		panic(cyclebreaker.NilError("iteratorAction"))
 	}
-
-	// pointer to baseIterator.delegateAction so this method can
-	// be provided
-	//	- also causes werrWait to be pointed to, a used non-copy struct
-	i := baseIterator[T]{iteratorAction: iteratorAction}
-	i.errWait.Add(1)
-
-	return &BaseIterator[T]{baseIterator: &i}
+	return &BaseIterator[T]{iteratorAction: iteratorAction}
 }
 
 // Cond implements the condition statement of a Go “for” clause
@@ -111,27 +57,23 @@ func NewBaseIterator[T any](iteratorAction IteratorAction[T]) (iterator *BaseIte
 //
 //	for i, iterator := iters.NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
 //	  // i is pointer to slice element
-func (i *baseIterator[T]) Cond(iterationVariablep *T, errp ...*error) (condition bool) {
+func (i *BaseIterator[T]) Cond(iterationVariablep *T, errp ...*error) (condition bool) {
 	if iterationVariablep == nil {
-		perrors.NewPF("iterationVariablep cannot bee nil")
+		cyclebreaker.NilError("iterationVariablep")
 	}
 
-	// handle error
-	if ep := i.err.Load(); ep != nil {
-		if err := *ep; err != nil {
-			if len(errp) > 0 {
-				if errp0 := errp[0]; errp0 != nil {
-					*errp0 = err // update errp with error
-				}
-			}
-			return // error return: cond false, iterationVariablep unchanged, errp updated
-		}
+	// outside lock check updating errp
+	if hasError, _ := i.getErr(replaceErrp, errp...); hasError {
+		return // iterator is canceled
 	}
 
-	// check for next value
+	// next value
 	var value T
-	if value, condition = i.nextSame(IsNext); condition {
+	if value, condition = i.Next(); condition {
 		*iterationVariablep = value
+	} else if len(errp) > 0 {
+		// collect any error for errp
+		i.getErr(replaceErrp, errp...)
 	}
 
 	return // condition and iterationVariablep updated, errp unchanged
@@ -140,13 +82,23 @@ func (i *baseIterator[T]) Cond(iterationVariablep *T, errp ...*error) (condition
 // Next advances to next item and returns it
 //   - if hasValue true, value contains the next value
 //   - otherwise, no more items exist and value is the data type zero-value
-func (i *baseIterator[T]) Next() (value T, hasValue bool) { return i.nextSame(IsNext) }
+func (i *BaseIterator[T]) Next() (value T, hasValue bool) {
 
-// Same returns the same value again
-//   - if hasValue true, value is valid
-//   - otherwise, no more items exist and value is the data type zero-value
-//   - If Next or Cond has not been invoked, Same first advances to the first item
-func (i *baseIterator[T]) Same() (value T, hasValue bool) { return i.nextSame(IsSame) }
+	// fast outside-lock value-check
+	if i.err.Load() != nil {
+		return // no more values: zero-value and hasValue false
+	}
+	i.publicsLock.Lock()
+	defer i.publicsLock.Unlock()
+
+	// inside-lock check
+	if i.err.Load() != nil {
+		return // no more values: zero-value and hasValue false
+	}
+	value, hasValue = i.doAction(doNext)
+
+	return // hasValue true, valid value return
+}
 
 // Cancel stops an iteration
 //   - after Cancel invocation, Cond, Next and Same indicate no value available
@@ -154,189 +106,131 @@ func (i *baseIterator[T]) Same() (value T, hasValue bool) { return i.nextSame(Is
 //   - an iterator implementation may require Cancel invocation
 //     to release resources
 //   - Cancel is deferrable
-func (i *baseIterator[T]) Cancel(errp ...*error) (err error) {
+func (i *BaseIterator[T]) Cancel(errp ...*error) (err error) {
 
-	// ignore if cancel alread invoked
-	if !i.cancelState.CompareAndSwap(uint32(notCanceled), uint32(cancelRequested)) {
-		i.errWait.Wait()
-		if err = *i.err.Load(); err != nil {
-			if len(errp) > 0 {
-				if ep := errp[0]; ep != nil {
-					*ep = perrors.AppendError(*ep, err)
-				}
-			}
-		}
-		return // already beyond cancel
+	// fast outside-lock check
+	var hasErr bool
+	if hasErr, err = i.getErr(appendErrp, errp...); hasErr {
+		return // already canceled
 	}
-
-	// wait for access to fn
+	// ensure cancel initiated prior to lock
+	if cancelStates(i.cancelState.Load()) == notCanceled {
+		i.cancelState.CompareAndSwap(uint32(notCanceled), uint32(cancelRequested))
+	}
+	// the lock provides wait mechanic
 	i.publicsLock.Lock()
 	defer i.publicsLock.Unlock()
 
-	_, _, err = i.enqueueForFn(enqueueForFnCancel)
-	if err != nil {
-		if len(errp) > 0 {
-			if ep := errp[0]; ep != nil {
-				*ep = perrors.AppendError(*ep, err)
-			}
-		}
+	// inside lock check
+	if hasErr, err = i.getErr(appendErrp, errp...); hasErr {
+		return // already canceled
 	}
+	// send cancel to iteratorAction
+	i.doAction(doCancel)
+	_, err = i.getErr(appendErrp, errp...)
 
 	return
 }
 
-// nextSame finds the next or the same value
-//   - isSame true means first or same value should be returned
-//   - value is the sought value or the T type’s zero-value if no value exists
-//   - hasValue true means value was assigned a valid T value
-func (i *baseIterator[T]) nextSame(isSame NextAction) (value T, hasValue bool) {
+const (
+	// [BaseIterator.doAction] invoked for next value
+	doNext anAction = false
+	// [BaseIterator.doAction] invoked for cancel
+	doCancel anAction = true
+)
 
-	// fast outside-lock value-check
-	if i.noValuesAvailable.Load() {
-		return // no more values: zero-value and hasValue false
-	}
-	// wait for access to fn
-	i.publicsLock.Lock()
-	defer i.publicsLock.Unlock()
+// Action for [BaseIterator.enqueueForFn]
+//   - doNext doCancel
+type anAction bool
 
-	// inside-lock check
-	if i.noValuesAvailable.Load() {
-		return // no more values: zero-value and hasValue false
-	}
-	if cancelStates(i.cancelState.Load()) != notCanceled {
-		i.noValuesAvailable.Store(true)
-		return // some cancellation of the iterator
-	}
-
-	// same value when a value has previously been read
-	if i.didNext {
-		if isSame == IsSame {
-			value = i.value
-			hasValue = i.hasValue
-			return // same value return
-		}
-	} else {
-		// did seek the first value
-		i.didNext = true
-	}
-
-	// invoke fn
-	var cancelState cancelStates
-	var err error
-	// enqueueForFn unlocks while invoking fn to allow re-entrancy.
-	// if fn returns error, enqueueForFn updates: iter.isEnd iter.err iter.value iter.hasValue.
-	value, cancelState, err = i.enqueueForFn(enqueueForFnNextItem)
-
-	// determine whether a value was provided
-	hasValue = err == nil && cancelState == notCanceled
-
-	if !hasValue {
-		i.noValuesAvailable.Store(true)
-		return // no more values available
-	}
-
-	// store received value for future IsSame
-	i.value = value
-	i.hasValue = hasValue
-
-	return // hasValue true, valid value return
-}
-
-// enqueueForFn invokes iter.fn
-//   - is hasValue true, value is valid, err nil, cancelState notCanceled
-//   - otherwise, i.err is updated, i.errWait released,
-//     cancelState other than notCanceled or cancelRequested
+// doAction invokes [BaseIterator.iteratorAction]
+//   - invoked while holding [BaseIterator.publicsLock]
+//   - [BaseIterator.err] should have been checked inside lock
+//   - on return:
+//   - — if hasValue is true, value is valid
+//   - — [BaseIterator.err] may be updated
 //   - —
-//   - invoked while holding i.publicsLock
-//   - recovers from fn panics
-//   - updates i.err i.cancelState i.errWait
-func (i *baseIterator[T]) enqueueForFn(isCancel bool) (
-	value T,
-	cancelState cancelStates,
-	err error,
-) {
+//   - recovers from [BaseIterator.iteratorAction] panic
+func (i *BaseIterator[T]) doAction(action anAction) (value T, hasValue bool) {
 
-	// cancelState immediately prior to invoking i.invokeFn
-	cancelState = cancelStates(i.cancelState.Load())
-
-	// is invocation is still possible?
-	if cancelState != notCanceled &&
-		cancelState != cancelRequested {
-		err = *i.err.Load() // collect previous error
-		return              // no-further-invocations state return
+	// cancelState inside lock prior to invoking iteratorAction
+	var cancelState = cancelStates(i.cancelState.Load())
+	if cancelState == cancelRequested {
+		action = doCancel // after Cancel invoked, the only action is cancel
 	}
-	// true if a panic occurred here or in invokeFn
-	//	- false: invokeFn returned
-	var isPanic bool
-	// true if invokeFn decided to cancel istead of request a value
-	var didCancel bool
-	// deferred update of i.cancelState i.err i.errWait
-	defer i.updateState(&cancelState, &didCancel, &err)
-	// capture panics
-	defer cyclebreaker.RecoverErr(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, &isPanic)
+	defer cyclebreaker.Recover(func() cyclebreaker.DA { return cyclebreaker.A() }, nil, i.setErr)
 
-	// invoke i.invokeFn
-
-	// wasCancel is the cancel value provided to invokeFn
-	var wasCancel = cancelState != notCanceled
-	// the value returned by invokeFn
-	var v T
-
-	v, isPanic, err = i.iteratorAction(wasCancel)
+	v, err := i.iteratorAction(bool(action))
 
 	// determine if value is valid
-	if didCancel = errors.Is(err, cyclebreaker.ErrEndCallbacks); didCancel {
-		err = nil
-	}
-	if err == nil && !wasCancel && !didCancel {
+	if hasValue = action == doNext && err == nil; hasValue {
 		value = v
 	}
 
-	return
-}
-
-// update i.cancelState i.err i.errWait
-func (i *baseIterator[T]) updateState(cancelStatep *cancelStates, didCancelp *bool, errp *error) {
-	// cancelState immediately prior to invoking i.invokeFn
-	//	- either notCanceled cancelRequested
-	var cancelState = *cancelStatep
-	// whether invokeFn decided to cancel iteration
-	var didCancel = *didCancelp
-	// possible error returned by i.invokeFn or result of panic
-	var err = *errp
-
-	// determine next state and ignore ErrEndCallbacks
-	var nextState = notCanceled
+	// update state: cancelComplete endOfData errorReceived
+	var nextState cancelStates
 	if err != nil {
-
-		// received a bad error from i.invokeFn
 		if !errors.Is(err, cyclebreaker.ErrEndCallbacks) {
+			// received an unknown error
 			nextState = errorReceived
 		} else {
-
-			// received end-of-data from i.invokeFn
+			// received end-of-data from iteratorAction
 			err = nil // ignore the error
 			if cancelState == notCanceled {
-				nextState = endOfData // spontaneous end of data
+				// spontaneous end of data
+				nextState = endOfData
 			} else {
-				nextState = cancelComplete // non-error return from cancel invocation
+				// end-of-data return from cancel invocation
+				nextState = cancelComplete
 			}
 		}
-	} else if cancelState == cancelRequested || didCancel {
-
+	} else if cancelState == cancelRequested {
 		// non-error return from cancel invocation
 		nextState = cancelComplete
 	}
-
-	// handle transition to ended state
 	if nextState != notCanceled {
-		// update the ended state
-		i.cancelState.Store(uint32(nextState))
-		*cancelStatep = nextState // update return value
-		// try and store error
-		if i.err.CompareAndSwap(nil, &err) {
-			// if error update, notify threads awaiting error
-			i.errWait.Done()
+		i.setErr2(err, nextState)
+	}
+
+	return
+}
+
+const (
+	// [BaseIterator.getErr] uses [perrors.AppendError]
+	appendErrp getErrAppend = false
+	// [BaseIterator.getErr] replaces *errp
+	replaceErrp getErrAppend = true
+)
+
+// how [BaseIterator.getErr] updates *errp
+//   - appendErrp replaceErrp
+type getErrAppend bool
+
+// getErr reads [BaseIterator.err] and returns err, *errp
+func (i *BaseIterator[T]) getErr(replace getErrAppend, errp ...*error) (isPresent bool, err error) {
+	var ep = i.err.Load()
+	if isPresent = ep != nil; !isPresent {
+		return // err is not present yet
+	} else if err = *ep; err == nil {
+		return // result is no error
+	}
+	if len(errp) > 0 {
+		if errp0 := errp[0]; errp0 != nil {
+			if replace {
+				*errp0 = err // update errp with error
+			} else {
+				*errp0 = perrors.AppendError(*errp0, err)
+			}
 		}
 	}
+	return // error return
+}
+
+// setErr updates atomic error container
+func (i *BaseIterator[T]) setErr(err error) { i.setErr2(err, panicked) }
+
+// setErr2 updates atomic error container
+func (i *BaseIterator[T]) setErr2(err error, state cancelStates) {
+	i.cancelState.Store(uint32(state))
+	i.err.Store(&err)
 }

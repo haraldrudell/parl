@@ -22,11 +22,6 @@ func TestEmpty(t *testing.T) {
 	} else if actual != zeroValue {
 		t.Error("Next returned other than zero-value")
 	}
-	if actual, ok = iter.Same(); ok {
-		t.Error("Next returned true")
-	} else if actual != zeroValue {
-		t.Error("Next returned other than zero-value")
-	}
 	if err = iter.Cancel(); err != nil {
 		t.Errorf("Cancel err: %v", err)
 	}

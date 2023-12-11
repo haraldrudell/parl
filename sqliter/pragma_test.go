@@ -37,8 +37,8 @@ func TestPragma(t *testing.T) {
 	//t.Fail()
 	var exp = map[string]string{
 		"foreignKeys": "0",
-		"journal":     "memory",
-		"timeout":     "0",
+		"journalMode": "memory",
+		"busyTimeout": "0",
 	}
 
 	var pragmas map[string]string
@@ -72,8 +72,8 @@ func TestPragmaSQL(t *testing.T) {
 	//t.Fail()
 	var exp = map[string]string{
 		"foreignKeys": "0",
-		"journal":     "memory",
-		"timeout":     "0",
+		"journalMode": "memory",
+		"busyTimeout": "0",
 	}
 
 	var pragmas map[string]string

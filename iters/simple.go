@@ -63,16 +63,10 @@ func (i *Simple[K, T]) Init() (iterationVariable T, iterator Iterator[T]) {
 //   - if err is nil, value is valid and isPanic false.
 //     Otherwise, err is non-nil and isPanic may be set.
 //     value is zero-value
-func (i *Simple[K, T]) iteratorAction(isCancel bool) (
-	value T,
-	isPanic bool,
-	err error,
-) {
+func (i *Simple[K, T]) iteratorAction(isCancel bool) (value T, err error) {
 	if isCancel {
 		return
 	}
-	defer cyclebreaker.RecoverErr(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, &isPanic)
-
 	// get next key from keyIterator
 	var key K
 	var hasKey bool
@@ -80,7 +74,6 @@ func (i *Simple[K, T]) iteratorAction(isCancel bool) (
 		err = cyclebreaker.ErrEndCallbacks
 		return
 	}
-
 	value = i.simpleConverter(key)
 
 	return

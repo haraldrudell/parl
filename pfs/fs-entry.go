@@ -12,7 +12,7 @@ import "io/fs"
 //   - a Directory containing additional file-system entries
 //   - a Root representing a file-system traversal entry point
 type FSEntry interface {
-	// Name is basename from fs.FileInfo “file.txt”
+	// Name is basename from fs.DirEntry “file.txt”
 	Name() (base string)
 	// IsDir returns whether the file-system entry is a directory containing files
 	// as opposed to a file

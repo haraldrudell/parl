@@ -21,16 +21,12 @@ type Converter[K any, V any] struct {
 	//     ConverterFunction should release any resources.
 	//     Any returned value is not used
 	//   - ConverterFunction signals end of values by returning parl.ErrEndCallbacks.
-	//     if hasValue true, the accompanying value is used
-	//   - if ConverterFunction returns error, it will not be invoked again.
-	//     Any returned value is not used
+	//     if hasValue is true, the accompanying value is used
+	//   - when ConverterFunction returns error, it will not be invoked again.
+	//     For errors other than parl.ErrEndCallbacks, value is not used
 	//   - ConverterFunction must be thread-safe
 	//   - ConverterFunction is invoked by at most one thread at a time
 	converter ConverterFunction[K, V]
-	// BaseIterator implements Cancel and the DelegateAction[T] function required by
-	// Delegator[T]
-	//	- receives invokeConverterFunction function
-	//	- provides delegateAction function
 	*BaseIterator[V]
 }
 
@@ -75,12 +71,7 @@ func (i *Converter[K, T]) Init() (iterationVariable T, iterator Iterator[T]) {
 //   - if err is nil, value is valid and isPanic false.
 //     Otherwise, err is non-nil and isPanic may be set.
 //     value is zero-value
-func (i *Converter[K, T]) iteratorAction(isCancel bool) (
-	value T,
-	isPanic bool,
-	err error,
-) {
-	defer cyclebreaker.RecoverErr(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, &isPanic)
+func (i *Converter[K, T]) iteratorAction(isCancel bool) (value T, err error) {
 
 	// get next key from keyIterator
 	var key K

@@ -19,40 +19,6 @@ func TestSliceInterface(t *testing.T) {
 	var value, zeroValue siiInterface
 	var hasValue, condition bool
 
-	// Same should return first value
-	iterator = NewSliceInterfaceIterator[siiInterface](sliceOfConcreteType)
-	value, hasValue = iterator.Same()
-	if !hasValue {
-		t.Error("Same hasValue false")
-	}
-	if value != &sliceOfConcreteType[0] {
-		t.Error("Same value bad")
-	}
-
-	// Same-Same should return first value
-	iterator = NewSliceInterfaceIterator[siiInterface](sliceOfConcreteType)
-	value, hasValue = iterator.Same()
-	_ = value
-	_ = hasValue
-	value, hasValue = iterator.Same()
-	if !hasValue {
-		t.Error("Same hasValue false")
-	}
-	if value != &sliceOfConcreteType[0] {
-		t.Error("Same value bad")
-	}
-
-	// Cancel-Same should return no value
-	iterator = NewSliceInterfaceIterator[siiInterface](sliceOfConcreteType)
-	iterator.Cancel()
-	value, hasValue = iterator.Same()
-	if hasValue {
-		t.Error("Cancel-Same hasValue true")
-	}
-	if value != zeroValue {
-		t.Error("Cancel-Same value not zero-value")
-	}
-
 	// Cancel-Next should return no value
 	iterator = NewSliceInterfaceIterator[siiInterface](sliceOfConcreteType)
 	iterator.Cancel()

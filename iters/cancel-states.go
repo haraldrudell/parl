@@ -20,6 +20,8 @@ const (
 	endOfData
 	// value-producer returned error other than parl.ErrEndCallbacks
 	errorReceived
+	// iteratorAction had panic
+	panicked
 )
 
 // notCanceled cancelRequested cancelComplete endOfData errorReceived
@@ -31,6 +33,7 @@ var cancelStatesMap = map[cancelStates]string{
 	cancelComplete:  "cancelComplete",
 	endOfData:       "endOfData",
 	errorReceived:   "errorReceived",
+	panicked:        "panic",
 }
 
 func (s cancelStates) String() (s2 string) {

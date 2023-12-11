@@ -51,8 +51,4 @@ type SimpleConverter[K any, V any] func(key K) (value V)
 //   - — returned didCancel is false
 //   - isPanic indicates that err is the result of a panic.
 //     isPanic is only used if err is non-nil
-type IteratorAction[T any] func(isCancel bool) (
-	value T,
-	isPanic bool,
-	err error,
-)
+type IteratorAction[T any] func(isCancel bool) (value T, err error)

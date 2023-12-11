@@ -57,11 +57,6 @@ type Iterator[T any] interface {
 	//	- if hasValue true, value contains the next value
 	//	- otherwise, no more items exist and value is the data type zero-value
 	Next() (value T, hasValue bool)
-	// Same returns the same value again
-	//	- if hasValue true, value is valid
-	//	- otherwise, no more items exist and value is the data type zero-value
-	//	- If Next or Cond has not been invoked, Same first advances to the first item
-	Same() (value T, hasValue bool)
 	// Cancel stops an iteration
 	//	- after Cancel invocation, Cond, Next and Same indicate no value available
 	//	- Cancel returns the first error that occurred during iteration, if any

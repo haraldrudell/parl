@@ -16,6 +16,8 @@ const (
 // PathRegistry stores values that are accessible by index or by
 // absolute path
 type PathRegistry[V any] struct {
+	// path provides O(1) access to values
+	//	- mappings are deleted by DeleteByIndex
 	paths  map[string]*V
 	values []*pathTuple[V]
 }
@@ -26,7 +28,7 @@ type pathTuple[V any] struct {
 	value *V
 }
 
-// NewPathRegistry returns a regustry of values by absolute path
+// NewPathRegistry returns a registry of values by absolute path
 func NewPathRegistry[V any]() (registry *PathRegistry[V]) {
 	return &PathRegistry[V]{paths: make(map[string]*V)}
 }
@@ -49,14 +51,10 @@ func (r *PathRegistry[V]) HasAbs(abs string) (hasAbs bool) {
 
 // ListLength returns the length of the value slice
 //   - a value can still be nil for a discarded root
-func (r *PathRegistry[V]) ListLength() (length int) {
-	return len(r.values)
-}
+func (r *PathRegistry[V]) ListLength() (length int) { return len(r.values) }
 
 // MapLength returns the number of stored values
-func (r *PathRegistry[V]) MapLength() (length int) {
-	return len(r.paths)
-}
+func (r *PathRegistry[V]) MapLength() (length int) { return len(r.paths) }
 
 // GetNext gets the next value and removes it from
 // the registry
@@ -95,6 +93,15 @@ func (r *PathRegistry[V]) GetValue(index int) (value *V) {
 	return
 }
 
+func (r *PathRegistry[V]) ObsoleteIndex(index int) {
+	if index < 0 && index >= len(r.values) {
+		return
+	}
+	var tuple = r.values[index]
+	tuple.value = nil
+	delete(r.paths, tuple.abs)
+}
+
 func (r *PathRegistry[V]) DeleteByIndex(index int) {
 	if index < 0 || index >= len(r.values) {
 		panic(perrors.ErrorfPF("delete index %d of 0…%d", index, len(r.values)-1))
@@ -118,7 +125,6 @@ func (r *PathRegistry[V]) DeleteByIndex(index int) {
 	if i0 != 0 || i1 != len(r.values) {
 		r.values = r.values[i0:i1]
 	}
-	return
 }
 
 func (r *PathRegistry[V]) Drop(onlyPaths ...bool) {
