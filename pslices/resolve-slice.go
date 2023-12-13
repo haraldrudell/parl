@@ -3,7 +3,6 @@
 ISC License
 */
 
-// ResolveSlice removes one level of indirection from a slice of pointers.
 package pslices
 
 // ResolveSlice removes one level of indirection from a slice of pointers.

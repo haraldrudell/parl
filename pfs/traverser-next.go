@@ -38,6 +38,7 @@ func (t *Traverser) Next() (result ResultEntry) {
 			// process any pending returned entries
 			if len(t.skippables) > 0 {
 				entry = t.skippables[0]
+				t.skippables[0] = ResultEntry{}
 				t.skippables = t.skippables[1:]
 
 				// handle skip and error
@@ -64,6 +65,13 @@ func (t *Traverser) Next() (result ResultEntry) {
 				// process pending directory entries
 			} else if len(t.dirEntries) > 0 {
 				var dir = t.dirEntries[0]
+				// number of directory entries typically ranges a dozen up to 3,000
+				// one small slice alloc equals copy of 3,072 bytes: trimleft_bench_test.go
+				// sizeof dirEntry is 48 bytes: 64 elements is 3,072 bytes
+				// alloc is once per directory, copy is once per directory entry
+				// number of copied elements for n is: [n(n+1)]/2: if 11 or more directory entries: alloc is faster
+				// do alloc here
+				t.dirEntries[0] = dirEntry{}
 				t.dirEntries = t.dirEntries[1:]
 				var name = dir.dirEntry.Name()
 				entry.ProvidedPath = filepath.Join(dir.providedPath, name)

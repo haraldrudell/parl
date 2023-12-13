@@ -12,12 +12,15 @@ const (
 	minGoResultLength = 1
 )
 
-// GoResult transfers thread outcomes from a thread to
-// the thread’s launcher
+// GoResult awaits thread outcomes using the minimum to make a goroutine awaitable
 type GoResult chan error
 
-// NewGoResult transfers thread outcomes from a thread to
-// the thread’s launcher
+// NewGoResult returns the minimum mechanic to make a goroutine awaitable
+//   - mechanic is buffered channel
+//   - a thread-launcher provides a GoResult value of sufficient capacity to its launched threads
+//   - exiting threads send an error value that may be nil
+//   - the thread-launcher awaits results one by one
+//   - to avoid threads blocking prior to exiting, the channel must have sufficient capacity
 //   - n is goroutine capacity, default 1
 //
 // Usage:
@@ -52,7 +55,8 @@ func NewGoResult(n ...int) (goResult GoResult) {
 //     submit non-fatal errors
 //   - errCh should be a buffered channel large enough for all its goroutines
 //   - — this prevents goroutines from blocking in channel send
-//   - SendError should only panic from structural coding problems
+//   - SendError only panics from structural coding problems
+//   - deferrable thread-safe
 func (g GoResult) SendError(errp *error) {
 	if errp == nil {
 		panic(NilError("errp"))
@@ -74,6 +78,7 @@ func (g GoResult) SendError(errp *error) {
 
 // ReceiveError is a deferrable function receiving error values from goroutines
 //   - n is number of goroutines to wait for, default 1
+//   - errp may be nil
 //   - ReceiveError makes a goroutine:
 //   - — awaitable and
 //   - — able to return a fatal error
@@ -81,7 +86,8 @@ func (g GoResult) SendError(errp *error) {
 //     submit non-fatal errors
 //   - GoRoutine should have enough capacity for all its goroutines
 //   - — this prevents goroutines from blocking in channel send
-//   - ReceiveError should only panic from structural coding problems
+//   - ReceiveError only panics from structural coding problems
+//   - deferrable thread-safe
 func (g GoResult) ReceiveError(errp *error, n ...int) (err error) {
 	if g == nil {
 		panic(NilError("GoResult"))
@@ -104,12 +110,14 @@ func (g GoResult) ReceiveError(errp *error, n ...int) (err error) {
 			continue // good return: ignore
 		}
 		e = perrors.Stack(e)
-
 		err = perrors.AppendError(err, e)
-		if errp != nil {
-			*errp = perrors.AppendError(*errp, e)
-		}
+	}
+	if errp != nil {
+		*errp = perrors.AppendError(*errp, err)
 	}
 
 	return
 }
+
+// Count returns number of results that can be collected. Thread-safe
+func (g GoResult) Count() (count int) { return len(g) }

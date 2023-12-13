@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Port contains an iana port number 1…65535.
 package iana
 
 import (

@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Period provides real-time based fixed-length interval perioding ordered using a uint64 zero-based index.
 package ptime
 
 import (

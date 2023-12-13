@@ -3,7 +3,6 @@
 ISC License
 */
 
-// OrderedAny is a slice ordered by a function alllowing duplicates.
 package pslices
 
 import (

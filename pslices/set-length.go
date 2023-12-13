@@ -3,7 +3,6 @@
 ISC License
 */
 
-// SetLength adjusts the lenght of *slicep extending with append if necessary.
 package pslices
 
 // SetLength adjusts the lenght of *slicep extending with append if necessary.

@@ -11,6 +11,13 @@ package pslices
 //   - if count < 1 or slicep is empty or nil, nothing is done
 //   - if count >= len(slicep) slicep is emptied
 //   - no allocation or free is triggered
+//   - —
+//   - copy versus slice-away-and-alloc: if slice byte-length is 640 bytes or larger, use alloc
+//   - TrimLeft(&slice, 1) vs. slice = slice[1:]
+//   - one small slice alloc equals copy of 3,072 bytes: trimleft_bench_test.go
+//   - copy count of n elements one at a time is ∑n: [n(n+1)]/2
+//   - optimal strategy is slice-away slice[1:] and on append, try to avoid alloc by
+//     copy recuperating the obsoleted capacity
 func TrimLeft[E any](slicep *[]E, count int, noZero ...bool) {
 
 	// get valid length and count

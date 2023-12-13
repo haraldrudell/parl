@@ -14,6 +14,7 @@ import (
 //   - for signed integer types, isSigned is true and i64 has value
 //   - isPointer indicates that u64 holds a pointer value
 //   - nil returns: u64 = 0, hasValue true, isPointer true, isSigned false
+//   - superseded by non-reflection version [github.com/haraldrudell/parl/ints.IntProperties]
 func IntValue(value any) (u64 uint64, i64 int64, hasValue, isSigned, isPointer bool) {
 	var typeOf reflect.Type = reflect.TypeOf(value)
 	if hasValue = typeOf == nil; hasValue {

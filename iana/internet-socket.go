@@ -3,7 +3,6 @@
 ISC License
 */
 
-// InternetSocket is a unique named type for socket identifiers based on protocol, IP address and possibly port number.
 package iana
 
 import (

@@ -3,7 +3,7 @@
 ISC License
 */
 
-// pstrings provides FilteredJoin QuoteList StrSliceContains
+// Package pstrings provides string fitting, filtered join and quoting of a string slice.
 package pstrings
 
 import (

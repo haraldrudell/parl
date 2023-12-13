@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package parlos provides simplified functions related to the os package
 package pos
 
 import (

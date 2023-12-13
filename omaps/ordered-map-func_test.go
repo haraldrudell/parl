@@ -3,7 +3,6 @@
 ISC License
 */
 
-// OrderedMapFunc is a mapping whose values are provided in custom order.
 package omaps
 
 import (

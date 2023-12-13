@@ -3,7 +3,7 @@
 ISC License
 */
 
-// Ordered is an ordered slice overwriting duplicates implementing [parl.Ordered][E any].
+// Package pslices provides somehat outdated slice functions such as ordered slices
 package pslices
 
 import (

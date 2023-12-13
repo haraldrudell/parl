@@ -3,7 +3,7 @@
 ISC License
 */
 
-// Package parlos provides simplified functions related to the os package
+// Package parlos provides simplified functions for home-directory and hostname.
 package pos
 
 import (

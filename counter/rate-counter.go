@@ -3,7 +3,6 @@
 ISC License
 */
 
-// RateCounter is a value/running/max counter with averaging.
 package counter
 
 import (

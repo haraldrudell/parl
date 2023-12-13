@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Package parli provides certain interface declarations.
 package parli
 
 import (

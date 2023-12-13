@@ -3,7 +3,6 @@
 ISC License
 */
 
-// EpochValue is a timestamp with Thread-Safe atomic access.
 package ptime
 
 import (

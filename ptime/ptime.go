@@ -3,7 +3,7 @@
 ISC License
 */
 
-// Package parltime provides time utility functions
+// Package parltime provides on-time timers, 64-bit epoch, formaatting and other time functions.
 package ptime
 
 import (

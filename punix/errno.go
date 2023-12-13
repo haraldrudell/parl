@@ -3,7 +3,7 @@
 ISC License
 */
 
-// punix has functions to examine unix.Errno errors
+// Package punix examines unix.Errno errors and identifies Unix-like platforms.
 package punix
 
 import (

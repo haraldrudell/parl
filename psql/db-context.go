@@ -3,7 +3,7 @@
 ISC License
 */
 
-// Package psql augments database/sql
+// Package psql provides cached, partitioned database objects with cached prepared stetements.
 package psql
 
 import (

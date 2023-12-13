@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Package pids provides a typed process identifier.
 package pids
 
 import (
@@ -19,41 +20,36 @@ import (
 //   - Pid has IsNonZero Int Uint32 methods
 type Pid uint32
 
-func NewPid(u32 uint32) (pid Pid) {
-	return Pid(u32)
-}
+// NewPid returns a process identifier based on a 32-bit integer
+func NewPid(u32 uint32) (pid Pid) { return Pid(u32) }
 
-// NewPidInteger returns a typed value process identifier
-func NewPidInteger[T constraints.Integer](pid T) (typedPid Pid, err error) {
-	var u32 uint32
-	if u32, err = ints.Unsigned[uint32](pid, perrors.PackFunc()); err != nil {
-		return
-	}
-
-	typedPid = Pid(u32)
-	return
-}
-
+// NewPid1 returns a typed value process identifier panicking on error
 func NewPid1[T constraints.Integer](pid T) (typedPid Pid) {
 	var err error
-	if typedPid, err = NewPidInteger(pid); err != nil {
+	if typedPid, err = ConvertToPid(pid); err != nil {
 		panic(err)
 	}
 	return
 }
 
-func (pid Pid) IsNonZero() (isValid bool) {
-	return pid != 0
+// ConvertToPid returns a typed value process identifier from any Integer type
+func ConvertToPid[T constraints.Integer](pid T) (typedPid Pid, err error) {
+	var u32 uint32
+	if u32, err = ints.Unsigned[uint32](pid, perrors.PackFunc()); err != nil {
+		return
+	}
+	typedPid = Pid(u32)
+
+	return
 }
 
-func (pid Pid) Int() (pidInt int) {
-	return int(pid)
-}
+// IsNonZero returns whether trhe process identifier contains a valid process ID
+func (pid Pid) IsNonZero() (isValid bool) { return pid != 0 }
 
-func (pid Pid) Uint32() (pidUint32 uint32) {
-	return uint32(pid)
-}
+// Int converts a process identifier to a platform-specific sized int
+func (pid Pid) Int() (pidInt int) { return int(pid) }
 
-func (pid Pid) String() (s string) {
-	return strconv.Itoa(int(pid))
-}
+// Uint32 converts a process identifier to a 32-bit unsigned integer
+func (pid Pid) Uint32() (pidUint32 uint32) { return uint32(pid) }
+
+func (pid Pid) String() (s string) { return strconv.Itoa(int(pid)) }

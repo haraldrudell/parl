@@ -3,16 +3,19 @@
 ISC License
 */
 
+// Package pbytes provides byte-slice related functions TrimNewline.
 package pbytes
 
 import "bytes"
 
+// newlinc-character variants
 var pbNewlines = [][]byte{
-	[]byte("\r\n"),
-	[]byte("\n"),
-	[]byte("\r"),
+	[]byte("\r\n"), // Windows
+	[]byte("\n"),   // Unix-like and macOS
+	[]byte("\r"),   // legacy macOS
 }
 
+// TrimNewline trims Unix-like obsolete macOS and Windows newlines
 func TrimNewline(in []byte) (out []byte) {
 	for _, nl := range pbNewlines {
 		if out = bytes.TrimSuffix(in, nl); len(in) != len(out) {
@@ -20,5 +23,6 @@ func TrimNewline(in []byte) (out []byte) {
 		}
 	}
 	out = in
+
 	return
 }

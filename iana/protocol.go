@@ -3,7 +3,8 @@
 ISC License
 */
 
-// Protocol represents iana Assigned Internet Protocol Numbers for IPv4 and IPv6.
+// Package iana provides iana-standardized Internet protocols, port numbers, address families and
+// an Internet-socket identifier
 package iana
 
 import (

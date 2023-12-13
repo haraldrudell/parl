@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Package pterm provides an ANSI-based status terminal and password-input.
 package pterm
 
 import (

@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Package ptesting provides a platform identifier for Go benchmarks.
 package ptesting
 
 import (

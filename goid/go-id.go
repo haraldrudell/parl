@@ -3,7 +3,7 @@
 ISC License
 */
 
-// goid.GoID() provides a unique goroutine identifier.
+// Package goid obtaines a thread’s parl.ThreadID unique goroutine identifier.
 package goid
 
 import (

@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Epoch translates a time value to a 64-bit value that can be used atomically.
 package ptime
 
 import "time"

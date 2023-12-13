@@ -64,9 +64,12 @@ type KeyEnum[K constraints.Ordered, T any] interface {
 //   - K is a key type whose values map to restricted type V values one-to-one.
 //   - V is a restricted type for enumeration values that may store more efficiently compared to a portable type.
 type EnumItem[K constraints.Ordered, V any] interface {
-	Key() (key K)               // Key returns the key for this enumeration value
-	Description() (desc string) // Description returns a descriptive sentence for this enumeration value
-	Value() (value V)           // Value returns this enumeration value’s value using the restricted type
+	// Key returns the key for this enumeration value
+	Key() (key K)
+	// Description returns a descriptive sentence for this enumeration value
+	Description() (desc string)
+	// Value returns this enumeration value’s value using the restricted type
+	Value() (value V)
 
 	fmt.Stringer
 }

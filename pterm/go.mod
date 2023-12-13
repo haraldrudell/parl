@@ -1,3 +1,5 @@
+// © 2021–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+// ISC License
 module github.com/haraldrudell/parl/pterm
 
 go 1.21
@@ -5,7 +7,7 @@ go 1.21
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.137
+	github.com/haraldrudell/parl v0.4.138
 	golang.org/x/term v0.15.0
 )
 

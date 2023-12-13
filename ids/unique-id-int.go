@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Package ids provides an implementation int-sized unique identifier source
 package ids
 
 import (

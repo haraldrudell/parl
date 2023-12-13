@@ -3,7 +3,6 @@
 ISC License
 */
 
-// ThreadSafeOrderedMapFunc is a mapping whose values are provided in custom order. Thread-safe.
 package omaps
 
 import (

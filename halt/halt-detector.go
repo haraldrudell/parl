@@ -3,7 +3,7 @@
 ISC License
 */
 
-// HaltDetector sends detected Go runtime execution halts on channel ch.
+// Package halt detects Go runtime execution halts.
 package halt
 
 import (

@@ -3,7 +3,6 @@
 ISC License
 */
 
-// AddressFamily contains iana Address Family Numbers such as IP versions 4 and 6 for the Internet.
 package iana
 
 import (

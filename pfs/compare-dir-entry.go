@@ -9,6 +9,7 @@ import "io/fs"
 
 // compareDirEntry sorts [fs.DirEntry] by basename
 //   - ascending 8-bit character
+//   - used with [slices.SortFunc] and [os.File.ReadDir]
 func compareDirEntry(a, b fs.DirEntry) (result int) {
 	var an = a.Name()
 	var bn = b.Name()

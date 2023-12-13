@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Package omaps provides ordered Go hash-maps with order provided by B-Tree m-ary self-balancing ordered trees
 package omaps
 
 import (
@@ -18,7 +19,7 @@ type SameFunc[V any] func(a, b V) (isSameRank bool)
 
 // BTreeMap is a reusable and promotable mapping
 // whose values are provided in custom order
-//   - mapping implementation is Go Map
+//   - mapping implementation is Go map
 //   - ordering structure is B-tree
 //   - B-tree offers:
 //   - — avoiding vector-copy of large sorted slices which is slow and

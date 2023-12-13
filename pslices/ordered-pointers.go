@@ -3,8 +3,6 @@
 ISC License
 */
 
-// OrderedPointers is an ordered list of *E pointers sorted by the referenced values.
-// OrderedPointers implements [parl.OrderedPointers][E any].
 package pslices
 
 import (

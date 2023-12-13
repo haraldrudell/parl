@@ -1,8 +1,9 @@
 /*
 © 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
-All rights reserved.
+ISC License
 */
 
+// Package sqliter provides partitioning, cached prepared statements and data conversion for SQLite3.
 package sqliter
 
 import (

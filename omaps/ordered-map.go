@@ -3,7 +3,6 @@
 ISC License
 */
 
-// OrderedMap is a mapping whose values are provided in order.
 package omaps
 
 import (

@@ -3,8 +3,6 @@
 ISC License
 */
 
-// OrderedAny is a slice ordered by a function allowing duplicates.
-// OrderedAny implements [parl.Ordered][E any].
 package pslices
 
 import (

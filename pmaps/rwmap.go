@@ -3,8 +3,7 @@
 ISC License
 */
 
-// RWMap is a one-liner thread-safe mapping.
-// RWMap implements [parli.ThreadSafeMap][K comparable, V any].
+// Package pmaps provides an unordered, thread-safe, RWMutex-mechanic map pmaps.RWMap.
 package pmaps
 
 import (

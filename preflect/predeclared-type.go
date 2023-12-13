@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Package preflect obtains underlying type using reflection
 package preflect
 
 import (

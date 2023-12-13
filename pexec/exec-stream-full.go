@@ -3,6 +3,7 @@
 ISC License
 */
 
+// Package pexec provides streaming, context-cancelable system command execution
 package pexec
 
 import (
