@@ -10,8 +10,8 @@ import (
 	"github.com/haraldrudell/parl/iters"
 )
 
-// Iterator traverses file-system entries and errors
-type Iterator struct {
+// DirIterator traverses file-system directories
+type DirIterator struct {
 	// traverser is the file-system traverser.
 	// Only method is [Traverser.Next]
 	traverser Traverser
@@ -24,10 +24,13 @@ type Iterator struct {
 //   - path is the initial path for the file-system walk.
 //     it may be relative or absolute, contain symlinks and
 //     point to a file, directory or special file
-//   - if symlinks and directories are not skipped, they are followed
-//   - all errors during traversal are provided as is
-func NewIterator(path string) (iterator iters.Iterator[ResultEntry]) {
-	i := Iterator{traverser: *NewTraverser(path)}
+//   - only error-free directories are returned.
+//     if directories are not skipped, they are followed.
+//   - any file-system entry error cancels the iterator with error.
+//     Entry end return ends the iterator.
+//   - symlinks are followed
+func NewDirIterator(path string) (iterator iters.Iterator[ResultEntry]) {
+	i := DirIterator{traverser: *NewTraverser(path)}
 	i.BaseIterator = *iters.NewBaseIterator(i.iteratorAction)
 	return &i
 }
@@ -37,24 +40,38 @@ func NewIterator(path string) (iterator iters.Iterator[ResultEntry]) {
 //
 //		for i, iterator := iters.NewSlicePointerIterator(someSlice).Init(); iterator.Cond(&i); {
 //	   // i is pointer to slice element
-func (i *Iterator) Init() (result ResultEntry, iterator iters.Iterator[ResultEntry]) {
+func (i *DirIterator) Init() (result ResultEntry, iterator iters.Iterator[ResultEntry]) {
 	iterator = i
 	return
 }
 
 // iteratorAction provides items to the BaseIterator
-func (t *Iterator) iteratorAction(isCancel bool) (result ResultEntry, err error) {
+func (t *DirIterator) iteratorAction(isCancel bool) (result ResultEntry, err error) {
 	if isCancel {
-		return // cancel notify return: Tarverser has no cleanup
+		return
 	}
+	for {
+		result = t.traverser.Next()
 
-	// get next file-system entry or error
-	result = t.traverser.Next()
+		// handle end
+		if result.IsEnd() {
+			err = parl.ErrEndCallbacks
+			return
+		}
 
-	//end iterator when traverser ends
-	if result.IsEnd() {
-		err = parl.ErrEndCallbacks
+		// any error cancels iterator
+		if result.Err != nil {
+			err = result.Err
+			return
+		}
+
+		//	- if it is not an error or end,
+		//	- and it is not a directory,
+		//	- ignore it
+		if !result.IsDir() {
+			continue
+		}
+
+		return // directory return
 	}
-
-	return
 }

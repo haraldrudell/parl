@@ -7,9 +7,7 @@ package omaps
 
 import "github.com/google/btree"
 
-type btreeMap[K comparable, V any] struct {
-	BTreeMap[K, V]
-}
+type btreeMap[K comparable, V any] struct{ BTreeMap[K, V] }
 
 // func newBTreeMap2[K comparable, V btree.Ordered]() (m *btreeMap[K, V]) {
 // 	return &btreeMap[K, V]{BTreeMap: *NewBTreeMap[K, V]()}

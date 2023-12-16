@@ -3,7 +3,6 @@
 ISC License
 */
 
-// TrimLeft removes count bytes from the start of slicep, copying remaining bytes to its beginning.
 package pslices
 
 // TrimLeft removes count bytes from the start of slicep, copying remaining bytes to its beginning.

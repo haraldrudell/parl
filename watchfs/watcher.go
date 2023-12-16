@@ -3,117 +3,190 @@
 ISC License
 */
 
-// Package watchfs provides a file-system watcher for Linux and macOS.
 package watchfs
 
 import (
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
+	"github.com/google/uuid"
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pfs"
 	"github.com/haraldrudell/parl/ptime"
 )
 
-var watchNo int64 // atomic
+var NoIgnores *regexp.Regexp
 
+// 220505 github.com/fsnotify/fsnotify v1.5.4
+// 220315 github.com/fsnotify/fsnotify v1.4.9 does not support macOS
+// 220315 use the old github.com/fsnotify/fsevents v0.1.1
+
+// Watcher implements a file-system event stream based on [github.com/fsnotify/fsnotify.Watcher]
+//   - eventFn receives filtered events and must be thread-safe
+//   - —
+//   - the fsnotify api provides two channels so threading is required
+//   - the Errors channel is unbuffered
+//   - the Events channel is typically unbuffered but can be buffered
+//   - Events are sent by value with name and Op only
+//   - — no timestamp
+//   - — no unique identifier
+//   - watchers are not recursive into subdirectories
+//   - — to detect new entires, all child-directories must be watched
 type Watcher struct {
-	abs           string
-	cleanDir      string
-	filter        Op
-	ignores       *regexp.Regexp
-	errFn         func(err error)
-	eventFn       func(event *WatchEvent)
-	eventFn0      func(event *WatchEvent)
-	watcher       *fsnotify.Watcher
-	ID            int64
-	watcherClosed atomic.Bool
-	wg            sync.WaitGroup
+	eventFn func(event *WatchEvent)
+	errFn   func(err error)
+	ignores *regexp.Regexp
+	filter  Op
+
+	addLock sync.Mutex
+	WatcherShim
 }
 
-// NewWatcher0 returns a file system watcher.
-// NewWatcher0 does not implicitly watch anything.
-// errFn must be thread-safe.
-// eventFn must be thread-safe.
-func NewWatcher0(
-	ignores *regexp.Regexp,
-	eventFn func(event *WatchEvent),
-	errFn func(err error)) (watch *Watcher) {
-
-	w := Watcher{
-		errFn:   errFn,
+// NewWatcher provides a channel sending file-system events from a file-system entry and its child directories.
+//   - consider using [NewWatcherCh] for callback-free architecture
+//   - filter [WatchOpAll] (default: 0) is: Create Write Remove Rename Chmod.
+//     it can also be a bit-coded value.
+//   - ignores is a regexp for the absolute filename.
+//     it is applied while scanning directories.
+//   - errFn must be thread-safe.
+//   - eventFn must be thread-safe.
+//     this means that any storing and subsequent retrieval of event
+//     must be thread-safe, protected by go, Mutex or atomic
+//   - Close the watcher by canceling the context or invoking .Shutdown().
+//     This means that any storing and subequent retrieval of the err value
+//     must be thread-safe, protected by go, Mutex or atomic
+func NewWatcher(
+	filter Op, ignores *regexp.Regexp,
+	eventFn func(event *WatchEvent), errFn func(err error),
+) (watcher *Watcher) {
+	return &Watcher{
 		eventFn: eventFn,
-		ID:      atomic.AddInt64(&watchNo, 1),
+		errFn:   errFn,
+		filter:  filter,
+		ignores: ignores,
 	}
-	var err error
-	if w.watcher, err = fsnotify.NewWatcher(); err != nil {
-		panic(perrors.Errorf("fsnotify.NewWatcher: '%w'", err))
-	}
-	w.wg.Add(2)
-	go w.errorThread()
-	go w.eventThread()
-	return &w
 }
 
-func (w *Watcher) List() (paths []string) {
-	return w.watcher.WatchList()
-}
+// Watch adds file-system entry-watchers
+//   - entry is the file-system location being watched, absolute or relative.
+//     If a directory, all subdirectories are watched, too.
+func (w *Watcher) Watch(entry string) (err error) {
+	w.addLock.Lock()
+	defer w.addLock.Unlock()
+	defer w.shutdownOnErr(&err)
 
-func (w *Watcher) Shutdown() {
-	if w.watcherClosed.CompareAndSwap(false, true) {
-		var err error
-		if err = w.watcher.Close(); err != nil {
-			w.errFn(perrors.Errorf("watcher.Close: %w", err))
-		}
-	}
-	w.wg.Wait()
-}
-
-func (w *Watcher) errorThread() {
-	w.wg.Done()
-	defer parl.Recover(func() parl.DA { return parl.A() }, nil, parl.Infallible)
-
-	errCh := w.watcher.Errors
-	for {
-		if err, ok := <-errCh; !ok {
+	// initialize api if not already done
+	if w.WatcherShim.ID == 0 {
+		// check that filter is valid
+		if _, err = w.filter.fsnotifyOp(); err != nil {
 			return
+		}
+		// invoke Watch
+		if err = NewWatcherShim(&w.WatcherShim, w.filterEvent, w.errFn).Watch(); err != nil {
+			return
+		}
+	}
+
+	// get entry following symlinks
+	var fsFileInfo fs.FileInfo
+	if fsFileInfo, err = os.Stat(entry); perrors.IsPF(&err, "os.Stat %w", err) {
+		return
+	}
+	// if not a directory, watch it
+	if !fsFileInfo.IsDir() {
+		if err = w.WatcherShim.Add(entry); err != nil {
+			return
+		}
+		return // wathing non-directory return
+	}
+
+	// scan for directories
+	// neither Linux and macOS can watch a directory tree so
+	// each watched directory needs to be referenced
+	var now = time.Now()
+	var iterator = pfs.NewDirIterator(entry)
+	defer iterator.Cancel(&err)
+	for resultEntry, _ := iterator.Init(); iterator.Cond(&resultEntry); {
+
+		// scan directory for all subdirectories
+		if w.ignores != nil && w.ignores.MatchString(resultEntry.Abs) {
+			continue
+		}
+		if err = w.WatcherShim.Add(resultEntry.Abs); err != nil {
+			return
+		}
+	}
+
+	var t1 = time.Now()
+	var d = t1.Sub(now).Round(100 * time.Millisecond)
+	parl.Debug("%s WatchFS directories added in %s\n", ptime.NsLocal(now), d)
+
+	return
+}
+
+func (w *Watcher) filterEvent(name string, op Op, t time.Time) (err error) {
+
+	// if it is CREATE of a directory, add that directory to be watched, too
+	if op&Create != 0 {
+		if err = w.addCreatedDirectoriesToWatcher(name); err != nil {
+			return // directory add error return
+		}
+	}
+
+	// apply event filter
+	if w.filter != WatchOpAll && op&Op(w.filter) == 0 {
+		return // filtered event return
+	}
+
+	var watchEvent = WatchEvent{
+		At:       t,
+		ID:       uuid.New(),
+		BaseName: filepath.Base(name),
+		AbsName:  name,
+		Op:       op.String(),
+		OpBits:   op,
+	}
+
+	w.eventFn(&watchEvent) // send event
+
+	return
+}
+
+// whenever create if new directory,it is added
+func (w *Watcher) addCreatedDirectoriesToWatcher(absName string) (err error) {
+
+	// check if the created entry is a directory
+	var fsFileInfo fs.FileInfo
+	if fsFileInfo, err = os.Lstat(absName); err != nil {
+		// ignore ENOENT because the entry may already have been removed
+		if errors.Is(err, fs.ErrNotExist) {
+			err = nil
 		} else {
-			w.errFn(err)
+			err = perrors.Errorf("os.Lstat: %w", err)
 		}
+		return // os.Stat failed, do not know if its a directory
 	}
-}
-func (w *Watcher) eventThread() {
-	w.wg.Done()
-	defer parl.Recover(func() parl.DA { return parl.A() }, nil, w.errFn)
-
-	events := w.watcher.Events
-	for {
-
-		// wait for event
-		fsnotifyEvent, ok := <-events
-		if !ok {
-			return // events channel closed exit
-		}
-
-		// debug print
-		now := time.Now()
-		parl.Debug("%s %s", ptime.NsLocal(now), fsnotifyEvent)
-
-		// ignore filter
-		if w.ignores != nil && w.ignores.MatchString(fsnotifyEvent.Name) {
-			continue // ignore pattern skip
-		}
-
-		// send event
-		w.sendEvent(NewWatchEvent(&fsnotifyEvent, now, w))
+	if !fsFileInfo.IsDir() {
+		return // not a directory return
 	}
+
+	// add the newly created directory to the list of watched directories
+	if err = w.WatcherShim.Add(absName); perrors.IsPF(&err, "watcher.Add: %w", err) {
+		return
+	}
+
+	return
 }
 
-func (w *Watcher) sendEvent(ev *WatchEvent) {
-	defer parl.Recover(func() parl.DA { return parl.A() }, nil, w.errFn)
-
-	w.eventFn(ev)
+func (w *Watcher) shutdownOnErr(errp *error) {
+	if *errp == nil || w.WatcherShim.ID == 0 {
+		return
+	}
+	w.WatcherShim.Shutdown()
 }

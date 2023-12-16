@@ -15,9 +15,9 @@ import (
 )
 
 // Pid is a unique named type for process identifiers
-//   - Pid implements fmt.Stringer
-//   - Pid is ordered
-//   - Pid has IsNonZero Int Uint32 methods
+//   - Pid implements [fmt.Stringer]
+//   - Pid is [constraints.Ordered]
+//   - Pid has [Pid.IsNonZero] [Pid.Int] [Pid.Uint32] methods
 type Pid uint32
 
 // NewPid returns a process identifier based on a 32-bit integer

@@ -13,16 +13,6 @@ import (
 	"testing"
 )
 
-type V struct{ value int }
-
-func (v *V) String() (s string) {
-	return strconv.Itoa(v.value)
-}
-
-func testLess(a, b *V) (aBeforeB bool) {
-	return a.value < b.value
-}
-
 func TestNewOrderedMapFunc(t *testing.T) {
 	var debug = false
 	var v1 = V{1}
@@ -30,10 +20,14 @@ func TestNewOrderedMapFunc(t *testing.T) {
 	var v3 = V{3}
 	var expList = []*V{&v1, &v3}
 
+	// Clone() Put()
+	// btreeMap: Get() Length() Range() Delete() Clear() List()
 	var m OrderedMapFunc[int, *V]
+
 	var vPointers []*V
 
-	m = *NewOrderedMapFunc[int, *V](testLess)
+	m = *NewOrderedMapFunc[int, *V](ascendingVvalueLess)
+
 	// put in order 2, 3, 1
 	m.Put(v2.value, &v2)
 	t.Logf("%v", m.List())
@@ -43,7 +37,8 @@ func TestNewOrderedMapFunc(t *testing.T) {
 	t.Logf("%v", m.List())
 	// delete 2
 	m.Delete(v2.value)
-	// should return 1, 3
+
+	// List should return 1, 3
 	vPointers = m.List()
 
 	// vPointers: [1 3]
@@ -65,3 +60,11 @@ func TestNewOrderedMapFunc(t *testing.T) {
 		t.Logf("List: %v exp %v", vPointers, expList)
 	}
 }
+
+// V is a test struct with ebcapsulated integer value
+type V struct{ value int }
+
+func (v *V) String() (s string) { return strconv.Itoa(v.value) }
+
+// sorts by the encapsulated integer value ascending
+func ascendingVvalueLess(a, b *V) (aBeforeB bool) { return a.value < b.value }

@@ -11,6 +11,19 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// All slice operations:
+// - len(slice)
+// - append(slice, E...)
+// - cap(slice)
+// - make([]E, n)
+// - slice[:b]
+// - slice[a:]
+// - slice[a:b]
+// - slice[:]
+// - slice[a]
+// - &slice[a]
+// - &slice
+//   - copy(slice, slice2)
 type ThreadSafeSlice[T any] struct {
 	lock  sync.RWMutex
 	slice []T

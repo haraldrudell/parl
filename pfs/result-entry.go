@@ -43,6 +43,7 @@ type ResultEntry struct {
 	// any error associated with this entry
 	Err error
 	// why this entry was provided
+	//	- REnd REntry RSkippable RDirBad RSymlinkBad RError
 	Reason ResultReason
 }
 

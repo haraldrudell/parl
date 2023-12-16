@@ -283,6 +283,45 @@ func (s *StatusTerminal) Log(format string, a ...any) {
 	}
 }
 
+// LogC outputs to specific logger, ie. stdout
+func (s *StatusTerminal) LogStdout(format string, a ...any) {
+
+	// if not a terminal, regular logging
+	if !s.IsTerminal.Load() {
+		var logLines = parl.Sprintf(format, a...)
+		s.printStdout(logLines) // parl.Log is thread-safe
+		for writer := range s.copyLog {
+			s.write(logLines, writer.Write)
+		}
+		return
+	}
+
+	// get log string that ends with newline
+	var logLines string
+	if len(a) > 0 {
+		logLines = parl.Sprintf(format, a...)
+	} else {
+		logLines = format
+	}
+	if len(logLines) > 0 && logLines[len(logLines)-1:] != NewLine {
+		logLines += NewLine
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if !s.statusEnded.Load() {
+		s.Print(s.clearStatus())
+		s.printStdout(logLines)
+		s.Print(s.restoreStatus())
+	} else {
+		s.printStdout(logLines)
+	}
+	for writer := range s.copyLog {
+		s.write(logLines, writer.Write)
+	}
+}
+
 // SetTerminal overrides status regardless of whether a terminal is used
 //   - isTerminal overrides the detection of if ANSI sequences are supported
 //   - width is width to use if width cannot be read from the stream

@@ -10,11 +10,7 @@ import (
 )
 
 // OrderedMapFunc is a mapping whose values are provided in custom order
-//   - less(a, b) implements sort order and returns:
-//   - — true if a sorts before b
-//   - — false if a is of equal rank to b, or a is after b
-//   - — a equals b must not return true
-//   - mapping implementation is Go Map
+//   - mapping implementation is Go map
 //   - ordering structure is B-tree
 //   - B-tree offers:
 //   - — avoiding vector-copy of large sorted slices which is slow and

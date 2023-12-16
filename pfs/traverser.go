@@ -73,6 +73,9 @@ type dirEntry struct {
 //     Path may be of any modeType: file, directory or special file.
 //     Empty string means process’ current directory
 //   - the Next method is used to obtain file-system entries and errors
+//   - consider using pfs iterators:
+//   - — [Iterator] for all entries and errors
+//   - — [DirIterator] for error-free directories
 //
 // Usage:
 //

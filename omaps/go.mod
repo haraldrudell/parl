@@ -10,7 +10,7 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/btree v1.1.2
-	github.com/haraldrudell/parl v0.4.139
+	github.com/haraldrudell/parl v0.4.140
 	golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb
 )
 

@@ -7,6 +7,7 @@ package omaps
 
 import (
 	"github.com/google/btree"
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // ThreadSafeOrderedMapFunc is a mapping whose
@@ -26,6 +27,8 @@ type ThreadSafeOrderedMapFunc[K comparable, V any] struct {
 	less                btree.LessFunc[V]
 }
 
+// NewThreadSafeOrderedMapFunc returns a mapping whose
+// values are provided in custom order. Thread-safe.
 func NewThreadSafeOrderedMapFunc[K comparable, V any](
 	less func(a, b V) (aBeforeB bool),
 ) (orderedMap *ThreadSafeOrderedMapFunc[K, V]) {
@@ -34,6 +37,56 @@ func NewThreadSafeOrderedMapFunc[K comparable, V any](
 		tree:          btree.NewG(BtreeDegree, less),
 		less:          less,
 	}
+}
+
+// GetOrCreate returns an item from the map if it exists otherwise creates it.
+//   - newV or makeV are invoked in the critical section, ie. these functions
+//     may not access the map or deadlock
+//   - if a key is mapped, its value is returned
+//   - otherwise, if newV and makeV are both nil, nil is returned.
+//   - otherwise, if newV is present, it is invoked to return a pointer ot a value.
+//     A nil return value from newV causes panic. A new mapping is created using
+//     the value pointed to by the newV return value.
+//   - otherwise, a mapping is created using whatever makeV returns
+//   - newV and makeV may not access the map.
+//     The map’s write lock is held during their execution
+//   - GetOrCreate is an atomic, thread-safe operation
+//   - value insert is O(log n)
+func (m *ThreadSafeOrderedMapFunc[K, V]) GetOrCreate(
+	key K,
+	newV func() (value *V),
+	makeV func() (value V),
+) (value V, hasValue bool) {
+	defer m.m2.Lock()()
+
+	// try existing mapping
+	//	- value is not comparable, so if mapping exists, the only
+	//		action is to overwrite existing value
+	if value, hasValue = m.m2.Get(key); hasValue {
+		return // mapping exists return
+	}
+
+	// create using newV
+	if hasValue = newV != nil; hasValue {
+		if pt := newV(); pt == nil {
+			panic(perrors.NewPF("newV returned nil"))
+		} else {
+			value = *pt
+		}
+
+		// create using makeV
+	} else if hasValue = makeV != nil; hasValue {
+		value = makeV()
+	} else {
+
+		return // no key, no newV or makeV: no value return
+	}
+
+	// store the created value
+	m.m2.Put(key, value)
+	m.tree.ReplaceOrInsert(value)
+
+	return // value created return
 }
 
 func (m *ThreadSafeOrderedMapFunc[K, V]) Put(key K, value V) {

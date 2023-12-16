@@ -120,7 +120,7 @@ func (m *BTreeMap[K, V]) List(n ...int) (list []V) {
 		return
 	}
 
-	// non-zero list length [1..length] to use
+	// find non-zero list length [1..length] to use
 	var nUse int
 	// provided n capped by length
 	if len(n) > 0 {

@@ -24,7 +24,8 @@ const (
 )
 
 // Op allows callers to not import fsnotify dependency
-// Op value is a bitfield of or of one or more Op enum bits
+//   - Op value is a bitfield of or of one or more Op enum bits
+//   - Create Write Remove Rename Chmod
 type Op uint32
 
 // list of all watchfs.Op bit values
@@ -56,20 +57,19 @@ func NewOp(o fsnotify.Op) (op Op) {
 }
 
 // fsnotifyOp converts a watchfs.Op to an fsnotify.Op
-func (op Op) fsnotifyOp() (o fsnotify.Op) {
+func (op Op) fsnotifyOp() (o fsnotify.Op, err error) {
 
 	// check for unknown bits
 	if unknownBits := uint32(op) &^ allBits; unknownBits != 0 {
-		panic(perrors.Errorf("fsnotifyOp unknown fsnotify.Op bits: 0x%s", strconv.FormatInt(int64(unknownBits), 16)))
+		err = perrors.Errorf("fsnotifyOp unknown fsnotify.Op bits: 0x%s", strconv.FormatInt(int64(unknownBits), 16))
 	}
+	o = fsnotify.Op(op)
 
-	return fsnotify.Op(op)
+	return
 }
 
-// Uint32 returns the uint 32 vaklue of the op bit field
-func (op Op) Uint32() (value uint32) {
-	return uint32(op)
-}
+// Uint32 returns the uint 32 value of the op bit field
+func (op Op) Uint32() (value uint32) { return uint32(op) }
 
 // OpList returns the list of set bits Ops in op.
 func (op Op) OpList() (ops []Op) {
@@ -82,9 +82,7 @@ func (op Op) OpList() (ops []Op) {
 }
 
 // HasOp determines if op has the o Op in its bit-encoded value.
-func (op Op) HasOp(o Op) (hasOp bool) {
-	return op&o != 0
-}
+func (op Op) HasOp(o Op) (hasOp bool) { return op&o != 0 }
 
 func (op Op) String() (s string) {
 	s = fsnotify.Op(op).String()
