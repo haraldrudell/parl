@@ -35,11 +35,13 @@ func NewKeyOrderedMap[K btree.Ordered, V any]() (orderedMap *KeyOrderedMap[K, V]
 	}
 }
 
-// NewKeyOrderedMap returns a mapping whose keys are provided in order.
+// NewKeyOrderedMap returns a mapping whose keys are provided in order
+//   - [constraints.Ordered] is [btree.Ordered] plus uintptr
+//   - if K type does not have uintptr, use [NewKeyOrderedMap]
 func NewKeyOrderedMapOrdered[K constraints.Ordered, V any]() (orderedMap *KeyOrderedMap[K, V]) {
 	return &KeyOrderedMap[K, V]{
 		map2: *newMap[K, V](),
-		tree: btree.NewG[K](BtreeDegree, Less),
+		tree: btree.NewG[K](BtreeDegree, LessOrdered),
 	}
 }
 

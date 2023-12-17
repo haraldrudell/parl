@@ -10,9 +10,7 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-// Less is btree.LessFunc for ordered values
-func Less[V constraints.Ordered](a, b V) (aBeforeB bool) {
-	return a < b
-}
+// LessOrdered is [btree.LessFunc] for ordered values
+func LessOrdered[V constraints.Ordered](a, b V) (aBeforeB bool) { return a < b }
 
-var _ btree.LessFunc[int] = Less[int]
+var _ btree.LessFunc[int] = LessOrdered[int]

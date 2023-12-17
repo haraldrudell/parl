@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pmaps
+package pmaps2
 
 import (
 	"sync"
@@ -20,20 +20,35 @@ const (
 	RangeDelete = true
 )
 
-// ThreadSafeMap is a thread-safe reusable promotable Go map
-//   - native Go map functions: Get Put Delete Length Range
-//   - convenience functions: Clear Clone
-//   - — those methods need access to the Go map
+// ThreadSafeMap is a thread-safe reusable promotable hash-map
+//   - ThreadSafeMap is the innermost type providing thread-safety to consuming
+//     map implementations
+//   - 5 native Go map functions: Get Put Delete Length Range
+//   - — Delete optionally writes zero-value
+//   - convenience methods:
+//   - — Clone based on [maps.Clone]
+//   - — Clear using fast recreate or [maps.Range] optionally writing zero-values
 //   - lock control: Lock RLock
+//   - order functions:
+//   - — List unordered values
 //   - ThreadSafeMap uses reader/writer mutual exclusion lock for thread-safety
+//   - map mechnic is Go map
 type ThreadSafeMap[K comparable, V any] struct {
-	lock sync.RWMutex
-	m    map[K]V
+	lock            *sync.RWMutex
+	goMap           map[K]V
+	unlock, runlock func()
 }
 
 // NewThreadSafeMap returns a thread-safe Go map
+//   - stores self-refencing pointers
 func NewThreadSafeMap[K comparable, V any]() (m *ThreadSafeMap[K, V]) {
-	return &ThreadSafeMap[K, V]{m: make(map[K]V)}
+	var rwm sync.RWMutex
+	return &ThreadSafeMap[K, V]{
+		lock:    &rwm,
+		goMap:   make(map[K]V),
+		unlock:  rwm.Unlock,
+		runlock: rwm.RUnlock,
+	}
 }
 
 // allows consumers to obtain the write lock
@@ -51,19 +66,17 @@ func (m *ThreadSafeMap[K, V]) RLock() (runlock func()) {
 }
 
 // Get returns the value mapped by key or the V zero-value otherwise.
-//   - the ok return value is true if a mapping was found.
+//   - hasValue is true if a mapping was found
 //   - invoked while holding Lock or RLock
 //   - O(1)
-func (m *ThreadSafeMap[K, V]) Get(key K) (value V, ok bool) {
-	value, ok = m.m[key]
+func (m *ThreadSafeMap[K, V]) Get(key K) (value V, hasValue bool) {
+	value, hasValue = m.goMap[key]
 	return
 }
 
 // Put creates or replaces a mapping
 //   - invoked while holding Lock
-func (m *ThreadSafeMap[K, V]) Put(key K, value V) {
-	m.m[key] = value
-}
+func (m *ThreadSafeMap[K, V]) Put(key K, value V) { m.goMap[key] = value }
 
 // Delete removes mapping for key
 //   - if key is not mapped, the map is unchanged
@@ -76,39 +89,38 @@ func (m *ThreadSafeMap[K, V]) Delete(key K, useZeroValue ...bool) {
 
 	// if doZero is not present and true, regular map delete
 	if len(useZeroValue) == 0 || !useZeroValue[0] {
-		delete(m.m, key)
+		delete(m.goMap, key)
 		return // non-zero-value delete
 	}
 
 	// if key mapping does not exist: noop
-	if _, itemExists := m.m[key]; !itemExists {
+	if _, itemExists := m.goMap[key]; !itemExists {
 		return // write-free item does not exist return
 	}
 
 	// set value to zero to prevent temporary memory leaks
 	var zeroValue V
-	m.m[key] = zeroValue
+	m.goMap[key] = zeroValue
 
 	// delete
-	delete(m.m, key)
+	delete(m.goMap, key)
 }
 
 // Length returns the number of mappings
 //   - invoked while holding RLock or Lock
-func (m *ThreadSafeMap[K, V]) Length() (length int) {
-	return len(m.m)
-}
+func (m *ThreadSafeMap[K, V]) Length() (length int) { return len(m.goMap) }
 
 // Range traverses map bindings
 //   - iterates over map until rangeFunc returns false
-//   - similar to: func (*sync.Map).Range(f func(key any, value any) bool)
+//   - similar to [sync.Map.Range] func (*sync.Map).Range(f func(key any, value any) bool)
 //   - invoked while holding RLock or Lock
-func (m *ThreadSafeMap[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bool)) {
-	for k, v := range m.m {
+func (m *ThreadSafeMap[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bool)) (rangedAll bool) {
+	for k, v := range m.goMap {
 		if !rangeFunc(k, v) {
 			return
 		}
 	}
+	return true
 }
 
 // Clear empties the map
@@ -119,15 +131,15 @@ func (m *ThreadSafeMap[K, V]) Clear(useRange ...bool) {
 
 	// if useRange is not present and true, clear by re-initialize
 	if len(useRange) == 0 || !useRange[0] {
-		m.m = make(map[K]V)
+		m.goMap = make(map[K]V)
 		return // re-create clear return
 	}
 
 	// zero-out and delete each item
 	var zeroValue V
-	for k := range m.m {
-		m.m[k] = zeroValue
-		delete(m.m, k)
+	for k := range m.goMap {
+		m.goMap[k] = zeroValue
+		delete(m.goMap, k)
 	}
 }
 
@@ -135,7 +147,15 @@ func (m *ThreadSafeMap[K, V]) Clear(useRange ...bool) {
 //   - clone is done by ranging all keys
 //   - invoked while holding RLock or Lock
 func (m *ThreadSafeMap[K, V]) Clone() (clone *ThreadSafeMap[K, V]) {
-	return &ThreadSafeMap[K, V]{m: maps.Clone(m.m)}
+	var rwm sync.RWMutex
+	clone = &ThreadSafeMap[K, V]{
+		lock:    &rwm,
+		goMap:   maps.Clone(m.goMap),
+		unlock:  rwm.Unlock,
+		runlock: rwm.RUnlock,
+	}
+
+	return
 }
 
 // List provides the mapped values, undefined ordering
@@ -144,7 +164,7 @@ func (m *ThreadSafeMap[K, V]) Clone() (clone *ThreadSafeMap[K, V]) {
 func (m *ThreadSafeMap[K, V]) List(n int) (list []V) {
 
 	// handle n
-	var length = len(m.m)
+	var length = len(m.goMap)
 	if n == 0 {
 		n = length
 	} else if n > length {
@@ -154,23 +174,13 @@ func (m *ThreadSafeMap[K, V]) List(n int) (list []V) {
 	// create and populate list
 	list = make([]V, n)
 	i := 0
-	for _, v := range m.m {
+	for _, v := range m.goMap {
 		list[i] = v
 		i++
-		if i > n {
+		if i >= n {
 			break
 		}
 	}
 
 	return
-}
-
-// invokes lock.Unlock()
-func (m *ThreadSafeMap[K, V]) unlock() {
-	m.lock.Unlock()
-}
-
-// invokes lock.RUnlock()
-func (m *ThreadSafeMap[K, V]) runlock() {
-	m.lock.RUnlock()
 }

@@ -8,12 +8,22 @@ package watchfs
 import (
 	"regexp"
 	"sync"
+	"sync/atomic"
 )
 
+// WatcherCh provides a channel api for a file-system watcher
 type WatcherCh struct {
-	ch        chan any
-	watcher   *Watcher
+	// ch sends *WatchEvent or []*WatchEvent values
+	ch chan any
+	// watcher is a file-system  watcher with portable callback api
+	watcher *Watcher
+
+	// eventLock ensures serialization of read-write-back to ch
+	// and close
 	eventLock sync.Mutex
+	// if ch is closed
+	//	- written behind eventLock
+	isClosed atomic.Bool
 }
 
 // NewWatcherCh returns a file-system watcher using channel mechanic
@@ -32,6 +42,8 @@ func NewWatcherCh(
 	return &w
 }
 
+func (w *WatcherCh) Watch(path string) (err error) { return w.watcher.Watch(path) }
+
 // Ch returns either *WatchEvent or []*WatchEvent
 //   - Thread-safe
 func (w *WatcherCh) Ch() (ch <-chan any) { return w.ch }
@@ -44,7 +56,30 @@ func (w *WatcherCh) Ch() (ch <-chan any) { return w.ch }
 //   - if watchEvent and watchEvents are both nil, the watcher has ended
 //   - Thread-safe
 func (w *WatcherCh) Get() (watchEvent *WatchEvent, watchEvents []*WatchEvent) {
-	return UnpackEvents(<-w.ch)
+	var any, ok = <-w.ch
+	if !ok {
+		return
+	}
+	return UnpackEvents(any)
+}
+
+func (w *WatcherCh) Shutdown() {
+	// shutdown callback api
+	w.watcher.Shutdown()
+
+	// ensure channel is closed
+	if w.isClosed.Load() {
+		return
+	}
+	w.eventLock.Lock()
+	defer w.eventLock.Unlock()
+
+	if w.isClosed.Load() {
+		return
+	}
+
+	close(w.ch)
+	w.isClosed.Store(true)
 }
 
 // eventFunc sends on w.ch
@@ -53,6 +88,9 @@ func (w *WatcherCh) eventFunc(event *WatchEvent) {
 	w.eventLock.Lock()
 	defer w.eventLock.Unlock()
 
+	if w.isClosed.Load() {
+		return
+	}
 	select {
 	case anyEvent = <-w.ch:
 		// if single event, create slice
@@ -66,5 +104,3 @@ func (w *WatcherCh) eventFunc(event *WatchEvent) {
 		w.ch <- event
 	}
 }
-
-func (w *WatcherCh) Shutdown() { w.watcher.Shutdown() }

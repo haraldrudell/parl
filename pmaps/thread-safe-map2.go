@@ -5,7 +5,10 @@ ISC License
 
 package pmaps
 
-import "github.com/haraldrudell/parl/perrors"
+import (
+	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pmaps/pmaps2"
+)
 
 // threadSafeMap is a private promotable field
 // that does not promote any public identifiers
@@ -13,12 +16,12 @@ import "github.com/haraldrudell/parl/perrors"
 //   - convenience methods: clone Clear
 //   - order methods: List
 type threadSafeMap[K comparable, V any] struct {
-	m2 ThreadSafeMap[K, V]
+	tsm pmaps2.ThreadSafeMap[K, V]
 }
 
 // newThreadSafeMap returns a thread-safe Go map
 func newThreadSafeMap[K comparable, V any]() (m *threadSafeMap[K, V]) {
-	return &threadSafeMap[K, V]{m2: *NewThreadSafeMap[K, V]()}
+	return &threadSafeMap[K, V]{tsm: *pmaps2.NewThreadSafeMap[K, V]()}
 }
 
 // GetOrCreate returns an item from the map if it exists otherwise creates it.
@@ -38,11 +41,11 @@ func (m *threadSafeMap[K, V]) GetOrCreate(
 	key K,
 	newV func() (value *V),
 	makeV func() (value V),
-) (value V, ok bool) {
-	defer m.m2.Lock()()
+) (value V, hasValue bool) {
+	defer m.tsm.Lock()()
 
 	// try existing mapping
-	if value, ok = m.m2.Get(key); ok {
+	if value, hasValue = m.tsm.Get(key); hasValue {
 		return // mapping exists return
 	}
 
@@ -53,16 +56,16 @@ func (m *threadSafeMap[K, V]) GetOrCreate(
 			panic(perrors.NewPF("newV returned nil"))
 		}
 		value = *pt
-		m.m2.Put(key, value)
-		ok = true
+		m.tsm.Put(key, value)
+		hasValue = true
 		return // created using newV return
 	}
 
 	// create using makeV
 	if makeV != nil {
 		value = makeV()
-		m.m2.Put(key, value)
-		ok = true
+		m.tsm.Put(key, value)
+		hasValue = true
 		return // created using makeV return
 	}
 
@@ -70,43 +73,43 @@ func (m *threadSafeMap[K, V]) GetOrCreate(
 }
 
 func (m *threadSafeMap[K, V]) clone() (clone *threadSafeMap[K, V]) {
-	return &threadSafeMap[K, V]{m2: *m.m2.Clone()}
+	return &threadSafeMap[K, V]{tsm: *m.tsm.Clone()}
 }
 func (m *threadSafeMap[K, V]) Get(key K) (value V, ok bool) {
-	defer m.m2.RLock()()
+	defer m.tsm.RLock()()
 
-	return m.m2.Get(key)
+	return m.tsm.Get(key)
 }
 
 func (m *threadSafeMap[K, V]) Put(key K, value V) {
-	defer m.m2.Lock()()
+	defer m.tsm.Lock()()
 
-	m.m2.Put(key, value)
+	m.tsm.Put(key, value)
 }
 
 func (m *threadSafeMap[K, V]) Delete(key K, useZeroValue ...bool) {
-	defer m.m2.Lock()()
+	defer m.tsm.Lock()()
 
-	m.m2.Delete(key, useZeroValue...)
+	m.tsm.Delete(key, useZeroValue...)
 }
 
 func (m *threadSafeMap[K, V]) Length() (length int) {
-	defer m.m2.RLock()()
+	defer m.tsm.RLock()()
 
-	return m.m2.Length()
+	return m.tsm.Length()
 }
 
-func (m *threadSafeMap[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bool)) {
-	defer m.m2.RLock()()
+func (m *threadSafeMap[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bool)) (rangedAll bool) {
+	defer m.tsm.RLock()()
 
-	m.m2.Range(rangeFunc)
+	return m.tsm.Range(rangeFunc)
 }
 
 // Clear empties the map
 func (m *threadSafeMap[K, V]) Clear(useRange ...bool) {
-	defer m.m2.Lock()()
+	defer m.tsm.Lock()()
 
-	m.m2.Clear(useRange...)
+	m.tsm.Clear(useRange...)
 }
 
 // List provides the mapped values, undefined ordering
@@ -118,7 +121,7 @@ func (m *threadSafeMap[K, V]) List(n ...int) (list []V) {
 	if len(n) > 0 {
 		n0 = n[0]
 	}
-	defer m.m2.RLock()()
+	defer m.tsm.RLock()()
 
-	return m.m2.List(n0)
+	return m.tsm.List(n0)
 }

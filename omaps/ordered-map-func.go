@@ -17,7 +17,8 @@ import (
 //   - — avoiding linear traversal of linked-lists which is slow and
 //   - — is a more efficient structure than binary tree
 type OrderedMapFunc[K comparable, V any] struct {
-	btreeMap[K, V] // Get() Length() Range() Delete() Clear() List()
+	// Get() Length() Range() Delete() Clear() List()
+	btreeMap[K, V]
 	// type LessFunc[T any] func(a, b T) bool.
 	//   - less(a, b) implements sort order and returns:
 	//   - — true if a sorts before b
@@ -43,7 +44,7 @@ func NewOrderedMapFunc[K comparable, V any](
 
 // Put creates or replaces a mapping
 func (m *OrderedMapFunc[K, V]) Put(key K, value V) {
-	m.btreeMap.put(key, value, m.sameFunc)
+	m.btreeMap.put(key, value, m.less)
 }
 
 // Clone returns a shallow clone of the map
@@ -53,9 +54,4 @@ func (m *OrderedMapFunc[K, V]) Clone() (clone *OrderedMapFunc[K, V]) {
 		btreeMap: *m.btreeMap.Clone(),
 		less:     m.less,
 	}
-}
-
-// sameFunc returns if the two values have equal sort-order rank
-func (m *OrderedMapFunc[K, V]) sameFunc(value1, value2 V) (isSameRank bool) {
-	return !m.less(value1, value2) && !m.less(value2, value1)
 }

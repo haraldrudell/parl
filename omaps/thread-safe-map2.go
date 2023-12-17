@@ -7,7 +7,7 @@ package omaps
 
 import (
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pmaps"
+	"github.com/haraldrudell/parl/pmaps/pmaps2"
 )
 
 // threadSafeMap is a private promotable field
@@ -16,12 +16,12 @@ import (
 //   - convenience methods: clone Clear
 //   - order methods: List
 type threadSafeMap[K comparable, V any] struct {
-	m2 pmaps.ThreadSafeMap[K, V]
+	m2 pmaps2.ThreadSafeMap[K, V]
 }
 
 // newThreadSafeMap returns a thread-safe Go map
 func newThreadSafeMap[K comparable, V any]() (m *threadSafeMap[K, V]) {
-	return &threadSafeMap[K, V]{m2: *pmaps.NewThreadSafeMap[K, V]()}
+	return &threadSafeMap[K, V]{m2: *pmaps2.NewThreadSafeMap[K, V]()}
 }
 
 // GetOrCreate returns an item from the map if it exists otherwise creates it.

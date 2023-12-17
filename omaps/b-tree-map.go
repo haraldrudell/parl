@@ -15,30 +15,36 @@ const (
 	BtreeDegree = 6 // each level has 2^6 children: 64
 )
 
-type SameFunc[V any] func(a, b V) (isSameRank bool)
-
-// BTreeMap is a reusable and promotable mapping
-// whose values are provided in custom order
-//   - mapping implementation is Go map
+// BTreeMap is a reusable, promotable custom value-ordered mapping
+//   - 4/5 native Go map functions: Get Delete Length Range
+//   - — Put is implemented by consumers that can compare V values
+//   - convenience functions:
+//   - — Clear using fast, scavenging re-create
+//   - — Clone using range, optionally appending to provided instance
+//   - order functions:
+//   - — List
+//   - —
 //   - ordering structure is B-tree
 //   - B-tree offers:
 //   - — avoiding vector-copy of large sorted slices which is slow and
 //   - — avoiding linear traversal of linked-lists which is slow and
 //   - — is a more efficient structure than binary tree
-//   - Put is implemented by consumers that can compare V values
+//   - non-thread-safe maps
+//   - mapping implementation is Go map
 type BTreeMap[K comparable, V any] struct {
-	map2[K, V] // Get() Length() Range()
-	tree       *btree.BTreeG[V]
+	// Get() Length() Range()
+	map2[K, V]
+	tree *btree.BTreeG[V]
 }
 
 // NewBTreeMap returns a mapping whose values are provided in custom order
-//   - btree.Ordered does not include ~uintptr
+//   - btree.Ordered does not include ~uintptr. For other ordered V, use [NewBTreeMapAny]
 func NewBTreeMap[K comparable, V btree.Ordered]() (orderedMap *BTreeMap[K, V]) {
 	return newBTreeMap[K, V](btree.NewOrderedG[V](BtreeDegree))
 }
 
 // NewBTreeMapAny returns a mapping whose values are provided in custom order
-//   - for uintptr
+//   - supports uintptr. If the ordered V is not uintptr, use [NewBTreeMap]
 func NewBTreeMapAny[K comparable, V any](less btree.LessFunc[V]) (orderedMap *BTreeMap[K, V]) {
 	return newBTreeMap[K, V](btree.NewG[V](BtreeDegree, less))
 }

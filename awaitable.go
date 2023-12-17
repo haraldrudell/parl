@@ -24,14 +24,10 @@ type Awaitable struct {
 }
 
 // NewAwaitable returns a one-to-many sempahore
-func NewAwaitable() (awaitable *Awaitable) {
-	return &Awaitable{ch: make(chan struct{})}
-}
+func NewAwaitable() (awaitable *Awaitable) { return &Awaitable{ch: make(chan struct{})} }
 
 // Ch returns an awaitable channel. Thread-safe
-func (a *Awaitable) Ch() (ch AwaitableCh) {
-	return a.ch
-}
+func (a *Awaitable) Ch() (ch AwaitableCh) { return a.ch }
 
 // isClosed inspects whether the awaitable has been triggered
 //   - Thread-safe

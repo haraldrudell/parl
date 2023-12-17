@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pmaps
+package pmaps2
 
 import (
 	"testing"

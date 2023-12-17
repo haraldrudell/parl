@@ -27,8 +27,9 @@ var NoIgnores *regexp.Regexp
 // 220315 github.com/fsnotify/fsnotify v1.4.9 does not support macOS
 // 220315 use the old github.com/fsnotify/fsevents v0.1.1
 
-// Watcher implements a file-system event stream based on [github.com/fsnotify/fsnotify.Watcher]
+// Watcher implements a file-system watcher using callback api
 //   - eventFn receives filtered events and must be thread-safe
+//   - if directories are created, Watcher adds those to being watched
 //   - —
 //   - the fsnotify api provides two channels so threading is required
 //   - the Errors channel is unbuffered
@@ -44,7 +45,9 @@ type Watcher struct {
 	ignores *regexp.Regexp
 	filter  Op
 
-	addLock sync.Mutex
+	// addLock serializes Watch-create and Shutdown
+	addLock    sync.Mutex
+	isShutdown bool
 	WatcherShim
 }
 
@@ -77,8 +80,6 @@ func NewWatcher(
 //   - entry is the file-system location being watched, absolute or relative.
 //     If a directory, all subdirectories are watched, too.
 func (w *Watcher) Watch(entry string) (err error) {
-	w.addLock.Lock()
-	defer w.addLock.Unlock()
 	defer w.shutdownOnErr(&err)
 
 	// initialize api if not already done
@@ -87,8 +88,7 @@ func (w *Watcher) Watch(entry string) (err error) {
 		if _, err = w.filter.fsnotifyOp(); err != nil {
 			return
 		}
-		// invoke Watch
-		if err = NewWatcherShim(&w.WatcherShim, w.filterEvent, w.errFn).Watch(); err != nil {
+		if err = w.create(); err != nil {
 			return
 		}
 	}
@@ -98,12 +98,13 @@ func (w *Watcher) Watch(entry string) (err error) {
 	if fsFileInfo, err = os.Stat(entry); perrors.IsPF(&err, "os.Stat %w", err) {
 		return
 	}
+
 	// if not a directory, watch it
 	if !fsFileInfo.IsDir() {
 		if err = w.WatcherShim.Add(entry); err != nil {
 			return
 		}
-		return // wathing non-directory return
+		return // watching non-directory return
 	}
 
 	// scan for directories
@@ -127,6 +128,28 @@ func (w *Watcher) Watch(entry string) (err error) {
 	var d = t1.Sub(now).Round(100 * time.Millisecond)
 	parl.Debug("%s WatchFS directories added in %s\n", ptime.NsLocal(now), d)
 
+	return
+}
+
+func (w *Watcher) Shutdown() {
+	w.addLock.Lock()
+	defer w.addLock.Unlock()
+
+	w.isShutdown = true
+	if w.WatcherShim.ID != 0 {
+		w.WatcherShim.Shutdown()
+	}
+}
+
+func (w *Watcher) create() (err error) {
+	w.addLock.Lock()
+	defer w.addLock.Unlock()
+
+	if w.WatcherShim.ID != 0 || w.isShutdown {
+		return
+	}
+	// invoke Watch
+	err = NewWatcherShim(&w.WatcherShim, w.filterEvent, w.errFn).Watch()
 	return
 }
 
@@ -188,5 +211,5 @@ func (w *Watcher) shutdownOnErr(errp *error) {
 	if *errp == nil || w.WatcherShim.ID == 0 {
 		return
 	}
-	w.WatcherShim.Shutdown()
+	w.Shutdown()
 }

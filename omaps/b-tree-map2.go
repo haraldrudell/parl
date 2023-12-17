@@ -5,8 +5,11 @@ ISC License
 
 package omaps
 
-import "github.com/google/btree"
+import (
+	"github.com/google/btree"
+)
 
+// btreeMap is private version of [BtreeMap]
 type btreeMap[K comparable, V any] struct{ BTreeMap[K, V] }
 
 // func newBTreeMap2[K comparable, V btree.Ordered]() (m *btreeMap[K, V]) {
@@ -21,13 +24,14 @@ func (m *btreeMap[K, V]) Clone() (clone *btreeMap[K, V]) {
 	return &btreeMap[K, V]{BTreeMap: *m.BTreeMap.Clone()}
 }
 
-func (m *btreeMap[K, V]) put(key K, value V, sameFunc SameFunc[V]) {
+func (m *btreeMap[K, V]) put(key K, value V, less btree.LessFunc[V]) {
 
 	// existing mapping
 	if existing, hasExisting := m.Get(key); hasExisting {
 
 		//no-op: key exist with equal rank
-		if sameFunc(value, existing) {
+		//	- if ! value < existing && ! existing < value: values ranked the same
+		if !less(value, existing) && !less(existing, value) {
 			return // exists with equal sort order return: nothing to do
 		}
 

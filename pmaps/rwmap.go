@@ -8,21 +8,33 @@ package pmaps
 
 import (
 	"github.com/haraldrudell/parl/parli"
+	"github.com/haraldrudell/parl/pmaps/pmaps2"
 )
 
-// RWMap is a one-liner thread-safe mapping.
-// RWMap implements [parli.ThreadSafeMap][K comparable, V any].
-//   - GetOrCreate method is an atomic, thread-safe operation
+// RWMap is a thread-safe mapping based on read/write mutex
+//   - 5 native Go map functions: Get Put Delete Length Range
+//   - — Delete optionally writes zero-value
+//   - complex atomic methods:
+//   - — GetOrCreate method is an atomic, thread-safe operation
 //     as opposed to Get-then-Put
-//   - PutIf is atomic, thread-safe operation
-//   - native Go map functions: Get Put Delete Length Range
-//   - convenience methods: Clone Clone2 Clear
-//   - order functions: List Keys
-//   - V is copied so if size of V is large or V contains locks, use pointer
-//   - RWMap uses reader/writer mutual exclusion lock for slightly higher performance.
+//   - — PutIf is atomic, thread-safe operation
+//   - convenience methods:
+//   - — Clone Clone2 based on [maps.Clone]
+//   - — Clear using fast recreate or [maps.Range] optionally writing zero-values
+//   - order functions:
+//   - — List unordered values
+//   - — Keys unordered keys
+//   - V is copied so if V is large or contains locks, use pointer to V type
+//   - RWMap implements [parli.ThreadSafeMap][K comparable, V any]
+//   - —
+//   - map mechanic is Go map
+//   - RWMap uses reader/writer mutual exclusion lock for slightly higher performance
 //   - Get methods are O(1)
+//   - innermost type provides thread-safety
+//   - outermost type provides map api
 type RWMap[K comparable, V any] struct {
-	threadSafeMap[K, V] // Clear()
+	// Get() GetOrCreate() Put() Delete() Length() Range() Clear() List()
+	threadSafeMap[K, V]
 }
 
 // NewRWMap returns a thread-safe map implementation
@@ -35,21 +47,21 @@ func NewRWMap2[K comparable, V any]() (rwMap *RWMap[K, V]) {
 	return &RWMap[K, V]{threadSafeMap: *newThreadSafeMap[K, V]()}
 }
 
-// Putif is conditional Put depending on the return value from the putIf function.
+// Putif is conditional Put depending on the return value from the putIf function
 //   - if key does not exist in the map, the put is carried out and wasNewKey is true
 //   - if key exists and putIf is nil or returns true, the put is carried out and wasNewKey is false
 //   - if key exists and putIf returns false, the put is not carried out and wasNewKey is false
 //   - during PutIf, the map cannot be accessed and the map’s write-lock is held
 //   - PutIf is an atomic, thread-safe operation
 func (m *RWMap[K, V]) PutIf(key K, value V, putIf func(value V) (doPut bool)) (wasNewKey bool) {
-	defer m.m2.Lock()()
+	defer m.tsm.Lock()()
 
-	existing, keyExists := m.m2.Get(key)
+	existing, keyExists := m.tsm.Get(key)
 	wasNewKey = !keyExists
 	if keyExists && putIf != nil && !putIf(existing) {
 		return // putIf false return: this value should not be updated
 	}
-	m.m2.Put(key, value)
+	m.tsm.Put(key, value)
 
 	return
 }
@@ -61,7 +73,7 @@ func (m *RWMap[K, V]) Clone() (clone parli.ThreadSafeMap[K, V]) {
 
 // Clone returns a shallow clone of the map
 func (m *RWMap[K, V]) Clone2() (clone *RWMap[K, V]) {
-	defer m.m2.RLock()()
+	defer m.tsm.RLock()()
 
 	return &RWMap[K, V]{threadSafeMap: *m.threadSafeMap.clone()}
 }
@@ -69,40 +81,25 @@ func (m *RWMap[K, V]) Clone2() (clone *RWMap[K, V]) {
 // Keys provides the mapping keys, undefined ordering
 //   - O(n)
 //   - invoked while holding RLock or Lock
-func (m *RWMap[K, V]) Keys(n ...int) (list []K) {
+func (m *RWMap[K, V]) Keys(n ...int) (keys []K) {
 	// get n
 	var n0 int
 	if len(n) > 0 {
 		n0 = n[0]
 	}
-	defer m.m2.RLock()()
+	defer m.tsm.RLock()()
 
-	// handle n
-	var length = m.m2.Length()
-	if n0 == 0 {
+	// n0 is actual length to use
+	var length = m.tsm.Length()
+	if n0 <= 0 {
 		n0 = length
 	} else if n0 > length {
 		n0 = length
 	}
-	list = make([]K, n0)
 
-	var r = ranger[K, V]{
-		list: list,
-		n:    n0,
-	}
-	m.m2.Range(r.rangeFunc)
+	var keyRanger = pmaps2.KeyRanger[K, V]{List: make([]K, n0)}
+	m.tsm.Range(keyRanger.RangeFunc)
+	keys = keyRanger.List
 
-	return
-}
-
-type ranger[K comparable, V any] struct {
-	list []K
-	i, n int
-}
-
-func (r *ranger[K, V]) rangeFunc(key K, value V) (keepGoing bool) {
-	r.list[r.i] = key
-	r.i++
-	keepGoing = r.i < r.n
 	return
 }
