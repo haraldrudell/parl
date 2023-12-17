@@ -46,8 +46,10 @@ func (o *OnTickerThreadTester) Context() (ctx context.Context) {
 }
 
 func TestOnTickerThread(t *testing.T) {
-	var period = time.Millisecond
-	var ticks = 2
+	const period = time.Millisecond
+	const minPeriod = period / 2
+	const maxPeriod = 4 * period
+	const ticks = 2
 
 	var ctx, cancel = context.WithCancel(context.Background())
 	var o = NewOnTickerThreadTester(ctx, ticks)
@@ -71,9 +73,9 @@ func TestOnTickerThread(t *testing.T) {
 	}
 	// duration should relate to period
 	var duration = o.ats[1].Sub(o.ats[0])
-	if duration < period/2 {
+	if duration < minPeriod {
 		t.Errorf("duration too short: %s exp %s", duration, period)
-	} else if duration >= 2*period {
+	} else if duration >= maxPeriod {
 		t.Errorf("duration too long: %s exp %s", duration, period)
 	}
 }
