@@ -55,8 +55,9 @@ func newDataSourceNamer(appName string) (namer *DataSourceNamer) {
 	}
 }
 
-// DSN returns a data source name, ie an absolute filename
-// of a writable SQLite3 database file
+// DSN returns a data source name, ie. a filename from
+// application name and a partition key like year
+//   - effectyively an absolute path of a writable SQLite3 “.db” database file
 //   - implements parl’s [DatasourceNamer.DSN]
 func (n *DataSourceNamer) DSN(year ...parl.DBPartition) (dsnr parl.DataSourceName) {
 	var year0 parl.DBPartition

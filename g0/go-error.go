@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/errorglue"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/perrors/errorglue"
 )
 
 // GoError is a wrapper around an error associating it with a Go goroutine

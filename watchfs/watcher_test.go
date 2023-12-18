@@ -128,6 +128,7 @@ func TestWatcherDirectory(t *testing.T) {
 
 	// Phase2: List should return directory, dir2
 	listAct = watcher.List()
+	slices.Sort(listAct)
 	// List director, dir2: 2[
 	// "/private/var/folders/sq/0x1_9fyn1bv907s7ypfryt1c0000gn/T/TestNewDirNewFile1936666749/001"
 	// "/private/var/folders/sq/0x1_9fyn1bv907s7ypfryt1c0000gn/T/TestNewDirNewFile1936666749/001/dir2"]

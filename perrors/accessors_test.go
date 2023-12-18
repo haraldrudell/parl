@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/haraldrudell/parl/errorglue"
+	"github.com/haraldrudell/parl/perrors/errorglue"
 	"golang.org/x/sys/unix"
 )
 

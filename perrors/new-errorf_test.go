@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/haraldrudell/parl/errorglue"
+	"github.com/haraldrudell/parl/perrors/errorglue"
 	"github.com/haraldrudell/parl/pruntime"
 )
 

@@ -11,7 +11,7 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/counter"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/psql"
+	"github.com/haraldrudell/parl/psql/psql2"
 	_ "modernc.org/sqlite"
 )
 
@@ -37,9 +37,8 @@ type DataSource struct {
 	counters parl.Counters
 }
 
-// NewDB get a DB object that represents the databases in a directory
-//   - the driver’s methods are promoted like Query
-//   - implements parl’s [DataSourceNamer.DataSource] for SQLite3
+// OpenDataSource creates a database-file in the file-system and
+// returns its database implementation
 func OpenDataSource(dataSourceName parl.DataSourceName) (dataSource parl.DataSource, err error) {
 
 	d := DataSource{
@@ -55,6 +54,6 @@ func OpenDataSource(dataSourceName parl.DataSourceName) (dataSource parl.DataSou
 
 // PrepareContext returns a sql.Stmt that does retries on 5 SQLITE_BUSY
 //   - this is used by [parl.psql]
-func (ds *DataSource) WrapStmt(stmt *sql.Stmt) (stm psql.Stmt) {
+func (ds *DataSource) WrapStmt(stmt *sql.Stmt) (stm psql2.Stmt) {
 	return &Stmt{Stmt: stmt, ds: ds}
 }

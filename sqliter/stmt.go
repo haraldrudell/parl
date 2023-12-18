@@ -4,6 +4,31 @@ ISC License
 */
 
 // Package sqliter provides partitioning, cached prepared statements and data conversion for SQLite3.
+//
+//   - SQLite3 databases are semlessly created by
+//   - — using [DSNrFactory].DataSourceNamer with an application name and
+//   - — executing queries from [github.com/haraldrudell/parl/psql.DBFactory].NewDB cached DB objects and
+//   - — a partition ID
+//   - statement-retry remedy for SQLite3 concurrency shortcomings
+//   - — concurrency errors are not returned, there is a queueing implementation for retries
+//   - — this convenience is semalessly provided by [github.com/haraldrudell/parl/psql.NewDBMap]
+//
+// conversions for:
+//   - — Go time.Time to SQLite3 TEXT strict iso8601 UTC time-zone, nanosecond precision
+//     [TimeToDB] [TimeToDBNullable] [ToTime] [NullableToTime]
+//   - — Go bool to SQLite3 INTEGER [BoolToDB] [ToBool]
+//   - — Go time.Time to SQLite3’s DATETIME TEXT iso8601-like format millisecond precision
+//     [TimeToDATETIME] [DATETIMEtoTime]
+//   - — Go uuid.UUID to SQLite3 TEXT [UUIDToDB] [UUIDToDB]
+//
+// additionally:
+//   - retrieval of pragma, ie. SQLite3 performance-related database configuration
+//     [Pragma] [PragmaDB] [PragmaSQL]
+//   - data-source namer for application name and year partition
+//     [DSNrFactory].DataSourceNamer [OpenDataSourceNamer]
+//   - data-source that do not create database-files [OpenDataSourceNamerRO] for querying existing
+//     databases
+//   - retrieval of actionable SQLite3 error codes [Code]
 package sqliter
 
 import (
@@ -50,8 +75,7 @@ var executingCount int // behind queue
 // Stmt implements retries for a SQLite3 table
 //   - the code here implements retries due to SQLite3 producing various
 //     concurrency errors
-//   - this is legacy code from 2022-06 featuring functional program rather than
-//     structs which has lead to multiple memory leaks
+//   - this is legacy code from 2022-06
 type Stmt struct {
 	*sql.Stmt
 	ds *DataSource
@@ -61,8 +85,7 @@ type Stmt struct {
 //   - for performance reasons cached prepared statements are used
 //   - the code here implements retries due to SQLite3 producing various
 //     concurrency errors
-//   - this is legacy code from 2022-06 featuring functional program rather than
-//     structs which has lead to multiple memory leaks
+//   - this is legacy code from 2022-06
 func (st *Stmt) ExecContext(ctx context.Context, args ...any) (sqlResult sql.Result, err error) {
 	st.retry(func() (e error) {
 		sqlResult, err = st.Stmt.ExecContext(ctx, args...)
@@ -75,8 +98,7 @@ func (st *Stmt) ExecContext(ctx context.Context, args ...any) (sqlResult sql.Res
 //   - for performance reasons cached prepared statements are used
 //   - the code here implements retries due to SQLite3 producing various
 //     concurrency errors
-//   - this is legacy code from 2022-06 featuring functional program rather than
-//     structs which has lead to multiple memory leaks
+//   - this is legacy code from 2022-06
 func (st *Stmt) QueryContext(ctx context.Context, args ...any) (sqlRows *sql.Rows, err error) {
 	st.retry(func() (e error) {
 		sqlRows, err = st.Stmt.QueryContext(ctx, args...)
@@ -89,8 +111,7 @@ func (st *Stmt) QueryContext(ctx context.Context, args ...any) (sqlRows *sql.Row
 //   - for performance reasons cached prepared statements are used
 //   - the code here implements retries due to SQLite3 producing various
 //     concurrency errors
-//   - this is legacy code from 2022-06 featuring functional program rather than
-//     structs which has lead to multiple memory leaks
+//   - this is legacy code from 2022-06
 func (st *Stmt) QueryRowContext(ctx context.Context, args ...any) (sqlRow *sql.Row) {
 	st.retry(func() (e error) {
 		sqlRow = st.Stmt.QueryRowContext(ctx, args...)
@@ -103,8 +124,7 @@ func (st *Stmt) QueryRowContext(ctx context.Context, args ...any) (sqlRow *sql.R
 // an object-oriented struct
 //   - query is a function that executes a query against a SQLite3 table
 //     returning its error result
-//   - this is legacy code from 2022-06 featuring functional program rather than
-//     structs which has lead to multiple memory leaks
+//   - this is legacy code from 2022-06
 func (st *Stmt) retry(query func() (err error)) {
 	// use counters to measure query concurrency
 	var c = st.ds.counters.GetOrCreateCounter(sqStatement).Inc()

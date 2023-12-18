@@ -3,7 +3,7 @@
 ISC License
 */
 
-// Package pmaps2 contains resusable map types
+// Package pmaps2 contains resusable map types for other parl packages.
 package pmaps2
 
 import "golang.org/x/exp/maps"

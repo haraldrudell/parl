@@ -16,7 +16,7 @@ const (
 )
 
 // UUIDToDB stores a Go 128-bit UUID as 36 characters SQLite TEXT
-//   - Go type: array [16]byte from package github.com/google/uuid
+//   - Go reflect type: array [16]byte from package github.com/google/uuid
 //   - — 16×8 is 128 bits
 //   - SQLite type: 36-character string TEXT “01234567-89ab-cdef-0123-456789abcdef”
 //   - — 32×4 is 128 bits
@@ -34,7 +34,7 @@ func UUIDToDB(ID uuid.UUID) (dbValue string) {
 // ToUUID converts an SQLite TEXT value to Go uuid.UUID
 //   - err: non-nil on failure
 //   - ID: valid or zero-value on failure
-//   - Go value: [16]byte uuid.UUID from package github.com/google/uuid
+//   - Go reflect type: [16]byte uuid.UUID from package github.com/google/uuid
 //   - — 16×8 is 128 bits
 //   - SQLite value: 36-character TEXT “01234567-89ab-cdef-0123-456789abcdef”
 //   - — 32×4 is 128 bits

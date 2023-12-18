@@ -3,6 +3,23 @@
 ISC License
 */
 
+// Package psql provides cached, shared, partitioned database objects with
+// cached prepared statements cancelable by context.
+//
+//   - [NewDBMap] provides cached, shared database implementation objects.
+//     database access is using cached prepared statements and
+//     access using application name and partition name like year.
+//   - [NewResultSetIterator] provides a Go for-statements abstract result-set iterator
+//   - [ScanFunc] is the signature for preparing custom result-set iterators
+//   - seamless statement-retry, remedying concurrency-deficient databases such as
+//     SQLite3
+//   - —
+//   - [TrimSql] trims SQL statements in Go raw string literals, multi-line strings enclosed by
+//     the back-tick ‘`’ character
+//   - [ColumnType] describes columns of a result-set
+//   - convenience method for single-value queries: [DBMap.QueryInt] [DBMap.QueryString]
+//   - [SqlExec] pprovides statement execution prior to obtaining a cached database, ie. for
+//     seamlessly preparing the schema
 package psql
 
 import (
@@ -13,6 +30,7 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/psql/psql2"
 )
 
 // DBMap provides:
@@ -30,8 +48,8 @@ type DBMap struct {
 	schema func(dataSource parl.DataSource, ctx context.Context) (err error)
 
 	stateLock sync.Mutex
-	m         map[parl.DataSourceName]*StatementCache // behind stateLock
-	closeErr  atomic.Pointer[error]                   // written behind stateLock
+	m         map[parl.DataSourceName]*psql2.StatementCache // behind stateLock
+	closeErr  atomic.Pointer[error]                         // written behind stateLock
 }
 
 // NewDBMap returns a database connection and prepared statement cache
@@ -43,7 +61,7 @@ func NewDBMap(
 	return &DBMap{
 		dsnr:   dsnr,
 		schema: schema,
-		m:      make(map[parl.DataSourceName]*StatementCache),
+		m:      make(map[parl.DataSourceName]*psql2.StatementCache),
 	}
 }
 
@@ -51,7 +69,7 @@ func NewDBMap2(
 	dsnr parl.DataSourceNamer,
 	schema func(dataSource parl.DataSource, ctx context.Context) (err error),
 	getp *func(dataSourceName parl.DataSourceName,
-		ctx context.Context) (dbStatementCache *StatementCache, err error),
+		ctx context.Context) (dbStatementCache *psql2.StatementCache, err error),
 ) (dbMap *DBMap) {
 	dbMap = NewDBMap(dsnr, schema)
 	*getp = dbMap.getOrCreateDBCache
@@ -62,11 +80,11 @@ func NewDBMap2(
 func (d *DBMap) Exec(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (execResult parl.ExecResult, err error) {
-	var stmt Stmt
+	var stmt psql2.Stmt
 	if stmt, err = d.getStmt(partition, query, ctx); err != nil {
 		return
 	}
-	if execResult, err = NewExecResult(stmt.ExecContext(ctx, args...)); err != nil {
+	if execResult, err = psql2.NewExecResult(stmt.ExecContext(ctx, args...)); err != nil {
 		err = perrors.Errorf("Exec: %w", err)
 		return
 	}
@@ -78,7 +96,7 @@ func (d *DBMap) Exec(
 func (d *DBMap) Query(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (sqlRows *sql.Rows, err error) {
-	var stmt Stmt
+	var stmt psql2.Stmt
 	if stmt, err = d.getStmt(partition, query, ctx); err != nil {
 		return
 	}
@@ -94,7 +112,7 @@ func (d *DBMap) Query(
 func (d *DBMap) QueryRow(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (sqlRow *sql.Row, err error) {
-	var stmt Stmt
+	var stmt psql2.Stmt
 	if stmt, err = d.getStmt(partition, query, ctx); err != nil {
 		return
 	}
@@ -111,7 +129,7 @@ func (d *DBMap) QueryRow(
 func (d *DBMap) QueryString(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (value string, err error) {
-	var stmt Stmt
+	var stmt psql2.Stmt
 	if stmt, err = d.getStmt(partition, query, ctx); err != nil {
 		return
 	}
@@ -127,7 +145,7 @@ func (d *DBMap) QueryString(
 func (d *DBMap) QueryInt(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (value int, err error) {
-	var stmt Stmt
+	var stmt psql2.Stmt
 	if stmt, err = d.getStmt(partition, query, ctx); err != nil {
 		return
 	}
@@ -173,10 +191,10 @@ func (d *DBMap) Close() (err error) {
 // getStmt obtains a cached statemrnt or prepares the statement and caches it
 func (d *DBMap) getStmt(
 	partition parl.DBPartition, query string, ctx context.Context,
-) (stmt Stmt, err error) {
+) (stmt psql2.Stmt, err error) {
 
 	// obtain the statement cache
-	var dbCache *StatementCache
+	var dbCache *psql2.StatementCache
 	if dbCache, err = d.getOrCreateDBCache(d.dsnr.DSN(partition), ctx); err != nil {
 		return // closed or failure return
 	}
@@ -195,7 +213,7 @@ func (d *DBMap) getStmt(
 // getOrCreateDBCache returns a cached database object or
 // creates, caches and returns a database object
 func (d *DBMap) getOrCreateDBCache(dataSourceName parl.DataSourceName,
-	ctx context.Context) (dbStatementCache *StatementCache, err error) {
+	ctx context.Context) (dbStatementCache *psql2.StatementCache, err error) {
 
 	// status check outside lock
 	if ep := d.closeErr.Load(); ep != nil {
@@ -227,7 +245,7 @@ func (d *DBMap) getOrCreateDBCache(dataSourceName parl.DataSourceName,
 	if err = d.schema(dataSource, ctx); err != nil {
 		return // schema failure exit
 	}
-	dbStatementCache = NewStatementCache(dataSource)
+	dbStatementCache = psql2.NewStatementCache(dataSource)
 
 	return // good exit
 }
@@ -237,7 +255,7 @@ func (d *DBMap) getEnd(
 	errp *error,
 	dataSourceName parl.DataSourceName,
 	dataSourcep *parl.DataSource,
-	dbStatementCachep **StatementCache,
+	dbStatementCachep **psql2.StatementCache,
 ) {
 
 	// success case

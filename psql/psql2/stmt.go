@@ -3,7 +3,8 @@
 ISC License
 */
 
-package psql
+// Package psql2 contains types supporting psql functions.
+package psql2
 
 import (
 	"context"

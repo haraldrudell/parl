@@ -14,6 +14,12 @@ type Registry[V any] struct {
 	values []*pathTuple[V]
 }
 
+// pathTuple holds a value and the key for that value in the paths map
+type pathTuple[V any] struct {
+	abs   string
+	value *V
+}
+
 // NewRegistry returns a registry of values by absolute path
 func NewRegistry[V any]() (registry *Registry[V]) { return &Registry[V]{paths: make(map[string]*V)} }
 

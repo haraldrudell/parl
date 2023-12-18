@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pfs
+package pio
 
 import (
 	"context"
@@ -11,17 +11,17 @@ import (
 )
 
 // ContextReader reader terminated by context
-type ContextReader struct {
+type ContextReaderX struct {
 	ctx context.Context
 	io.Reader
 }
 
 // NewContextReader instantiates ContextReader
-func NewContextReader(ctx context.Context, reader io.Reader) io.Reader {
-	return &ContextReader{ctx: ctx, Reader: reader}
+func NewContextReaderX(ctx context.Context, reader io.Reader) io.Reader {
+	return &ContextReaderX{ctx: ctx, Reader: reader}
 }
 
-func (cr *ContextReader) Read(p []byte) (n int, err error) {
+func (cr *ContextReaderX) Read(p []byte) (n int, err error) {
 	if err := cr.ctx.Err(); err != nil {
 		return 0, err
 	}

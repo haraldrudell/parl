@@ -9,6 +9,7 @@ package pfs
 import (
 	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -16,6 +17,13 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pslices"
+)
+
+const (
+	// platform path separator as a string
+	sSep = string(filepath.Separator)
+	// [os.File.ReadDir] get all names
+	allNamesAtOnce = -1
 )
 
 // Traverser represents a file system that is scanned following symlinks
@@ -68,6 +76,7 @@ type dirEntry struct {
 }
 
 // NewTraverser returns a file-system traverser
+//   - typically used via [pfs.Iterator] or [pfs.DirIterator]
 //   - path is the initial path.
 //     Path may be relative or absolute, contain symlinks and be unclean.
 //     Path may be of any modeType: file, directory or special file.

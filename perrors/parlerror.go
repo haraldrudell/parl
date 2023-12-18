@@ -8,7 +8,7 @@ package perrors
 import (
 	"sync"
 
-	"github.com/haraldrudell/parl/errorglue"
+	"github.com/haraldrudell/parl/perrors/errorglue"
 )
 
 const (

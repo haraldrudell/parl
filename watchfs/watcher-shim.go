@@ -71,7 +71,7 @@ type WatcherShim struct {
 	watcherLock sync.Mutex
 	// written behind watcherLock
 	//	- except for shimShutdownWinner	shimShutDown
-	state parl.Uint32[shimState]
+	state parl.Atomic32[shimState]
 	// written behind watcherLock
 	watcher atomic.Pointer[fsnotify.Watcher]
 }

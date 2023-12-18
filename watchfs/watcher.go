@@ -52,15 +52,15 @@ type Watcher struct {
 }
 
 // NewWatcher provides a channel sending file-system events from a file-system entry and its child directories.
-//   - consider using [NewWatcherCh] for callback-free architecture
+//   - consider using [Iterator] or [NewWatcherCh] for callback-free architecture
 //   - filter [WatchOpAll] (default: 0) is: Create Write Remove Rename Chmod.
 //     it can also be a bit-coded value.
 //   - ignores is a regexp for the absolute filename.
 //     it is applied while scanning directories.
-//   - errFn must be thread-safe.
 //   - eventFn must be thread-safe.
 //     this means that any storing and subsequent retrieval of event
 //     must be thread-safe, protected by go, Mutex or atomic
+//   - errFn must be thread-safe.
 //   - Close the watcher by canceling the context or invoking .Shutdown().
 //     This means that any storing and subequent retrieval of the err value
 //     must be thread-safe, protected by go, Mutex or atomic

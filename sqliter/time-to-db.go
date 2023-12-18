@@ -49,6 +49,7 @@ func ToTime(timeString string) (t time.Time, err error) {
 // SQLite TEXT ISO8601 nano-second resolution UTC time zone
 //   - for nullable database column
 //   - SQLite TEXT: “2022-01-01T08:00:00.000000000Z”
+//   - NULL corresponds to time.Time{} [time.Time.IsZero] true
 func TimeToDBNullable(t time.Time) (dbValue any) {
 	if t.IsZero() {
 		return nil // empty string
@@ -60,6 +61,7 @@ func TimeToDBNullable(t time.Time) (dbValue any) {
 //   - nullable database column
 //   - SQLite TEXT ISO8601 nano-second resolution UTC time zone
 //   - SQLite TEXT: “2022-01-01T08:00:00.000000000Z”
+//   - NULL corresponds to time.Time{} [time.Time.IsZero] true
 func NullableToTime(nullString sql.NullString) (t time.Time, err error) {
 	if !nullString.Valid {
 		return // NULL: t.IsZero()

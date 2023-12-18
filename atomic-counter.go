@@ -11,7 +11,7 @@ import (
 )
 
 // AtomicCounter is a uint64 thread-safe counter
-//   - atomic.Uint64 added:
+//   - [atomic.Uint64] added:
 //   - Inc Dec delegating to Add
 //   - Inc2 Dec2: preventing wrap-around CompareAndSwap mechanic
 //   - Set sets particular value

@@ -11,11 +11,12 @@ import (
 )
 
 // parl.Once is an observable sync.Once with an alternative DoErr method
-//   - DoErr invokes a function returning error recovering a panic
-//   - IsDone returns whether the Once has been executed, atomic performance
-//   - Result returns a possible DoErr outcome, hasValue indicates if values are present. Atomic performance
+//   - [Once.DoErr] invokes a function returning error recovering a panic
+//   - [Once.IsDone] returns whether the Once has been executed, atomic performance
+//   - [Once.Result] returns a possible [Once.DoErr] outcome, atomic performance
+//   - [Once.Do] is similar to [sync.Once.Do]
 //   - parl.Once is thread-safe and does not require initialization
-//   - No thread will return from Once.Do or Once.DoErr until once.Do or once.DoErr has completed
+//   - No thread will return from [Once.Do] or [Once.DoErr] until once.Do or once.DoErr has completed
 type Once struct {
 	// sync.Once is not observable
 	once sync.Once
@@ -25,25 +26,13 @@ type Once struct {
 	// result is the outcome of a possible DoErr invocation
 	//	- if nil, either the Once has not triggered or
 	//		it was triggered by Once.Do that does not have a result
-	result atomic.Pointer[invokeResult]
+	result atomic.Pointer[onceDoErrResult]
 }
 
-// Do calls the function if and only if Do or DoErr is being called for the first time
-// for this instance of Once. Thread-safe
-//   - a panic is not recovered
-//   - thread-safe
-//   - —
-//   - once.Do must execute for happens before guarantee
-func (o *Once) Do(doFuncArgument func()) {
-
-	// because isDone must be set inside of once.Do,
-	// the doFuncArgument argument must be invoked inside a wrapper function
-	//	- the wrapper function must have access to doFuncArgument
-	//	- because once.Do must be invoked every time,
-	//		the wrapper must alway be present
-	var d = doFuncArgumentInvoker{doFuncArgument: doFuncArgument, Once: o}
-
-	o.once.Do(d.invokeF)
+// onceDoErrResult contains the result of a DoErr invocation
+type onceDoErrResult struct {
+	isPanic bool
+	err     error
 }
 
 // DoErr calls the function if and only if Do or DoErr is being called for the first time
@@ -56,12 +45,17 @@ func (o *Once) Do(doFuncArgument func()) {
 //   - because sync.Once.Do has fixed signature,
 //     Do must be invoke a function wrapper
 //   - once.Do must execute for happens before guarantee
+//
+// Usage:
+//
+//	var once parl.Once
+//	var didTheClose, isPanic, err = once.DoErr(osFile.Close)
 func (o *Once) DoErr(doErrFuncArgument func() (err error)) (didOnce, isPanic bool, err error) {
 
 	// wrapper provides the wrapper function for sync.Once.Do
 	//	- once.Do must be invoked every time for happens-before
 	//	- therefore, wrapper must always be present
-	var wrapper = doErrWrapper{
+	var wrapper = onceDoErr{
 		doErrFuncArgument: doErrFuncArgument,
 		didOnce:           &didOnce,
 		isPanic:           &isPanic,
@@ -83,12 +77,41 @@ func (o *Once) DoErr(doErrFuncArgument func() (err error)) (didOnce, isPanic boo
 	return
 }
 
+// Do calls the function if and only if Do or DoErr is being called for the first time
+// for this instance of Once. Thread-safe
+//   - a panic is not recovered
+//   - thread-safe
+//   - —
+//   - once.Do must execute for happens before guarantee
+//
+// Usage:
+//
+//	var once parl.Once
+//	once.Do(myFunc)
+//	…
+//	if once.IsDone() …
+//	func myFunc() { …
+func (o *Once) Do(doFuncArgument func()) {
+
+	// because isDone must be set inside of once.Do,
+	// the doFuncArgument argument must be invoked inside a wrapper function
+	//	- the wrapper function must have access to doFuncArgument
+	//	- because once.Do must be invoked every time,
+	//		the wrapper must alway be present
+	var d = onceDo{doFuncArgument: doFuncArgument, Once: o}
+
+	o.once.Do(d.invokeF)
+}
+
 // IsDone returns true if Once did execute
 //   - thread-safe, atomic performance
 func (o *Once) IsDone() (isDone bool) { return o.isDone.Load() }
 
-// Result returns the DoErr outcome provided with atomic performance
-//   - only available if hasResult is true
+// Result returns the [Once.DoErr] outcome provided with atomic performance
+//   - values are only valid if hasResult is true
+//   - hasResult is false when:
+//   - — the Once has not triggered or
+//   - — the Once was triggered by [Once.Do]
 //   - thread-safe
 func (o *Once) Result() (isPanic bool, hasResult bool, err error) {
 	var result = o.result.Load()
@@ -100,64 +123,4 @@ func (o *Once) Result() (isPanic bool, hasResult bool, err error) {
 	err = result.err
 
 	return
-}
-
-// invokeResult contains the result of a DoErr invocation
-type invokeResult struct {
-	isPanic bool
-	err     error
-}
-
-// doErrWrapper provides a wrapper function for sync.once.Do
-// that executes a function returning an error that may panic
-type doErrWrapper struct {
-	doErrFuncArgument func() (err error)
-	// DoErr return value pointers
-	didOnce *bool
-	isPanic *bool
-	errp    *error
-	// pointer to observable parl.Once
-	//	- has isDone and result fields
-	*Once
-}
-
-// invokeDoErrFuncArgument is behind o.once
-func (d *doErrWrapper) invokeDoErrFuncArgument() {
-	// indicate that the once did execute: last action
-	defer d.isDone.Store(true)
-	var result invokeResult
-	defer d.saveResult(&result)
-	defer RecoverErr(func() DA { return A() }, &result.err, &result.isPanic)
-
-	result.err = d.doErrFuncArgument()
-}
-
-// saveResult stores the outcome of a DoErr invocation
-func (d *doErrWrapper) saveResult(result *invokeResult) {
-
-	// store result in parl.Once
-	d.result.Store(result)
-
-	// update DoErr return values
-	*d.didOnce = true
-	*d.isPanic = result.isPanic
-	*d.errp = result.err
-}
-
-// doFuncArgumentInvoker provides a wrapper method
-// that invokes doFuncArgument and then sets isDone to true
-type doFuncArgumentInvoker struct {
-	doFuncArgument func()
-	// pointer to observable parl.Once
-	//	- has isDone field
-	*Once
-}
-
-// invokeF is behind o.once
-//   - after doFuncArgument invocation, it sets isDone to true
-//   - isDone provides observability
-func (d *doFuncArgumentInvoker) invokeF() {
-	defer d.isDone.Store(true)
-
-	d.doFuncArgument()
 }

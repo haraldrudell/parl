@@ -11,6 +11,7 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/psql/psql2"
 )
 
 // SqlExec is used when parl.DB is not available, for example to implement the schema
@@ -37,7 +38,7 @@ func SqlExec(label string, ctx context.Context, dataSource parl.DataSource,
 
 	// execute
 	var execResult parl.ExecResult
-	if execResult, err = NewExecResult(sqlStmt.ExecContext(ctx, args...)); err != nil {
+	if execResult, err = psql2.NewExecResult(sqlStmt.ExecContext(ctx, args...)); err != nil {
 		err = perrors.Errorf("exec %s: %w", label, err)
 		return
 	}

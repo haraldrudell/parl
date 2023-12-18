@@ -11,7 +11,7 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/psql"
+	"github.com/haraldrudell/parl/psql/psql2"
 )
 
 var pragmaList = []string{
@@ -32,7 +32,7 @@ func Pragma(dataSource parl.DataSource, ctx context.Context) (pragmas map[string
 	pragmas = make(map[string]string)
 	var value string
 	for _, key := range pragmaList {
-		if value, err = psql.QueryString(key, ctx, dataSource, pragmaMap[key]); err != nil {
+		if value, err = psql2.QueryString(key, ctx, dataSource, pragmaMap[key]); err != nil {
 			return
 		}
 		pragmas[key] = value

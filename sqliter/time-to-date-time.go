@@ -36,6 +36,7 @@ const (
 // [DATETIME]: https://sqlite.org/datatype3.html#date_and_time_datatype
 
 // TimeToDATETIME converts Go time.Time to SQLite [DATETIME] UTC millisecond precision
+//   - better to use is [TimeToDB] and [ToTime] using iso8601 utc time-zone with nanosecond precision
 //   - “2019-01-01 21:30:42.000 +00:00”
 //
 // [DATETIME]: https://sqlite.org/datatype3.html#date_and_time_datatype
@@ -44,6 +45,7 @@ func TimeToDATETIME(t time.Time) (dateTime string) {
 }
 
 // DATETIMEtoTime converts SQLite DATETIME to Go time.Time with location time.Local
+//   - better to use is [TimeToDB] and [ToTime] using iso8601 utc time-zone with nanosecond precision
 //   - database stores as TEXT in UTC, millisecond precision
 //   - “2019-01-01 21:30:42.000 +00:00”
 func DATETIMEtoTime(sqliteText string) (t time.Time, err error) {

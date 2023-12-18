@@ -3,7 +3,7 @@
 ISC License
 */
 
-package psql
+package psql2
 
 import (
 	"context"
