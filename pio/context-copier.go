@@ -63,7 +63,7 @@ func NewContextCopier(buf ...[]byte) (copier *ContextCopier) {
 // Copy copies from src to dst until end of data, error, Shutdown or context cancel
 //   - Shutdown method or context cancel aborts copy in progress
 //   - on context cancel, error returned is [context.Canceled]
-//   - on Shutdown, error returned has ErrCopyShutdown
+//   - on Shutdown, error returned has [ErrCopyShutdown]
 //   - if the runtime type of dst or src is [io.Closable],
 //     a thread is active during copying
 //   - such reader or writer will be closed
@@ -223,7 +223,7 @@ func (c *ContextCopier) copyEnd(errp *error) {
 	}
 
 	// await thread doing close, or do close
-	if g := c.g; g != nil {
+	if g := c.g; g.IsValid() {
 		// wait for result from thread
 		g.ReceiveError(errp)
 	} else {

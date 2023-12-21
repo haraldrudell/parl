@@ -66,6 +66,8 @@ type Stack struct {
 	// this thread
 	//	- FuncName is "main.main()" for main thread
 	creator pruntime.CodeLocation
+	// creator goroutine reference
+	goroutineRef string
 }
 
 // NewStack populates a Stack object with the current thread
@@ -108,13 +110,15 @@ func NewStack(skipFrames int) (stack parl.Stack) {
 		var creatorIndex = nonEmptyLineCount - runtCreator
 		// temporary creator code location
 		var creator pruntime.CodeLocation
+		var goroutineRef string
 		// determine s.isMainThread
-		creator.FuncName, s.isMainThread = ParseCreatedLine(trace[creatorIndex])
+		creator.FuncName, goroutineRef, s.isMainThread = ParseCreatedLine(trace[creatorIndex])
 		// if a goroutine, store creator
 		if !s.isMainThread {
+			s.goroutineRef = goroutineRef
+			creator.File, creator.Line = ParseFileLine(trace[creatorIndex+runtFileLineOffset])
 			s.creator = creator
 			skipAtEnd += runtCreator
-			creator.File, creator.Line = ParseFileLine(trace[creatorIndex+runtFileLineOffset])
 		}
 
 		// if not main thread, store goroutine function
@@ -155,7 +159,9 @@ func NewStack(skipFrames int) (stack parl.Stack) {
 	if threadID, status, err = ParseFirstLine(trace[0]); err != nil {
 		panic(err)
 	}
-	s.SetID(threadID, status)
+	s.threadID = threadID
+	s.status = status
+	//s.SetID(threadID, status)
 
 	// extract the desired stack frames into s.Frames
 	// stack:
@@ -176,7 +182,8 @@ func NewStack(skipFrames int) (stack parl.Stack) {
 		frame.CodeLocation.File, frame.CodeLocation.Line = ParseFileLine(trace[i+1])
 		frames = append(frames, &frame)
 	}
-	s.SetFrames(frames)
+	s.frames = frames
+	//s.SetFrames(frames)
 
 	stack = &s
 	return
@@ -184,40 +191,55 @@ func NewStack(skipFrames int) (stack parl.Stack) {
 
 var _ parl.Stack = &Stack{}
 
-func (s *Stack) ID() (threadID parl.ThreadID) {
-	return s.threadID
-}
+// thread ID 1… for the thread requesting the stack trace
+//   - ThreadID is comparable and has IsValid and String methods
+//   - ThreadID is typically an incremented 64-bit integer with
+//     main thread having ID 1
+func (s *Stack) ID() (threadID parl.ThreadID) { return s.threadID }
 
-func (s *Stack) IsMain() (isMainThread bool) {
-	return s.isMainThread
-}
+// true if the thread is the main thread
+//   - false for a launched goroutine
+func (s *Stack) IsMain() (isMainThread bool) { return s.isMainThread }
 
-func (s *Stack) Status() (status parl.ThreadStatus) {
-	return s.status
-}
+// a word indicating thread status, typically word “running”
+func (s *Stack) Status() (status parl.ThreadStatus) { return s.status }
 
-func (s *Stack) GoFunction() (goFunction *pruntime.CodeLocation) {
-	return &s.goFunction
-}
+// the goroutine function used to launch this thread
+//   - if IsMain is true, zero-value. Check using GoFunction().IsSet()
+//   - never nil
+func (s *Stack) GoFunction() (goFunction *pruntime.CodeLocation) { return &s.goFunction }
 
-func (s *Stack) Creator() (creator *pruntime.CodeLocation) {
-	return &s.creator
-}
-
-func (s *Stack) Frames() (frames []parl.Frame) {
-	return s.frames
-}
-
-func (s *Stack) MostRecentFrame() (frame parl.Frame) {
-	var f Frame
-	if len(s.frames) > 0 {
-		fp := s.frames[0].(*Frame)
-		f = *fp
-	}
-	frame = &f
+// the code location of the go statement creating this thread
+//   - if IsMain is true, zero-value. Check with Creator().IsSet()
+//   - never nil
+func (s *Stack) Creator() (creator *pruntime.CodeLocation, goRoutineRef string) {
+	var c = s.creator
+	creator = &c
+	goRoutineRef = s.goroutineRef
 	return
 }
 
+// A list of code locations for this thread
+//   - index [0] is the most recent code location, typically the invoker requesting the stack trace
+//   - includes invocation argument values
+func (s *Stack) Frames() (frames []parl.Frame) { return s.frames }
+
+// func (s *Stack) MostRecentFrame() (frame parl.Frame) {
+// 	var f Frame
+// 	if len(s.frames) > 0 {
+// 		fp := s.frames[0].(*Frame)
+// 		f = *fp
+// 	}
+// 	frame = &f
+// 	return
+// }
+
+// Shorts lists short code locations for all stack frames, most recent first:
+// Shorts("prepend") →
+//
+//	prepend Thread ID: 1
+//	prepend main.someFunction()-pruntime.go:84
+//	prepend main.main()-pruntime.go:52
 func (s *Stack) Shorts(prepend string) (shorts string) {
 	if prepend != "" {
 		prepend += "\x20"
@@ -229,43 +251,72 @@ func (s *Stack) Shorts(prepend string) (shorts string) {
 		sL = append(sL, prepend+frame.Loc().Short())
 	}
 	if s.creator.IsSet() {
-		sL = append(sL, prepend+"creator: "+s.creator.Short())
+		var s3 = prepend + "creator: " + s.creator.Short()
+		if s.goroutineRef != "" {
+			s3 += "\x20" + s.goroutineRef
+		}
+		sL = append(sL, s3)
 	}
 	return strings.Join(sL, "\n")
 }
 
 // SetID updates goroutine ID and thread status from the stack trace
 // status line
-func (s *Stack) SetID(threadID parl.ThreadID, status parl.ThreadStatus) {
-	s.threadID = threadID
-	s.status = status
-}
+// func (s *Stack) SetID(threadID parl.ThreadID, status parl.ThreadStatus) {
+// 	s.threadID = threadID
+// 	s.status = status
+// }
 
 // SetCreator is used if Stack is for a goroutine
 //   - describing whether it is the main thread
 //   - if a gouroutine, where the launching go statement was located
-func (s *Stack) SetCreator(creator *pruntime.CodeLocation, isMainThread bool) {
-	s.creator = *creator
-	s.isMainThread = isMainThread
+// func (s *Stack) SetCreator(creator *pruntime.CodeLocation, isMainThread bool) {
+// 	s.creator = *creator
+// 	s.isMainThread = isMainThread
+// }
+
+//func (s *Stack) SetFrames(frames []parl.Frame) { s.frames = frames }
+
+func (s *Stack) Dump() (s2 string) {
+	if s == nil {
+		return "<nil>"
+	}
+	var f = make([]string, len(s.frames))
+	for i, frame := range s.frames {
+		f[i] = fmt.Sprintf("%d: %s Args: %q", i+1, frame.Loc().Dump(), frame.Args())
+	}
+	return parl.Sprintf("threadID %q status %q isMain %t frames %d[\n%s\n]\ngoFunction:\n%s\ncreator: ref: %q\n%s",
+		s.threadID, s.status, s.IsMain(),
+		len(s.frames), strings.Join(f, "\n"),
+		s.goFunction.Dump(),
+		s.goroutineRef,
+		s.creator.Dump(),
+	)
 }
 
-func (s *Stack) SetFrames(frames []parl.Frame) {
-	s.frames = frames
-}
-
-func (s *Stack) String() (str string) {
+// String is a multi-line stack trace, most recent code location first:
+//
+//	ID: 18 IsMain: false status: running␤
+//	main.someFunction({0x100dd2616, 0x19})␤
+//	␠␠pruntime.go:64␤
+//	cre: main.main-pruntime.go:53␤
+func (s *Stack) String() (s2 string) {
 	sL := make([]string, len(s.frames))
 	for i, frame := range s.frames {
 		sL[i] = frame.String()
 	}
-	if str = strings.Join(sL, "\n"); str != "" {
-		str += "\n"
+	if s2 = strings.Join(sL, "\n"); s2 != "" {
+		s2 += "\n"
+	}
+	var cre = s.creator.Long()
+	if s.goroutineRef != "" {
+		cre += "\x20" + s.goroutineRef
 	}
 	return fmt.Sprintf("ID: %s IsMain: %t status: %s\n"+
 		"%s"+
 		"cre: %s",
 		s.threadID, s.isMainThread, s.status,
-		str,
-		s.creator.Long(),
+		s2,
+		cre,
 	)
 }

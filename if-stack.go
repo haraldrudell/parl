@@ -31,7 +31,8 @@ type Stack interface {
 	// the code location of the go statement creating this thread
 	//	- if IsMain is true, zero-value. Check with Creator().IsSet()
 	//	- never nil
-	Creator() (creator *pruntime.CodeLocation)
+	//	-goRoutineRef: “in goroutine 9”
+	Creator() (creator *pruntime.CodeLocation, goRoutineRef string)
 	// Shorts lists short code locations for all stack frames, most recent first:
 	// Shorts("prepend") →
 	//  prepend Thread ID: 1

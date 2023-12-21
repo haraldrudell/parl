@@ -35,16 +35,24 @@ type WatchEvent struct {
 	OpBits Op
 }
 
-// func (we *WatchEvent) String() (s string) {
-// 	return we.string(true)
-// }
+func (e WatchEvent) Dump() (s string) {
+	return parl.Sprintf("at: %s id: %s base: %q abs: %q op: %s %s",
+		e.At.Format(parl.Rfc3339ns),
+		e.ID,
+		e.BaseName,
+		e.AbsName,
+		e.Op,
+		e.OpBits,
+	)
 
-func (we WatchEvent) String() string {
-	var IDstring = we.ID.String()
+}
+
+func (e WatchEvent) String() (s string) {
+	var IDstring = e.ID.String()
 	return fmt.Sprintf("%s uuid: %s %s %s", // event: %#v",
-		parl.Short(we.At),          // 220506_08:03:53-07
+		parl.Short(e.At),           // 220506_08:03:53-07
 		IDstring[len(IDstring)-4:], // just the last 4 characters: uuid: b62f
-		we.Op,                      // CREATE
-		we.BaseName,                // a.txt or absoute path /…/a.txt
+		e.Op,                       // CREATE
+		e.BaseName,                 // a.txt or absoute path /…/a.txt
 	)
 }

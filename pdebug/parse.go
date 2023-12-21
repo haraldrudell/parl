@@ -19,7 +19,7 @@ const (
 )
 
 // created by begins lines returned by runtime.Stack if
-// the executing thread is a launched goroutine
+// the executing thread is a launched goroutine “created by ”
 var runtCreatedByPrefix = []byte("created by ")
 
 // getID obtains gorutine ID, as of go1.18 a numeric string "1"…
@@ -77,15 +77,24 @@ func ParseFileLine(fileLine []byte) (file string, line int) {
 //   - “created by main.main”
 //   - “created by main.(*MyType).goroutine1”
 //   - “main.main()”
-func ParseCreatedLine(createdLine []byte) (funcName string, IsMainThread bool) {
+//   - go1.21.5 231219: “created by codeberg.org/haraldrudell/tools/gact.(*Transcriber).TranscriberThread in goroutine 9”
+func ParseCreatedLine(createdLine []byte) (funcName, goroutineRef string, IsMainThread bool) {
 
-	// check if created frame exists
-	if !bytes.HasPrefix(createdLine, runtCreatedByPrefix) {
-		IsMainThread = true
+	// remove prefix “created by ”
+	var remain = bytes.TrimPrefix(createdLine, runtCreatedByPrefix)
+
+	// if the line did not have this prefix, it is the main thread that launched main.main
+	if IsMainThread = len(remain) == len(createdLine); IsMainThread {
 		return // main thread: IsMainThread: true funcName zero-value
 	}
 
-	funcName = string(createdLine[len(runtCreatedByPrefix):])
+	// “codeberg.org/haraldrudell/tools/gact.(*Transcriber).TranscriberThread in goroutine 9”
+	if index := bytes.IndexByte(remain, '\x20'); index != -1 {
+		funcName = string(remain[:index])
+		goroutineRef = string(remain[index+1:])
+	} else {
+		funcName = string(remain)
+	}
 
 	return
 }

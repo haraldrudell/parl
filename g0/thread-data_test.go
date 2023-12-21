@@ -116,8 +116,8 @@ func TestThreadData(t *testing.T) {
 	if short := threadData.String(); !strings.Contains(short, exp) {
 		t.Errorf("threadData.String(): %q exp %q", short, exp)
 	}
-
-	threadData.SetCreator(someType.stack.Creator())
+	var creator, _ = someType.stack.Creator()
+	threadData.SetCreator(creator)
 }
 
 // ITEST= go test -v -run '^TestThreadDataValues$' ./g0
@@ -146,21 +146,22 @@ type SomeType struct {
 	stack parl.Stack
 }
 
-func (st *SomeType) SomeCode(threadData *ThreadData) {
-	st.wg.Add(1)
-	go st.SomeFunction(threadData)
-	st.wg.Wait()
+func (s *SomeType) SomeCode(threadData *ThreadData) {
+	s.wg.Add(1)
+	go s.SomeFunction(threadData)
+	s.wg.Wait()
 }
-func (st *SomeType) SomeFunction(threadData *ThreadData) {
-	defer st.wg.Done()
+func (s *SomeType) SomeFunction(threadData *ThreadData) {
+	defer s.wg.Done()
 
-	st.SomeMethod(threadData)
+	s.SomeMethod(threadData)
 }
-func (st *SomeType) SomeMethod(threadData *ThreadData) {
-	st.stack = pdebug.NewStack(0)
+func (s *SomeType) SomeMethod(threadData *ThreadData) {
+	s.stack = pdebug.NewStack(0)
+	var creator, _ = s.stack.Creator()
 	threadData.Update(
-		st.stack.ID(),
-		st.stack.Creator(),
-		st.stack.GoFunction(),
+		s.stack.ID(),
+		creator,
+		s.stack.GoFunction(),
 		threadDataLabel)
 }

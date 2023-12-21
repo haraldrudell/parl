@@ -5,7 +5,12 @@ ISC License
 
 package pfs
 
-import "io/fs"
+import (
+	"io/fs"
+
+	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/perrors"
+)
 
 // ResultEntry is an existing file-system entry, traversal-end marker or an error-entry
 // during file-system traversal
@@ -54,3 +59,12 @@ func (e ResultEntry) Skip() { e.SkipEntry(e.No) }
 
 // IsEnd indicates that this ResultEntry is an end of entries marker
 func (e ResultEntry) IsEnd() (isEnd bool) { return e.DirEntry == nil }
+
+// resultEntry path: "…" abs"/…" err ‘OK’ reason ‘non-symlink non-directory non-error entry’
+func (e ResultEntry) String() (s string) {
+	return parl.Sprintf("resultEntry path: %q abs%q err ‘%s’ reason ‘%s’",
+		e.ProvidedPath, e.Abs,
+		perrors.Short(e.Err),
+		e.Reason,
+	)
+}

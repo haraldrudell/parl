@@ -109,7 +109,8 @@ func TestStack(t *testing.T) {
 	if actualS != expGoFunctionFileLine {
 		t.Errorf("stack.GoFunction FuncLine: %q expPrefix %q", stack.GoFunction().FuncLine(), expGoFunctionFileLine)
 	}
-	actualS = stack.Creator().Short()
+	var creator, _ = stack.Creator()
+	actualS = creator.Short()
 	if !strings.HasPrefix(actualS, expCreatorPrefix) {
 		t.Errorf("stack.Creator: %q expPrefix %q", actualS, expCreatorPrefix)
 	}

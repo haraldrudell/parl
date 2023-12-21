@@ -48,6 +48,8 @@ func (w *WatcherCh) Watch(path string) (err error) { return w.watcher.Watch(path
 //   - Thread-safe
 func (w *WatcherCh) Ch() (ch <-chan any) { return w.ch }
 
+func (w *WatcherCh) List() (paths []string) { return w.watcher.List() }
+
 // Get receives one or more watch events
 //   - blocks until an event is available or the watcher ends.
 //     For non-blocking designs, use [WatcherCh.Ch]

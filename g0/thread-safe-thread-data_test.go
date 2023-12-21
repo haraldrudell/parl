@@ -22,9 +22,10 @@ func TestThreadDataWrap(t *testing.T) {
 		t.Error("haveThreadID true")
 	}
 
+	var creator, _ = stack.Creator()
 	threadDataWrap.Update(
 		stack.ID(),
-		stack.Creator(),
+		creator,
 		stack.GoFunction(),
 		"",
 	)
@@ -33,5 +34,5 @@ func TestThreadDataWrap(t *testing.T) {
 	}
 	threadData = threadDataWrap.Get()
 	_ = threadData
-	threadDataWrap.SetCreator(stack.Creator())
+	threadDataWrap.SetCreator(creator)
 }
