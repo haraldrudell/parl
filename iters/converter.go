@@ -37,6 +37,7 @@ type Converter[K any, V any] struct {
 func NewConverterIterator[K any, V any](
 	keyIterator Iterator[K],
 	converter ConverterFunction[K, V],
+	asyncCancel ...func(),
 ) (iterator Iterator[V]) {
 	if converter == nil {
 		panic(cyclebreaker.NilError("converter"))
@@ -48,7 +49,7 @@ func NewConverterIterator[K any, V any](
 		keyIterator: keyIterator,
 		converter:   converter,
 	}
-	c.BaseIterator = NewBaseIterator(c.iteratorAction)
+	c.BaseIterator = NewBaseIterator(c.iteratorAction, asyncCancel...)
 
 	return &c
 }

@@ -31,6 +31,9 @@ const (
 	// displays error location but not stack traces
 	//	- second argument to [Executable.LongErrors]
 	OutputErrorLocationTrue = true
+	// always output error stack traces
+	//	- second argument to [Executable.LongErrors]
+	AlwaysStackTrace = true
 )
 
 const (

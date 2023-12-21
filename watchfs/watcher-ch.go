@@ -33,6 +33,18 @@ type WatcherCh struct {
 //     it is applied while scanning directories.
 //   - errFn must be thread-safe.
 //   - stores self-referencing pointers
+//   - consumers are expected to use:
+//   - — [NewIterator] using a Go for-statement iterative api
+//   - — [NewWatcherCh] using Go channel api
+//   - — [NewWatcher] using callback api
+//
+// Usage:
+//
+//	var watcherCh = watchfs.NewWatcherCh(watchfs.WatchOpAll, watchfs.NoIgnores, g.AddError)
+//	defer watcherCh.Shutdown()
+//	if err = watcherCh.Watch(path); err != nil {…
+//	for any := range watcherCh.Ch() {
+//	  event, events := watchfs.UnpackEvents(any)
 func NewWatcherCh(
 	filter Op, ignores *regexp.Regexp,
 	errFn func(err error),

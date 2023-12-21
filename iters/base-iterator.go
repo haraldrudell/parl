@@ -36,15 +36,28 @@ type BaseIterator[T any] struct {
 	//	- — returned from FunctionIteratorCancel -1 invocation without error
 	//	- non-nil error if fn returned error
 	//	- updated by enqueueForFn() inside i.publicsLock lock
-	err atomic.Pointer[error]
+	err         atomic.Pointer[error]
+	asyncCancel func()
 }
 
 // NewBaseIterator returns an implementation of Cond Next Cancel methods part of [iters.Iterator]
-func NewBaseIterator[T any](iteratorAction IteratorAction[T]) (iterator *BaseIterator[T]) {
+//   - asyncCancel is used if function or converter iterators are blocking.
+//     asyncCancel indicates that a Cancel invocation has occurred
+func NewBaseIterator[T any](
+	iteratorAction IteratorAction[T],
+	asyncCancel ...func(),
+) (iterator *BaseIterator[T]) {
 	if iteratorAction == nil {
 		panic(cyclebreaker.NilError("iteratorAction"))
 	}
-	return &BaseIterator[T]{iteratorAction: iteratorAction}
+	var ac func()
+	if len(asyncCancel) > 0 {
+		ac = asyncCancel[0]
+	}
+	return &BaseIterator[T]{
+		iteratorAction: iteratorAction,
+		asyncCancel:    ac,
+	}
 }
 
 // Cond implements the condition statement of a Go “for” clause
@@ -116,6 +129,10 @@ func (i *BaseIterator[T]) Cancel(errp ...*error) (err error) {
 	// ensure cancel initiated prior to lock
 	if cancelStates(i.cancelState.Load()) == notCanceled {
 		i.cancelState.CompareAndSwap(uint32(notCanceled), uint32(cancelRequested))
+	}
+	// asyncCancel
+	if ac := i.asyncCancel; ac != nil {
+		ac()
 	}
 	// the lock provides wait mechanic
 	i.publicsLock.Lock()

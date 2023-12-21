@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Datapoint tracks a fluctuating value with average. Thread-safe.
 package counter
 
 import (

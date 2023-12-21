@@ -29,6 +29,7 @@ type Simple[K any, V any] struct {
 func NewSimpleConverterIterator[K any, V any](
 	keyIterator Iterator[K],
 	simpleConverter SimpleConverter[K, V],
+	asyncCancel ...func(),
 ) (iterator Iterator[V]) {
 	if simpleConverter == nil {
 		panic(cyclebreaker.NilError("simpleConverter"))
@@ -40,7 +41,7 @@ func NewSimpleConverterIterator[K any, V any](
 		keyIterator:     keyIterator,
 		simpleConverter: simpleConverter,
 	}
-	c.BaseIterator = *NewBaseIterator(c.iteratorAction)
+	c.BaseIterator = *NewBaseIterator(c.iteratorAction, asyncCancel...)
 
 	return &c
 }

@@ -19,6 +19,12 @@ import (
 	"github.com/haraldrudell/parl/pstrings"
 )
 
+func TestWatcher(t *testing.T) {
+
+	// Shutdown() Watch()
+	//var watcher *Watcher = NewWatcher(WatchOpAll, NoIgnores)
+}
+
 // test watching single directory
 //   - Phase 1: watch single directory
 //   - Phase 2: add subdirectory

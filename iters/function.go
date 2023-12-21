@@ -33,12 +33,13 @@ type Function[T any] struct {
 //   - thread-safe
 func NewFunctionIterator[T any](
 	iteratorFunction IteratorFunction[T],
+	asyncCancel ...func(),
 ) (iterator Iterator[T]) {
 	if iteratorFunction == nil {
 		panic(cyclebreaker.NilError("iteratorFunction"))
 	}
 	f := &Function[T]{iteratorFunction: iteratorFunction}
-	f.BaseIterator = NewBaseIterator[T](f.iteratorAction)
+	f.BaseIterator = NewBaseIterator[T](f.iteratorAction, asyncCancel...)
 	return f
 }
 

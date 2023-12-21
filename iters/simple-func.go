@@ -32,12 +32,13 @@ type SimpleFunc[T any] struct {
 //   - thread-safe
 func NewSimpleFunctionIterator[T any](
 	iteratorFunction SimpleIteratorFunc[T],
+	asyncCancel ...func(),
 ) (iterator Iterator[T]) {
 	if iteratorFunction == nil {
 		panic(cyclebreaker.NilError("iteratorFunction"))
 	}
 	f := &SimpleFunc[T]{iteratorFunction: iteratorFunction}
-	f.BaseIterator = NewBaseIterator[T](f.iteratorAction)
+	f.BaseIterator = NewBaseIterator[T](f.iteratorAction, asyncCancel...)
 	return f
 }
 

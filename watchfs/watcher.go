@@ -28,6 +28,10 @@ var NoIgnores *regexp.Regexp
 // 220315 use the old github.com/fsnotify/fsevents v0.1.1
 
 // Watcher implements a file-system watcher using callback api
+//   - consumers are expected to use:
+//   - — [NewIterator] using a Go for-statement iterative api
+//   - — [NewWatcherCh] using Go channel api
+//   - — [NewWatcher] using callback api
 //   - eventFn receives filtered events and must be thread-safe
 //   - if directories are created, Watcher adds those to being watched
 //   - —

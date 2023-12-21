@@ -17,41 +17,71 @@ import (
 	"github.com/haraldrudell/parl/pslices"
 )
 
-const (
-	wUnwatched watchState = iota
-	wWatching
-	wWatchFailed
-)
-
-type watchState uint8
-
+// Iterator is a file-system watcher with Go for-statement iterative api
 type Iterator struct {
-	path       string
-	done       <-chan struct{}
-	watcher    Watcher
-	watchState parl.Atomic32[watchState]
-	err        atomic.Pointer[error]
-	isEvent    parl.CyclicAwaitable
+	// path is the file-system entry watched
+	//	- may be relative, unclean and contain symlinks
+	path string
+	// watcher is a file-system watcher with callback api
+	watcher Watcher
+	// if Watch has been invoked
+	isWatching atomic.Bool
+	// triggers on event receive
+	hasEvent parl.CyclicAwaitable
+	// err receives errors from the watcher api in real-time
+	err atomic.Pointer[error]
+	// true if asyncCancel was invoked
+	isAsyncCancel parl.Awaitable
+	// closes on context cancel
+	ctx context.Context
 
+	// eventLock makes events thread-safe
 	eventLock sync.Mutex
-	events    pslices.Shifter[*WatchEvent]
+	// events buffers wacther events that may arrive many at a time
+	events pslices.Shifter[*WatchEvent]
 }
 
 // NewIterator returns a file-system watch-event iterator
+//   - blocking iterator for use with go for-statement
+//   - optional context for cancelation
+//   - filter [WatchOpAll] (default: 0) is: Create Write Remove Rename Chmod
+//     it can also be a bit-coded value.
+//   - ignores is a regexp for the absolute filename.
+//     It is applied while scanning directories, not for individual events.
+//   - thread-safe
+//   - consumers are expected to use:
+//   - — [NewIterator] using a Go for-statement iterative api
+//   - — [NewWatcherCh] using Go channel api
+//   - — [NewWatcher] using callback api
 //
 // Usage:
 //
-// iterator = NewIterator(watchfs.WatchOpAll, watchfs.NoIgnores)
-func NewIterator(path string, filter Op, ignores *regexp.Regexp, ctx context.Context) (iterator iters.Iterator[*WatchEvent]) {
+//	var iterator = watchfs.NewIterator(somePath, watchfs.WatchOpAll, watchfs.NoIgnores, ctx)
+//	defer iterator.Cancel(&err)
+//	for watchEvent, _ := iterator.Init(); iterator.Cond(&watchEvent); {…
+func NewIterator(path string, filter Op, ignores *regexp.Regexp, ctx ...context.Context) (iterator iters.Iterator[*WatchEvent]) {
+
 	i := Iterator{
-		path:    path,
-		done:    ctx.Done(),
-		isEvent: *parl.NewCyclicAwaitable(),
+		path:          path,
+		hasEvent:      *parl.NewCyclicAwaitable(),
+		isAsyncCancel: *parl.NewAwaitable(),
 	}
-	i.watcher = *NewWatcher(filter, ignores, i.receiveWatchEvent, i.errFn)
-	return iters.NewFunctionIterator(i.iteratorFunction)
+	if len(ctx) > 0 {
+		i.ctx = ctx[0]
+	}
+	i.watcher = *NewWatcher(filter, ignores, i.receiveEventFromWatcher, i.errFn)
+	return iters.NewFunctionIterator(i.iteratorFunction, i.asyncCancel)
 }
 
+// iteratorFunction awaits the next event
+//   - iteratorFunction invocations are serialized by the function iterator.
+//     Therefore, iteratorFunction is a critical section with only one thread
+//     executing at any time
+//   - any thread may invoke iteratorFunction why it
+//     must be thread-safe
+//   - iteratorFunction is blocking but can be aborted by
+//     asyncCancel
+//   - thread-safe
 func (i *Iterator) iteratorFunction(isCancel bool) (fsEvent *WatchEvent, err error) {
 
 	//handle cancel and error
@@ -59,140 +89,116 @@ func (i *Iterator) iteratorFunction(isCancel bool) (fsEvent *WatchEvent, err err
 		i.watcher.Shutdown()
 	}
 	err = i.error() // collect any Shutdown errors
-	if isCancel || err != nil {
-		return // cancel or error return
+	if isCancel || i.isAsyncCancel.IsClosed() || err != nil {
+		if !isCancel && err == nil {
+			err = parl.ErrEndCallbacks
+		}
+		return // cancel or error return: will not be invoked again
 	}
 
 	// ensure Watching
-	if err = i.ensureWatch(); err != nil {
-		return
+	if !i.isWatching.Load() {
+		i.isWatching.Store(true)
+		if err = i.watcher.Watch(i.path); err != nil {
+			i.watcher.Shutdown()
+			// ignore i.error, an error is already present
+			return // bad watch return
+		}
 	}
 
-	// get or wait for file-system event, context cancel or error
-	var isDone bool
-	if fsEvent, isDone, err = i.event(); err != nil {
-		return // recent error return
+	// get any queued up event
+	if fsEvent = i.getEvent(); fsEvent != nil {
+		return // success return
 	}
-	if !isDone {
-		return // has event return
+	// arm cyclable
+	i.hasEvent.Open()
+	// make sure any event is collected prior to arming recyclable
+	if fsEvent = i.getEvent(); fsEvent != nil {
+		return // success return
 	}
-	// it’s context cancel
 
-	// shutdown watcher
+	// wait for next event
+	var maybeErr error
+	var done <-chan struct{}
+	if i.ctx != nil {
+		done = i.ctx.Done()
+	}
+	select {
+	case <-i.hasEvent.Ch():
+		if fsEvent = i.getEvent(); fsEvent != nil {
+			return // success return
+		}
+		maybeErr = perrors.NewPF("Bad state")
+	case <-done:
+		maybeErr = i.ctx.Err()
+	case <-i.isAsyncCancel.Ch():
+		maybeErr = parl.ErrEndCallbacks
+	}
 	i.watcher.Shutdown()
-	if err = i.error(); err != nil {
-		return
+	if err = i.error(); err == nil {
+		err = maybeErr
 	}
-	err = parl.ErrEndCallbacks // signal cancel
-	return
-}
 
-func (i *Iterator) ensureWatch() (err error) {
-
-	// fast check outside lock
-	var doWatch bool
-	if doWatch, err = i.stateCheck(); !doWatch {
-		return
-	}
-	i.eventLock.Lock()
-	defer i.eventLock.Unlock()
-
-	if doWatch, err = i.stateCheck(); !doWatch {
-		return
-	}
-	if err = i.watcher.Watch(i.path); err == nil {
-		i.watchState.Store(wWatching)
-		return
-	}
-	i.watchState.Store(wWatchFailed)
-	i.errFn(err)
-	i.watcher.Shutdown()
-	err = i.error()
-
-	return
-}
-
-func (i *Iterator) stateCheck() (doWatch bool, err error) {
-	switch i.watchState.Load() {
-	case wUnwatched:
-		doWatch = true
-	case wWatchFailed:
-		err = perrors.NewPF("Watch failed")
-	}
-	return
+	return // cancel error return
 }
 
 // receiveWatchEvent receives events from the watcher
-func (i *Iterator) receiveWatchEvent(event *WatchEvent) {
+//   - thread-safe
+func (i *Iterator) receiveEventFromWatcher(event *WatchEvent) {
 	i.eventLock.Lock()
 	defer i.eventLock.Unlock()
 
 	i.events.Append(event)
+	i.hasEvent.Close()
 }
 
-func (i *Iterator) event() (event *WatchEvent, isDone bool, err error) {
-
-	// check context cancel
-	select {
-	case _, isDone = <-i.done:
-		return
-	default:
-	}
-
-	// any pending event
-	if event = i.eventNow(); event != nil {
-		return
-	}
-
-	// wait for event, error or context cancel
-	select {
-	case _, isDone = <-i.done:
-		return
-	case <-i.isEvent.Ch():
-		i.isEvent.Open()
-	}
-	err = i.error()
-	event = i.eventNow()
-
-	return
-}
-
-func (i *Iterator) eventNow() (event *WatchEvent) {
+// getEvent gets an event from the buffer
+func (i *Iterator) getEvent() (event *WatchEvent) {
 	i.eventLock.Lock()
 	defer i.eventLock.Unlock()
 
 	if len(i.events.Slice) == 0 {
-		return
+		return // no event return
 	}
 	event = i.events.Slice[0]
 	i.events.Slice[0] = nil
 	i.events.Slice = i.events.Slice[1:]
 
-	return
+	return // has event return
 }
 
-// errFn receives errors
+// errFn receives errors from the watcher api
+//   - invoked at any time
+//   - thread-safe
 func (i *Iterator) errFn(err error) {
+	// append the error to i.err
 	for {
 		var errp = i.err.Load()
 		var err1 error
-		if errp == nil {
+		if errp != nil {
 			err1 = perrors.AppendError(*errp, err)
 		} else {
 			err1 = err
 		}
 		if i.err.CompareAndSwap(errp, &err1) {
-			break
+			break // successfully updated
 		}
 	}
-	i.isEvent.Close()
+	i.asyncCancel()
 }
 
+// error retrives any errors from watcher api
 func (i *Iterator) error() (err error) {
-	if i.err.Load() != nil {
-		if ep := i.err.Swap(nil); ep != nil {
-			err = *ep
-		}
+	if ep := i.err.Load(); ep != nil {
+		err = *ep
 	}
 	return
+}
+
+// asyncCancel is used to note cancel since watcher is blocking
+//   - can be invoked at any time
+//   - thread-safe
+func (i *Iterator) asyncCancel() {
+	i.isAsyncCancel.Close()
+	i.watcher.Shutdown()
 }
