@@ -15,7 +15,7 @@ import (
 type WatcherCh struct {
 	// ch sends *WatchEvent or []*WatchEvent values
 	ch chan any
-	// watcher is a file-system  watcher with portable callback api
+	// watcher is a file-system watcher with portable callback api
 	watcher *Watcher
 
 	// eventLock ensures serialization of read-write-back to ch

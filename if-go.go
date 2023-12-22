@@ -268,6 +268,11 @@ type GoError interface {
 	error // Error() string
 	// Err retrieves the original error value
 	Err() (err error)
+	// ErrString returns string representation of error
+	//   - if no error “OK”
+	//   - if not debug or panic, short error with location
+	//   - otherwise error with stack trace
+	ErrString() (errString string)
 	// Time provides when this error occurred
 	Time() time.Time
 	// IsThreadExit determines if this error is a thread exit, ie. GeExit GePreDoneExit

@@ -24,10 +24,16 @@ const (
 //   - IsDirectoryNonExistentIsError IsDirectoryNotDirIsError
 type IsDirectoryArg uint8
 
-// IsDirectory determines if path exists, is a directory or other entry
-//   - flags is bitfield
-//   - flags: IsDirectoryNonExistentIsError
-//   - flags: IsDirectoryNotDirIsError
+// IsDirectory determines if path exists, is directory or another type of file-system entry
+//   - path may be relative, contain symlinks or be unclean
+//   - isDirectory is true if path exists and is directory.
+//     Non-existing path is not an error.
+//   - if IsDirectoryNonExistentIsError is present,
+//     non-existing path returns error
+//   - if IsDirectoryNotDirIsError is present,
+//     a file-system entry that is not directory returns error
+//   - flags is bitfield: IsDirectoryNonExistentIsError | IsDirectoryNotDirIsError
+//   - symlinks are followed [os.Stat]
 func IsDirectory(path string, flags IsDirectoryArg) (isDirectory bool, err error) {
 	var fileInfo fs.FileInfo
 	if fileInfo, err = Stat(path); err != nil {

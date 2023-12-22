@@ -24,11 +24,11 @@ type DirIterator struct {
 //   - path is the initial path for the file-system walk.
 //     it may be relative or absolute, contain symlinks and
 //     point to a file, directory or special file
-//   - only error-free directories are returned.
-//     if directories are not skipped, they are followed.
-//   - any file-system entry error cancels the iterator with error.
-//     Entry end return ends the iterator.
-//   - symlinks are followed
+//   - only directories are returned.
+//     if directories are not skipped, they descended into.
+//   - symlinks are followed.
+//     Broken symlinks are ignored.
+//   - any errored file-system entry cancels the iterator with error.
 func NewDirIterator(path string) (iterator iters.Iterator[ResultEntry]) {
 	i := DirIterator{traverser: *NewTraverser(path)}
 	i.BaseIterator = *iters.NewBaseIterator(i.iteratorAction)
@@ -59,15 +59,19 @@ func (t *DirIterator) iteratorAction(isCancel bool) (result ResultEntry, err err
 			return
 		}
 
-		// any error cancels iterator
+		// ignore broken symlink
+		if result.Reason == RSymlinkBad {
+			continue
+		}
+
+		// any other error cancels iterator
 		if result.Err != nil {
 			err = result.Err
 			return
 		}
 
-		//	- if it is not an error or end,
-		//	- and it is not a directory,
-		//	- ignore it
+		//	- ignore any file-system entry that is not
+		//		a directory
 		if !result.IsDir() {
 			continue
 		}

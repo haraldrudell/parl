@@ -29,7 +29,7 @@ var watchNo atomic.Uint64
 // Watcher shim interfaces [fsnotify.Watcher]
 //   - purpose is to completely encapsulate fsnotify implementation
 //   - portable callback api
-//   - errFn recieves:
+//   - errFn receives:
 //   - — streamed fsnotify api errors
 //   - — eventFunc callback errors
 //   - — runtime errors and

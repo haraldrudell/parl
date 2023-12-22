@@ -46,9 +46,26 @@ func (e *GoError) Time() (when time.Time) {
 	return e.t
 }
 
-// Err returns the unbderlying error
+// Err returns the underlying error
 func (e *GoError) Err() (err error) {
 	return e.err
+}
+
+// ErrString returns string representation of error
+//   - if no error “OK”
+//   - if not debug or panic, short error with location
+//   - otherwise error with stack trace
+func (e *GoError) ErrString() (errString string) {
+	var isLong = parl.IsThisDebug()
+	if !isLong {
+		isLong, _, _, _ = perrors.IsPanic(e)
+	}
+	if isLong {
+		errString = perrors.Long(e)
+	} else {
+		errString = perrors.Short(e)
+	}
+	return
 }
 
 func (e *GoError) IsThreadExit() (isThreadExit bool) {

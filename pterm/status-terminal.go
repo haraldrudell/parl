@@ -247,80 +247,10 @@ func (s *StatusTerminal) LogTimeStamp(format string, a ...any) {
 // for two or more arguments, Printf formatting is used.
 // Single argument is not interpreted.
 // For non-ansi-terminal stderr, LogTimeStamp simply prints lines of text.
-func (s *StatusTerminal) Log(format string, a ...any) {
+func (s *StatusTerminal) Log(format string, a ...any) { s.doLog(false, format, a...) }
 
-	// if not a terminal, regular logging
-	if !s.IsTerminal.Load() {
-		var logLines = parl.Sprintf(format, a...)
-		s.Print(logLines) // parl.Log is thread-safe
-		for writer := range s.copyLog {
-			s.write(logLines, writer.Write)
-		}
-		return
-	}
-
-	// get log string that ends with newline
-	var logLines string
-	if len(a) > 0 {
-		logLines = parl.Sprintf(format, a...)
-	} else {
-		logLines = format
-	}
-	if len(logLines) > 0 && logLines[len(logLines)-1:] != NewLine {
-		logLines += NewLine
-	}
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if !s.statusEnded.Load() {
-		s.Print(s.clearStatus() + logLines + s.restoreStatus())
-	} else {
-		s.Print(logLines)
-	}
-	for writer := range s.copyLog {
-		s.write(logLines, writer.Write)
-	}
-}
-
-// LogC outputs to specific logger, ie. stdout
-func (s *StatusTerminal) LogStdout(format string, a ...any) {
-
-	// if not a terminal, regular logging
-	if !s.IsTerminal.Load() {
-		var logLines = parl.Sprintf(format, a...)
-		s.printStdout(logLines) // parl.Log is thread-safe
-		for writer := range s.copyLog {
-			s.write(logLines, writer.Write)
-		}
-		return
-	}
-
-	// get log string that ends with newline
-	var logLines string
-	if len(a) > 0 {
-		logLines = parl.Sprintf(format, a...)
-	} else {
-		logLines = format
-	}
-	if len(logLines) > 0 && logLines[len(logLines)-1:] != NewLine {
-		logLines += NewLine
-	}
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if !s.statusEnded.Load() {
-		s.Print(s.clearStatus())
-		s.printStdout(logLines)
-		s.Print(s.restoreStatus())
-	} else {
-		s.printStdout(logLines)
-	}
-	for writer := range s.copyLog {
-		s.write(logLines, writer.Write)
-	}
-}
+// LogStdout outputs to specific logger, ie. stdout
+func (s *StatusTerminal) LogStdout(format string, a ...any) { s.doLog(true, format, a...) }
 
 // SetTerminal overrides status regardless of whether a terminal is used
 //   - isTerminal overrides the detection of if ANSI sequences are supported
@@ -394,6 +324,44 @@ func (s *StatusTerminal) EndStatus() {
 	}
 	s.output = ""
 	s.Print(NewLine)
+}
+
+func (s *StatusTerminal) doLog(isStdout bool, format string, a ...any) {
+
+	// printf to single string, ensure ending with newline
+	var logLinesNewline = parl.Sprintf(format, a...)
+	if len(logLinesNewline) == 0 || logLinesNewline[len(logLinesNewline)-1:] != NewLine {
+		logLinesNewline += NewLine
+	}
+
+	if !s.IsTerminal.Load() || s.statusEnded.Load() {
+		// if not a terminal, regular logging
+		if !isStdout {
+			s.Print(logLinesNewline) // parl.Log is thread-safe
+		} else {
+			s.printStdout(logLinesNewline) // parl.Log is thread-safe
+		}
+	} else {
+		// output to status terminal
+		s.doStatus(isStdout, logLinesNewline)
+	}
+	// copy to log-copy writers
+	for writer := range s.copyLog {
+		s.write(logLinesNewline, writer.Write)
+	}
+}
+
+func (s *StatusTerminal) doStatus(isStdout bool, logLines string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if !isStdout {
+		s.Print(s.clearStatus() + logLines + s.restoreStatus())
+		return
+	}
+	s.Print(s.clearStatus())
+	s.printStdout(logLines)
+	s.Print(s.restoreStatus())
 }
 
 // clearStatus returns ANSI codes to clear the status area if any
