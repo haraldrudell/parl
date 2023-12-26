@@ -8,10 +8,10 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.1
-	github.com/haraldrudell/parl v0.4.147
+	github.com/haraldrudell/parl v0.4.148
 )
 
 require (
-	golang.org/x/exp v0.0.0-20231219180239-dc181d75b848 // indirect
+	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b // indirect
 	golang.org/x/text v0.14.0 // indirect
 )

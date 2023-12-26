@@ -15,17 +15,32 @@ import (
 
 // Thread interface
 
-// Go provides methods for a running goroutione thread to be provided as a function
-// argument in the go statement function call launching the thread.
-//   - Go.CancelGo affects this Go thread only.
-//   - Go.Cancel cancels:
-//   - — this Go thread
-//   - — this Go’s parent thread-group and
-//   - — this Go’s parent thread-group’s subordinate thread-groups
+// Go provides the four needs of a running goroutione thread.
+// The Go is provided as a function argument in the go statement function call
+// that launches the thread.
+//   - the four needs:
+//   - — to be waited upon via [Go.Done]
+//   - — to submit non-fatal errors via [Go.AddError]
+//   - — to detect and initiate cancel via [Go.Context] [Go.Cancel]
+//   - [Go.Cancel] cancels:
+//   - — this Go thread’s context
+//   - — this Go’s parent thread-group’s context and
+//   - — this Go’s parent thread-group’s subordinate thread-groups’ contexts
 //   - The Go Context is canceled when
 //   - — the parent GoGroup thread-group’s context is Canceled or
 //   - —a thread in the parent GoGroup thread-group initiates Cancel
 //   - Cancel by threads in sub ordinate thread-groups do not Cancel this Go thread
+//
+// Usage:
+//
+//	var threadGroup = g0.NewGoGroup(context.Background())
+//	go someFunc(threadGroup.Go())
+//	…
+//	func someFunc(g parl.Go) {
+//	  var err error
+//	  defer g.Register().Done(&err)
+//	  defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
+//	  …
 type Go interface {
 	// Register performs no function but allows the Go object to collect
 	// information on the new thread.
@@ -221,7 +236,7 @@ type GoGroup interface {
 	//	- parl.NoDebug
 	//	- parl.DebugPrint
 	//	- parl.AggregateThread
-	SetDebug(debug GoDebug)
+	SetDebug(debug GoDebug, log ...PrintfFunc)
 	fmt.Stringer
 }
 
@@ -266,7 +281,10 @@ type SubGo interface {
 	// threads that have been named ordered by name
 	NamedThreads() (threads []ThreadData)
 	// SetDebug enables debug logging on this particular instance
-	SetDebug(debug GoDebug)
+	//   - parl.NoDebug
+	//   - parl.DebugPrint
+	//   - parl.AggregateThread
+	SetDebug(debug GoDebug, log ...PrintfFunc)
 	fmt.Stringer
 }
 

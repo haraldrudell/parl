@@ -462,6 +462,46 @@ func GoNo(g parl.GoGen) (goNo string) {
 	return
 }
 
+func TestGoGroupTermination(t *testing.T) {
+	var goGroup = NewGoGroup(context.Background())
+
+	// an unused goGroup will only terminate after EnableTermination
+	goGroup.EnableTermination(parl.AllowTermination)
+
+	goGroup.Wait()
+}
+
+func TestSubGoTermination(t *testing.T) {
+	var goGroup = NewGoGroup(context.Background())
+	var subGo = goGroup.SubGo()
+
+	// an unused subGo will only terminate after EnableTermination
+	subGo.EnableTermination(parl.AllowTermination)
+
+	subGo.Wait()
+
+	// CascadeTermination does this
+	//goGroup.EnableTermination(parl.AllowTermination)
+
+	goGroup.Wait()
+}
+
+func TestGoGroup2Termination(t *testing.T) {
+	var goGroup = NewGoGroup(context.Background())
+	var subGroup = goGroup.SubGroup()
+	var subGo = subGroup.SubGo()
+
+	// an unused subGo will only terminate after EnableTermination
+	subGo.EnableTermination(parl.AllowTermination)
+
+	//subGo.EnableTermination(parl.AllowTermination)
+	subGo.Wait()
+
+	subGroup.Wait()
+
+	goGroup.Wait()
+}
+
 // waiter tests GoGroup.Wait()
 func waiter(
 	goGroup parl.GoGroup,
