@@ -11,6 +11,7 @@ import (
 
 // goEntityID is an unexported unique ID for a parl.Go object
 //   - every Go object has this identifier
+//   - private promotable field with public method
 type goEntityID struct {
 	id parl.GoEntityID
 }

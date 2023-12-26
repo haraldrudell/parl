@@ -31,6 +31,11 @@ var NoLog parl.PrintfFunc
 //     typically [github.com/haraldrudell/parl/mains.Executable.AddErr]
 //   - log outputs warnings and more, default [parl.Log] standard error
 //   - g is from [parl.NewGoResult] or [parl.NewGoResult2] making Reader awaitable
+//   - a GoGroup’s or SubGroup’s error channel is unbound buffer so Reader is only required for:
+//   - — real-time warning output
+//   - — terminating the process while additional goroutines are still running:
+//   - — on fatal thread exit or
+//   - — on exit of a primary goroutine
 //   - —
 //   - because reading of the threadgroup’s error channel must not stop,
 //     it is done in this separate thread.

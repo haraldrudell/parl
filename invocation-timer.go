@@ -104,7 +104,7 @@ func (i *InvocationTimer[T]) Oldest() (age time.Duration, threadID ThreadID) {
 //	func someFunc() {
 //	  defer invocationTimer.Invocation()()
 func (i *InvocationTimer[T]) Invocation(value T) (deferFunc func()) {
-	var invocation = NewInvocation(i.invocationEnd, value)
+	var invocation = NewInvocation(i.invocationEnd, value) // one allocation
 	i.insert(invocation)
 	i.ensureTimer()
 	var invos = i.invos.Value()
@@ -113,7 +113,7 @@ func (i *InvocationTimer[T]) Invocation(value T) (deferFunc func()) {
 		// callback for high parallelism warning
 		i.callback(ITParallelism, invos, max, invocation.ThreadID)
 	}
-	return invocation.DeferFunc
+	return invocation.DeferFunc // one allocation
 }
 
 // invocationEnd is invoked by the Invocation instance’s deferred function

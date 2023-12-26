@@ -17,19 +17,42 @@ const (
 //   - one-to-many, happens-before
 //   - the synchronization mechanic is closing channel, allowing threads to await
 //     multiple events
-//   - IsClosed provides thread-safe observability
-//   - Close is idempotent, thread-safe, deferrable and panic-free
+//   - [CyclicAwaitable.IsClosed] provides thread-safe observability
+//   - [CyclicAwaitable.Close] is idempotent, thread-safe, deferrable and panic-free
 //   - Open means event is pending, Close means event has triggered
+//   - [CyclicAwaitable.Open] arms the awaitable
 //   - —
 //   - because Awaitable is renewed, access is via atomic Pointer
-//   - because Pointer is used in new-function,
-//     field is pointer to ensure integrity
+//   - Pointer to struct allows for atomic update of IsClosed and Open
 type CyclicAwaitable struct{ atomic.Pointer[Awaitable] }
 
 // NewCyclicAwaitable returns an awaitable that can be re-initialized
 //   - if argument [task.CyclicAwaitableClosed] is provided, the initial state
 //     of the CyclicAwaitable is triggered
 //   - writes to non-pointer atomic fields
+//
+// Usage:
+//
+//	v.valueWaiter = parl.NewCyclicAwaitable()
+//	…
+//	func (v *V) getOrWaitForValue(value T) {
+//	  var hasValue bool
+//	  // check if value is already present
+//	  if value, hasValue = v.hasValueFromThread(); hasValue {
+//	    return
+//	  }
+//	  // arm cyclable
+//	  v.valueWaiter.Open()
+//	  // collect any value arriving prior to arming cyclable
+//	  if value, hasValue = v.hasValueFromThread(); hasValue {
+//	    return
+//	  }
+//	  <- v.valueWaiter.Ch()
+//	  value, _ = v.hasValueFromThread()
+//	…
+//	func (v *V) threadStoresValue(value T) {
+//	  v.store(value)
+//	  v.valueWaiter.Close()
 func NewCyclicAwaitable(initiallyClosed ...bool) (awaitable *CyclicAwaitable) {
 	c := CyclicAwaitable{}
 	c.Store(NewAwaitable())

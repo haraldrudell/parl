@@ -31,13 +31,17 @@ const (
 //   - SubGroup creates a subordinate thread-group with its own error channel.
 //     Fatal-error thread-exits in SubGroup can be recovered locally in that thread-group
 type Go struct {
-	goEntityID                    // EntityID(), uniquely identifies Go object
-	goParent                      // Cancel() Context()
-	creatorThreadId parl.ThreadID // the thread ID of the goroutine creating this thread
-	// tis thread’s Thread ID, creator location, go-function and
+	// EntityID(), uniquely identifies Go object
+	goEntityID
+	// Cancel() Context()
+	goParent
+	// the thread ID of the goroutine creating this thread
+	creatorThreadId parl.ThreadID
+	// this thread’s Thread ID, creator location, go-function and
 	// possible printable thread-name
 	thread *ThreadSafeThreadData
-	endCh  parl.Awaitable // channel that closes when this Go ends
+	// [parl.AwaitableCh] that closes when this Go ends
+	endCh parl.Awaitable
 }
 
 // newGo returns a Go object providing functions to a thread operating in a

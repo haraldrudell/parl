@@ -10,16 +10,14 @@ import (
 	"sync"
 )
 
-/*
-parl.WaitGroup is like a sync.Waitgroup that can be inspected.
-The Waiting method returns the number of threads waited for.
-parl.WaitGroup requires no initialization.
-
-	var wg parl.WaitGroup
-	wg.Add(1)
-	…
-	wg.Waiting()
-*/
+// parl.WaitGroup is like a sync.Waitgroup that can be inspected.
+// The Waiting method returns the number of threads waited for.
+// parl.WaitGroup requires no initialization.
+//
+//	var wg parl.WaitGroup
+//	wg.Add(1)
+//	…
+//	wg.Waiting()
 type WaitGroup struct {
 	sync.WaitGroup // Wait()
 	lock           sync.Mutex

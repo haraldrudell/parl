@@ -12,8 +12,8 @@ import "sync/atomic"
 //   - one-to-many, happens-before
 //   - the synchronization mechanic is closing channel, allowing consumers to await
 //     multiple events
-//   - IsClosed provides thread-safe observability
-//   - Close is idempotent, thread-safe, deferrable and panic-free
+//   - [Awaitable.IsClosed] provides thread-safe observability
+//   - [Awaitable.Close] is idempotent, thread-safe, deferrable and panic-free
 //   - [parl.CyclicAwaitable] is re-armable, cyclic version
 //   - —
 //   - alternative low-blocking inter-thread mechanics are [sync.WaitGroup] and [sync.RWMutex]
@@ -23,7 +23,7 @@ type Awaitable struct {
 	ch       chan struct{}
 }
 
-// NewAwaitable returns a one-to-many sempahore
+// NewAwaitable returns a one-to-many semaphore
 func NewAwaitable() (awaitable *Awaitable) { return &Awaitable{ch: make(chan struct{})} }
 
 // Ch returns an awaitable channel. Thread-safe

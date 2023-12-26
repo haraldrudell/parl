@@ -32,7 +32,7 @@ type mcReturnTicket func()
 //     libraries
 //   - cost is one thread, one timer, and a locked linked-list of invocations
 //   - —
-//   - EchoModerator is intended to control and diagnose exec.Command invocations
+//   - EchoModerator is intended to control and diagnose [exec.Command] invocations
 //   - problems include:
 //   - — too many parallel invocations
 //   - — invocations that do not return or are long running

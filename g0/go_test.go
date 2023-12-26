@@ -30,6 +30,19 @@ func TestGo(t *testing.T) {
 	var ok bool
 	var ctx0, ctx context.Context
 
+	// Register() AddError() Go() SubGo() SubGroup() Done() Wait()
+	// WaitCh() Cancel() Context() ThreadInfo() Creator()
+	// GoRoutine() GoID() EntityID()
+	var g parl.Go
+	var goGroup2 parl.GoGroup
+	var reset = func() {
+		goGroup2 = NewGoGroup(context.Background())
+		g = goGroup.Go()
+	}
+	_ = g
+	_ = reset
+	_ = goGroup2
+
 	// Register() AddError() Go() SubGo() SubGroup() Done() ThreadInfo()
 	// GoID() Wait()
 	goGroup = NewGoGroup(context.Background())

@@ -8,13 +8,10 @@ package pfs
 
 import (
 	"io/fs"
-	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync/atomic"
 
-	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pslices"
 )
@@ -208,12 +205,9 @@ func (t *Traverser) readDir(abs, providedPath string) (err error) {
 
 	// DirEntry with basename and modeType
 	var entries []fs.DirEntry
-	if entries, err = t.directoryOrder(abs); err != nil {
+	if entries, err = ReadDir(abs); err != nil {
 		return
 	}
-
-	// sort by 8-bit characters
-	slices.SortFunc(entries, compareDirEntry)
 
 	// create entries for Next function
 	//	- defers symlink resolution
@@ -223,28 +217,6 @@ func (t *Traverser) readDir(abs, providedPath string) (err error) {
 	for i, dirEntry := range entries {
 		dir.dirEntry = dirEntry
 		t.dirEntries[index+i] = dir
-	}
-
-	return
-}
-
-// directoryOrder returns unsorted entries, most with deferred [fs.FileInfo]
-func (t *Traverser) directoryOrder(abs string) (entries []fs.DirEntry, err error) {
-	// open the directory
-	var osFile *os.File
-	if osFile, err = os.Open(abs); perrors.Is(&err, "os.Open %w", err) {
-		return
-	}
-	defer parl.Close(osFile, &err)
-
-	// reads in directory order
-	//	- returns an array of interface-value pointers, meaning
-	//		each DirEntry is a separate allocation
-	//	- for most modeTypes, Type is availble without lstat invocation
-	//	- lstat is then deferred until Info method is invoked.
-	//		Every time such deferring Info is invoked, lstat is executed
-	if entries, err = osFile.ReadDir(allNamesAtOnce); perrors.Is(&err, "os.File.ReadDir %w", err) {
-		return
 	}
 
 	return

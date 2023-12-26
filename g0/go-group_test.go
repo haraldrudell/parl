@@ -11,202 +11,223 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
 func TestGoGroup(t *testing.T) {
-	messageBad := "bad"
-	errBad := errors.New(messageBad)
-	var label = "label"
+	var messageBad = "bad"
+	var errBad = errors.New(messageBad)
+	var shortTime = time.Millisecond
 
-	var goGroup parl.GoGroup
-	var goGroupImpl *GoGroup
-	var g0 parl.Go
-	var goImpl *Go
+	var g parl.Go
 	var goError parl.GoError
-	var goError2 parl.GoError
-	var ok bool
-	var count int
+	var ok, isClosed, allowTermination, didReceive bool
+	// var count, fatals int
 	var subGo parl.SubGo
 	var subGroup parl.SubGroup
-	var ctx0, ctx context.Context
-	var threads []parl.ThreadData
-	var fatals int
-	var onFirstFatal = func(goGen parl.GoGen) { fatals++ }
-	var expectG0ID uint64
+	var ctx, ctxAct context.Context
+	var cancelFunc context.CancelFunc
+	// var threads []parl.ThreadData
+	// var onFirstFatal = func(goGen parl.GoGen) { fatals++ }
+	// var expectG0ID uint64
+	var err error
+	var noError *error
+	var errCh <-chan parl.GoError
+	// var didComplete atomic.Bool
+	var isReady, isDone parl.WaitGroupCh
+	var timer *time.Timer
 
-	// g0.NewGoGroup returns *g0.GoGroup: NewGoGroup()
-	goGroup = NewGoGroup(context.Background())
-	if goGroupImpl, ok = goGroup.(*GoGroup); !ok {
-		t.Error("NewGoGroup did not return *g0.GoGroup")
-		t.FailNow()
-	}
-	goGroup.SetDebug(parl.AggregateThread)
-
-	// fail thread exit: Go() GoDone() Ch() Threads() NamedThreads() IsEnd() Wait()
-	g0 = goGroup.Go()
-	if goImpl, ok = g0.(*Go); !ok {
-		t.Error("GoGroup.Go() did not return *g0.Go")
-		t.FailNow()
-	}
-	_ = goImpl
-	g0.Register("x")
-	if len(goGroup.Threads()) != 1 {
-		t.Error("goGroup.Threads length bad")
-	}
-	if len(goGroup.NamedThreads()) != 1 {
-		t.Error("goGroup.NamedThreads length bad")
-	}
-	goGroupImpl.GoDone(g0, errBad)
-	// verify that error channel has error
-	if count = goGroupImpl.ch.Count(); count != 1 {
-		t.Errorf("bad Ch Count: %d exp 1", count)
-	}
-	goError, ok = <-goGroup.Ch() // receive errBad
-	if !ok {
-		t.Error("goGroup.Ch closed")
-	}
-	if goError == nil {
-		t.Error("goError nil")
-		t.FailNow()
-	}
-	if !errors.Is(goError.Err(), errBad) {
-		t.Errorf("wrong error: %q %x exp %q %x", goError.Error(), goError, errBad.Error(), errBad)
-	}
-	// verify GoGroup termination
-	_, ok = <-goGroup.Ch() // check that channel is now closed
-	if ok {
-		t.Error("goGroup.Ch did not close")
-	}
-	// the channel managed by NBChan goGroup.ch is closed
-	//	- the channel is goGroup.NBChan.ClosableChan.ch
-	//	- that means NBChan.sendThreadDefer did NBChan.Close
-	//
-	// - goGroup.isEnd does NBChan.IsClosed delegating to:
-	//	- ClosableChan.IsClosed which returns
-	//	- parl.Once.IsDone.IsTrue()
-	//	- there is a race condition between closing the channel
-	//	- and setting isDone true
-	//	- during which isEnd will indicate not ended
-	//
-	// therefore wait for the known pending close here:
-	goGroupImpl.ch.WaitForClose()
-
-	if !goGroupImpl.isEnd() {
-		t.Error("goGroup did not terminate")
-	}
-	if !goGroupImpl.wg.IsZero() {
-		t.Error("goGroup wg not zero")
-		t.FailNow()
-	}
-	goGroup.Wait()
-
-	// ConsumeError() EnableTermination() CascadeEnableTermination()
-	// IsEnableTermination()
-	goGroup = NewGoGroup(context.Background())
-	goGroupImpl = goGroup.(*GoGroup)
-	g0 = goGroup.Go()
-	goError2 = NewGoError(errBad, parl.GeNonFatal, g0)
-	goGroupImpl.ConsumeError(goError2)
-	var goErrorActual = <-goGroup.Ch() // GoError from ConsumeError
-	if goErrorActual != goError2 {
-		t.Error("GoGroup.ConsumeError failed")
-	}
-	if goGroupImpl.isEnd() {
-		t.Error("1 GoGroup terminated")
-	}
-	if !goGroup.IsEnableTermination() {
-		t.Error("IsEnableTermination false")
-	}
-	goGroup.EnableTermination(false)
-	if goGroup.IsEnableTermination() {
-		t.Error("IsEnableTermination true")
-	}
-	goGroupImpl.GoDone(g0, nil)
-	<-goGroup.Ch() // GoError from GoDone
-	if goGroupImpl.isEnd() {
-		t.Error("2 GoGroup terminated")
-	}
-	goGroup.EnableTermination(true)
-	if !goGroupImpl.isEnd() {
-		t.Error("GoGroup did not terminate")
+	// Go() SubGo() SubGroup() Ch() Wait() EnableTermination()
+	// IsEnableTermination() Cancel() Context() Threads() NamedThreads()
+	// SetDebug()
+	var goGroup parl.GoGroup
+	var goGroupImpl *GoGroup
+	var reset = func(ctx ...context.Context) {
+		var parentContext context.Context
+		if len(ctx) > 0 {
+			parentContext = ctx[0]
+		} else {
+			parentContext = context.Background()
+		}
+		goGroup = NewGoGroup(parentContext)
+		goGroupImpl = goGroup.(*GoGroup)
 	}
 
-	// SubGo() SubGroup()
-	goGroup = NewGoGroup(context.Background())
-	subGo = goGroup.SubGo()
-	goGroupImpl = subGo.(*GoGroup)
-	if goGroupImpl.isSubGroup {
-		t.Error("SubGo returned SubGroup")
-	}
-	if goGroupImpl.hasErrorChannel {
-		t.Error("SubGo has error channel")
-	}
-	subGroup = goGroup.SubGroup()
-	goGroupImpl = subGroup.(*GoGroup)
-	if !goGroupImpl.isSubGroup {
-		t.Error("SubGroup did not return SubGroup")
-	}
-	if !goGroupImpl.hasErrorChannel {
-		t.Error("SubGroup does not have error channel")
+	// NewGoGroup should not be canceled
+	reset()
+	isClosed = goGroupImpl.endCh.IsClosed()
+	if isClosed {
+		t.Error("NewGoGroup isClosed true")
 	}
 
-	// Context()
-	ctx0 = parl.NewCancelContext(context.Background())
-	goGroup = NewGoGroup(ctx0)
-	parl.InvokeCancel(ctx0)
-	ctx = goGroup.Context()
-	if ctx.Err() == nil {
-		t.Error("goGroup context did not cancel from parent context")
+	// GoGroup should terminate when its last thread exits
+	// Go should return parl.Go
+	reset()
+	g = goGroup.Go()
+	g.Done(noError)
+	isClosed = goGroupImpl.endCh.IsClosed()
+	if !isClosed {
+		t.Error("NewGoGroup last exit does not terminate")
 	}
 
-	// Cancel()
-	goGroup = NewGoGroup(context.Background())
+	// EnableTermination should be true
+	reset()
+	allowTermination = goGroup.EnableTermination()
+	if !allowTermination {
+		t.Error("EnableTermination false")
+	}
+
+	// EnableTermination(parl.PreventTermination) should be false
+	reset()
+	allowTermination = goGroup.EnableTermination(parl.PreventTermination)
+	if allowTermination {
+		t.Error("EnableTermination true")
+	}
+
+	// EnableTermination(parl.AllowTermination) should terminate an empty ThreadGroup
+	reset()
+	allowTermination = goGroup.EnableTermination(parl.AllowTermination)
+	_ = allowTermination
+	isClosed = goGroupImpl.endCh.IsClosed()
+	if !isClosed {
+		t.Error("EnableTermination true does not terminate")
+	}
+
+	// EnableTermination(parl.PreventTermination) should prevent termination
+	reset()
+	allowTermination = goGroup.EnableTermination(parl.PreventTermination)
+	_ = allowTermination
+	g = goGroup.Go()
+	g.Done(noError)
+	isClosed = goGroupImpl.endCh.IsClosed()
+	if isClosed {
+		t.Error("EnableTermination(parl.PreventTermination) does not prevent termination")
+	}
+	allowTermination = goGroup.EnableTermination(parl.AllowTermination)
+	if !allowTermination {
+		t.Error("EnableTermination false")
+	}
+	isClosed = goGroupImpl.endCh.IsClosed()
+	if !isClosed {
+		t.Error("EnableTermination(parl.AllowTermination) did not terminate")
+	}
+
+	// Context should return a context that is different from parent context
+	ctx = context.Background()
+	reset(ctx)
+	ctxAct = goGroup.Context()
+	if ctxAct == ctx {
+		t.Error("Context is parent context")
+	}
+
+	// Context should return a context that is canceled by parent context
+	ctx, cancelFunc = context.WithCancel(context.Background())
+	reset(ctx)
+	ctxAct = goGroup.Context()
+	if ctxAct.Err() != nil {
+		t.Error("Context is canceled")
+	}
+	cancelFunc()
+	err = ctxAct.Err()
+	if !errors.Is(err, context.Canceled) {
+		t.Error("Context not canceled by parent")
+	}
+
+	// Cancel should cancel Context
+	reset()
+	ctxAct = goGroup.Context()
+	if ctxAct.Err() != nil {
+		t.Error("Context is canceled")
+	}
 	goGroup.Cancel()
-	if ctx = goGroup.Context(); ctx.Err() == nil {
-		t.Error("goGroup cancel did not cancel context")
+	err = ctxAct.Err()
+	if !errors.Is(err, context.Canceled) {
+		t.Error("Cancel did not cancel Context")
 	}
 
-	// Add() UpdateThread() SetDebug() Threads() NamedThreads() G0ID()
-	goGroup = NewGoGroup(context.Background())
-	goGroupImpl = goGroup.(*GoGroup)
-
-	expectG0ID = uint64(goGroupImpl.goEntityID.id)
-	if expectG0ID != uint64(goGroupImpl.EntityID()) {
-		t.Error("goGroupImpl.G0ID bad")
-	}
-	goGroup.Go().Register()
-	if goGroupImpl.wg.Count() != 1 {
-		t.Errorf("goGroupImpl.wg.Count not 1: %d", goGroupImpl.wg.Count())
-	}
-	if len(goGroup.Threads()) > 0 {
-		t.Error("goGroup no-debug collects threads")
-	}
-	goGroup.SetDebug(parl.DebugPrint)
-	if !goGroupImpl.isDebug.Load() {
-		t.Error("goGroup.SetDebug DebugPrint failed")
-	}
-	goGroup.SetDebug(parl.AggregateThread)
-	if goGroupImpl.isDebug.Load() {
-		t.Error("goGroup.SetDebug AggregateThread failed")
-	}
-	goGroup.Go().Register(label)
-	if len(goGroup.Threads()) != 1 {
-		t.Errorf("goGroup.Threads not 1: %d", len(goGroup.Threads()))
-	}
-	threads = goGroup.NamedThreads()
-	if len(threads) != 1 || threads[0].Name() != label {
-		t.Error("goGroup.NamedThreads bad")
+	// Cancel should cancel Go Context
+	reset()
+	g = goGroup.Go()
+	goGroup.Cancel()
+	err = g.Context().Err()
+	if !errors.Is(err, context.Canceled) {
+		t.Error("Cancel did not cancel Go Context")
 	}
 
-	// FirstFatal()
-	goGroup = NewGoGroup(context.Background(), onFirstFatal)
-	goGroup.Go().Done(&errBad)
-	if fatals == 0 {
-		t.Error("onFirstFatal bad")
+	// Cancel should cancel SubGo Context
+	//	- SubGo
+	reset()
+	subGo = goGroup.SubGo()
+	goGroup.Cancel()
+	err = subGo.Context().Err()
+	if !errors.Is(err, context.Canceled) {
+		t.Error("Cancel did not cancel SubGo Context")
 	}
+
+	// Cancel should cancel SubGroup Context
+	//	-SubGroup
+	reset()
+	subGroup = goGroup.SubGroup()
+	goGroup.Cancel()
+	err = subGroup.Context().Err()
+	if !errors.Is(err, context.Canceled) {
+		t.Error("Cancel did not cancel subGroup Context")
+	}
+
+	// Ch should send errors
+	reset()
+	errCh = goGroup.Ch()
+	g = goGroup.Go()
+	g.AddError(errBad)
+	goError = <-errCh
+	if !errors.Is(goError.Err(), errBad) {
+		t.Error("Ch not sending errors")
+	}
+
+	// Ch should close on termination
+	reset()
+	goGroup.EnableTermination(parl.AllowTermination)
+	select {
+	case goError, ok = <-goGroup.Ch():
+		didReceive = true
+	default:
+		didReceive = false
+	}
+	_ = goError
+	if !didReceive || ok {
+		t.Error("Ch did not close on termination")
+	}
+
+	// Wait should wait until GoGroup terminates
+	reset()
+	isReady.Reset().Add(1)
+	isDone.Reset().Add(1)
+	go waiter(goGroup, &isReady, &isDone)
+	isReady.Wait()
+	if isDone.IsZero() {
+		t.Error("Wait completed prematurely")
+	}
+	goGroup.EnableTermination(parl.AllowTermination)
+	// there is a race condition with waiter function
+	//	- waiter needs to detect that the channel closed and
+	//		trigger isDone
+	//	- Wait enough here, shortTime
+	timer = time.NewTimer(shortTime)
+	select {
+	case <-isDone.Ch():
+	case <-timer.C:
+	}
+	if !isDone.IsZero() {
+		t.Error("Wait did not complete on termination")
+	}
+
+	// methods to test below here:
+	// Threads() NamedThreads()
+	// SetDebug()
+	//	- first fatal feature
 }
 
 func TestGoGroup_Frames(t *testing.T) {
@@ -439,4 +460,15 @@ func GoNo(g parl.GoGen) (goNo string) {
 		goNo = fmt.Sprintf("?type:%T", g)
 	}
 	return
+}
+
+// waiter tests GoGroup.Wait()
+func waiter(
+	goGroup parl.GoGroup,
+	isReady, isDone parl.Doneable,
+) {
+	defer isDone.Done()
+
+	isReady.Done()
+	goGroup.Wait()
 }

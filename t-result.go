@@ -15,9 +15,9 @@ type TResult[T any] struct {
 	Err     error
 }
 
-// NewTResult3 creates a TResult from pointers
+// NewTResult3 creates a TResult from pointers at the time values are available
 //   - value is considered valid if errp is nil or *errp is nil
-//   - value isPanic errp can be nil
+//   - any arguments may be nil
 func NewTResult3[T any](value *T, isPanic *bool, errp *error) (tResult *TResult[T]) {
 	var result TResult[T]
 	tResult = &result
@@ -36,11 +36,15 @@ func NewTResult3[T any](value *T, isPanic *bool, errp *error) (tResult *TResult[
 }
 
 // NewTResult creates a result container
-//   - if tFunc is present, it is invoked to retrieve result
+//   - if tFunc is present, it is invoked prior to returning storing its result
 //   - recovers tFunc panic
 func NewTResult[T any](tFunc ...TFunc[T]) (tResult *TResult[T]) {
+
+	// create result object
 	var t TResult[T]
 	tResult = &t
+
+	// check if tFunc is available
 	var f TFunc[T]
 	if len(tFunc) > 0 {
 		f = tFunc[0]
@@ -48,6 +52,8 @@ func NewTResult[T any](tFunc ...TFunc[T]) (tResult *TResult[T]) {
 	if f == nil {
 		return // tFunc not present return
 	}
+
+	// execute tFunc
 	defer RecoverErr(func() DA { return A() }, &t.Err, &t.IsPanic)
 
 	t.Value, t.Err = f()

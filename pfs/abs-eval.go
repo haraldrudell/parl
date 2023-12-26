@@ -19,7 +19,7 @@ const (
 // AbsEval returns an absolute path with resolved symlinks
 //   - if path is relative, the process’ current directory is used to make path absolute.
 //     path empty returns the process’ current directory as absolute evaled path
-//   - absPath is absolute and only empty on error.
+//   - absPath is absolute and only empty on error
 //   - absPath is clean:
 //   - — no multiple Separators in sequence
 //   - — no “.” path name elements

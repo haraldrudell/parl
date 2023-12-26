@@ -130,8 +130,38 @@ type GoGen interface {
 
 // Thread Group interfaces and Factory
 
-// GoGroup manages a thread-group.
-//   - A thread from this thread-group will terminate all threads in this
+// GoGroup manages a hierarchy of threads
+//   - GoGroup only terminates when:
+//   - — the last thread in its hierarchy exits
+//   - — [GoGroup.EnableTermination] is set to true when
+//     no Go threads exist in the hierarchy
+//   - the GoGroup hierarchy consists of:
+//   - — managed goroutines returned by [GoGroup.Go]
+//   - — a [SubGo] subordinate thread-group hierarchy returned by [GoGroup.SubGo]
+//     that allows for a group of threads to be canceled or waited upon separately
+//   - — a [SubGroup] subordinate thread-group hierarchy returned by [GoGroup.SubGroup]
+//     that allows for a group of threads to exit with fatal errors without
+//     canceling the GoGroup and for those threads to be
+//     canceled or waited upon separately
+//   - — each subordinate Go thread or SubGo or SubGroup subordinate thread-groups
+//     can create additional threads and subordinate thread-groups.
+//   - [GoGroup.Context] returns a context that is the context or parent context
+//     of all the Go threads, SubGo and SubGroup subordinate thread-groups
+//     in its hierarchy
+//   - [GoGroup.Cancel] cancels the GoGroup Context,
+//     thereby signaling to all threads in the GoGroup hierarchy to exit.
+//     This will eventually terminate the GoGroup
+//   - providing a parent context to the GoGroup implementation allows
+//     for terminating the GoGroup via this parent context
+//   - A thread invoking [Go.Cancel] will signal to all threads in its
+//     GoGroup or SubGo or SubGroup thread-groups to exit.
+//     It will also signal to all threads in its subordinate thread-groups to exit.
+//     This will eventually terminate its threadgroup and all that threadgroup’s
+//     subordinate threadgroups.
+//   - Alternatives to [parl.Go] is [parl.NewGoResult] and [parl.NewGoResult2]
+//     that only provides being awaitable to a goroutine
+//   - —
+//   - from this thread-group will terminate all threads in this
 //     and subordinate thread-groups if this thread-group was provided
 //     the FirstFailTerminates option, which is default.
 //   - A fatal thread-termination in a sub thread-group only affects this
@@ -167,14 +197,17 @@ type GoGroup interface {
 	// the FailChannel option is present, or only the first when both
 	// FailChannel and StoreSubsequentFail options are present.
 	Ch() (ch <-chan GoError)
-	// Wait waits for all threads of this thread-group to terminate.
+	// Wait waits for this thread-group to terminate.
 	Wait()
-	// EnableTermination false prevents the SubGo or GoGroup from terminating
-	// even if the number of threads is zero
-	EnableTermination(allowTermination bool)
-	// IsEnableTermination returns the state of EnableTermination,
-	// initially true
-	IsEnableTermination() (mayTerminate bool)
+	// EnableTermination controls temporarily preventing the GoGroup from
+	// terminating.
+	// EnableTermination is initially true.
+	//	- invoked with no argument returns the current state of EnableTermination
+	//	- invoked with [AllowTermination] again allows for termination and
+	//		immediately terminates the thread-group if no threads are currently running.
+	//	- invoked with [PreventTermination] allows for the number of managed
+	//		threads to be temporarily zero without terminating the thread-group
+	EnableTermination(allowTermination ...bool) (mayTerminate bool)
 	// Cancel terminates the threads in this and subordinate thread-groups.
 	Cancel()
 	// Context will Cancel when the parent context Cancels.
@@ -193,9 +226,10 @@ type GoGroup interface {
 }
 
 type SubGo interface {
-	// Go returns a Go object to be provided as a go statement function argument.
-	Go() (g0 Go)
-	// SubGo returns athread-group whose fatal errors go to Go’s parent.
+	// Go returns a [Go] object managing a thread of the GoGroup thread-group
+	// by providing the g value as a go-statement function argument.
+	Go() (g Go)
+	// SubGo returns a thread-group whose fatal errors go to Go’s parent.
 	//   - both non-fatal and fatal errors in SubGo threads are sent to Go’s parent
 	// 		like Go.AddError and Go.Done.
 	//		- therefore, when a SubGo thread fails, the application will typically exit.
@@ -213,10 +247,15 @@ type SubGo interface {
 	Wait()
 	// returns a channel that closes on subGo end similar to Wait
 	WaitCh() (ch AwaitableCh)
-	// EnableTermination false prevents the SubGo or GoGroup from terminating
-	// even if the number of threads is zero
-	EnableTermination(allowTermination bool)
-	IsEnableTermination() (mayTerminate bool)
+	// EnableTermination controls temporarily preventing the GoGroup from
+	// terminating.
+	// EnableTermination is initially true.
+	//	- invoked with no argument returns the current state of EnableTermination
+	//	- invoked with [AllowTermination] again allows for termination and
+	//		immediately terminates the thread-group if no threads are currently running.
+	//	- invoked with [PreventTermination] allows for the number of managed
+	//		threads to be temporarily zero without terminating the thread-group
+	EnableTermination(allowTermination ...bool) (mayTerminate bool)
 	// Cancel terminates the threads in this and subordinate thread-groups.
 	Cancel()
 	// Context will Cancel when the parent context Cancels.
@@ -253,6 +292,11 @@ type GoFactory interface {
 	//	- GoGroup only receives Cancel from ctx, it does not cancel this context.
 	NewGoGroup(ctx context.Context, onFirstFatal ...GoFatalCallback) (g0 GoGroup)
 }
+
+const (
+	AllowTermination   = true
+	PreventTermination = false
+)
 
 // data types
 

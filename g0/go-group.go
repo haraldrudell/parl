@@ -40,17 +40,20 @@ const (
 //   - new Go threads are handled by the g1WaitGroup
 //   - SubGroup creates a subordinate thread-group using this threadgroup’s error channel
 type GoGroup struct {
-	creator         pruntime.CodeLocation
-	parent          goGroupParent
-	hasErrorChannel bool // this GoGroup uses its error channel: GoGroup or SubGroup
-	isSubGroup      bool // is SubGroup: not GoGroup or SubGo
-	onFirstFatal    parl.GoFatalCallback
-	gos             parli.ThreadSafeMap[parl.GoEntityID, *ThreadData]
-	ch              parl.NBChan[parl.GoError]
+	creator pruntime.CodeLocation
+	parent  goGroupParent
+	// this GoGroup has error channel: GoGroup or SubGroup
+	hasErrorChannel bool
+	// is SubGroup: not GoGroup or SubGo
+	isSubGroup   bool
+	onFirstFatal parl.GoFatalCallback
+	gos          parli.ThreadSafeMap[parl.GoEntityID, *ThreadData]
+	ch           parl.NBChan[parl.GoError]
 	// endCh is a channel that closes when this threadGroup ends
 	endCh parl.Awaitable
 	// provides Go entity ID, sub-object waitgroup, cancel-context
-	goContext // Cancel() Context() EntityID()
+	// Cancel() Context() EntityID()
+	goContext
 
 	hadFatal           atomic.Bool
 	isNoTermination    atomic.Bool
@@ -62,7 +65,7 @@ type GoGroup struct {
 	//	- order of emitted termination goErrors by GoDone
 	//	- atomicity of goContext.Done() endCh.Close() ch.Close() in
 	//		GoDone Cancel EnableTermination
-	//	- ensuring that Add is prevented on GoGroup termination
+	//	- ensuring that Add is prevented during GoGroup termination
 	//	- doneLock is used in GoDone Add EnableTermination Cancel
 	doneLock sync.Mutex // for GoDone method
 }
@@ -397,26 +400,35 @@ func (g *GoGroup) FirstFatal() (firstFatal *parl.OnceWaiterRO) {
 
 // EnableTermination false prevents the SubGo or GoGroup from terminating
 // even if the number of threads is zero
-func (g *GoGroup) EnableTermination(allowTermination bool) {
+func (g *GoGroup) EnableTermination(allowTermination ...bool) (mayTerminate bool) {
 	if g.isDebug.Load() {
 		parl.Log("goGroup%s#:EnableTermination:%t", g.EntityID(), allowTermination)
 	}
-	if g.endCh.IsClosed() {
-		return // GoGroup is already shutdown return
-	} else if !allowTermination {
-		if g.isNoTermination.CompareAndSwap(false, true) { // prevent termination, it was previously allowed
+
+	// if not argument or the thread-group already terminated
+	//	- just return current state
+	if len(allowTermination) == 0 || g.endCh.IsClosed() {
+		return !g.isNoTermination.Load()
+	}
+
+	// prevent termination case
+	if !allowTermination[0] {
+		// if state change
+		if g.isNoTermination.CompareAndSwap(false, true) {
 			// add a fake count to parent waitgroup preventing iut from terminating
 			g.CascadeEnableTermination(1)
 		}
-		return // prevent termination complete
+		return // prevent termination complete: mayTerminate: false
 	}
 
-	// now allow termination
-	if !g.isNoTermination.CompareAndSwap(true, false) {
-		return // termination allowed already
+	// allow termination case
+	if g.isNoTermination.Load() {
+		if g.isNoTermination.CompareAndSwap(true, false) {
+			// remove the fake count from parent
+			g.CascadeEnableTermination(-1)
+		}
 	}
-	// remove the fake count from parent
-	g.CascadeEnableTermination(-1)
+	mayTerminate = true
 
 	// atomic operation: DoneBool and g0.ch.Close
 	g.doneLock.Lock()
@@ -427,11 +439,9 @@ func (g *GoGroup) EnableTermination(allowTermination bool) {
 		return // GoGroup is not in pending termination
 	}
 	g.endGoGroup()
-}
 
-// IsEnableTermination returns the state of EnableTermination,
-// initially true
-func (g *GoGroup) IsEnableTermination() (mayTerminate bool) { return !g.isNoTermination.Load() }
+	return
+}
 
 // CascadeEnableTermination manipulates wait groups of this goGroup and
 // those of its parents to allow or prevent termination
