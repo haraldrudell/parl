@@ -54,7 +54,7 @@ import (
 //	go someFunc(&w)
 //	…
 //	<-w.Ch()
-//	func someFunc(w *parl.WaitGroupCh) {
+//	func someFunc(w parl.Doneable) {
 //	  defer w.Done()
 type WaitGroupCh struct {
 	// p as atomic pointer provides integrity in reading counters without a lock
