@@ -17,6 +17,8 @@ const (
 )
 
 // AbsEval returns an absolute path with resolved symlinks
+//   - if symlinks are evaluated, the path must exist
+//   - non-existing path is checked using punix.IsENOENT(err)
 //   - if path is relative, the process’ current directory is used to make path absolute.
 //     path empty returns the process’ current directory as absolute evaled path
 //   - absPath is absolute and only empty on error
@@ -49,6 +51,18 @@ func AbsEval(path string, retainSymlinks ...bool) (absPath string, err error) {
 		//	- infix path segment not directory
 		//	- or encountering more than 255 symlinks
 		if absPath, err = filepath.EvalSymlinks(absPath); perrors.IsPF(&err, "EvalSymlinks %w", err) {
+
+			// // *errorglue.errorStack *fmt.wrapError *fs.PathError syscall.Errno
+			// parl.Log("filepath.EvalSymlinks ENOT error chanin: %s", errorglue.DumpChain(err))
+			// // os.IsNotExist fails: false
+			// parl.Log("os.IsNotExist fails: %t", os.IsNotExist(err))
+			// if errnoValue := punix.Errno(err); errnoValue != 0 {
+			// 	// errno: ENOENT 2 0x2
+			// 	parl.Log(punix.ErrnoString("errno", errnoValue))
+			// }
+			// // punix.IsENOENT: true
+			// parl.Log("punix.IsENOENT: %t", punix.IsENOENT(err))
+
 			return
 		}
 	} else if !didClean {

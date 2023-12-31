@@ -32,7 +32,7 @@ func OpenDataSourceNamerRO(appName string) (dsn parl.DataSourceNamer, err error)
 	// ensure that apppName’s directory already exists
 	var appDir string
 	// Path retrieves directory without panics or file-system writes
-	if appDir, err = pos.NewAppDir(appName).Path(); err != nil {
+	if appDir, _, err = pos.NewAppDir(appName).Path(); err != nil {
 		return // some error
 	}
 	var fileInfo fs.FileInfo

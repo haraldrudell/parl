@@ -102,7 +102,7 @@ func (n *DataSourceNamer) create() (err error) {
 
 func (n *DataSourceNamer) createRO() (err error) {
 	// determine directory
-	n.dir, err = pos.NewAppDir(n.appName).Path()
+	n.dir, _, err = pos.NewAppDir(n.appName).Path()
 
 	return
 }

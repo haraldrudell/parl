@@ -280,28 +280,6 @@ func (s *SocketListener[C]) invokeHandler(conn net.Conn) {
 }
 
 const (
-	NetworkTCP  = "tcp"
-	NetworkTCP4 = "tcp4" // net network tcp ipv4
-	NetworkTCP6 = "tcp6"
-)
-
-type Network string
-
-func (t Network) String() (s string) {
-	return networkSet.StringT(t)
-}
-
-func (t Network) IsValid() (isValid bool) {
-	return networkSet.IsValid(t)
-}
-
-var networkSet = sets.NewSet[Network]([]sets.SetElement[Network]{
-	{ValueV: NetworkTCP, Name: "tcp"},
-	{ValueV: NetworkTCP4, Name: "tcp4"},
-	{ValueV: NetworkTCP6, Name: "tcp6"},
-})
-
-const (
 	TransportTCP = iota + 1
 	TransportUDP
 	TransportIP
