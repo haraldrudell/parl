@@ -37,8 +37,8 @@ const (
 
 // ParseNetwork checks if network is valid
 //   - tcp tcp4 tcp6 udp udp4 udp6 ip ip4 ip6 unix unixgram unixpacket
-func ParseNetwork(network string) (err error) {
-	var n Network = Network(network)
+func ParseNetwork(network string) (n Network, err error) {
+	n = Network(network)
 	if !n.IsValid() {
 		err = perrors.Errorf("ParseNetwork: %w", net.UnknownNetworkError(network))
 	}

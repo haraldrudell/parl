@@ -99,11 +99,6 @@ const (
 	Rfc3339ns = "2006-01-02 15:04:05.000000000Z07:00"
 )
 
-type Password interface {
-	HasPassword() (hasPassword bool)
-	Password() (password string)
-}
-
 type FSLocation interface {
 	Directory() (directory string)
 }

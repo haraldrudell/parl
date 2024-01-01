@@ -6,7 +6,10 @@ ISC License
 package pterm
 
 const (
-	Red         = "\x1b[38:5:9m"
-	Green       = "\x1b[38:5:2m"
+	// foregorund color red
+	Red = "\x1b[38:5:9m"
+	// foregorund color green
+	Green = "\x1b[38:5:2m"
+	// foreground color reset to default
 	ResetColors = "\x1b[39;49m"
 )
