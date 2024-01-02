@@ -96,7 +96,7 @@ func (s *Https) httpsListenerThread() {
 	defer s.maybeClose(&tlsListener, &err)
 
 	// set Near socket address
-	if s.Near, err = s.nearAddr(tlsListener.Addr()); err != nil {
+	if s.Near, err = pnet.AddrPortFromAddr(tlsListener.Addr()); err != nil {
 		return
 	}
 	s.ListenAwaitable.Close()
@@ -143,6 +143,7 @@ func (s *Https) TLS() (tlsListener net.Listener, err error) {
 	if listener, err = pnet.Listen(s.Network, s.Server.Addr, &s.Cancel); err != nil {
 		return
 	}
+	var _ = net.Listen
 
 	// create a TLS listener from srv.ServeTLS
 	var tlsConfig *tls.Config

@@ -148,7 +148,7 @@ func (s *Http) httpListenerThread() {
 	defer s.maybeClose(&listener, &err)
 
 	// set Near socket address
-	if s.Near, err = s.nearAddr(listener.Addr()); err != nil {
+	if s.Near, err = pnet.AddrPortFromAddr(listener.Addr()); err != nil {
 		return
 	}
 	s.ListenAwaitable.Close()
@@ -171,27 +171,6 @@ func (s *Http) SendErr(err error) { s.ErrCh.Send(err) }
 // idempotent panic-free shutdown that does not return prior to server shut down
 func (s *Http) Shutdown() {
 	s.shutdownOnce.Do(s.shutdown)
-}
-
-// nearAddr converts tcp-protocol net.Addr to netip.AddrPort
-func (s *Http) nearAddr(addr net.Addr) (near netip.AddrPort, err error) {
-	// Addr is interface { Network() String() }
-	//	- runtime type is *net.TCPAddr struct { IP IP; Port int; Zone string }
-	var a, ok = addr.(*net.TCPAddr)
-	if !ok {
-		err = perrors.ErrorfPF("listener.Addr runtime type not *net.TCPAddr: %T", addr)
-		return
-	}
-	var b netip.Addr
-	if b, ok = netip.AddrFromSlice(a.IP); !ok {
-		err = perrors.ErrorfPF("listener.Addr bad length: %d", len(a.IP))
-		return
-	} else if a.Zone != "" {
-		b = b.WithZone(a.Zone)
-	}
-	near = netip.AddrPortFrom(b, uint16(a.Port))
-
-	return
 }
 
 // closes listener if non-nil
