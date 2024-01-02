@@ -6,8 +6,6 @@ ISC License
 package pslices
 
 import (
-	"sync/atomic"
-
 	"github.com/haraldrudell/parl/internal/cyclebreaker"
 )
 
@@ -17,87 +15,74 @@ import (
 //   - — the slice is out of items
 //   - — Close is invoked
 //   - RangeCh.Ch() must be either read until close or RangeCh.Close must be invoked
+//   - Close discards items
+//   - —
+//   - it is unclear whether pairing an updatable slice with an unbuffered channel is useful
+//   - — unlike a buffered channel, RangeCh is unbound
+//   - — RangeCh costs 1 thread maintaining the unbuffered channel
+//   - — channels are somewhat inefficient by processing only one element at a time
+//   - — controlling allocations by processing single elements, slices of elements or
+//     slices of slices of elements
+//   - — RangeCh sends any available elements then closes the channel and exits
 type RangeCh[T any] struct {
-	// ref must be pointer since a thread is launched in New function
-	//	- otherwise, memory leak may result
-	ref *threadData[T]
+	// the range-able channel sending data
+	//	- closes on end-of-data
+	//	- unbuffered
+	//	- send and close by rangeChWriteThread
+	ch chan T
+	// isClosed indicates that [RangeCh.Close] has been invoked
+	//	- the channel ch is about to close
+	//	- isClosed.Close is idempotent
+	//	- synchronization mechanic to exit rangeChWriteThread
+	//	- observable
+	isClosed *cyclebreaker.Awaitable
+	// isExit is synchronization mechanic that rangeChWriteThread has exit
+	//	- on isExit closing, ch is already closed
+	isExit cyclebreaker.AwaitableCh
 }
 
-// NewRangeCh returns a range-able channel based on a ThreadSafeSlice
+// NewRangeCh returns a range-able channel based on a [ThreadSafeSlice]
 //   - the Ch channel must be either read until it closes or Close must be invoked
-//   - Ch is a channel that can be used in a for range clause
+//   - Ch is a channel that can be used in a Go for-range clause
+//   - —
 //   - for can range over: array slice string map or channel
-//   - the only dynamic range source is channel which costs a thread writing to and closing the channel
+//   - the only dynamic range source is channel which costs a thread sending on and closing the channel
 func NewRangeCh[T any](tss *ThreadSafeSlice[T]) (rangeChan *RangeCh[T]) {
-
-	// create local pointed-to structure
-	//	- the pointer allows for launching a thread inside a new-function
-	var t = threadData[T]{
-		ch:              make(chan T),
-		threadSafeSlice: tss,
-		index:           -1,
-		exitCh:          make(chan struct{}),
+	var isExit = make(chan struct{})
+	r := RangeCh[T]{
+		ch:       make(chan T),
+		isClosed: cyclebreaker.NewAwaitable(),
+		isExit:   isExit,
 	}
 
 	// launch sending thread
-	go t.writeThread()
+	go rangeChWriteThread(tss, r.ch, r.isClosed.Ch(), isExit)
 
-	return &RangeCh[T]{ref: &t}
-}
-
-// ref is an internal structure supporting writeThread
-type threadData[T any] struct {
-	// the range-able channel sending data
-	//	- the thread sends on ch, so it must be the thread closing ch
-	ch chan T
-	// threadSafeSlice holds the data being sent
-	threadSafeSlice *ThreadSafeSlice[T]
-
-	// thread-safe mutable fields
-
-	// isClosed indicates that Close has been invoked
-	//	- the channel ch is about to close
-	//	- signals to the thread to stop reading from the slice
-	isClosed atomic.Bool
-
-	// writeThread fields
-
-	index int // next index in thread-safe slice
-	// writeThread closes exitCh on exit
-	//	- when thread closes exitCh, ch has already been closed
-	exitCh chan struct{}
+	return &r
 }
 
 // Ch returns the range-able channel sending values, thread-safe
-func (r *RangeCh[T]) Ch() (ch <-chan T) {
-	return r.ref.ch
-}
+func (r *RangeCh[T]) Ch() (ch <-chan T) { return r.ch }
 
 // Close closes the ch channel, thread-safe, idempotent
 //   - Close may discard a pending item and causes the thread to stop reading from the slice
 //   - Close does not return until Ch is closed and the thread have exited
 func (r *RangeCh[T]) Close() {
-	defer func() { <-r.ref.exitCh }() // wait for thread to close ch, then close exitCh, then exit
 
-	// try to win the first-to-close race
-	//	- r.isClosed true signals to writeThread to exit
-	if !r.ref.isClosed.CompareAndSwap(false, true) {
-		return // loser waits for winner
-	}
+	// cause rangeChWriteThread to exit
+	r.isClosed.Close()
 
-	// read to ensure writeThread is unblocked
-	select {
-	case <-r.ref.ch: // this unblocks writeThread so it finds r.isClosed to be true
-	default:
-	}
+	// wait for rangeChWriteThread to exit
+	<-r.isExit
 }
 
-// - isCloseInvoked is true if Close has been invoked, may not have returned or closed ch yet
-// - isChClosed means Ch has closed
-// - exitCh is a channel that closes, ie. it allows waiting for Ch to close
+// State returns [RangeCh] state
+// - isCloseInvoked is true if [RangeCh.Close] has been invoked, but Close may not have completed
+// - isChClosed means [RangeCh.Ch] has closed and resources are released
+// - exitCh allows to wait for Close complete
 func (r *RangeCh[T]) State() (isCloseInvoked, isChClosed bool, exitCh <-chan struct{}) {
-	isCloseInvoked = r.ref.isClosed.Load()
-	exitCh = r.ref.exitCh
+	isCloseInvoked = r.isClosed.IsClosed()
+	exitCh = r.isExit
 	select {
 	case <-exitCh:
 		isChClosed = true
@@ -106,30 +91,37 @@ func (r *RangeCh[T]) State() (isCloseInvoked, isChClosed bool, exitCh <-chan str
 	return
 }
 
-// writeThread writes elements to r.ch until end or Close
-//   - typically writeThread will block in channel send
-func (r *threadData[T]) writeThread() {
+// rangeChWriteThread writes elements to r.ch until end or Close
+//   - typically rangeChWriteThread will block in channel send
+//   - infallible: runtime errors printed to standard error
+func rangeChWriteThread[T any](
+	tss *ThreadSafeSlice[T],
+	ch chan<- T,
+	isClosedCh cyclebreaker.AwaitableCh,
+	isExit chan struct{},
+) {
 	var err error
 	defer cyclebreaker.Recover(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, cyclebreaker.Infallible)
-	defer cyclebreaker.Closer(r.exitCh, &err)
-	defer cyclebreaker.Closer(r.ch, &err)
+	defer cyclebreaker.Closer(isExit, &err)
+	defer cyclebreaker.CloserSend(ch, &err)
 
-	var element T
-	var hasValue bool
+	var index int
 	for {
 
 		// get element to send
-		r.index++
-		if element, hasValue = r.threadSafeSlice.Get(r.index); !hasValue {
+		//	- non-blocking
+		//	- hasValue false when out of values
+		var element, hasValue = tss.Get(index)
+		if !hasValue {
 			return // end of items return
 		}
+		index++
 
 		// write thread normally blocks here
-		r.ch <- element
-
-		// check if Close was invoked while blocked
-		if r.isClosed.Load() {
-			return // closed by r.doClose return
+		select {
+		case ch <- element:
+		case <-isClosedCh:
+			return // [RangeCh.Close] invoked
 		}
 	}
 }
