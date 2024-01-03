@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/perrors/errorglue"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
@@ -192,8 +193,24 @@ func processRecoverValue(annotation string, panicValue interface{}, frames int) 
 	if frames < 0 {
 		frames = 0
 	}
-	return perrors.Errorf("%s “%w”",
+
+	// if panicValue is an error with attached stack,
+	// the panic detector will fail because
+	// that innermost stack does not include panic recovery
+	var hadPreRecoverStack bool
+	if e, ok := panicValue.(error); ok {
+		hadPreRecoverStack = errorglue.GetInnerMostStack(e) != nil
+	}
+	// ensure an error value is derived from panicValue
+	err = perrors.Errorf("%s “%w”",
 		annotation,
 		ensureError(panicValue, frames+processRecoverFrames),
 	)
+	// make sure err has a post-recover() stack
+	//	- this will allow the panic detector to succeed
+	if hadPreRecoverStack {
+		err = perrors.Stackn(err, frames)
+	}
+
+	return
 }

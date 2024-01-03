@@ -17,5 +17,5 @@ func RecoverErr(deferredLocation func() DA, errp *error, isPanic ...*bool) {
 	if len(isPanic) > 0 {
 		isPanicp = isPanic[0]
 	}
-	doRecovery("", deferredLocation, errp, NoOnError, recover2OnErrrorOnce, isPanicp, recover())
+	doRecovery(noAnnotation, deferredLocation, errp, NoOnError, recoverOnErrrorNone, isPanicp, recover())
 }

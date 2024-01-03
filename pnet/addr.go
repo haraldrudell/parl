@@ -6,7 +6,6 @@ ISC License
 package pnet
 
 import (
-	"net"
 	"net/netip"
 	"strconv"
 
@@ -134,9 +133,10 @@ func EnsureZone(addr netip.Addr, ifName string, ifIndex IfIndex, acceptNumeric .
 //var isDigits = regexp.MustCompile(`^[0-9]+$`).MatchString
 
 // Zone examines the zone included in addr
-//   - no zone: hasZone, isNumeric false
-//   - numeric zone "1": hasZone true, isNumeric false
-//   - interface-name zone "eth0": hasZone, isNumeric true
+//   - no zone: hasZone: false, isNumeric: false
+//   - numeric zone “1”: hasZone: true, isNumeric: true.
+//     Number is network interface index.
+//   - interface-name zone “eth0”: hasZone: true, isNumeric false
 func Zone(addr netip.Addr) (zone string, znum int, hasZone, isNumeric bool) {
 	zone = addr.Zone()
 	if hasZone = zone != ""; !hasZone {
@@ -148,28 +148,10 @@ func Zone(addr netip.Addr) (zone string, znum int, hasZone, isNumeric bool) {
 	return
 }
 
-// IPAddr returns IPAddr from IP and IfIndex to IPAddr
-func IPAddr(IP net.IP, index IfIndex, zone string) (ipa *net.IPAddr, err error) {
-	ipa = &net.IPAddr{IP: IP}
-	if IsIPv6(IP) {
-		if zone != "" {
-			ipa.Zone = zone
-		} else {
-			ipa.Zone, _, err = index.Zone()
-		}
-	}
-	return
-}
-
-// AddrToIPAddr: Network() "ip", no port number
-func AddrToIPAddr(addr netip.Addr) (addrInterface net.Addr) {
-	if !addr.IsValid() {
-		panic(perrors.NewPF("invalid netip.Addr"))
-	}
-	return &net.IPAddr{IP: addr.AsSlice(), Zone: addr.Zone()}
-}
-
-// Addr46 convert 4in6 to 4 for consistent IPv4/IPv6
+// Addr46 converts 4in6 IPv6 addresses to IPv4 for consistent IPv4/IPv6
+//   - IPv6 has a special class of addresses represnting an IPv4 address
+//   - IPv6 “::ffff:192.0.2.128” represents the IPv4 address “192.0.2.128”
+//   - Addr46 converts such addresses to IPv4
 func Addr46(addr netip.Addr) (addr46 netip.Addr) {
 	if addr.Is4In6() {
 		addr46 = netip.AddrFrom4(addr.As4())

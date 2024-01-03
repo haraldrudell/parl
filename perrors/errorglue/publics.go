@@ -160,7 +160,7 @@ func RecoverThread(label string, onError func(err error)) {
 	if v := recover(); v != nil {
 		err, ok := v.(error)
 		if !ok {
-			err = fmt.Errorf("Non-error value: %v", v)
+			err = fmt.Errorf("non-error value: %v", v)
 		}
 		onError(fmt.Errorf("%s: %w", label, err))
 	}

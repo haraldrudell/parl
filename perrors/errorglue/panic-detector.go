@@ -27,6 +27,12 @@ var panicDetectorOne = func() (pd *panicDetector) {
 	return &p
 }()
 
+func PanicDetectorValues() (deferS, panicS string) {
+	deferS = panicDetectorOne.runtimeDeferInvokerLocation
+	panicS = panicDetectorOne.runtimePanicFunctionLocation
+	return
+}
+
 // test panicDetector on this runtime
 /*
 221221 disabled

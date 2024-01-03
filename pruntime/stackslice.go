@@ -51,6 +51,8 @@ func NewStackSlice(skip int) (slice StackSlice) {
 	return
 }
 
+// Short returns the executing code location if any
+//   - “ at mains.(*Executable).AddErr-executable.go:25”
 func (st StackSlice) Short() (s string) {
 	if len(st) >= 1 {
 		s = " at " + st[0].Short()

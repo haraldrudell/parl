@@ -10,43 +10,50 @@ import (
 	"strings"
 
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/perrors/errorglue"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
 // Recover recovers panic using deferred annotation
-//   - onError error receiver is invoked exactly one
-//   - errors in *errp and panic are aggregated into a single error value
-//   - if onError non-nil, the function is invoked once with the aggregate error
-//   - if onError nil, the aggregate error is logged to standard error
-//   - if onError is [Parl.NoOnErrror], logging is suppressed
-//   - if errp is non-nil, it is updated with the aggregate error
+//   - Recover creates a single aggregate error of *errp and any panic
+//   - if onError non-nil, the function is invoked zero or one time with the aggregate error
+//   - if onError nil, the error is logged to standard error
+//   - if errp is non-nil, it is updated with any aggregate error
 //
 // Usage:
 //
 //	func someFunc() (err error) {
 //	  defer parl.Recover(func() parl.DA { return parl.A() }, &err, parl.NoOnError)
 func Recover(deferredLocation func() DA, errp *error, onError OnError) {
-	doRecovery("", deferredLocation, errp, onError, recover2OnErrrorOnce, noIsPanic, recover())
+	doRecovery(noAnnotation, deferredLocation, errp, onError, recoverOnErrrorOnce, noIsPanic, recover())
 }
 
 // Recover2 recovers panic using deferred annotation
-//   - if onError non-nil, the function is invoked with any error in *errp and any panic
-//   - if onError nil, the errors are logged to standard error
-//   - if onError is [Parl.NoOnErrror], logging is suppressed
-//   - if errp is non-nil, it is updated with an aggregate error
+//   - if onError non-nil, the function is invoked zero, one or two times with any error in *errp and any panic
+//   - if onError nil, errors are logged to standard error
+//   - if errp is non-nil:
+//   - — if *errp was nil, it is updated with any panic
+//   - — if *errp was non-nil, it is updated with any panic as an aggregate error
 //
 // Usage:
 //
 //	func someFunc() (err error) {
 //	  defer parl.Recover2(func() parl.DA { return parl.A() }, &err, parl.NoOnError)
 func Recover2(deferredLocation func() DA, errp *error, onError OnError) {
-	doRecovery("", deferredLocation, errp, onError, recover2OnErrrorMultiple, noIsPanic, recover())
+	doRecovery(noAnnotation, deferredLocation, errp, onError, recoverOnErrrorMultiple, noIsPanic, recover())
 }
 
 // RecoverAnnotation is like Recover but with fixed-string annotation
 func RecoverAnnotation(annotation string, errp *error, onError OnError) {
-	doRecovery(annotation, noDeferredAnnotation, errp, onError, recover2OnErrrorOnce, noIsPanic, recover())
+	doRecovery(annotation, noDeferredAnnotation, errp, onError, recoverOnErrrorOnce, noIsPanic, recover())
 }
+
+// nil OnError function
+//   - public for RecoverAnnotation
+var NoOnError OnError
+
+// OnError is a function that receives error values from an errp error pointer or a panic
+type OnError func(err error)
 
 const (
 	// counts the frames in [parl.A]
@@ -54,20 +61,33 @@ const (
 	// counts the stack-frame in [parl.processRecover]
 	processRecoverFrames = 1
 	// counts the stack-frame of [parl.doRecovery] and [parl.Recover] or [parl.Recover2]
-	//	- but for panic detectpr to work, there must be one frame after
+	//	- but for panic detector to work, there must be one frame after
 	//		runtime.gopanic, so remove one frame
 	doRecoveryFrames = 2 - 1
-	// indicates onError to be invoked once for all errors
-	recover2OnErrrorOnce = false
-	// indicates onError to be invoked once per error
-	recover2OnErrrorMultiple = true
+	// fixed-string annotation is not present
+	noAnnotation = ""
 )
+
+const (
+	// indicates onError to be invoked once for all errors
+	recoverOnErrrorOnce OnErrorStrategy = iota
+	// indicates onError to be invoked once per error
+	recoverOnErrrorMultiple
+	// do not invoke onError
+	recoverOnErrrorNone
+)
+
+// how OnError is handled: recoverOnErrrorOnce recoverOnErrrorMultiple recoverOnErrrorNone
+type OnErrorStrategy uint8
 
 // indicates deferred annotation is not present
 var noDeferredAnnotation func() DA
 
 // DA is the value returned by a deferred code location function
 type DA *pruntime.CodeLocation
+
+// contains a deferred code location for annotation
+type annotationLiteral func() DA
 
 // A is a thunk returning a deferred code location
 func A() DA { return pruntime.NewCodeLocation(parlAFrames) }
@@ -76,17 +96,24 @@ func A() DA { return pruntime.NewCodeLocation(parlAFrames) }
 var noIsPanic *bool
 
 // doRecovery implements recovery for Recovery andd Recovery2
-func doRecovery(annotation string, deferredAnnotation func() DA, errp *error, onError OnError, multiple bool, isPanic *bool, recoverValue interface{}) {
+func doRecovery(annotation string, deferredAnnotation annotationLiteral, errp *error, onError OnError, onErrorStrategy OnErrorStrategy, isPanic *bool, recoverValue interface{}) {
+	if onErrorStrategy == recoverOnErrrorNone {
+		if errp == nil {
+			panic(NilError("errp"))
+		}
+	} else if errp == nil && onError == nil {
+		panic(NilError("both errp and onError"))
+	}
 
 	// build aggregate error in err
 	var err error
-
-	// if onError is to be invoked multiple times,
-	// and *errp contains an error,
-	// invoke onError or Log to standard error
 	if errp != nil {
-		if err = *errp; err != nil && multiple {
-			invokeOnError(onError, err) // invokee onError or parl.Log
+		err = *errp
+		// if onError is to be invoked multiple times,
+		// and *errp contains an error,
+		// invoke onError or Log to standard error
+		if err != nil && onErrorStrategy == recoverOnErrrorMultiple {
+			invokeOnError(onError, err) // invoke onError or parl.Log
 		}
 	}
 
@@ -95,50 +122,59 @@ func doRecovery(annotation string, deferredAnnotation func() DA, errp *error, on
 		if isPanic != nil {
 			*isPanic = true
 		}
-		if annotation == "" {
-			if deferredAnnotation != nil {
-				if da := deferredAnnotation(); da != nil {
-					var cL = (*pruntime.CodeLocation)(da)
-					// single wword package name
-					var packageName = cL.Package()
-					// recoverDaPanic.func1: hosting function name and a derived name for the function literal
-					var funcName = cL.FuncIdentifier()
-					// removed “.func1” suffix
-					if index := strings.LastIndex(funcName, "."); index != -1 {
-						funcName = funcName[:index]
-					}
-					annotation = fmt.Sprintf("panic detected in %s.%s:",
-						packageName,
-						funcName,
-					)
-				}
-			}
-			if annotation == "" {
-				// default annotation cannot be obtained
-				//	- the deferred Recover function is invoked directly from rutine, eg. runtime.gopanic
-				//	- therefore, use fixed string
-				annotation = "recover from panic:"
-			}
+		if annotation == noAnnotation {
+			annotation = getDeferredAnnotation(deferredAnnotation)
 		}
-		e := processRecover(annotation, recoverValue, doRecoveryFrames)
-		if multiple {
-			invokeOnError(onError, e)
-		} else {
-			err = perrors.AppendError(err, e)
+		var panicError = processRecoverValue(annotation, recoverValue, doRecoveryFrames)
+		err = perrors.AppendError(err, panicError)
+		if onErrorStrategy == recoverOnErrrorMultiple {
+			invokeOnError(onError, panicError)
 		}
 	}
 
 	// if err now contains any error
-	//	- write bacxk to non-nil errp
-	//	- if not multiple, invoke onErorr or Log the aggregate error
 	if err != nil {
+		// if errp non-nil:
+		//	- err was obtained from *errp
+		//	- err may now be panicError or have had panicError appended
+		//	- overwrite back to non-nil errp
 		if errp != nil && *errp != err {
 			*errp = err
 		}
-		if !multiple {
+		// if OnError is once, invoke onError or Log with the aggregate error
+		if onErrorStrategy == recoverOnErrrorOnce {
 			invokeOnError(onError, err)
 		}
 	}
+}
+
+// getDeferredAnnotation obtains annotation from a deferred annotation function literal
+func getDeferredAnnotation(deferredAnnotation annotationLiteral) (annotation string) {
+	if deferredAnnotation != nil {
+		if da := deferredAnnotation(); da != nil {
+			var cL = (*pruntime.CodeLocation)(da)
+			// single word package name
+			var packageName = cL.Package()
+			// recoverDaPanic.func1: hosting function name and a derived name for the function literal
+			var funcName = cL.FuncIdentifier()
+			// removed “.func1” suffix
+			if index := strings.LastIndex(funcName, "."); index != -1 {
+				funcName = funcName[:index]
+			}
+			annotation = fmt.Sprintf("panic detected in %s.%s:",
+				packageName,
+				funcName,
+			)
+		}
+	}
+	if annotation == "" {
+		// default annotation cannot be obtained
+		//	- the deferred Recover function is invoked directly from rutine, eg. runtime.gopanic
+		//	- therefore, use fixed string
+		annotation = "recover from panic:"
+	}
+
+	return
 }
 
 // invokeOnError invokes an onError function or logs to standard error if onError is nil
@@ -150,15 +186,31 @@ func invokeOnError(onError OnError, err error) {
 	Log("Recover: %+v\n", err)
 }
 
-// processRecover ensures non-nil result to be error with Stack
+// processRecoverValue returns an error value with stack from annotation and panicValue
 //   - annotation is non-empty annotation indicating code loction or action
 //   - panicValue is non-nil value returned by built-in recover function
-func processRecover(annotation string, panicValue interface{}, frames int) (err error) {
+func processRecoverValue(annotation string, panicValue interface{}, frames int) (err error) {
 	if frames < 0 {
 		frames = 0
 	}
-	return perrors.Errorf("%s “%w”",
+
+	// if panicValue is an error with attached stack,
+	// the panic detector will fail because
+	// that innermost stack does not include panic recovery
+	var hadPreRecoverStack bool
+	if e, ok := panicValue.(error); ok {
+		hadPreRecoverStack = errorglue.GetInnerMostStack(e) != nil
+	}
+	// ensure an error value is derived from panicValue
+	err = perrors.Errorf("%s “%w”",
 		annotation,
 		ensureError(panicValue, frames+processRecoverFrames),
 	)
+	// make sure err has a post-recover() stack
+	//	- this will allow the panic detector to succeed
+	if hadPreRecoverStack {
+		err = perrors.Stackn(err, frames)
+	}
+
+	return
 }
