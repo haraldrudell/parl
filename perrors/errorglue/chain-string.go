@@ -94,7 +94,7 @@ func ChainString(err error, format CSFormat) (s string) {
 			var errorAsString string
 			if richError, ok := err.(ChainStringer); ok {
 				if !isFirstInChain && format == LongFormat {
-					errorAsString = richError.ChainString(LongSuffix)
+					errorAsString = richError.ChainString(LongFormat)
 				} else {
 					errorAsString = richError.ChainString(format)
 				}

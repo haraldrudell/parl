@@ -16,8 +16,8 @@ import (
 )
 
 func TestChainString(t *testing.T) {
-	var longFormatExpectedLines = 17
-	var longFormatValue2LineIndex = 5
+	var longFormatExpectedLines = 19
+	var longFormatValue2LineIndex = 6
 	// cst is a fixture with a complex error graph
 	var cst = errFixture{
 		errorMessage:    "error-message",

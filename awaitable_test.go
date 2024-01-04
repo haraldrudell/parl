@@ -64,3 +64,9 @@ func TestAwaitable(t *testing.T) {
 		t.Error("IsClosed false")
 	}
 }
+
+func TestZeroValue(t *testing.T) {
+	var awaitable Awaitable
+	awaitable.Close()
+	t.Log("OK")
+}
