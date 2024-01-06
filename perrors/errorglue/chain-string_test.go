@@ -8,6 +8,7 @@ package errorglue
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -16,8 +17,8 @@ import (
 )
 
 func TestChainString(t *testing.T) {
-	var longFormatExpectedLines = 19
-	var longFormatValue2LineIndex = 6
+	var longFormatExpectedLines = 23
+	var longFormatValue2LineIndex = 8
 	// cst is a fixture with a complex error graph
 	var cst = errFixture{
 		errorMessage:    "error-message",
@@ -31,6 +32,7 @@ func TestChainString(t *testing.T) {
 		value2: "value2",
 	}
 	cst.Do(t)
+	var firsLineExp = cst.expectedMessage + " [" + reflect.TypeOf(cst.err).String() + "]"
 
 	var actualString string
 	var sList []string
@@ -81,7 +83,7 @@ func TestChainString(t *testing.T) {
 		t.Errorf("FAIL LongFormat %d lines, expected: %d", len(sList), longFormatExpectedLines)
 	}
 	// first line shouldmatch
-	if sList[0] != cst.expectedMessage {
+	if sList[0] != firsLineExp {
 		t.Errorf("FAIL LongFormat first line\n%q expected:\n%q", sList[0], cst.expectedMessage)
 	}
 	actualString = sList[longFormatValue2LineIndex]
@@ -109,6 +111,66 @@ func TestAppended(t *testing.T) {
 	if !strings.Contains(s, contains2) {
 		t.Errorf("does not contain: %q: %q", contains2, s)
 	}
+}
+
+func TestChainStringList(t *testing.T) {
+	var errNew = errors.New("new")
+	var errErrorf1 = fmt.Errorf("errorf1 %w", errNew)
+	var stack = shortStack()
+	// errorStack is a rich error
+	//	- does not modify error message
+	var errStack = NewErrorStack(errErrorf1, stack)
+	var errErrorf2 = fmt.Errorf("errorf2 %w", errStack)
+	var relatedErr = errors.New("related")
+	var err = NewRelatedError(errErrorf2, relatedErr)
+	var formatExpMap = map[CSFormat]string{
+		DefaultFormat: err.Error(),
+		CodeLocation:  err.Error() + " at " + stack[0].Short(),
+		ShortFormat:   err.Error() + " at " + stack[0].Short() + " 1[related]",
+		LongFormat: strings.Join([]string{
+			err.Error() + " [" + reflect.TypeOf(err).String() + "]",
+			errErrorf2.Error() + " [" + reflect.TypeOf(errErrorf2).String() + "]",
+			errStack.Error() + " [" + reflect.TypeOf(errStack).String() + "]" + stack.String(),
+			errErrorf1.Error() + " [" + reflect.TypeOf(errErrorf1).String() + "]",
+			errNew.Error() + " [" + reflect.TypeOf(errNew).String() + "]",
+			relatedErr.Error() + " [" + reflect.TypeOf(relatedErr).String() + "]",
+		}, "\n"),
+		ShortSuffix: stack[0].Short(),
+		LongSuffix: strings.Join([]string{
+			err.Error() + " [" + reflect.TypeOf(err).String() + "]",
+			stack.String(),
+			relatedErr.Error() + " [" + reflect.TypeOf(relatedErr).String() + "]",
+		}, "\n"),
+	}
+
+	// err error-chain:
+	// *errorglue.relatedError *fmt.wrapError
+	// *errorglue.errorStack *fmt.wrapError *errors.errorString
+	t.Logf("err error-chain: %s", DumpChain(err))
+
+	var formatAct, formatExp string
+	var ok bool
+
+	for _, csFormat := range csFormatList {
+		if formatExp, ok = formatExpMap[csFormat]; !ok {
+			t.Errorf("no expected value for format: %s", csFormat)
+		}
+		formatAct = ChainString(err, csFormat)
+
+		t.Logf("%s: %s", csFormat, formatAct)
+
+		// ChainString should match
+		if formatAct != formatExp {
+			t.Errorf("FAIL %s:\n%q exp\n%q",
+				csFormat, formatAct, formatExp,
+			)
+		}
+	}
+}
+
+// shortStack sends a short stack slice
+func shortStack() (stack pruntime.StackSlice) {
+	return pruntime.NewStackSlice(0)[:2]
 }
 
 // uses a goroutine to create an err fixture including

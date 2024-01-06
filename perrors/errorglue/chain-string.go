@@ -33,10 +33,10 @@ func ChainString(err error, format CSFormat) (s string) {
 	case DefaultFormat: // like printf %v, printf %s and error.Error()
 		s = err.Error() // the first error in the chain has our error message
 		return
-	case CodeLocation:
+	case CodeLocation: // only one errror, with code location
 		s = shortFormat(err)
 		return
-	case ShortFormat: // one-liner with code location appended associated errors
+	case ShortFormat: // one-liner with code location and associated errors
 		s = shortFormat(err)
 
 		//add appended errors at the end 2[…]
@@ -51,10 +51,18 @@ func ChainString(err error, format CSFormat) (s string) {
 		}
 
 		return
-	case ShortSuffix:
+	case ShortSuffix: // for stackError, this provide the code-location without leading “ at ”
 		s = codeLocation(err)
 		return
-	case LongFormat, LongSuffix:
+	case LongFormat:
+		// all errors with message and type
+		//	- stack traces
+		//	- related data
+		//	- associated errors
+	case LongSuffix:
+		// first error of each error-chain in long format
+		//	- an error chain is the initial error and any related errors
+		//	- stack traces and data for all errors
 	default:
 		var stack = pruntime.NewStackSlice(0)
 		var packFuncS string
@@ -72,20 +80,22 @@ func ChainString(err error, format CSFormat) (s string) {
 	// errorsToPrint: list of discovered associated errors to print
 	var errorsToPrint = []error{err}
 
-	// traverse error instances
+	// traverse all error instances
+	//	- the initial error and any unique related error
 	for i := 0; i < len(errorsToPrint); i++ {
 
-		// traverse error chain
+		// every error is an error chain
+		//	- traverse error chain
 		var isFirstInChain = true
 		for err = errorsToPrint[i]; err != nil; err = errors.Unwrap(err) {
 
 			// look for associated errors
-			if e2, ok := err.(RelatedError); ok {
-				if e3 := e2.AssociatedError(); e3 != nil {
+			if relatedHolder, ok := err.(RelatedError); ok {
+				if relatedErr := relatedHolder.AssociatedError(); relatedErr != nil {
 					// add any new errors to errorsToPrint
-					if !errorMap[e3] {
-						errorMap[e3] = true
-						errorsToPrint = append(errorsToPrint, e3)
+					if !errorMap[relatedErr] {
+						errorMap[relatedErr] = true
+						errorsToPrint = append(errorsToPrint, relatedErr)
 					}
 				}
 			}
@@ -93,16 +103,18 @@ func ChainString(err error, format CSFormat) (s string) {
 			// ChainStringer errors produce their own representations
 			var errorAsString string
 			if richError, ok := err.(ChainStringer); ok {
-				if !isFirstInChain && format == LongFormat {
+				if isFirstInChain {
 					errorAsString = richError.ChainString(LongFormat)
 				} else {
 					errorAsString = richError.ChainString(format)
 				}
 			} else {
 
-				// for non-rich errors, only print the first one
-				if isFirstInChain {
-					errorAsString = err.Error()
+				// regular errors
+				//	- LongFormat prints all with type
+				//	- LongSuffix only prints if first in chain
+				if format == LongFormat || isFirstInChain {
+					errorAsString = fmt.Sprintf("%s [%T]", err.Error(), err)
 				}
 			}
 

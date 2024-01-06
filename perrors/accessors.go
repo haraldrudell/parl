@@ -8,6 +8,7 @@ package perrors
 import (
 	"errors"
 	"reflect"
+	"slices"
 
 	"github.com/haraldrudell/parl/perrors/errorglue"
 	"github.com/haraldrudell/parl/pruntime"
@@ -15,26 +16,43 @@ import (
 
 const e116PackFuncStackFrames = 1
 
-// error116.ErrorData get possible string values associated with an error chain.
-// list is a list of string values that were stored with an empty key, oldest first.
-// keyValues are string values associated with a key string, newest key wins.
-// err can be nil
+// ErrorData returns any embedded data values from err and its error chain as a list and map
+//   - list contains values where key was empty, oldest first
+//   - keyValues are string values associated with a key string, overwriting older values
+//   - err list keyValues may be nil
 func ErrorData(err error) (list []string, keyValues map[string]string) {
-	for err != nil {
-		if e, ok := err.(errorglue.ErrorHasData); ok {
-			key, value := e.KeyValue()
-			if key == "" { // for the slice
-				list = append([]string{value}, list...)
-			} else { // for the map
-				if keyValues == nil {
-					keyValues = map[string]string{key: value}
-				} else if _, ok := keyValues[key]; !ok {
-					keyValues[key] = value
-				}
-			}
+
+	// traverse the err and its error chain, newest first
+	//	- only errors with data matter
+	for ; err != nil; err = errors.Unwrap(err) {
+
+		// ignore errrors without key/value pair
+		var e, ok = err.(errorglue.ErrorHasData)
+		if !ok {
+			continue
 		}
-		err = errors.Unwrap(err)
+
+		// empty key is appended to slice
+		//	- oldest value first
+		var key, value = e.KeyValue()
+		if key == "" { // for the slice
+			list = append(list, value) // newest first
+			continue
+		}
+
+		// for the map
+		if keyValues == nil {
+			keyValues = map[string]string{key: value}
+			continue
+		}
+		// values are added newset first
+		//	- do not overwrite newer values with older
+		if _, ok := keyValues[key]; !ok {
+			keyValues[key] = value
+		}
 	}
+	slices.Reverse(list) // oldest first
+
 	return
 }
 
@@ -73,16 +91,17 @@ func IsWarning(err error) (isWarning bool) {
 //
 //	error116.FuncName
 func PackFunc() (packageDotFunction string) {
-	return PackFuncN(1)
+	var frames = 1 // cpunt PackFunc frame
+	return PackFuncN(frames)
 }
 
 func PackFuncN(skipFrames int) (packageDotFunction string) {
 	if skipFrames < 0 {
 		skipFrames = 0
 	}
-	cl := pruntime.NewCodeLocation(e116PackFuncStackFrames + skipFrames)
-	packageDotFunction = cl.Name()
-	if pack := cl.Package(); pack != "main" {
+	var cL = pruntime.NewCodeLocation(e116PackFuncStackFrames + skipFrames)
+	packageDotFunction = cL.Name()
+	if pack := cL.Package(); pack != "main" {
 		packageDotFunction = pack + "." + packageDotFunction
 	}
 	return
@@ -98,6 +117,25 @@ func ErrpString(errp *error) (s string) {
 		return
 	}
 	s = err.Error()
+	return
+}
+
+// LongShort picks output format
+//   - no error: “OK”
+//   - no panic: error-message at runtime.gopanic:26
+//   - panic: long format with all stack traces and values
+//   - associated errors are always printed
+func LongShort(err error) (message string) {
+	var format errorglue.CSFormat
+	if err == nil {
+		format = errorglue.ShortFormat
+	} else if isPanic, _, _, _ := IsPanic(err); isPanic {
+		format = errorglue.LongFormat
+	} else {
+		format = errorglue.ShortFormat
+	}
+	message = errorglue.ChainString(err, format)
+
 	return
 }
 

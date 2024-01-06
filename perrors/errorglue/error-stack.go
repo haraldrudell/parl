@@ -74,7 +74,11 @@ func (errorStackValue *errorStack) ChainString(format CSFormat) (s string) {
 				s = errorStackAtString + s
 			}
 		}
-		s = errorStackValue.Error() + s + errorStackValue.s.String()
+		s = fmt.Sprintf("%s [%T]%s%s",
+			errorStackValue.Error(), errorStackValue, // “error-message [errors.Type]”
+			s,                          // “ at runtime.gopanic:17”
+			errorStackValue.s.String(), // multiple-line stack-trace
+		)
 		return
 	case LongSuffix:
 		s = errorStackValue.s.String()

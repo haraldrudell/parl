@@ -59,8 +59,14 @@ func (csFormat CSFormat) String() (s string) {
 // map for quick printable-string lookup
 var csFormatMap = map[CSFormat]string{
 	DefaultFormat: "DefaultFormat",
+	CodeLocation:  "CodeLocation",
 	ShortFormat:   "ShortFormat",
 	LongFormat:    "LongFormat",
 	ShortSuffix:   "ShortSuffix",
 	LongSuffix:    "LongSuffix",
 }
+
+var csFormatList = []CSFormat{
+	DefaultFormat, CodeLocation, ShortFormat, LongFormat, ShortSuffix, LongSuffix,
+}
+var _ = csFormatList

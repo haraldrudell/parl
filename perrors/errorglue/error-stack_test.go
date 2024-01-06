@@ -7,6 +7,7 @@ package errorglue
 
 import (
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -36,31 +37,29 @@ func TestErrorStack(t *testing.T) {
 		DefaultFormat, ShortFormat, LongFormat, ShortSuffix, LongSuffix,
 		badFormat,
 	}
+	// NewErrorStack should return error
+	var error1 = NewErrorStack(error0, stackSlice)
+	// runtime type should be errorStack
+	var eStack *errorStack
+	var ok bool
+	if eStack, ok = error1.(*errorStack); !ok {
+		t.Fatalf("NewErrorStack not errorStack")
+	}
 	// map from format to expected value
 	var formatExp = map[CSFormat]string{
-		DefaultFormat: error0.Error(),
-		ShortFormat:   error0.Error() + stackSlice.Short(),
-		LongFormat:    error0.Error() + stackSlice.String(),
+		DefaultFormat: eStack.Error(),
+		ShortFormat:   eStack.Error() + stackSlice.Short(),
+		LongFormat:    eStack.Error() + " [" + reflect.TypeOf(eStack).String() + "]" + stackSlice.String(),
 		ShortSuffix:   shortSuffix,
 		LongSuffix:    stackSlice.String(),
 		badFormat:     "",
 	}
 	_ = atString
-	var error1 error
 	var stackSliceAct pruntime.StackSlice
-	var ok bool
 	var sAct, sExp string
 
 	// ChainString() StackTrace()
-	var eStack *errorStack
-
-	// NewErrorStack should return error
-	error1 = NewErrorStack(error0, stackSlice)
-
-	// runtime type should be errorStack
-	if eStack, ok = error1.(*errorStack); !ok {
-		t.Fatalf("NewErrorStack not errorStack")
-	}
+	var _ *errorStack
 
 	// StackTrace should return the slice
 	stackSliceAct = eStack.StackTrace()
