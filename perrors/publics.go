@@ -12,10 +12,6 @@ import (
 	"github.com/haraldrudell/parl/pruntime"
 )
 
-const (
-	puFrames = 1
-)
-
 // error116.Warning indicates that err is a problem of less severity than error.
 // It is uesed for errors that are not to terminate the thread.
 // A Warning can be detected using error116.IsWarning().
@@ -77,14 +73,15 @@ func AppendErrorDefer(errp, errp2 *error, fn func() (err error)) {
 }
 
 func TagErr(e error, tags ...string) (err error) {
+	var frames = 1 // count TagErr frame
 
 	// ensure error has stack
 	if !HasStack(e) {
-		e = Stackn(e, puFrames)
+		e = Stackn(e, frames)
 	}
 
 	// values to print
-	s := pruntime.NewCodeLocation(puFrames).PackFunc()
+	s := pruntime.NewCodeLocation(frames).PackFunc()
 	if tagString := strings.Join(tags, "\x20"); tagString != "" {
 		s += "\x20" + tagString
 	}
@@ -92,6 +89,15 @@ func TagErr(e error, tags ...string) (err error) {
 	return Errorf("%s: %w", s, e)
 }
 
+// InvokeIfError invokes errFn with *errp if *errp is non-nil
+//   - used as a deferred conditional error storer
+//   - deferrable, thread-safe
+//
+// Usage:
+//
+//	func someFunc() {
+//	  var err error
+//	  defer perrors.InvokeIfError(&err, addError)
 func InvokeIfError(errp *error, errFn func(err error)) {
 	var err error
 	if errp != nil {
