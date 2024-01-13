@@ -16,11 +16,20 @@ import (
 // This should never fail, when it does, panic is thrown
 func ShortHostname() (host string) {
 	var err error
-	if host, err = os.Hostname(); err != nil {
-		panic(perrors.Errorf("os.Hostname: '%w'", err))
+	if host, err = Hostname(); err != nil {
+		panic(err)
 	}
-	if index := strings.Index(host, "."); index != -1 {
+
+	return
+}
+
+// hostname without domain part
+func Hostname() (host string, err error) {
+	if host, err = os.Hostname(); perrors.IsPF(&err, "os.Hostname: %w", err) {
+		return
+	} else if index := strings.Index(host, "."); index != -1 {
 		host = host[:index]
 	}
+
 	return
 }
