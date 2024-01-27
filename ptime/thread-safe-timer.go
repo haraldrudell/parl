@@ -16,11 +16,17 @@ const (
 	defaultDefaultDuration = time.Second
 )
 
-// ThreadSafeTimer is a timer that can be Reset by multiple threads
-//   - a [time.Timer] with thread-safe Reset method and default Reset duration
-//   - fields and method signatures identical to [time.Timer]
+// ThreadSafeTimer is a timer that can be Reset by multiple threads. Improvements:
+//   - Stop and Reset are thread-safe
+//   - Reset includes Stop in a fail-safe sequence and can be invoked at any time by any thread
+//   - NewThreadSafeTimer has a defaultDuration of 1 second if argument is missing, zero or negative
+//   - Reset also uses defaultDuration if argument is zero or negative
+//   - fields and method signatures are identical to [time.Timer]
+//   - ThreadSafeTimer may be copied or stored in slices or maps
 //   - —
+//   - cost: 1 sync.Mutex, 1 int64, 2 pointers, 2 allocations
 //   - [time.Timer] public methods and fields: C Reset Stop
+//   - time.Timer Reset must be in an uninterrupted Stop-drain-Reset sequence or memory leaks result
 type ThreadSafeTimer struct {
 	// the default duration for Reset method
 	defaultDuration time.Duration
@@ -30,11 +36,15 @@ type ThreadSafeTimer struct {
 	resetLock *sync.Mutex
 }
 
-// NewThreadSafeTimer returns a timer with thread-safe Reset
-//   - timer starts running
-//   - default default duration is 1 second
-//   - —
-//   - promoted fields and methods: C Stop
+// NewThreadSafeTimer returns a running timer with thread-safe Reset
+//   - default defaultDuration is 1 second for defaultDuration missing, zero or negative
+//   - defaultDuration is the default for Reset when Reset argument is zero or negative
+//   - Reset can be invoked at any time without any precautions.
+//   - — [time.Timer.Reset] has many conditions to avoid memory leaks
+//   - Stop and Reset methods are thread-safe
+//   - a timer must either expire or have Stop invoked to release resources
+//   - if timer was created in same thread or obtained via synchronize before,
+//     read of field C is thread-safe
 func NewThreadSafeTimer(defaultDuration ...time.Duration) (timer *ThreadSafeTimer) {
 
 	// determine default duration
@@ -64,19 +74,24 @@ func (t *ThreadSafeTimer) Reset(duration time.Duration) {
 	if duration <= 0 {
 		duration = t.defaultDuration
 	}
-
-	var timer0 = t.Timer
-	var C = timer0.C
 	t.resetLock.Lock()
 	defer t.resetLock.Unlock()
 
 	// Reset should be invoked only on:
 	//	- stopped or expired timers
 	//	- with drained channels
-	timer0.Stop()
+	t.Timer.Stop()
 	select {
-	case <-C:
+	case <-t.Timer.C:
 	default:
 	}
-	timer0.Reset(duration)
+	t.Timer.Reset(duration)
+}
+
+// Stop prevents the Timer from firing
+func (t *ThreadSafeTimer) Stop() (wasRunning bool) {
+	t.resetLock.Lock()
+	defer t.resetLock.Unlock()
+
+	return t.Timer.Stop()
 }
