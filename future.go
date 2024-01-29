@@ -43,7 +43,7 @@ type Future[T any] struct {
 //	  defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err, &isPanic)
 //
 //	   value = …
-func NewFuture[T any]() (calculation *Future[T]) { return &Future[T]{await: *NewAwaitable()} }
+func NewFuture[T any]() (calculation *Future[T]) { return &Future[T]{} }
 
 // IsCompleted returns whether the calculation is complete. Thread-safe
 func (f *Future[T]) IsCompleted() (isCompleted bool) { return f.await.IsClosed() }

@@ -208,7 +208,6 @@ func new(
 		creator: *pruntime.NewCodeLocation(stackOffset),
 		parent:  parent,
 		gos:     pmaps.NewRWMap[parl.GoEntityID, *ThreadData](),
-		endCh:   *parl.NewAwaitable(),
 	}
 	newGoContext(&g.goContext, ctx)
 	if parl.IsThisDebug() {

@@ -62,9 +62,7 @@ type Iterator struct {
 func NewIterator(path string, filter Op, ignores *regexp.Regexp, ctx ...context.Context) (iterator iters.Iterator[*WatchEvent]) {
 
 	i := Iterator{
-		path:          path,
-		hasEvent:      *parl.NewCyclicAwaitable(),
-		isAsyncCancel: *parl.NewAwaitable(),
+		path: path,
 	}
 	if len(ctx) > 0 {
 		i.ctx = ctx[0]
@@ -86,6 +84,7 @@ func (i *Iterator) iteratorFunction(isCancel bool) (fsEvent *WatchEvent, err err
 
 	//handle cancel and error
 	if isCancel {
+		parl.Debug("received isCancel true: watcher.Shutdown")
 		i.watcher.Shutdown()
 	}
 	err = i.error() // collect any Shutdown errors
@@ -99,6 +98,7 @@ func (i *Iterator) iteratorFunction(isCancel bool) (fsEvent *WatchEvent, err err
 	// ensure Watching
 	if !i.isWatching.Load() {
 		i.isWatching.Store(true)
+		parl.Debug("invoking watcher.Watch %q", i.path)
 		if err = i.watcher.Watch(i.path); err != nil {
 			i.watcher.Shutdown()
 			// ignore i.error, an error is already present

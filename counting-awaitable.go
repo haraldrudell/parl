@@ -39,7 +39,7 @@ type CountingAwaitable struct {
 //     prior to the Awaitable channel actually closing
 //   - mechanic is atomic.Int64.CompareAndSwap
 func NewCountingAwaitable() (awaitable *CountingAwaitable) {
-	return &CountingAwaitable{Awaitable: *NewAwaitable()}
+	return &CountingAwaitable{}
 }
 
 // IsTriggered returns true if counter has been used and returned to zero

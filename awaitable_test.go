@@ -17,7 +17,7 @@ func TestAwaitable(t *testing.T) {
 	// Ch() Close() IsClosed()
 	var awaitable *Awaitable
 	var reset = func() {
-		awaitable = NewAwaitable()
+		awaitable = &Awaitable{}
 	}
 
 	// Ch is non-nil

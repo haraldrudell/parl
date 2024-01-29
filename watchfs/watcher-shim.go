@@ -90,7 +90,6 @@ func NewWatcherShim(
 	watcherShim.ID = watchNo.Add(1)
 	watcherShim.eventFunc = eventFunc
 	watcherShim.errFn = errFn
-	watcherShim.shutdownComplete = *parl.NewAwaitable()
 	return
 }
 

@@ -9,7 +9,7 @@ import "sync/atomic"
 
 // Awaitable is a semaphore allowing any number of threads to observe
 // and await an event
-//   - one-to-many, happens-before, initialization-free
+//   - one-to-many, synchronizes-before, initialization-free
 //   - the synchronization mechanic is closing channel, allowing consumers to await
 //     multiple events
 //   - [Awaitable.IsClosed] provides thread-safe observability
@@ -20,41 +20,19 @@ import "sync/atomic"
 //     but those are less performant for the managing thread
 type Awaitable struct {
 	isClosed atomic.Bool
-	// channel from atomicCh
-	cp atomic.Pointer[chan struct{}]
+	// channel managed by atomicCh
+	chanp atomic.Pointer[chan struct{}]
 }
-
-// NewAwaitable returns a one-to-many semaphore
-func NewAwaitable() (awaitable *Awaitable) { return &Awaitable{} }
 
 // Ch returns an awaitable channel. Thread-safe
 func (a *Awaitable) Ch() (ch AwaitableCh) { return a.atomicCh() }
 
-func (a *Awaitable) atomicCh() (ch chan struct{}) {
-	var c2 chan struct{}
-	for {
-		var cp = a.cp.Load()
-		if cp != nil {
-			if ch = *cp; ch != nil {
-				return // channel from atomic pointer
-			}
-		}
-		if c2 == nil {
-			c2 = make(chan struct{})
-		}
-		if a.cp.CompareAndSwap(cp, &c2) {
-			ch = c2
-			return // channel written to atomic pointer
-		}
-	}
-}
-
 // isClosed inspects whether the awaitable has been triggered
+//   - on true return, it is guaranteed that the channel has been closed
 //   - Thread-safe
 func (a *Awaitable) IsClosed() (isClosed bool) {
-	var ch = a.atomicCh()
 	select {
-	case <-ch:
+	case <-a.atomicCh():
 		isClosed = true
 	default:
 	}
@@ -72,4 +50,24 @@ func (a *Awaitable) Close() (didClose bool) {
 	}
 	close(ch)
 	return // didClose return
+}
+
+// atomicCh returns a non-nil channel using atomic mechanic
+func (a *Awaitable) atomicCh() (ch chan struct{}) {
+	var newChan chan struct{}
+	for {
+		var loadedChanp = a.chanp.Load()
+		if loadedChanp != nil {
+			if ch = *loadedChanp; ch != nil {
+				return // channel from atomic pointer
+			}
+		}
+		if newChan == nil {
+			newChan = make(chan struct{})
+		}
+		if a.chanp.CompareAndSwap(loadedChanp, &newChan) {
+			ch = newChan
+			return // channel written to atomic pointer
+		}
+	}
 }

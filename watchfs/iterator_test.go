@@ -21,12 +21,15 @@ import (
 )
 
 func TestNewIterator(t *testing.T) {
+	//t.Errorf("logging on")
 	// for debugging, disable timeouts here
-	const noTimeout = false
+	const timeoutIsDisabled = true
 	var dir = t.TempDir()
 	var urwx fs.FileMode = 0700
 	var dir2 = filepath.Join(dir, "dir2")
-	var shortTime = 10 * time.Millisecond
+	// 10 ms
+	var shortTime = 100 * time.Millisecond
+	// 100 ms
 	var cancelTimeout = 100 * time.Millisecond
 
 	var ctx, cancelFunc = context.WithCancel(context.Background())
@@ -34,6 +37,7 @@ func TestNewIterator(t *testing.T) {
 	var value *WatchEvent
 	var hasValue, receivedRecord bool
 	var timer *time.Timer
+	var resettingTimer *ptime.ThreadSafeTimer
 	var recordCh <-chan recordR[*WatchEvent]
 
 	var iterator iters.Iterator[*WatchEvent] = NewIterator(dir, WatchOpAll, NoIgnores, ctx)
@@ -52,10 +56,13 @@ func TestNewIterator(t *testing.T) {
 		panic(err)
 	}
 
-	timer = time.NewTimer(shortTime)
-	defer timer.Stop()
-	if noTimeout {
-		timer.Stop()
+	// timeout channel, non-nil if timeouts are enabled
+	var C <-chan time.Time
+	if !timeoutIsDisabled {
+		// [ptime.NewThreadSafeTimer] to handle Reset correctly
+		resettingTimer = ptime.NewThreadSafeTimer(shortTime)
+		defer resettingTimer.Stop()
+		C = resettingTimer.C
 	}
 	select {
 	case record := <-recordCh:
@@ -63,20 +70,20 @@ func TestNewIterator(t *testing.T) {
 		value = record.value
 		hasValue = record.hasValue
 		err = record.err
-	case <-timer.C:
+	case <-C:
 		t.Errorf("iterator.Next timeout %s err %s", ptime.Duration(shortTime), perrors.Short(err))
 	}
 
 	// if timeout, consult iterator.Cancel
 	if !receivedRecord {
-		if !noTimeout {
-			timer.Reset(cancelTimeout)
+		if !timeoutIsDisabled {
+			resettingTimer.Reset(cancelTimeout)
 		}
 		var cancelCh = invokeCancel(iterator)
 		select {
 		case record := <-cancelCh:
 			t.Fatalf("iterator.Cancel err %s", perrors.Short(record.err))
-		case <-timer.C:
+		case <-C:
 			t.Fatalf("iterator.Cancel timeout %s", ptime.Duration(cancelTimeout))
 		}
 	}

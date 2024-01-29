@@ -60,7 +60,6 @@ func newGo(parent goParent, goInvocation *pruntime.CodeLocation) (
 	g := Go{
 		goEntityID:      *newGoEntityID(),
 		goParent:        parent,
-		endCh:           *parl.NewAwaitable(),
 		creatorThreadId: goid.GoID(),
 		thread:          NewThreadSafeThreadData(),
 	}

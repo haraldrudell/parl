@@ -42,7 +42,6 @@ func NewCloseCallbacker(closer io.Closer, closeCallback CloseCallback) (closeCal
 	return &CloseCallbacker{
 		closer:        closer,
 		closeCallback: closeCallback,
-		isClosed:      *parl.NewAwaitable(),
 	}
 }
 

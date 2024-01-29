@@ -102,8 +102,6 @@ func NewHttp(nearSocket netip.AddrPort, network pnet.Network) (hp *Http) {
 			Handler: serveMux, // struct
 			Addr:    hostPort,
 		},
-		ListenAwaitable:    *parl.NewAwaitable(),
-		EndListenAwaitable: *parl.NewAwaitable(),
 	}
 }
 

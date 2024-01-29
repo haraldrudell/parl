@@ -127,7 +127,7 @@ func NewDebouncer[T any](
 		panic(NilError("errFn"))
 	}
 
-	var isShutdown = NewAwaitable()
+	var isShutdown Awaitable
 
 	// debounce timer expiring when output thread should send
 	var debounceTimer = time.NewTimer(time.Second)
@@ -148,9 +148,8 @@ func NewDebouncer[T any](
 		debounceTimer:    debounceTimer,
 		useMaxDelay:      maxDelay > 0,
 		maxDelayTimer:    *ptime.NewThreadSafeTimer(maxDelay),
-		isShutdown:       isShutdown,
+		isShutdown:       &isShutdown,
 		errFn:            errFn,
-		inputExit:        *NewAwaitable(),
 	}
 	// get timer ready for reset
 	in.maxDelayTimer.Stop()
@@ -165,9 +164,8 @@ func NewDebouncer[T any](
 		maxDelayTimer:   &in.maxDelayTimer,
 		isInputExit:     in.inputExit.Ch(),
 		sender:          sender,
-		isShutdown:      isShutdown,
+		isShutdown:      &isShutdown,
 		errFn:           errFn,
-		outputExit:      *NewAwaitable(),
 	}
 
 	go out.outputThread()
@@ -176,7 +174,7 @@ func NewDebouncer[T any](
 	return &Debouncer[T]{
 		in:         &in,
 		out:        &out,
-		isShutdown: isShutdown,
+		isShutdown: &isShutdown,
 	}
 }
 

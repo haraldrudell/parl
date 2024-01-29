@@ -201,7 +201,7 @@ func (w *WaitGroupCh) getP() (p *addsDones) {
 		if p = w.p.Load(); p != nil {
 			return // already initialized return
 		} else if newAddsDones == nil {
-			newAddsDones = &addsDones{ch: NewAwaitable()}
+			newAddsDones = &addsDones{ch: &Awaitable{}}
 		}
 		if w.p.CompareAndSwap(nil, newAddsDones) {
 			p = newAddsDones
