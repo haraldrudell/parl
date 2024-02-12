@@ -17,7 +17,7 @@ import (
 //   - stack[panicIndex] is the code line causing the panic
 //   - [perrors.Short] displays the error message along with the code location raising panic
 //   - [perrors.Long] displays all available information about the error
-func IsPanic(err error) (isPanic bool, stack pruntime.StackSlice, recoveryIndex, panicIndex int) {
+func IsPanic(err error) (isPanic bool, stack pruntime.Stack, recoveryIndex, panicIndex int) {
 	isPanic, stack, recoveryIndex, panicIndex, _, _ = errorglue.FirstPanicStack(err)
 	return
 }

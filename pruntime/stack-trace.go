@@ -9,6 +9,13 @@ import (
 	"runtime"
 )
 
+const (
+	// stack allocation binary growth of this multiple
+	allocationStep = 1024
+	// increase per step
+	multiple = 2
+)
+
 // StackTrace returns [runtime.Stack] after allocating sufficient buffer
 //   - if the entire stackTrace is converted to string and split: those substrings
 //     will be interned part of the larger stackTrace string causing memory leak, ie.
@@ -30,15 +37,14 @@ import (
 //   - the stack trace has a terminating newline
 func StackTrace() (stackTrace []byte) {
 	var buf []byte
-	var n int
-	for size := 1024; ; size *= 2 {
+	var bytesWritten int
+	for size := allocationStep; ; size *= multiple {
 		buf = make([]byte, size)
-		if n = runtime.Stack(buf, runtimeStackOnlyThisGoroutine); n >= size {
-			buf = nil
-			continue
+		if bytesWritten = runtime.Stack(buf, runtimeStackOnlyThisGoroutine); bytesWritten < size {
+			break
 		}
-		break
 	}
-	stackTrace = buf[:n]
+	stackTrace = buf[:bytesWritten]
+
 	return
 }

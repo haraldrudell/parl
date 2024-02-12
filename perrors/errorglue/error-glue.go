@@ -48,7 +48,7 @@ type ErrorHasCode interface {
 
 // ErrorCallStacker enrichens an error with a stack trace of code locations
 type ErrorCallStacker interface {
-	StackTrace() pruntime.StackSlice
+	StackTrace() (stack pruntime.Stack)
 }
 
 // ErrorStore is a thread-safe store for any number of errors

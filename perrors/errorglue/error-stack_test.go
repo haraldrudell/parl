@@ -16,100 +16,129 @@ import (
 )
 
 func TestErrorStack(t *testing.T) {
-	// stackSlice to use
-	var stackSlice = pruntime.NewStackSlice(0)
-	// error message “message”
-	var message = "message"
-	// at-strign preceding code locations “ at ”
+	//t.Errorf("logging on")
+	// stack to examine
+	var stackExp = pruntime.NewStack(0)
+	// at-string preceding code locations “ at ”
 	var atString = "\x20at\x20"
-	// encapsulated error
-	var error0 = errors.New(message)
-	// a invalid format code
+	// encapsulated error “message”
+	var error0 = errors.New("message")
+	// an invalid ChainString format code
 	var badFormat = func() (badFormat CSFormat) {
 		var i = -1
 		badFormat = CSFormat(i)
 		return
 	}()
-	// extected [ShorttSuffix] output
-	var shortSuffix = strings.TrimPrefix(stackSlice.Short(), atString)
+	// expected [ShortSuffix] output
+	var shortSuffixExp = strings.TrimPrefix(stackExp.Frames()[0].Loc().Short(), atString)
 	// ordered list of formats
 	var formats = []CSFormat{
 		DefaultFormat, ShortFormat, LongFormat, ShortSuffix, LongSuffix,
 		badFormat,
 	}
-	// NewErrorStack should return error
-	var error1 = NewErrorStack(error0, stackSlice)
-	// runtime type should be errorStack
-	var eStack *errorStack
-	var ok bool
-	if eStack, ok = error1.(*errorStack); !ok {
-		t.Fatalf("NewErrorStack not errorStack")
-	}
 	// map from format to expected value
-	var formatExp = map[CSFormat]string{
-		DefaultFormat: eStack.Error(),
-		ShortFormat:   eStack.Error() + stackSlice.Short(),
-		LongFormat:    eStack.Error() + " [" + reflect.TypeOf(eStack).String() + "]" + stackSlice.String(),
-		ShortSuffix:   shortSuffix,
-		LongSuffix:    stackSlice.String(),
-		badFormat:     "",
-	}
-	_ = atString
-	var stackSliceAct pruntime.StackSlice
-	var sAct, sExp string
+	var formatExp map[CSFormat]string
 
-	// ChainString() StackTrace()
+	var ok bool
+	var err error
+	var stackAct pruntime.Stack
+	var chainStringAct, chainStringExp string
 	var _ *errorStack
 
-	// StackTrace should return the slice
-	stackSliceAct = eStack.StackTrace()
-	if !slices.Equal(stackSliceAct, stackSlice) {
-		t.Errorf("StackTrace bad\n%v exp\n%v", stackSliceAct, stackSlice)
+	// ChainString() StackTrace()
+	//	- delegated: Format() Unwrap() Error()
+	var eStackAct *errorStack
+
+	err = NewErrorStack(error0, stackExp)
+
+	// NewErrorStack() should return runtime type errorStack
+	if eStackAct, ok = err.(*errorStack); !ok {
+		t.Fatalf("FAIL NewErrorStack not errorStack")
 	}
 
-	for _, csFormat := range formats {
-		if sExp, ok = formatExp[csFormat]; !ok {
-			t.Errorf("no formatMap entry for format %s", csFormat)
-		}
-		sAct = eStack.ChainString(csFormat)
+	// StackTrace() should return the slice
+	stackAct = eStackAct.StackTrace()
+	if !slices.Equal(stackAct.Frames(), stackExp.Frames()) {
+		t.Errorf("StackTrace bad\n%v exp\n%v", stackAct, stackExp)
+	}
 
-		if sAct != sExp {
-			t.Errorf("ChainString %s:\n%q exp\n%q",
+	// ChainString() should return correct string
+	formatExp = map[CSFormat]string{
+		DefaultFormat: eStackAct.Error(),
+		ShortFormat:   eStackAct.Error() + atString + stackExp.Frames()[0].Loc().Short(),
+		LongFormat:    eStackAct.Error() + " [" + reflect.TypeOf(eStackAct).String() + "]" + "\n" + stackExp.String(),
+		ShortSuffix:   shortSuffixExp,
+		LongSuffix:    stackExp.String(),
+		badFormat:     "",
+	}
+	for _, csFormat := range formats {
+		if chainStringExp, ok = formatExp[csFormat]; !ok {
+			t.Errorf("CORRUPT no formatMap entry for format %s", csFormat)
+		}
+
+		// DefaultFormat: message
+		// ShortFormat: message at errorglue.TestErrorStack()-error-stack_test.go:21
+		// LongFormat: message [*errorglue.errorStack]ID: 34 IsMain: false status: running
+		//     github.com/haraldrudell/parl/perrors/errorglue.TestErrorStack(0x14000120820)
+		//       error-stack_test.go:21
+		//     testing.tRunner(0x14000120820, 0x102b3a100)
+		//       testing.go:1595
+		//     cre: testing.(*T).Run-testing.go:1648 in goroutine 1 1
+		// ShortSuffix: errorglue.TestErrorStack()-error-stack_test.go:21
+		// LongSuffix: ID: 34 IsMain: false status: running
+		// 	github.com/haraldrudell/parl/perrors/errorglue.TestErrorStack(0x14000120820)
+		// 	error-stack_test.go:21
+		// testing.tRunner(0x14000120820, 0x102b3a100)
+		// 	testing.go:1595
+		// cre: testing.(*T).Run-testing.go:1648 in goroutine 1 1
+		// ?255:
+		t.Logf("%s: %s", csFormat, chainStringExp)
+
+		chainStringAct = eStackAct.ChainString(csFormat)
+		if chainStringAct != chainStringExp {
+			t.Errorf("FAIL ChainString %s:\n%q exp\n%q",
 				csFormat,
-				sAct, sExp,
+				chainStringAct, chainStringExp,
 			)
 		}
 	}
 }
 
-// ShortFormat and ShortSuffix should panic location for non-stack recover-value
-func TestErrorStackPanic(t *testing.T) {
-	var suffixExp string
+// errorStack.ChainString(ShortSuffix), and [perrors.Short], should return
+// panic location and not error creation location
+func TestErrorStackPanicLine(t *testing.T) {
 	var atString = "\x20at\x20"
-	var error0 error
 
-	var errorRecovered error
+	var suffixExp string
+	// errContainingPanicAct is created in recovery from a panic() invocation
+	var errContainingPanicAct error
 	var suffixAct string
-	var stackSlice pruntime.StackSlice
+	// stackAct is taken on the same line as a errContainingPanic panic() invocation
+	var stackAct pruntime.Stack
+	var noErrorBase error
 
 	// ChainString() StackTrace()
+	//	- delegated: Format() Unwrap() Error()
 	var eStack *errorStack
 
-	stackSlice, errorRecovered = getErrorStackPanic(error0)
-	if errorRecovered == nil {
+	// get actuals
+	stackAct, errContainingPanicAct = getErrorStackPanic(noErrorBase)
+	if errContainingPanicAct == nil {
 		panic(errors.New("errorRecovered == nil"))
-	} else if stackSlice == nil {
+	} else if stackAct == nil {
 		panic(errors.New("stackSlice == nil"))
 	}
+	// errContainingPanicAct runtime type should be errorStack
+	eStack = errContainingPanicAct.(*errorStack)
 
-	eStack = errorRecovered.(*errorStack)
+	// stackSlice: "errorglue.getErrorStackPanic()-error-stack_test.go:202"
+	t.Logf("stackSlice: %s", stackAct.Frames()[0].Loc().Short())
 
-	t.Logf("stackSlice: %q", stackSlice.Short())
-	suffixExp = strings.TrimPrefix(stackSlice.Short(), atString)
-
+	// ShortSuffix should match
+	suffixExp = strings.TrimPrefix(stackAct.Frames()[0].Loc().Short(), atString)
 	suffixAct = eStack.ChainString(ShortSuffix)
 	if suffixAct != suffixExp {
-		t.Errorf("ChainString panic:\n%q exp\n%q", suffixAct, suffixExp)
+		t.Errorf("FAIL ChainString panic:\n%q exp\n%q", suffixAct, suffixExp)
 	}
 }
 
@@ -118,12 +147,12 @@ func TestErrorStackPanicWithStack(t *testing.T) {
 	//t.Errorf("logging on")
 	var suffixExp string
 	var atString = "\x20at\x20"
-	var error0 = NewErrorStack(errors.New("message"), pruntime.NewStackSlice(0))
+	var error0 = NewErrorStack(errors.New("message"), pruntime.NewStack(0))
 
 	var errorRecovered error
 	var suffixAct string
-	var slice pruntime.StackSlice
-	var stacks []pruntime.StackSlice
+	var slice pruntime.Stack
+	var stacks []pruntime.Stack
 
 	// ChainString() StackTrace()
 	var eStack *errorStack
@@ -150,14 +179,14 @@ func TestErrorStackPanicWithStack(t *testing.T) {
 	//	- because oldest does not have a panic
 
 	// oldest: " at errorglue.TestErrorStackPanicWithStack()-error-stack_test.go:117"
-	t.Logf("errorRecovered oldest: %q", stacks[0].Short())
+	t.Logf("errorRecovered oldest: %q", stacks[0].Frames()[0].Loc().Short())
 	// newest: " at errorglue.getErrorStackPanic.func1()-error-stack_test.go:156"
-	t.Logf("errorRecovered newest: %q", stacks[1].Short())
+	t.Logf("errorRecovered newest: %q", stacks[1].Frames()[0].Loc().Short())
 	// stackSlice: " at errorglue.getErrorStackPanic()-error-stack_test.go:166"
-	t.Logf("slice: %q", slice.Short())
+	t.Logf("slice: %q", slice.Frames()[0].Loc().Short())
 
 	// get expected value from verifying slice
-	suffixExp = strings.TrimPrefix(slice.Short(), atString)
+	suffixExp = strings.TrimPrefix(slice.Frames()[0].Loc().Short(), atString)
 
 	suffixAct = eStack.ChainString(ShortSuffix)
 	if suffixAct != suffixExp {
@@ -165,18 +194,22 @@ func TestErrorStackPanicWithStack(t *testing.T) {
 	}
 }
 
-func getErrorStackPanic(error0 error) (slice pruntime.StackSlice, err error) {
-	defer func() {
-		var stack = pruntime.NewStackSlice(0)
-		var e = recover().(error)
-		err = NewErrorStack(e, stack)
-	}()
+// getErrorStackPanic returns a stack from the same line as a panic in err
+//   - error0 is an optional error used as panic argument
+func getErrorStackPanic(error0 error) (stack pruntime.Stack, err error) {
+	defer getErrorStackPanicRecover(&err)
 
 	if error0 == nil {
 		error0 = errors.New("recover")
 	}
-
-	// NewStackSlice and panic on same line
-	for slice = pruntime.NewStackSlice(0); ; panic(error0) {
+	// NewStack and panic on same line
+	for stack = pruntime.NewStack(0); ; panic(error0) {
 	}
+}
+
+// getErrorStackPanicRecover is deeferred recover function for getErrorStackPanic
+func getErrorStackPanicRecover(errp *error) {
+	var stack = pruntime.NewStack(0)
+	var e = recover().(error)
+	*errp = NewErrorStack(e, stack)
 }

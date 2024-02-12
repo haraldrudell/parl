@@ -66,7 +66,7 @@ var csFormatMap = map[CSFormat]string{
 	LongSuffix:    "LongSuffix",
 }
 
+// DefaultFormat CodeLocation ShortFormat LongFormat ShortSuffix LongSuffix,
 var csFormatList = []CSFormat{
 	DefaultFormat, CodeLocation, ShortFormat, LongFormat, ShortSuffix, LongSuffix,
 }
-var _ = csFormatList

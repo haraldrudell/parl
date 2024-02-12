@@ -5,25 +5,29 @@ ISC License
 
 package parl
 
-import "github.com/haraldrudell/parl/pruntime"
+import (
+	"fmt"
+
+	"github.com/haraldrudell/parl/pruntime"
+)
 
 // Stack contains a stack trace parsed into basic type only datapoints
-//   - stack trace from [runtime.Stack] or [debug.Stack]
+//   - stack trace from [pdebug.Stack]
 type Stack interface {
 	// thread ID 1… for the thread requesting the stack trace
 	//	- ThreadID is comparable and has IsValid and String methods
 	//	- ThreadID is typically an incremented 64-bit integer with
 	//		main thread having ID 1
-	ID() ThreadID
+	ID() (threadID ThreadID)
 	// a word indicating thread status, typically word “running”
-	Status() ThreadStatus
+	Status() (threadStatus ThreadStatus)
 	// true if the thread is the main thread
 	//	- false for a launched goroutine
 	IsMain() (isMain bool)
 	// A list of code locations for this thread
 	//	- index [0] is the most recent code location, typically the invoker requesting the stack trace
 	//	- includes invocation argument values
-	Frames() (frames []Frame)
+	Frames() (frames []pruntime.Frame)
 	// the goroutine function used to launch this thread
 	//	- if IsMain is true, zero-value. Check using GoFunction().IsSet()
 	//	- never nil
@@ -31,8 +35,8 @@ type Stack interface {
 	// the code location of the go statement creating this thread
 	//	- if IsMain is true, zero-value. Check with Creator().IsSet()
 	//	- never nil
-	//	-goRoutineRef: “in goroutine 9”
-	Creator() (creator *pruntime.CodeLocation, goRoutineRef string)
+	//	- goRoutineRef: “in goroutine 9”
+	Creator() (creator *pruntime.CodeLocation, creatorID ThreadID, goRoutineRef string)
 	// Shorts lists short code locations for all stack frames, most recent first:
 	// Shorts("prepend") →
 	//  prepend Thread ID: 1
@@ -44,7 +48,7 @@ type Stack interface {
 	//  main.someFunction({0x100dd2616, 0x19})␤
 	//  ␠␠pruntime.go:64␤
 	//  cre: main.main-pruntime.go:53␤
-	String() (s string)
+	fmt.Stringer
 }
 
 // Frame represents an executing code location, ie. a code line in source code

@@ -16,7 +16,7 @@ func TestIsPanic(t *testing.T) {
 	err := New(message)
 
 	var isPanic bool
-	var stack pruntime.StackSlice
+	var stack pruntime.Stack
 	var recoveryIndex int
 	var panicIndex int
 	errPanic := func() (err error) {
@@ -33,13 +33,14 @@ func TestIsPanic(t *testing.T) {
 	}
 
 	isPanic, stack, recoveryIndex, panicIndex = IsPanic(errPanic)
+	var frames = stack.Frames()
 	t.Logf("isPanic: %t stack: %d recoveryIndex: %d panicIndex: %d",
-		isPanic, len(stack), recoveryIndex, panicIndex)
+		isPanic, len(frames), recoveryIndex, panicIndex)
 	t.Logf("\nstack:%s", stack)
 	if !isPanic {
 		t.Error("panic error has isPanic false")
 	}
-	if len(stack) == 0 {
+	if len(frames) == 0 {
 		t.Error("stack length zero exp non-zero")
 	}
 	// recoveryIndex cn be 0

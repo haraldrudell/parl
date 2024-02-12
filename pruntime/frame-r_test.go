@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pdebug
+package pruntime
 
 import (
 	"testing"

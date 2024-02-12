@@ -14,7 +14,7 @@ import (
 
 type TLSTap struct {
 	*tls.Conn
-	t *Tap
+	tap *Tap
 }
 
 // NewNetConnTap returns a data tap for a bidirectional data stream
@@ -26,19 +26,19 @@ type TLSTap struct {
 //   - if any of readWriter, reads or writes implements io.Close, they are closed on socketTap.Close
 //   - the consumer may invoke socketTap.Close to ensure reads and writes are closed
 //   - errors in reads or writes do not affect the socketTap consumer
-func NewTLSTap(conn *tls.Conn, reads, writes io.Writer, errs func(err error)) (socketTap io.ReadWriter) {
+func NewTLSTap(conn *tls.Conn, readsWriter, writesWriter io.Writer, addError parl.AddError) (socketTap io.ReadWriter) {
 	if conn == nil {
 		panic(parl.NilError("conn"))
 	}
 	socketTap = &TLSTap{
 		Conn: conn,
-		t:    NewTap(reads, writes, errs),
+		tap:  NewTap(readsWriter, writesWriter, addError),
 	}
 	return
 }
 
-func (t *TLSTap) Read(p []byte) (n int, err error) { return t.t.Read(t.Conn, p) }
+func (t *TLSTap) Read(p []byte) (n int, err error) { return t.tap.Read(t.Conn, p) }
 
-func (t *TLSTap) Write(p []byte) (n int, err error) { return t.t.Write(t.Conn, p) }
+func (t *TLSTap) Write(p []byte) (n int, err error) { return t.tap.Write(t.Conn, p) }
 
-func (t *TLSTap) Close() (err error) { return t.t.Close(t.Conn) }
+func (t *TLSTap) Close() (err error) { return t.tap.Close(t.Conn) }

@@ -116,7 +116,7 @@ func TestThreadData(t *testing.T) {
 	if short := threadData.String(); !strings.Contains(short, exp) {
 		t.Errorf("threadData.String(): %q exp %q", short, exp)
 	}
-	var creator, _ = someType.stack.Creator()
+	var creator, _, _ = someType.stack.Creator()
 	threadData.SetCreator(creator)
 }
 
@@ -158,7 +158,7 @@ func (s *SomeType) SomeFunction(threadData *ThreadData) {
 }
 func (s *SomeType) SomeMethod(threadData *ThreadData) {
 	s.stack = pdebug.NewStack(0)
-	var creator, _ = s.stack.Creator()
+	var creator, _, _ = s.stack.Creator()
 	threadData.Update(
 		s.stack.ID(),
 		creator,

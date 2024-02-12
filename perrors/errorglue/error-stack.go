@@ -15,27 +15,39 @@ import (
 const errorStackAtString = "\x20at\x20"
 
 // errorStack provides a stack trace to an error chain.
-// errorStack has publics Error() Unwrap() Format() ChainString() StackTrace()
+//   - errorStack has publics Error() Unwrap() Format() ChainString() StackTrace()
 type errorStack struct {
+	// Format() Unwrap() Error()
 	RichError
-	s pruntime.StackSlice // slice
+	s pruntime.Stack
 }
 
-var _ error = &errorStack{}            // errorStack behaves like an error
-var _ ErrorCallStacker = &errorStack{} // errorStack can provide a stack trace
-var _ ChainStringer = &errorStack{}    // errorStack can be used by ChainString
-var _ fmt.Formatter = &errorStack{}    // errorStack has features for fmt.Printf
-var _ Wrapper = &errorStack{}          // errorStack has an error chain
+// errorStack implements [error]
+var _ error = &errorStack{}
 
-func NewErrorStack(err error, st pruntime.StackSlice) (e2 error) {
+// errorStack implements [ErrorCallStacker] can provide a stack trace [ErrorCallStacker.StackTrace]
+var _ ErrorCallStacker = &errorStack{}
+
+// errorStack implements [ChainStringer]: [ChainStringer.ChainString]
+var _ ChainStringer = &errorStack{}
+
+// errorStack implements [fmt.Formatter]: has features for [fmt.Printf]: [fmt.Formatter.Format]
+var _ fmt.Formatter = &errorStack{}
+
+// errorStack implements [Wrapper]: has an error chain [Wrapper.Unwrap]
+var _ Wrapper = &errorStack{}
+
+// NewErrorStack attaches a stack to err
+func NewErrorStack(err error, st pruntime.Stack) (e2 error) {
 	return &errorStack{*newRichError(err), st}
 }
 
-func (e *errorStack) StackTrace() (st pruntime.StackSlice) {
+// StackTrace returns a clone of e’s stack trace
+func (e *errorStack) StackTrace() (st pruntime.Stack) {
 	if e == nil {
 		return
 	}
-	return e.s.Clone()
+	return e.s
 }
 
 // ChainString is invoked by [ChainStringer] to get a specific format
@@ -74,7 +86,7 @@ func (errorStackValue *errorStack) ChainString(format CSFormat) (s string) {
 				s = errorStackAtString + s
 			}
 		}
-		s = fmt.Sprintf("%s [%T]%s%s",
+		s = fmt.Sprintf("%s [%T]%s\n%s",
 			errorStackValue.Error(), errorStackValue, // “error-message [errors.Type]”
 			s,                          // “ at runtime.gopanic:17”
 			errorStackValue.s.String(), // multiple-line stack-trace
@@ -94,16 +106,19 @@ func (errorStackValue *errorStack) shortCodeLocationString() (isPanic bool, shor
 
 	// check for a panic which will be the code location
 	//	- instead of returning random runtime locations,
-	//		this returns the code line wherte the panic occurred
+	//		this returns the code line where the panic occurred
 	//	- this may be a stack from subordinate error in the error chain
+	var frame pruntime.Frame
 	if isPanic0, stack, _, panicIndex, _, _ := FirstPanicStack(errorStackValue); isPanic0 {
 		isPanic = true
+		var frames = stack.Frames()
 		// code line that caused panic
-		shortCodeLocationString = stack[panicIndex].Short()
+		frame = frames[panicIndex]
 	} else {
 		// regular code location
-		shortCodeLocationString = errorStackValue.s.Short()
+		frame = errorStackValue.s.Frames()[0]
 	}
+	shortCodeLocationString = frame.Loc().Short()
 
 	return
 }

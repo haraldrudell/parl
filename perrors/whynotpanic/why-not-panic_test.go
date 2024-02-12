@@ -23,7 +23,7 @@ func TestWhyNotPanic(t *testing.T) {
 	var s string
 	var errorNil error
 	var errorNoStack = errors.New("errorNoStack")
-	var errorStackNoPanic = errorglue.NewErrorStack(errors.New("errorStackNoPanic"), pruntime.NewStackSlice(0))
+	var errorStackNoPanic = errorglue.NewErrorStack(errors.New("errorStackNoPanic"), pruntime.NewStack(0))
 	var _, isErrorCallStacker = errorStackNoPanic.(errorglue.ErrorCallStacker)
 	var errorIsPanic = recoverPanic1()
 	var errorPanicWithStack = recoverPanic2()
@@ -75,6 +75,6 @@ func recoverPanic1() (err error) {
 func recoverPanic2() (err error) {
 	defer cyclebreaker.RecoverErr(func() cyclebreaker.DA { return cyclebreaker.A() }, &err)
 
-	var errorWithStack = errorglue.NewErrorStack(errors.New("errorStackNoPanic"), pruntime.NewStackSlice(0))
+	var errorWithStack = errorglue.NewErrorStack(errors.New("errorStackNoPanic"), pruntime.NewStack(0))
 	panic(errorWithStack)
 }

@@ -15,17 +15,17 @@ import (
 // Tap returns a socket tap producing two streams of data
 // read from and written to a socket
 type Tap struct {
-	closeWinner   atomic.Bool
-	IsClosed      parl.Awaitable
-	reads, writes io.Writer
-	errs          func(err error)
+	closeWinner               atomic.Bool
+	IsClosed                  parl.Awaitable
+	readsWriter, writesWriter io.Writer
+	addError                  func(err error)
 }
 
-func NewTap(reads, writes io.Writer, errs func(err error)) (tap *Tap) {
+func NewTap(readsWriter, writesWriter io.Writer, addError parl.AddError) (tap *Tap) {
 	return &Tap{
-		reads:  reads,
-		writes: writes,
-		errs:   errs,
+		readsWriter:  readsWriter,
+		writesWriter: writesWriter,
+		addError:     addError,
 	}
 }
 
@@ -35,8 +35,8 @@ func (t *Tap) Read(reader io.Reader, p []byte) (n int, err error) {
 	n, err = reader.Read(p)
 
 	// copy read data to reads
-	if n > 0 && t.reads != nil {
-		var readsN, readsErr = t.reads.Write(p[:n])
+	if n > 0 && t.readsWriter != nil {
+		var readsN, readsErr = t.readsWriter.Write(p[:n])
 		// error in reads
 		if readsErr != nil {
 			t.handleError(NewPioError(PeReads, readsErr))
@@ -47,8 +47,8 @@ func (t *Tap) Read(reader io.Reader, p []byte) (n int, err error) {
 	}
 
 	// propagate reader error
-	if err != nil && t.errs != nil {
-		t.errs(NewPioError(PeRead, err))
+	if err != nil && t.addError != nil {
+		t.addError(NewPioError(PeRead, err))
 	}
 
 	return
@@ -56,9 +56,9 @@ func (t *Tap) Read(reader io.Reader, p []byte) (n int, err error) {
 
 func (t *Tap) Write(writer io.Writer, p []byte) (n int, err error) {
 
-	// copy data to writes
-	if t.writes != nil {
-		var writesN, writesErr = t.writes.Write(p[:n])
+	// copy data to writes writer
+	if t.writesWriter != nil {
+		var writesN, writesErr = t.writesWriter.Write(p)
 		// error in writes
 		if writesErr != nil {
 			t.handleError(NewPioError(PeWrites, writesErr))
@@ -71,9 +71,9 @@ func (t *Tap) Write(writer io.Writer, p []byte) (n int, err error) {
 	// do delegated Write
 	n, err = writer.Write(p)
 
-	// propagate reader error
-	if err != nil && t.errs != nil {
-		t.errs(NewPioError(PeWrite, err))
+	// propagate reader error to addError as well
+	if err != nil && t.addError != nil {
+		t.addError(NewPioError(PeWrite, err))
 	}
 
 	return
@@ -90,14 +90,14 @@ func (t *Tap) Close(closer any) (err error) {
 
 	// close delegate if it implements io.Close
 	if closer, ok := closer.(io.Closer); ok {
-		if parl.Close(closer, &err); err != nil && t.errs != nil {
-			t.errs(NewPioError(PeClose, err))
+		if parl.Close(closer, &err); err != nil && t.addError != nil {
+			t.addError(NewPioError(PeClose, err))
 		}
 	}
 
 	// reads and writes
 	var e [2]error
-	for i, a := range []any{t.reads, t.writes} {
+	for i, a := range []any{t.readsWriter, t.writesWriter} {
 		var closer, ok = a.(io.Closer)
 		if !ok {
 			continue
@@ -117,8 +117,8 @@ func (t *Tap) Close(closer any) (err error) {
 }
 
 func (t *Tap) handleError(err error) {
-	if t.errs != nil {
-		t.errs(err)
+	if t.addError != nil {
+		t.addError(err)
 	} else {
 		panic(err)
 	}

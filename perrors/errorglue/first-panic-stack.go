@@ -7,50 +7,10 @@ package errorglue
 
 import (
 	"errors"
-	"strings"
 
+	"github.com/haraldrudell/parl/perrors/panicdetector"
 	"github.com/haraldrudell/parl/pruntime"
 )
-
-const (
-	runtimePrefix = "runtime."
-)
-
-// Indices examines a stack to see if it includes a panic. Thread-safe
-//   - isPanic is true if the stack includes a panic
-//   - stack[recoveryIndex] is the code line of the deferred function containing recovery invocation
-//   - stack[panicIndex] is the code line causing the panic
-func Indices(stack pruntime.StackSlice) (isPanic bool, recoveryIndex, panicIndex int) {
-	found := 0
-	stackLength := len(stack)
-	pd := panicDetectorOne
-	for i := 0; i < stackLength; i++ {
-		funcName := stack[i].FuncName
-		if i > 0 && funcName == pd.runtimeDeferInvokerLocation {
-			recoveryIndex = i - 1
-			found++
-			if found == 2 {
-				break
-			}
-		}
-		if i+1 < stackLength && funcName == pd.runtimePanicFunctionLocation {
-
-			// scan for end of runtime functions
-			for panicIndex = i + 1; panicIndex+1 < stackLength; panicIndex++ {
-				if !strings.HasPrefix(stack[panicIndex].FuncLine(), runtimePrefix) {
-					break // this frame not part of the runtime
-				}
-			}
-
-			found++
-			if found == 2 {
-				break
-			}
-		}
-	}
-	isPanic = found == 2
-	return
-}
 
 // FirstPanicStack checks all stack traces, oldest first, for
 // a panic and returns:
@@ -77,7 +37,7 @@ func Indices(stack pruntime.StackSlice) (isPanic bool, recoveryIndex, panicIndex
 //     provided an error with stack trace
 //   - on err nil: all values false, nil or zero
 func FirstPanicStack(err error) (
-	isPanic bool, stack pruntime.StackSlice, recoveryIndex, panicIndex int,
+	isPanic bool, stack pruntime.Stack, recoveryIndex, panicIndex int,
 	numberOfStacks int,
 	errorWithStack error,
 ) {
@@ -94,7 +54,7 @@ func FirstPanicStack(err error) (
 	// if there is no panic,
 	// the oldest stack should be returned
 	//	- keep track of it here
-	var oldestStack pruntime.StackSlice
+	var oldestStack pruntime.Stack
 	var oldestErr error
 
 	// scan for panic-stack, oldest error first
@@ -112,7 +72,7 @@ func FirstPanicStack(err error) (
 		numberOfStacks++
 
 		// check if the stack trace has a panic
-		isPanic, recoveryIndex, panicIndex = Indices(stack)
+		isPanic, recoveryIndex, panicIndex = panicdetector.Indices(stack)
 		if !isPanic {
 			continue // this error did not have a panic stack-trace
 		}

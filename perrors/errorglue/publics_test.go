@@ -32,80 +32,84 @@ func TestErrorChainSlice(t *testing.T) {
 }
 
 func TestGetInnerMostStack(t *testing.T) {
-	err := errors.New("x")
-	errOneStack := NewErrorStack(err, pruntime.NewStackSlice(0))
-	stack1 := errOneStack.(ErrorCallStacker).StackTrace()
-	errTwoStacks := NewErrorStack(errOneStack, pruntime.NewStackSlice(1))
-	stack2 := errTwoStacks.(ErrorCallStacker).StackTrace()
-	if len(stack1) == len(stack2) {
+	var errNoStack = errors.New("x")
+	var errOneStack = NewErrorStack(errNoStack, pruntime.NewStack(0))
+	var stack1 = errOneStack.(ErrorCallStacker).StackTrace()
+	var errTwoStacks = NewErrorStack(errOneStack, pruntime.NewStack(1))
+	var stack2 = errTwoStacks.(ErrorCallStacker).StackTrace()
+	if len(stack1.Frames()) == len(stack2.Frames()) {
 		t.Error("stacks same")
 	}
 
-	var stack pruntime.StackSlice
+	var stack pruntime.Stack
 
+	// nil error should return nil stack
 	stack = GetInnerMostStack(nil)
-	if len(stack) != 0 {
-		t.Errorf("stack1 len not 0: %d", len(stack))
+	if stack != nil {
+		t.Errorf("stack not nil")
 	}
 
-	stack = GetInnerMostStack(err)
-	if len(stack) != 0 {
-		t.Errorf("stack2 len not 0: %d", len(stack))
+	// error without stack should return nil
+	stack = GetInnerMostStack(errNoStack)
+	if stack != nil {
+		t.Errorf("stack not nil")
 	}
 
 	stack = GetInnerMostStack(errOneStack)
-	if len(stack) == 0 {
+	if len(stack.Frames()) == 0 {
 		t.Error("stack3 len 0")
 	}
-	if len(stack) != len(stack1) {
-		t.Errorf("stack3 bad length %d exp %d", len(stack), len(stack1))
+	if len(stack.Frames()) != len(stack1.Frames()) {
+		t.Errorf("stack3 bad length %d exp %d", len(stack.Frames()), len(stack1.Frames()))
 	}
 
 	stack = GetInnerMostStack(errTwoStacks)
-	if len(stack) == 0 {
+	if len(stack.Frames()) == 0 {
 		t.Error("stack4 len 0")
 	}
-	if len(stack) != len(stack1) {
-		t.Errorf("stack4 bad length %d exp %d", len(stack), len(stack1))
+	if len(stack.Frames()) != len(stack1.Frames()) {
+		t.Errorf("stack4 bad length %d exp %d", len(stack.Frames()), len(stack1.Frames()))
 	}
 }
 
 func TestGetStackTrace(t *testing.T) {
-	err := errors.New("x")
-	errOneStack := NewErrorStack(err, pruntime.NewStackSlice(0))
-	stack1 := errOneStack.(ErrorCallStacker).StackTrace()
-	errTwoStacks := NewErrorStack(errOneStack, pruntime.NewStackSlice(1))
-	stack2 := errTwoStacks.(ErrorCallStacker).StackTrace()
-	if len(stack1) == len(stack2) {
+	var errNoStack = errors.New("x")
+	var errOneStack = NewErrorStack(errNoStack, pruntime.NewStack(0))
+	var stack1 = errOneStack.(ErrorCallStacker).StackTrace()
+	var errTwoStacks = NewErrorStack(errOneStack, pruntime.NewStack(1))
+	var stack2 = errTwoStacks.(ErrorCallStacker).StackTrace()
+	if len(stack1.Frames()) == len(stack2.Frames()) {
 		t.Error("stacks same")
 	}
 
-	var stack pruntime.StackSlice
+	var stack pruntime.Stack
 
+	// nil error should return nil
 	stack = GetStackTrace(nil)
-	if len(stack) != 0 {
-		t.Errorf("stack1 len not 0: %d", len(stack))
+	if stack != nil {
+		t.Errorf("stack not nil")
 	}
 
-	stack = GetStackTrace(err)
-	if len(stack) != 0 {
-		t.Errorf("stack2 len not 0: %d", len(stack))
+	// no-stack error should return nil
+	stack = GetStackTrace(errNoStack)
+	if stack != nil {
+		t.Errorf("stack not nil")
 	}
 
 	stack = GetStackTrace(errOneStack)
-	if len(stack) == 0 {
+	if len(stack.Frames()) == 0 {
 		t.Error("stack3 len 0")
 	}
-	if len(stack) != len(stack1) {
-		t.Errorf("stack3 bad length %d exp %d", len(stack), len(stack1))
+	if len(stack.Frames()) != len(stack1.Frames()) {
+		t.Errorf("stack3 bad length %d exp %d", len(stack.Frames()), len(stack1.Frames()))
 	}
 
 	stack = GetStackTrace(errTwoStacks)
-	if len(stack) == 0 {
+	if len(stack.Frames()) == 0 {
 		t.Error("stack4 len 0")
 	}
-	if len(stack) != len(stack2) {
-		t.Errorf("stack4 bad length %d exp %d", len(stack), len(stack2))
+	if len(stack.Frames()) != len(stack2.Frames()) {
+		t.Errorf("stack4 bad length %d exp %d", len(stack.Frames()), len(stack2.Frames()))
 	}
 }
 

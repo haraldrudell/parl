@@ -27,7 +27,7 @@ func TestPanicToErr(t *testing.T) {
 
 	var panicLine *pruntime.CodeLocation
 	var err error
-	var stack pruntime.StackSlice
+	var stack pruntime.Stack
 	var errorShort string
 
 	// get [parl.RecoverErr] values from recovering a panic

@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors/errorglue"
+	"github.com/haraldrudell/parl/perrors/panicdetector"
 )
 
 var whyTemplate = strings.Join([]string{
@@ -45,13 +47,16 @@ func WhyNotPanic(err error) (s string) {
 		message = "none"
 	}
 	var lastStack string
-	if len(stack) > 0 {
-		lastStack = stack.String()
-	} else {
+	if st, ok := stack.(parl.Stack); ok {
+		if len(st.Frames()) > 0 {
+			lastStack = stack.String()
+		}
+	}
+	if lastStack == "" {
 		lastStack = "none"
 	}
 
-	var deferS, panicS = errorglue.PanicDetectorValues()
+	var deferS, panicS = panicdetector.PanicDetectorValues()
 
 	s = fmt.Sprintf(whyTemplate,
 		isPanic, recoveryIndex, panicIndex, err == nil, numberOfStacks,

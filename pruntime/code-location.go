@@ -117,7 +117,7 @@ func (cl *CodeLocation) Short() (funcName string) {
 //
 //	mains.(*Executable).AddErr-executable.go:25
 func (cl *CodeLocation) Long() (funcName string) {
-	return fmt.Sprintf("%s-%s:%d", cl.FuncName, filepath.Base(cl.File), cl.Line)
+	return fmt.Sprintf("%s-%s:%d", cl.FuncName, cl.File, cl.Line)
 }
 
 // Full returns all available information on one line

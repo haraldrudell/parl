@@ -64,10 +64,10 @@ func ChainString(err error, format CSFormat) (s string) {
 		//	- an error chain is the initial error and any related errors
 		//	- stack traces and data for all errors
 	default:
-		var stack = pruntime.NewStackSlice(0)
+		var stack = pruntime.NewStack(0)
 		var packFuncS string
-		if len(stack) > 0 {
-			packFuncS = stack[0].PackFunc() + "\x20"
+		if len(stack.Frames()) > 0 {
+			packFuncS = stack.Frames()[0].Loc().PackFunc() + "\x20"
 		}
 		var e = fmt.Errorf("%sbad format: %s", packFuncS, format)
 		panic(NewErrorStack(e, stack))

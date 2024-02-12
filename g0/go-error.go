@@ -88,9 +88,10 @@ func (e *GoError) Go() (g0 parl.Go) {
 }
 
 func (e *GoError) String() (s string) {
-	err := e.err
-	if stack := errorglue.GetInnerMostStack(err); len(stack) > 0 {
-		s = "-at:" + stack[0].Short()
+	var err = e.err
+	var stack = errorglue.GetInnerMostStack(err)
+	if stack != nil {
+		s = "-at:" + stack.Frames()[0].String()
 	}
 	var message string
 	if err != nil {
