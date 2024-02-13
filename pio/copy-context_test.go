@@ -14,7 +14,6 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pruntime"
 )
 
 func TestCopyContext(t *testing.T) {
@@ -50,7 +49,7 @@ func TestCopyContext(t *testing.T) {
 
 	// cancel via thread should not write and instead return error
 	ctx = context.Background()
-	ctx = parl.AddNotifier1(ctx, func(slice pruntime.StackSlice) {
+	ctx = parl.AddNotifier1(ctx, func(stack parl.Stack) {
 		t.Log("contextCancelListener")
 		var _ parl.NotifierFunc
 	})

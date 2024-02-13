@@ -383,8 +383,8 @@ func TestSubGroup(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	var ctx = parl.AddNotifier(context.Background(), func(slice pruntime.StackSlice) {
-		t.Logf("ALLCANCEL %s", slice)
+	var ctx = parl.AddNotifier(context.Background(), func(stack parl.Stack) {
+		t.Logf("ALLCANCEL %s", stack)
 	})
 
 	var threadGroup = NewGoGroup(ctx)

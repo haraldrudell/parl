@@ -83,21 +83,22 @@ func newNotifierCounter(packFunc string, t *testing.T) (c *notifierCounter) {
 }
 
 // notifierFunc is a notifierFunc function for child or all contexts
-func (c *notifierCounter) notifierFunc(slice pruntime.StackSlice) {
+func (c *notifierCounter) notifierFunc(stack Stack) {
 	t := c.t
 
 	// count invocation
 	c.count++
 
 	// check stack trace
-	if len(slice) < 2 {
+	var frames = stack.Frames()
+	if len(frames) < 2 {
 		panic(perrors.ErrorfPF("bad stack slice: %s"))
 	}
-	var tracePackFunc = slice[1].PackFunc()
+	var tracePackFunc = frames[1].Loc().PackFunc()
 	if tracePackFunc == c.packFunc {
 		return // stack trace OK return
 	}
-	t.Logf("TRACE: %s", slice)
+	t.Logf("TRACE: %s", stack)
 	panic(perrors.New("Bad stack slice"))
 }
 

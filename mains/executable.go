@@ -431,7 +431,7 @@ func (x *Executable) Exit(stausCode ...int) {
 	} else {
 		parl.Debug("\nexe.Exit: err: %T '%[1]v'", x.err)
 	}
-	parl.Debug("\nexe.Exit invocation:\n%s\n", string(pruntime.StackTrace()))
+	parl.Debug("\nexe.Exit invocation:\n%s\n", pruntime.NewStack(0))
 	if parl.IsThisDebug() { // add newline during debug without location
 		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}

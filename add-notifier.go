@@ -8,8 +8,6 @@ package parl
 import (
 	"context"
 	"sync/atomic"
-
-	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
@@ -19,7 +17,7 @@ const (
 
 // a NotifierFunc receives a stack trace of function causing cancel
 //   - typically stack trace begins with [parl.InvokeCancel]
-type NotifierFunc func(slice pruntime.StackSlice)
+type NotifierFunc func(slice Stack)
 
 // notifier1Key is the context value key for child-context notifiers
 var notifier1Key cancelContextKey = "notifyChild"
@@ -110,7 +108,7 @@ func handleContextNotify(ctx context.Context) {
 	}
 
 	// stack trace for notifiers: expensive
-	var cl = pruntime.NewStackSlice(cancelNotifierFrames)
+	var cl = newStack(cancelNotifierFrames)
 
 	// invoke all notifier functions
 	if notifier != nil {

@@ -8,6 +8,7 @@ package pruntime
 // Frame represents an executing code location, ie. a code line in source code
 //   - parl.Frame is similar to [runtime.Frame] returned by [runtime.CallersFrames]
 //     but has only basic types, ie. it can be printed, stored and transferred
+//   - a lis of Frame is returned by [Stack.Frames]
 type Frame interface {
 	// the code location for this frame, never nil
 	Loc() (location *CodeLocation)

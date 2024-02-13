@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/haraldrudell/parl/pruntime/pruntime2"
+	"github.com/haraldrudell/parl/pruntime/pruntimelib"
 )
 
 // Stackr is a parl-free [pdebug.Stack]
@@ -99,11 +99,11 @@ func NewStack(skipFrames int) (stack Stack) {
 		var creator CodeLocation
 		var goroutineRef string
 		// determine s.isMainThread
-		creator.FuncName, goroutineRef, s.isMainThread = pruntime2.ParseCreatedLine(trace[creatorIndex])
+		creator.FuncName, goroutineRef, s.isMainThread = pruntimelib.ParseCreatedLine(trace[creatorIndex])
 		// if a goroutine, store creator
 		if !s.isMainThread {
 			s.GoroutineRef = goroutineRef
-			creator.File, creator.Line = pruntime2.ParseFileLine(trace[creatorIndex+runtFileLineOffset])
+			creator.File, creator.Line = pruntimelib.ParseFileLine(trace[creatorIndex+runtFileLineOffset])
 			s.Creator = creator
 			// “in goroutine 1”
 			if index := strings.LastIndex(goroutineRef, "\x20"); index != -1 {
@@ -119,8 +119,8 @@ func NewStack(skipFrames int) (stack Stack) {
 		if !s.isMainThread && creatorIndex >= skipAtStart+runtGoFunction {
 			// the trace index for goroutine function
 			var goIndex = creatorIndex - runtGoFunction
-			s.goFunction.FuncName, _ = pruntime2.ParseFuncLine(trace[goIndex])
-			s.goFunction.File, s.goFunction.Line = pruntime2.ParseFileLine(trace[goIndex+runtFileLineOffset])
+			s.goFunction.FuncName, _ = pruntimelib.ParseFuncLine(trace[goIndex])
+			s.goFunction.File, s.goFunction.Line = pruntimelib.ParseFileLine(trace[goIndex+runtFileLineOffset])
 		}
 	}
 
@@ -150,7 +150,7 @@ func NewStack(skipFrames int) (stack Stack) {
 	// parse first line: s.ID s.Status
 	var threadID uint64
 	var status string
-	if threadID, status, err = pruntime2.ParseFirstLine(trace[0]); err != nil {
+	if threadID, status, err = pruntimelib.ParseFirstLine(trace[0]); err != nil {
 		panic(err)
 	}
 	s.ThreadID = threadID
@@ -172,10 +172,10 @@ func NewStack(skipFrames int) (stack Stack) {
 			var frame = &frameStructs[frameIndex]
 
 			// parse function line
-			frame.CodeLocation.FuncName, frame.args = pruntime2.ParseFuncLine(trace[i])
+			frame.CodeLocation.FuncName, frame.args = pruntimelib.ParseFuncLine(trace[i])
 
 			// parse file line
-			frame.CodeLocation.File, frame.CodeLocation.Line = pruntime2.ParseFileLine(trace[i+1])
+			frame.CodeLocation.File, frame.CodeLocation.Line = pruntimelib.ParseFileLine(trace[i+1])
 			frames[frameIndex] = frame
 			frameIndex++
 		}

@@ -8,7 +8,7 @@ package pdebug
 import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pruntime/pruntime2"
+	"github.com/haraldrudell/parl/pruntime/pruntimelib"
 )
 
 // getID obtains gorutine ID, as of go1.18 a numeric string "1"…
@@ -16,7 +16,7 @@ func ParseFirstLine(debugStack []byte) (ID parl.ThreadID, status parl.ThreadStat
 
 	var uID uint64
 	var status0 string
-	if uID, status0, err = pruntime2.ParseFirstLine(debugStack); err != nil {
+	if uID, status0, err = pruntimelib.ParseFirstLine(debugStack); err != nil {
 		err = perrors.Stack(err)
 		return
 	}

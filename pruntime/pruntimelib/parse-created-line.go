@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pruntime2
+package pruntimelib
 
 import (
 	"bytes"

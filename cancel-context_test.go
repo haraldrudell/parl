@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl/perrors/errorglue"
-	"github.com/haraldrudell/parl/pruntime"
 )
 
 // tests:
@@ -168,8 +167,8 @@ func TestChildCancel(t *testing.T) {
 
 	// create ctx0…3
 	var ctx0 = context.Background()
-	var ctx1 = AddNotifier(ctx0, func(slice pruntime.StackSlice) {
-		t.Log(slice)
+	var ctx1 = AddNotifier(ctx0, func(stack Stack) {
+		t.Log(stack)
 	})
 	var ctx2 = NewCancelContext(ctx1)
 	var ctx3 = NewCancelContext(ctx2)

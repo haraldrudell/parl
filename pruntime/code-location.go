@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+
+	"github.com/haraldrudell/parl/pruntime/pruntimelib"
 )
 
 const (
@@ -67,7 +69,7 @@ func NewCodeLocation(stackFramesToSkip int) (cl *CodeLocation) {
 //
 //	AddErr
 func (cl *CodeLocation) Name() (funcName string) {
-	_, _, _, funcName = SplitAbsoluteFunctionName(cl.FuncName)
+	_, _, _, funcName = pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
 	return
 }
 
@@ -75,20 +77,20 @@ func (cl *CodeLocation) Name() (funcName string) {
 //
 //	mains
 func (cl *CodeLocation) Package() (packageName string) {
-	_, packageName, _, _ = SplitAbsoluteFunctionName(cl.FuncName)
+	_, packageName, _, _ = pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
 	return
 }
 
 // PackFunc return base package name and function “mains.AddErr”
 func (cl *CodeLocation) PackFunc() (packageDotFunction string) {
-	_, packageName, _, funcName := SplitAbsoluteFunctionName(cl.FuncName)
+	_, packageName, _, funcName := pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
 	return packageName + "." + funcName
 }
 
 // FuncIdentifier return the function name identifier “AddErr”
 //   - no spaces
 func (cl *CodeLocation) FuncIdentifier() (funcIdentifier string) {
-	_, _, _, funcIdentifier = SplitAbsoluteFunctionName(cl.FuncName)
+	_, _, _, funcIdentifier = pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
 	return
 }
 

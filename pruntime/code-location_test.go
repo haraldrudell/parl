@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/haraldrudell/parl/pruntime/pruntimelib"
 )
 
 type clTypeName struct{}
@@ -143,7 +145,7 @@ func TestSplitAbsoluteFunctionName(t *testing.T) {
 				defer func() {
 					recoverValue = recover()
 				}()
-				gotPackagePath, gotPackageName, gotTypePath, gotFuncName = SplitAbsoluteFunctionName(tt.args.absPath)
+				gotPackagePath, gotPackageName, gotTypePath, gotFuncName = pruntimelib.SplitAbsoluteFunctionName(tt.args.absPath)
 			}()
 			isPanic := recoverValue != nil
 			if isPanic != tt.wantPanic {

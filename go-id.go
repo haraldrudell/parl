@@ -8,11 +8,11 @@ package parl
 import (
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pruntime"
-	"github.com/haraldrudell/parl/pruntime/pruntime2"
+	"github.com/haraldrudell/parl/pruntime/pruntimelib"
 )
 
 func goID() (threadID ThreadID) {
-	var ID, _, err = pruntime2.ParseFirstLine(pruntime.FirstStackLine())
+	var ID, _, err = pruntimelib.ParseFirstLine(pruntime.FirstStackLine())
 	if perrors.IsPF(&err, "pruntime.ParseFirstLine %w", err) {
 		panic(err)
 	}

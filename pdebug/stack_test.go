@@ -16,6 +16,7 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pruntime"
+	"github.com/haraldrudell/parl/pruntime/pruntimelib"
 )
 
 func TestStack(t *testing.T) {
@@ -45,7 +46,7 @@ func TestStack(t *testing.T) {
 			panic(perrors.ErrorfPF("too few lines in stack trace: %d need >=5", len(lines)))
 		}
 		funcLine := lines[len(lines)-5] // "testing.tRunner(0x1400011cb60, 0x1011810a8)"
-		packagePath, packageName, typePath, funcName := pruntime.SplitAbsoluteFunctionName(funcLine)
+		packagePath, packageName, typePath, funcName := pruntimelib.SplitAbsoluteFunctionName(funcLine)
 		if argIndex := strings.Index(funcName, "("); argIndex != -1 {
 			funcName = funcName[:argIndex]
 		}
