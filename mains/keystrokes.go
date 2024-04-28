@@ -6,8 +6,6 @@ ISC License
 package mains
 
 import (
-	"bufio"
-	"os"
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
@@ -19,6 +17,9 @@ const (
 	// optional argument to [Keystrokes.Launch]
 	SilentClose = true
 )
+
+// didLaunch ensures multiple keystrokesThread are not running
+var didLaunch atomic.Bool
 
 // Keystrokes reads line-wise from standard input
 //   - [os.File.Read] from [os.Stdin] cannot be aborted because
@@ -50,7 +51,7 @@ func NewKeystrokes() (keystrokes *Keystrokes) { return &Keystrokes{} }
 //   - can only be invoked once per process or panic
 //   - supports functional chaining
 //   - silent [SilentClose] does not echo anything on [os.Stdin] closing
-func (k *Keystrokes) Launch(silent ...bool) (keystrokes *Keystrokes) {
+func (k *Keystrokes) Launch(addError parl.AddError, silent ...bool) (keystrokes *Keystrokes) {
 	keystrokes = k
 
 	// ensure only launched once
@@ -64,7 +65,8 @@ func (k *Keystrokes) Launch(silent ...bool) (keystrokes *Keystrokes) {
 	if len(silent) > 0 {
 		isSilent = silent[0]
 	}
-	go keystrokesThread(isSilent, &k.stdin)
+
+	go keystrokesThread(isSilent, addError, &k.stdin)
 
 	return
 }
@@ -78,45 +80,6 @@ func (k *Keystrokes) Launch(silent ...bool) (keystrokes *Keystrokes) {
 func (k *Keystrokes) Ch() (ch <-chan string) { return k.stdin.Ch() }
 
 // CloseNow closes the string-sending channel discarding any pending characters
-func (k *Keystrokes) CloseNow(errp *error) { k.stdin.CloseNow(errp) }
-
-// didLaunch ensures multiple keystrokesThread are not running
-var didLaunch atomic.Bool
-
-// keystrokesThread reads blocking from [os.Stdin] therefore cannot be cancelled
-//   - therefore, keystrokesThread is a top-level function not waited upon
-//   - on [Keystrokes.CloseNow], keystrokesThread exits on the following return
-//   - on [os.Stdin] closing, keystrokesThread closes the Keystrokes channel
-//   - [parl.Infallible] prints any errors to standard error
-//   - —
-//   - -verbose=mains.keystrokesThread
-func keystrokesThread(silent bool, stdin *parl.NBChan[string]) {
-	var err error
-	defer parl.Debug("keystrokes.scannerThread exiting: err: %s", perrors.Short(err))
-	// if a panic is recovered, or err holds an error, both are printed to standard error
-	defer parl.Recover(func() parl.DA { return parl.A() }, &err, parl.Infallible)
-	// ensure string-channel closes on exit without discarding any input
-	defer stdin.Close()
-
-	var scanner = bufio.NewScanner(os.Stdin)
-	parl.Debug("keystrokes.scannerThread scanning: stdin.Ch: 0x%x", stdin.Ch())
-
-	// blocks here
-	for scanner.Scan() {
-		// DidClose is true if close was invoked
-		//	- stdin.Ch may not be closed yet
-		if stdin.DidClose() {
-			return // terminated by Keystrokes.CloseNow
-		}
-		if parl.IsThisDebug() {
-			parl.Log("keystrokes.Send %q", scanner.Text())
-		}
-		stdin.Send(scanner.Text())
-	}
-
-	// scanner had end of input or error
-	if err = scanner.Err(); !silent && err == nil {
-		// echoed to standard error
-		parl.Log("%s standard input closed", perrors.PackFunc())
-	}
+func (k *Keystrokes) CloseNow(errp *error) {
+	k.stdin.CloseNow(errp)
 }

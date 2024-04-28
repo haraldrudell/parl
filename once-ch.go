@@ -51,6 +51,8 @@ func (o *OnceCh) IsWinner(noWait ...bool) (isWinner bool, closeFunc func()) {
 
 func (o *OnceCh) Ch() (ch AwaitableCh) { return o.awaitable.Ch() }
 
+func (o *OnceCh) IsInvoked() (isInvoked bool) { return o.winner.Load() }
+
 func (o *OnceCh) IsClosed() (isClosed bool) { return o.awaitable.IsClosed() }
 
 func (o *OnceCh) close() { o.awaitable.Close() }
