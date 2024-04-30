@@ -14,44 +14,60 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/sets"
 )
-
-const (
-	tcpListening tcpState = iota + 1
-	tcpAccepting
-	tcpClosing
-	tcpClosed
-)
-
-type tcpState uint32
 
 const (
 	sendErrorOnChannel = true
 )
 
-// TCPListener embeds net.TCPListener
+// SocketListener is a generic wrapper for [net.Listener]
+//   - not intended for direct use, instead use specific implementations like:
+//   - — [TCPListener]
+//   - C is the type of connection the handler function receives:
+//   - — net.Conn, *net.TCPConn, …
 //   - panic-handled connection threads
 //   - Ch: real-time error channel or collecting errors after close: Err
 //   - WaitCh: idempotent waitable thread-terminating Close
-//   - C is net.Conn, *net.TCPConn, …
+//   - SocketListener methods are thread-safe
 type SocketListener[C net.Conn] struct {
+	// netListener can be type aasserted to a listener for
+	// transport socket type
 	netListener net.Listener
-	network     Network         // network for listening tcp tcp4 tcp6…
-	transport   SocketTransport // transport udp/tcp/ip/unix
-
+	// network for listening tcp tcp4 tcp6…
+	//	- the type of near and far socket addresses
+	//	- network should be compatible wwith transport
+	network Network
+	// transport indicates what listener implementation netListener
+	// can be type asserted to: udp/tcp/ip/unix
+	transport SocketTransport
+	// stateLock attains integrity by making mutually exclusive:
+	//	- [SocketListener.Listen]
+	//	- [SocketListener.close]
+	//	- [SocketListener.setAcceptState]
 	stateLock sync.Mutex
-	state     tcpState
+	// state controls the singleton statee cycle: 0 soListening soAccepting soClosing soClosed
+	//	- writes behind stateLock for integrity
+	state parl.Atomic32[socketState]
+	// allows waiting for all pending connections
+	connWait sync.WaitGroup
+	// allows waiting for accept thread to exit
+	acceptWait sync.WaitGroup
+	// allows waiting for close complete
+	closeWait chan struct{}
+	// the channel never closes
+	errCh parl.NBChan[error]
+	// cached error from [SocketListener.close]
+	closeErr atomic.Pointer[error]
 
-	handler    func(C)
-	connWait   sync.WaitGroup     // allows waiting for all pending connections
-	acceptWait sync.WaitGroup     // allows waiting for accept thread to exit
-	closeWait  chan struct{}      // allows waiting for close complete
-	closeErr   error              // cached error from close
-	errCh      parl.NBChan[error] // the channel never closes
+	// SocketListener.AcceptConnections
+
+	// the function receiving new connections
+	handler func(C)
 }
 
-// NewSocketListener returns object for receiving IPv4 tcp connections
+// NewSocketListener returns object listening for socket connections
+//   - C is the type of net.Listener the handler function provided to [SocketListener.AcceptConnections]
+//   - SocketListener provides asynchronous error handling
 //   - handler must invoke net.Conn.Close
 func NewSocketListener[C net.Conn](
 	listener net.Listener,
@@ -83,11 +99,12 @@ func NewSocketListener[C net.Conn](
 func (s *SocketListener[C]) Listen(socketString string) (err error) {
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
-	switch tcpState(atomic.LoadUint32((*uint32)(&s.state))) {
-	case tcpListening, tcpAccepting:
+
+	switch s.state.Load() {
+	case soListening, soAccepting:
 		err = perrors.NewPF("invoked on listening socket")
 		return
-	case tcpClosing, tcpClosed:
+	case soClosing, soClosed:
 		err = perrors.NewPF("invoked on closed socket")
 		return
 	}
@@ -115,12 +132,13 @@ func (s *SocketListener[C]) Listen(socketString string) (err error) {
 	}
 
 	// update state to listening
-	atomic.StoreUint32((*uint32)(&s.state), uint32(tcpListening))
+	s.state.Store(soListening)
 
 	return
 }
 
 // Ch returns a real-time error channel
+//   - the channel never closes
 //   - unread errors can also be collected using [TCPListener.Err]
 func (s *SocketListener[C]) Ch() (ch <-chan error) {
 	return s.errCh.Ch()
@@ -128,7 +146,8 @@ func (s *SocketListener[C]) Ch() (ch <-chan error) {
 
 // AcceptConnections is a blocking function handling inbound connections
 //   - AcceptConnections can only be invoked once
-//   - accept of connections continues until Close is invoked
+//   - handler must be non-nil, socket state must be Listening
+//   - accepts connections until Close is invoked despite errors
 //   - handler must invoke net.Conn.Close
 func (s *SocketListener[C]) AcceptConnections(handler func(C)) {
 	defer s.close(sendErrorOnChannel)
@@ -168,9 +187,7 @@ func (s *SocketListener[C]) AcceptConnections(handler func(C)) {
 
 // IsAccept indicates whether the listener is functional and
 // accepting incoming connections
-func (s *SocketListener[C]) IsAccept() (isAcceptThread bool) {
-	return tcpState(atomic.LoadUint32((*uint32)(&s.state))) == tcpAccepting
-}
+func (s *SocketListener[C]) IsAccept() (isAcceptThread bool) { return s.state.Load() == soAccepting }
 
 // WaitCh returns a channel that closes when [] completes
 //   - ListenTCP4.Close needs to have been invoked for the channel to close
@@ -211,50 +228,59 @@ func (s *SocketListener[C]) Err(errp *error) {
 	}
 }
 
+// Close ensures the socket is closed
+//   - socket guaranteed to be close on return
+//   - idempotent panic-free awaitable thread-safe
 func (s *SocketListener[C]) Close() (err error) {
 	_, err = s.close(false)
 	return
 }
 
+// setAcceptState transitions from [soListening] to [soAccepting]
+// in critical section
 func (s *SocketListener[C]) setAcceptState() (err error) {
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	switch tcpState(atomic.LoadUint32((*uint32)(&s.state))) {
-	case tcpListening:
-		atomic.StoreUint32((*uint32)(&s.state), uint32(tcpAccepting))
+	switch s.state.Load() {
+	case soListening:
+		s.state.Store(soAccepting)
 		s.acceptWait.Add(1)
 	case 0:
 		err = perrors.NewPF("socket not listening")
-	case tcpAccepting:
+	case soAccepting:
 		err = perrors.NewPF("invoked on accepting socket")
-	case tcpClosing, tcpClosed:
+	case soClosing, soClosed:
 		err = perrors.NewPF("invoked on closed socket")
 	}
 	return
 }
 
 func (s *SocketListener[C]) close(sendError bool) (didClose bool, err error) {
-	if tcpState(atomic.LoadUint32((*uint32)(&s.state))) == tcpClosed {
-		err = s.closeErr
+	if s.state.Load() == soClosed {
+		if ep := s.closeErr.Load(); ep != nil {
+			err = *ep
+		}
 		return // already closed return
 	}
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
 	// select closing invocation
-	if didClose = tcpState(atomic.LoadUint32((*uint32)(&s.state))) != tcpClosed; !didClose {
-		err = s.closeErr
+	if didClose = s.state.Load() != soClosed; !didClose {
+		if ep := s.closeErr.Load(); ep != nil {
+			err = *ep
+		}
 		return // already closed return
 	}
 
 	// execute close
-	atomic.StoreUint32((*uint32)(&s.state), uint32(tcpClosing))
+	s.state.Store(soClosing)
 	defer close(s.closeWait)
-	defer atomic.StoreUint32((*uint32)(&s.state), uint32(tcpClosed))
+	defer s.state.Store(soClosed)
 	defer s.acceptWait.Wait()
 	if parl.Close(s.netListener, &err); perrors.Is(&err, "TCPListener.Close %w", err) {
-		s.closeErr = err
+		s.closeErr.Store(&err)
 		if sendError {
 			s.errCh.Send(err)
 		}
@@ -264,7 +290,7 @@ func (s *SocketListener[C]) close(sendError bool) (didClose bool, err error) {
 }
 
 // invokeHandler is a goroutine executing the handler function for a new connection
-//   - invokeHandler recovers panics in handler function
+//   - invokeHandler recovers panic in handler function
 func (s *SocketListener[C]) invokeHandler(conn net.Conn) {
 	defer s.connWait.Done()
 	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errCh.AddErrorProc)
@@ -278,24 +304,3 @@ func (s *SocketListener[C]) invokeHandler(conn net.Conn) {
 
 	s.handler(c)
 }
-
-const (
-	TransportTCP = iota + 1
-	TransportUDP
-	TransportIP
-	TransportUnix
-)
-
-type SocketTransport uint8
-
-func (t SocketTransport) String() (s string) {
-	return transportSet.StringT(t)
-}
-
-func (t SocketTransport) IsValid() (isValid bool) {
-	return transportSet.IsValid(t)
-}
-
-var transportSet = sets.NewSet[SocketTransport]([]sets.SetElement[SocketTransport]{
-	{ValueV: TransportTCP, Name: "tcp"},
-})

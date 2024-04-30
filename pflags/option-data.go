@@ -17,6 +17,8 @@ const (
 	typeMismatch = "option %s type %T: bad yaml data pointer of type: %T"
 )
 
+var NoOptions []OptionData
+
 // OptionData contain options data for the flag package
 //   - OptionData is used for command-line options to be declarative
 //   - instead of flag.BoolVar and similar invocations scattered about the codebase

@@ -18,14 +18,20 @@ import (
 // StdinReader is a reader wrapping the unclosable os.Stdin.Read
 //   - on error, the error is sent to addError and EOF is returned
 type StdinReader struct {
+	// optionl error submitting function
 	addError parl.AddError
+	// whether error has occured in [StdinReader.Read]
 	isClosed atomic.Bool
-	isError  *atomic.Bool
+	// optional value set to true on error
+	isError *atomic.Bool
 }
 
 var _ io.Reader = &StdinReader{}
 
 // NewStdinReader returns a reader that closes on error
+//   - addError is an optional function receiving errors occurring in [os.Stdin.Read].
+//     if missing, errors are printed to stderr
+//   - isError is an optional atomic set to true on first error
 func NewStdinReader(addError parl.AddError, isError *atomic.Bool) (reader *StdinReader) {
 	return &StdinReader{
 		addError: addError,
@@ -35,8 +41,14 @@ func NewStdinReader(addError parl.AddError, isError *atomic.Bool) (reader *Stdin
 
 // Read reads from standard input
 //   - on error, the reader closes
-//   - errors are submitted separately or printed to stderr
+//   - errors are submitted separately or printed to stderr and not returned
+//   - the only error returned is [io.EOF]
+//   - [os.Stdin] cannot be closed so a blocking read cannot be canceled
+//   - if another process closes stdin, on the next keypress an error will result
+//   - on process exit, Read may hang until enter is pressed
 func (r *StdinReader) Read(p []byte) (n int, err error) {
+
+	// already closed case
 	if r.isClosed.Load() {
 		err = io.EOF
 		return
@@ -46,28 +58,39 @@ func (r *StdinReader) Read(p []byte) (n int, err error) {
 
 	n, isPanic, err = r.read(p)
 
-	if err != nil {
-		r.isClosed.Store(true)
-		if r.isError != nil {
-			r.isError.Store(true)
-		}
-		// os.StdinRead error:
-		// “read /dev/stdin: input/output error [*fs.PathError]
-		// input/output error [syscall.Errno]”
-		// isPanic: false
-		if r.addError != nil {
-			err = perrors.ErrorfPF("os.Stdin.Read error: “%w” isPanic: %t",
-				err, isPanic,
-			)
-			r.addError(err)
-		} else {
-			fmt.Fprintf(os.Stderr, "os.Stdin.Read error: “%s” isPanic: %t",
-				perrors.Long(err),
-				isPanic,
-			)
-		}
-		err = io.EOF
+	// no error case
+	if err == nil {
+		return
 	}
+
+	// store error condition in object
+	r.isClosed.Store(true)
+	// if isError present, note error has occurred
+	if r.isError != nil {
+		r.isError.Store(true)
+	}
+
+	// if another process closes stdin:
+	// os.StdinRead error:
+	// “read /dev/stdin: input/output error [*fs.PathError]
+	// input/output error [syscall.Errno]”
+	// isPanic: false
+
+	// if addError present, submit error to it
+	if r.addError != nil {
+		err = perrors.ErrorfPF("os.Stdin.Read error: “%w” isPanic: %t",
+			err, isPanic,
+		)
+		r.addError(err)
+		err = io.EOF
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "os.Stdin.Read error: “%s” isPanic: %t",
+		perrors.Long(err),
+		isPanic,
+	)
+	err = io.EOF
 
 	return
 }

@@ -13,3 +13,6 @@ type AddErrorIf interface {
 	// AddError is a function to submit non-fatal errors
 	AddError(err error)
 }
+
+// absent [parl.AddError] argument
+var NoAddErr AddError

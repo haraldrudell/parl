@@ -15,9 +15,10 @@ import (
 
 // keystrokesThread reads blocking from [os.Stdin] therefore cannot be canceled
 //   - therefore, keystrokesThread is a top-level function not waited upon
-//   - on [Keystrokes.CloseNow], keystrokesThread exits on the following return
+//   - on [Keystrokes.CloseNow], keystrokesThread exits on the following return keypress
 //   - on [os.Stdin] closing, keystrokesThread closes the Keystrokes channel
-//   - [parl.Infallible] prints any errors to standard error
+//   - [StdinReader] converts any error to [io.EOF]
+//   - [parl.Infallible] prints any errors to standard error, should not be any
 //   - —
 //   - -verbose=mains.keystrokesThread
 func keystrokesThread(silent bool, addError parl.AddError, stdin *parl.NBChan[string]) {
@@ -57,5 +58,8 @@ func keystrokesThread(silent bool, addError parl.AddError, stdin *parl.NBChan[st
 		return
 	}
 	// echoed to standard error
+	//	- echoed if:
+	//	- stdin closed without error, eg. from user pressing ^D
+	//	- silent is false
 	parl.Log("%s standard input closed", perrors.PackFunc())
 }

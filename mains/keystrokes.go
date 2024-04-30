@@ -27,6 +27,12 @@ var didLaunch atomic.Bool
 //   - therefore, on process exit or [Keystrokes.CloseNow], keystrokesThread thread is left blocked in Read
 //   - —
 //   - -verbose='mains...Keystrokes|mains.keystrokesThread' “github.com/haraldrudell/parl/mains.(*Keystrokes)”
+//   - this object is released on process exit.
+//     Remaining items due to stdin cannot be closed are:
+//   - the stdin unbound channel
+//   - optional addError
+//   - those items along with [KeyStrokesThread] and [StdinReader] are released
+//     on process exit or next keypress
 type Keystrokes struct {
 	// unbound locked combined channel and slice type
 	stdin parl.NBChan[string]
@@ -51,6 +57,7 @@ func NewKeystrokes() (keystrokes *Keystrokes) { return &Keystrokes{} }
 //   - can only be invoked once per process or panic
 //   - supports functional chaining
 //   - silent [SilentClose] does not echo anything on [os.Stdin] closing
+//   - addError if present receives errors from [os.Stdin.Read]
 func (k *Keystrokes) Launch(addError parl.AddError, silent ...bool) (keystrokes *Keystrokes) {
 	keystrokes = k
 
@@ -80,6 +87,4 @@ func (k *Keystrokes) Launch(addError parl.AddError, silent ...bool) (keystrokes 
 func (k *Keystrokes) Ch() (ch <-chan string) { return k.stdin.Ch() }
 
 // CloseNow closes the string-sending channel discarding any pending characters
-func (k *Keystrokes) CloseNow(errp *error) {
-	k.stdin.CloseNow(errp)
-}
+func (k *Keystrokes) CloseNow(errp *error) { k.stdin.CloseNow(errp) }
