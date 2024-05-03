@@ -212,6 +212,8 @@ func new(
 	newGoContext(&g.goContext, ctx)
 	if parl.IsThisDebug() {
 		g.isDebug.Store(true)
+		var log parl.PrintfFunc = parl.Log
+		g.log.CompareAndSwap(nil, &log)
 	}
 	if len(onFirstFatal) > 0 {
 		g.onFirstFatal = onFirstFatal[0]

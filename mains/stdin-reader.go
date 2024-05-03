@@ -70,6 +70,12 @@ func (r *StdinReader) Read(p []byte) (n int, err error) {
 		r.isError.Store(true)
 	}
 
+	// do not submit or print EOF error
+	//	- indication is r.isError true
+	if err == io.EOF {
+		return
+	}
+
 	// if another process closes stdin:
 	// os.StdinRead error:
 	// “read /dev/stdin: input/output error [*fs.PathError]

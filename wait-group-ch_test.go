@@ -156,7 +156,6 @@ func TestWaitGroupChWait(t *testing.T) {
 	if isWaitReturn.Load() {
 		t.Error("Wait returned prematurely")
 	}
-	D("w.Done")
 	w.Done()
 	// race condition between w.ch closing and
 	// waiter triggering isDone

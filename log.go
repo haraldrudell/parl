@@ -97,6 +97,8 @@ func GetD(skipFrames int) (debug func(format string, a ...interface{})) {
 // has debug logging enabled
 //   - true when -debug globally enabled using SetDebug(true)
 //   - true when the -verbose regexp set with SetRegexp matches
+//   - matched against [pruntime.CodeLocation.FuncName]
+//   - “github.com/haraldrudell/parl/mains.(*Executable).AddErr”
 func IsThisDebug() bool {
 	return stderrLogger.IsThisDebug()
 }

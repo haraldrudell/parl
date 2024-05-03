@@ -17,7 +17,10 @@ import (
 )
 
 const (
-	sendErrorOnChannel = true
+	// when Accept exits, errors are sent [SocketListener.close]
+	threadExitSendsErrorOnChannel = true
+	// when a consumeer invoked Close, errors are not sent [SocketListener.close]
+	consumerClose = false
 )
 
 // SocketListener is a generic wrapper for [net.Listener]
@@ -57,7 +60,8 @@ type SocketListener[C net.Conn] struct {
 	// the channel never closes
 	errCh parl.NBChan[error]
 	// cached error from [SocketListener.close]
-	closeErr atomic.Pointer[error]
+	closeErr     atomic.Pointer[error]
+	threadSource atomic.Pointer[ThreadSource[C]]
 
 	// SocketListener.AcceptConnections
 
@@ -144,34 +148,50 @@ func (s *SocketListener[C]) Ch() (ch <-chan error) {
 	return s.errCh.Ch()
 }
 
+func (s *SocketListener[C]) SetThreadSource(threadSource ThreadSource[C]) {
+	s.threadSource.Store(&threadSource)
+}
+
 // AcceptConnections is a blocking function handling inbound connections
 //   - AcceptConnections can only be invoked once
-//   - handler must be non-nil, socket state must be Listening
+//   - handler must be non-nil or
+//   - socket state must be Listening
 //   - accepts connections until Close is invoked despite errors
 //   - handler must invoke net.Conn.Close
-func (s *SocketListener[C]) AcceptConnections(handler func(C)) {
-	defer s.close(sendErrorOnChannel)
-	if handler == nil {
-		s.errCh.Send(perrors.NewPF("handler cannot be nil"))
-		return
-	}
+func (s *SocketListener[C]) AcceptConnections(handler func(C)) (goodClose bool) {
+	var isPanic bool
+	var cReceiver ConnectionReceiver[C]
+	defer s.close(threadExitSendsErrorOnChannel)
 	if err := s.setAcceptState(); err != nil {
 		s.errCh.Send(err)
 		return
 	}
-	defer s.acceptWait.Done() // indicate accept thread exited
-	defer s.connWait.Wait()   // wait for connection goroutines
-	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errCh.AddErrorProc)
+	defer s.acceptWait.Done()                  // indicate accept thread exited
+	defer s.waitForConns(&cReceiver, &isPanic) // wait for connection goroutines
+	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, func(err error) {
+		s.errCh.AddErrorProc(err)
+	})
 
 	s.handler = handler
 	var err error
 	var conn net.Conn
 	for {
 
+		// obtain connection receiver from possible thread source
+		if cReceiver, err = s.getReceiver(); err != nil {
+			s.errCh.Send(err)
+			return
+		} else if cReceiver != nil {
+			s.connWait.Add(1)
+		} else if handler == nil {
+			s.errCh.Send(perrors.NewPF("handler cannot be nil"))
+			return
+		}
+
 		// block waiting for incoming connection
 		if conn, err = s.netListener.Accept(); err != nil { // blocking: either a connection or an error
 			if opError, ok := err.(*net.OpError); ok {
-				if errors.Is(opError.Err, net.ErrClosed) {
+				if goodClose = errors.Is(opError.Err, net.ErrClosed); goodClose {
 					return // use of closed: assume shutdown: ListenTCP4 is closed
 				}
 			}
@@ -179,9 +199,20 @@ func (s *SocketListener[C]) AcceptConnections(handler func(C)) {
 			continue
 		}
 
+		// type assert connection: closes conn if assertion fails
+		var c C
+		if c, err = s.assertConnection(conn); err != nil {
+			s.errCh.Send(err)
+			return
+		}
+
 		// invoke connection handler
-		s.connWait.Add(1)
-		go s.invokeHandler(conn)
+		if cReceiver != nil {
+			s.invokeHandle(c, cReceiver, &isPanic)
+		} else {
+			s.connWait.Add(1)
+			go s.invokeHandler(c)
+		}
 	}
 }
 
@@ -232,7 +263,7 @@ func (s *SocketListener[C]) Err(errp *error) {
 //   - socket guaranteed to be close on return
 //   - idempotent panic-free awaitable thread-safe
 func (s *SocketListener[C]) Close() (err error) {
-	_, err = s.close(false)
+	_, err = s.close(consumerClose)
 	return
 }
 
@@ -256,6 +287,8 @@ func (s *SocketListener[C]) setAcceptState() (err error) {
 	return
 }
 
+// close closes [SocketListener.netListener]
+//   - only the
 func (s *SocketListener[C]) close(sendError bool) (didClose bool, err error) {
 	if s.state.Load() == soClosed {
 		if ep := s.closeErr.Load(); ep != nil {
@@ -289,18 +322,71 @@ func (s *SocketListener[C]) close(sendError bool) (didClose bool, err error) {
 	return
 }
 
+func (s *SocketListener[C]) invokeHandle(connImpl C, cReceiver ConnectionReceiver[C], isPanic *bool) {
+	*isPanic = true
+
+	// TODO 240430: on panic, it is unknown whether the socket was closed
+	//	- parl.IdempotentCloser cannot be used, because connImp is an implementation C
+	//	- do nothing for now
+	cReceiver.Handle(connImpl)
+
+	*isPanic = false
+}
+
+func (s *SocketListener[C]) waitForConns(cReceiverp *ConnectionReceiver[C], isPanic *bool) {
+	if cReceiver := *cReceiverp; cReceiver != nil {
+		cReceiver.Shutdown()
+	}
+	// if there is panic, it connWait is uncertain
+	if *isPanic {
+		return
+	}
+	s.connWait.Wait() // wait for connection goroutines
+}
+
 // invokeHandler is a goroutine executing the handler function for a new connection
 //   - invokeHandler recovers panic in handler function
-func (s *SocketListener[C]) invokeHandler(conn net.Conn) {
+func (s *SocketListener[C]) invokeHandler(connImpl C) {
 	defer s.connWait.Done()
 	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errCh.AddErrorProc)
 
-	var c C
-	var ok bool
-	if c, ok = conn.(C); !ok {
-		s.errCh.Send(perrors.ErrorfPF("connection assertion to %T failed for type %T", c, conn))
+	s.handler(connImpl)
+}
+
+// obtain handler from possible thread source
+func (s *SocketListener[C]) getReceiver() (cReceiver ConnectionReceiver[C], err error) {
+
+	var ts ThreadSource[C]
+	if tsp := s.threadSource.Load(); tsp != nil {
+		ts = *tsp
+	}
+	if ts == nil {
 		return
 	}
 
-	s.handler(c)
+	if cReceiver, err = ts.Receiver(s.connWait.Done, s.errCh.Send); err != nil {
+		return // error from [ThreadSource.Receiver]
+	} else if cReceiver == nil {
+		err = perrors.NewPF("Received nil ConnectionReceiver")
+		return // [ThreadSource.Receiver] returned nil
+	}
+
+	return // good non-nil return, err nil
+}
+
+// type assert connection
+func (s *SocketListener[C]) assertConnection(conn net.Conn) (c C, err error) {
+
+	var ok bool
+	if c, ok = conn.(C); ok {
+		return
+	}
+
+	err = perrors.ErrorfPF("connection assertion to %T failed for type %T", c, conn)
+	var e error
+	parl.Close(conn, &e)
+	if e != nil {
+		err = perrors.AppendError(err, e)
+	}
+	return
 }

@@ -20,6 +20,7 @@ const (
 	// indicates silent: no banner. Must be first option on command-line ‘-silent’
 	SilentString = "-" + silentOption
 	silentOption = "silent"
+	Version      = "version"
 )
 
 // type for second argument to [BaseOptionData]
@@ -41,7 +42,7 @@ var BaseOptions BaseOptionsType
 func BaseOptionData(program string, yaml YamlOption) (optionData []pflags.OptionData) {
 
 	var nonYamlOptions = []pflags.OptionData{
-		{P: &BaseOptions.Version, Name: "version", Value: false, Usage: "displays version"},
+		{P: &BaseOptions.Version, Name: Version, Value: false, Usage: "displays version"},
 		{P: &BaseOptions.Verbosity, Name: "verbose", Value: "", Usage: "Regular expression for selective debug, eg. main.main: https://github.com/google/re2/wiki/Syntax"},
 		{P: &BaseOptions.Debug, Name: pflags.DebugOptionName, Value: false, Usage: "Global debug printing with code locations and long stack traces"},
 		{P: &BaseOptions.Silent, Name: silentOption, Value: false, Usage: "Suppresses banner and informational output. Must be first option"},
