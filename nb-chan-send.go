@@ -5,12 +5,11 @@ ISC License
 
 package parl
 
-import (
-	"sync/atomic"
-)
+import "math"
 
 // Send sends a single value on the channel
 //   - non-blocking, thread-safe, panic-free and error-free
+//   - if Close or CloseNow was invoked, items are discarded
 func (n *NBChan[T]) Send(value T) {
 	if n.isCloseInvoked.Load() {
 		return // no send after Close(), atomic performance: noop
@@ -19,22 +18,25 @@ func (n *NBChan[T]) Send(value T) {
 	n.inputLock.Lock()
 	defer n.postSend()
 
+	// if Close or CloseNow was invoked, items are discarded
 	if n.isCloseInvoked.Load() {
 		return // no send after Close() return: noop
 	}
 
-	// try to provide value to thread
-	if !n.noThread.Load() && n.alertOrLaunchThreadWithValue(value) {
-		return // value was handed to thread return: done
+	// try providing value to thread
+	//	- ensures a thread is running if configured
+	//	- updates threadProgressRequired
+	if n.alertOrLaunchThreadWithValue(value) {
+		return // value was provided to a thread
 	}
 
 	// save value in [NBChan.inputQueue]
 	if n.inputQueue == nil {
-		n.inputQueue = n.newQueue(1) // enforce allocation size
+		n.inputQueue = n.newQueue(1) // will allocation proper size
 	}
 	n.inputQueue = append(n.inputQueue, value)
-	atomic.StoreUint64(&n.inputCapacity, uint64(cap(n.inputQueue)))
-	atomic.AddUint64(&n.unsentCount, 1)
+	n.inputCapacity.Store(uint64(cap(n.inputQueue)))
+	n.unsentCount.Add(1)
 }
 
 // Send sends many values non-blocking, thread-safe, panic-free and error-free on the channel
@@ -52,7 +54,7 @@ func (n *NBChan[T]) SendMany(values []T) {
 		return // no send after Close() return: noop
 	}
 
-	if !n.noThread.Load() && n.alertOrLaunchThreadWithValue(values[0]) {
+	if n.alertOrLaunchThreadWithValue(values[0]) {
 		values = values[1:]
 		valueCount--
 		if valueCount == 0 {
@@ -65,13 +67,16 @@ func (n *NBChan[T]) SendMany(values []T) {
 		n.inputQueue = n.newQueue(valueCount)
 	}
 	n.inputQueue = append(n.inputQueue, values...)
-	atomic.StoreUint64(&n.inputCapacity, uint64(cap(n.inputQueue)))
-	atomic.AddUint64(&n.unsentCount, uint64(valueCount))
+	n.inputCapacity.Store(uint64(cap(n.inputQueue)))
+	n.unsentCount.Add(uint64(valueCount))
 }
 
-// preSend registers a Send/SendMany invocation pre-inputLock
+// preSend registers a Send or SendMany invocation pre-inputLock
+//   - send count is in [NBChan.sends]
+//   - handles [NBChan.sendsWait] that prevents a thread from exiting
+//     during Send SendMany invocations
 func (n *NBChan[T]) preSend() {
-	if atomic.AddUint64(&n.sends, 1) == 1 {
+	if n.sends.Add(1) == 1 {
 		n.sendsWait.HoldWaiters()
 	}
 }
@@ -83,32 +88,23 @@ func (n *NBChan[T]) postSend() {
 	n.inputLock.Unlock()
 
 	// decrement sends
-	var sends = int(atomic.AddUint64(&n.sends, ^uint64(0)))
+	var sends = int(n.sends.Add(math.MaxUint64))
+	if sends == 0 {
+		n.sendsWait.ReleaseWaiters()
+	}
 
-	// update data available
-	var unsentCount = atomic.LoadUint64(&n.unsentCount)
+	// update dataWaitCh
+	var unsentCount = n.unsentCount.Load()
 	n.setDataAvailable(unsentCount > 0)
 
-	if n.noThread.Load() {
-		return // no thread progress to manage
+	// handle thread progress
+	if !n.threadProgressRequired.Load() ||
+		sends > 0 ||
+		n.gets.Load() > 0 {
+		return // thread progress not required or by later thread
 	}
 
-	// ensure thread progress
-
-	// if no data only release any sends waiters
-	if unsentCount == 0 {
-		// release thread if it is waiting for pending sends
-		if sends == 0 {
-			n.sendsWait.ReleaseWaiters()
-		}
-		return
-	}
-
-	// a send ended and data is available
-	// release any sends waiters to get the new data
-	n.sendsWait.ReleaseWaiters()
-	// alert any waiting always-threads to get the new data
-	n.alertThread(nil)
+	n.tcEnsureThreadProgress()
 }
 
 func (n *NBChan[T]) ensureInput(size int) (queue []T) {
@@ -139,7 +135,7 @@ func (n *NBChan[T]) ensureOutput(size int) (queue []T) {
 func (n *NBChan[T]) newQueue(count int) (queue []T) {
 
 	// determine size
-	var size = int(atomic.LoadUint64(&n.allocationSize))
+	var size = int(n.allocationSize.Load())
 	if size > 0 {
 		if count > size {
 			size = count
@@ -155,143 +151,72 @@ func (n *NBChan[T]) newQueue(count int) (queue []T) {
 	return make([]T, size)[:0]
 }
 
-// alertOrLaunchThreadWithValue attempts to launch thread using value
-//   - invoked while holding [NBChan.inputLock]
-//   - Invoked by Send/SendMany
-//   - value has nit been added to unsentCount yet
+// alertOrLaunchThreadWithValue attempts to launch thread providing it the value item
+//   - Invoked by [NBChan.Send] and [NBChan.SendMany]
+//     while holding [NBChan.inputLock]
+//   - only invoked when on-demand or always-on threading configured
+//   - value has not been added to unsentCount yet
+//   - isGetRace indicates pending Get while NBChan is empty
+//   - — only matters if didProvideValue is false
+//   - caller must hold inputLock
 func (n *NBChan[T]) alertOrLaunchThreadWithValue(value T) (didProvideValue bool) {
 
-	// if Get in progress or NBChan is not empty, don’t launch thread
-	if atomic.LoadUint64(&n.gets) > 0 || // [NBChan.Get] in progress
-		atomic.LoadUint64(&n.unsentCount) > 0 { // channel is not empty
-		return // gets are in progress or not empty return: no thread interaction allowed
+	//	- NBChan may be configured for no-thread on-demand-thread or always-on thread
+	//	- no thread may be running
+	//	- this is the only Send SendMany invocation
+	//	- Get invocations may be ongoing
+
+	// if NBChan is configured for no thread, value cannot be provided
+	if n.noThread.Load() {
+		return // no-thread configuration
 	}
 
-	if n.alertThread(&value) {
+	// if unsent count is not zero, no change is required to threading
+	//	- only Send SendMany which use inputLock can increase this value
+	if n.unsentCount.Load() > 0 {
+		return // channel is not empty return
+	}
+
+	//	- unsent count is zero
+	//	- new Get invocations will return prior to outputLock
+	//	- a lingering Get may be in progress or waiting for inputLock
+	//	- configuration is on-demand-thread or always-thread
+	//	- unsent count is zero
+	//	- this is only Send/SendMany and there is no Get
+	//	- there may be no thread running
+
+	// if Get is in progress, thread should launch later
+	if n.tcDeferredProgressCheck() {
+		return
+	}
+
+	// starting the thread, that is most important
+	//	- will go to send value
+	if n.tcStartThreadWinner() {
+		n.unsentCount.Add(1)
+		var hasValue = true
+		n.tcStartThread(value, hasValue)
 		didProvideValue = true
-		return
-	} else if didProvideValue = n.tryStartThread(); !didProvideValue {
-		return // this invocation did not win thread-launch return : didProvideValue: false
+		n.threadProgressRequired.CompareAndSwap(true, false)
+		return // thread was started with value
 	}
 
-	atomic.AddUint64(&n.unsentCount, 1)
-	n.startThread(value)
-	return // launched new thread return: didProvideValue: true
-}
-
-// tryStartThread attempts to be the thread that gets to launch sendThread
-//   - inside threadLock
-//   - on isRunningThread true, closesOnThreadSend must be valid
-func (n *NBChan[T]) tryStartThread() (isWinner bool) {
-	var ch chan struct{}
-	var didWin bool
-	if n.closesOnThreadSend.Load() == nil {
-		ch = make(chan struct{})
-		didWin = n.closesOnThreadSend.CompareAndSwap(nil, &ch)
-	}
-	n.threadLock.Lock()
-	defer n.threadLock.Unlock()
-
-	// check for thread already running or this invocation should not launch it
-	if isWinner = n.isRunningThread.CompareAndSwap(false, true); !isWinner {
-		return // thread was already running return
-	}
-	if !didWin {
-		if ch == nil {
-			ch = make(chan struct{})
+	// try alerting a waiting always-on thread without waiting
+	//	- if successful, thread will go to send value
+	if n.isThreadAlways.Load() {
+		if didProvideValue = n.tcAlertThread(&value); didProvideValue {
+			n.threadProgressRequired.CompareAndSwap(true, false)
+			return // always-on thread alerted with value
 		}
-		n.closesOnThreadSend.Store(&ch) // fresh channel
-	}
-	return
-}
-
-// startThread launches the send thread
-//   - on Send/SendMany when unsentCount was 0 and no gets in progress
-//   - on postGet if unsentCount > 0 and gets in progress went to 0
-//   - isRunningThread.CompareAndSwap winner invokes startThread
-//   - thread runs until unsentCount is 0 inside threadLock
-func (n *NBChan[T]) startThread(value T) {
-	var endCh = make(chan struct{})
-	n.threadWait.Store(&endCh)
-	go n.sendThread(value) // send err in new thread
-}
-
-func (n *NBChan[T]) waitForSendThread() {
-	var ch chan struct{}
-	if chp := n.threadWait.Load(); chp == nil {
-		return
-	} else {
-		ch = *chp
 	}
 
-	<-ch
-}
-
-// alertThread alerts any waiting always-threads
-//   - invoked from Send/SendMany
-//   - value has not been added to unsentCount yet
-func (n *NBChan[T]) alertThread(valuep *T) (didAlert bool) {
-	if didAlert = n.threadAlertPending.CompareAndSwap(true, false); !didAlert {
-		return // sendThread not waiting for alert or this invocation not winner return
-	}
-
-	// alert sendThread
-	if valuep != nil {
-		atomic.AddUint64(&n.unsentCount, 1)
-		n.threadAlertValue.Store(valuep)
-	}
-	n.threadAlertWait.ReleaseWaiters()
+	// there is a thread running with no items
+	//	- on-demand or always
+	//	- may be about to: exit getsWait sendsWait
+	//	- Close or CloseNow may have been invoked
+	//	- if it’s thread exit and unsent items exist, that is problem
+	//	- flag it to be dealt with once all Send SendMany Get completes
+	n.threadProgressRequired.CompareAndSwap(false, true)
 
 	return
-}
-
-func (n *NBChan[T]) updateDataAvailable() (dataCh chan struct{}) {
-	if n.closableChan.IsClosed() {
-		return n.setDataAvailableAfterClose()
-	}
-	return n.setDataAvailable(atomic.LoadUint64(&n.unsentCount) > 0)
-}
-
-func (n *NBChan[T]) setDataAvailableAfterClose() (dataCh chan struct{}) {
-	return n.setDataAvailable(true)
-}
-
-func (n *NBChan[T]) setDataAvailable(isAvailable bool) (dataCh chan struct{}) {
-	if chp := n.dataWaitCh.Load(); chp != nil && n.isDataAvailable.Load() == isAvailable {
-		dataCh = *chp
-		return // initialized and in correct state return: noop
-	}
-	n.availableLock.Lock()
-	defer n.availableLock.Unlock()
-
-	// not yet initialized case
-	var chp = n.dataWaitCh.Load()
-	if chp == nil {
-		dataCh = make(chan struct{})
-		if isAvailable {
-			close(dataCh)
-		}
-		n.dataWaitCh.Store(&dataCh)
-		n.isDataAvailable.Store(isAvailable)
-		return // channel initialized and state set return
-	}
-
-	// is state correct?
-	dataCh = *chp
-	if n.isDataAvailable.Load() == isAvailable {
-		return // channel was initialized and state was correct return
-	}
-
-	// should channel be closed: if data is available
-	if isAvailable {
-		close(*chp)
-		n.isDataAvailable.Store(true)
-		return // channel closed andn state updated return
-	}
-
-	// replace with open channel: data is not available
-	dataCh = make(chan struct{})
-	n.dataWaitCh.Store(&dataCh)
-	n.isDataAvailable.Store(false)
-	return // new open channel stored and state updated return
 }

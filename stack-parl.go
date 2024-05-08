@@ -11,10 +11,10 @@ import (
 )
 
 // - Go stack traces are created by [runtime.NewStack] and is a byte slice
-type stackP struct{ pruntime.Stack }
+type stackParl struct{ pruntime.Stack }
 
 // [pdebug.Stack] implements [parl.Stack]
-var _ Stack = &stackP{}
+var _ Stack = &stackParl{}
 
 // NewStack populates a Stack object with the current thread
 // and its stack using debug.Stack
@@ -26,7 +26,7 @@ func newStack(skipFrames int) (stack Stack) {
 	skipFrames++
 
 	// result of parsing to be returned
-	stack = &stackP{Stack: pruntime.NewStack(skipFrames)}
+	stack = &stackParl{Stack: pruntime.NewStack(skipFrames)}
 
 	return
 }
@@ -35,13 +35,13 @@ func newStack(skipFrames int) (stack Stack) {
 //   - ThreadID is comparable and has IsValid and String methods
 //   - ThreadID is typically an incremented 64-bit integer with
 //     main thread having ID 1
-func (s *stackP) ID() (threadID ThreadID) {
+func (s *stackParl) ID() (threadID ThreadID) {
 	threadID = ThreadID(s.Stack.(*pruntime.StackR).ThreadID)
 	return
 }
 
 // a word indicating thread status, typically word “running”
-func (s *stackP) Status() (status ThreadStatus) {
+func (s *stackParl) Status() (status ThreadStatus) {
 	status = ThreadStatus(s.Stack.(*pruntime.StackR).Status)
 	return
 }
@@ -49,7 +49,7 @@ func (s *stackP) Status() (status ThreadStatus) {
 // the code location of the go statement creating this thread
 //   - if IsMain is true, zero-value. Check with Creator().IsSet()
 //   - never nil
-func (s *stackP) Creator() (creator *pruntime.CodeLocation, creatorID ThreadID, goRoutineRef string) {
+func (s *stackParl) Creator() (creator *pruntime.CodeLocation, creatorID ThreadID, goRoutineRef string) {
 	var stackR = s.Stack.(*pruntime.StackR)
 	var c = stackR.Creator
 	creator = &c

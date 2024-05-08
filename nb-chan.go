@@ -10,61 +10,54 @@ import (
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/sets"
 )
 
 const (
-	defaultNBChanSize = 10         // T elements
-	NBChanExit        = "exit"     // NBChan thread is not running
-	NBChanAlert       = "alert"    // NBChan thread is always running and blocked idle waiting for alert
-	NBChanGets        = "GetWait"  // NBChan thread is blocked waiting for Get invocations to complete
-	NBChanSends       = "SendWait" // NBChan thread is blocked waiting for Send/SendMany invocations to complete
-	NBChanSendBlock   = "chSend"   // NBChan thread is blocked in channel send
-	NBChanRunning     = "run"      // NBChan is running
+	// T elements default allocation size for buffers unless specified
+	defaultNBChanSize = 10
 )
 
-const (
-	// NBChanAlways configures NBChan to always have a thread
-	//   - benefit: for empty NBChan, Send/SendMany to  channel receive is faster due to avoiding thread launch
-	//   - cost: a thread is always running instad of only running when NBChan non-empty
-	//   - cost: Close or CloseNow must be invoked to shutdown NBChan
-	NBChanAlways NBChanThreadType = iota + 1
-	// NBChanNone configures no thread.
-	//	- benefit: lower cpu
-	//	- cost: data can only be received using [NBChan.Get]
-	NBChanNone
-)
-
-// NBChan is a non-blocking send channel with trillion-size queues.
-//   - NBChan behaves both like a channel and a thread-safe slice
+// NBChan is a non-blocking send, unbound-queue channel.
+//   - NBChan behaves like a channel and a thread-safe slice
 //   - — efficiency of sending and receiving multiple items at once
 //   - — ability to wait for items to become available
-//   - NBChan is initialization-free, thread-safe, idempotent and observable with panic-free methods and deferrable medthods
-//   - values are sent to the channel using Send/SendMany that are never blocked by channel send
-//     and are panic-free error-free
-//   - values are received from the channel or fetched all or many at once using Get
-//   - — Get wait:DataWaitCh and NBChanNone is highest throughput at lowest cpu load
-//   - — — cost is no channel is sending values, Get must be used
+//   - NBChan is initialization-free, thread-safe, idempotent and observable with panic-free and/or deferrable methods
+//   - values are sent non-blocking, panic free and error free using:
+//   - — [NBChan.Send] for single item
+//   - — [NBChan.SendMany] for any number of items
+//   - values are received from NBChan via:
+//   - — a Go receive channel returned by [NBChan.Ch] or
+//   - — fetched all, one or many at once using [NBChan.Get]
+//   - — for Get, values can be awaited using [NBChan.DataWaitCh]
+//   - [NBChanThreadType] provided to [NewNBChan] configures for performance:
+//   - — [NBChanNone]: highest throughput at lowest cpu load
+//   - — — cost is no channel sending values, ie. Ch is not available
+//   - — — only way to receive items is [NBChan.Get]
+//   - — — Get returns any number of items at once
+//   - — — wait is by [NBChan.DataWaitCh]
 //   - — — benefit is no thread
-//   - — Get Ch and NBChanAlways is higher throughput than regular thread
+//   - — [NBChanAlways] is higher throughput than regular thread
 //   - — — cost is thread is always running
-//   - — with regular thread or NBChanAlways:
-//   - — — Ch offers wait with channel receive
-//   - — — DataWaitCh only waits for data available
+//   - — — Ch Get and DataWaitCh are all available
+//   - — with regular thread or [NBChanAlways]:
+//   - — — [NBChan.Ch] offers wait with channel receive
+//   - — — [NBChan.DataWaitCh] offers wait for data available
+//   - low-allocation throughput can be obtained by using NBChan to handle
+//     slices of items []Value. NBChan can then operate at near zero allocations.
 //   - NBChan has deferrable, panic-free, observable, idempotent close.
 //     The underlying channel is closed when:
-//   - — Close is invoked and the channel is read to end
-//   - — CloseNow is invoked
+//   - — [NBChan.Close] is invoked and the channel is read to empty, ie.deferred close
+//   - — [NBChan.CloseNow] is invoked
 //   - NBChan is observable:
-//   - — DidClose indicates whether Close or CloseNow has been invoked
-//   - — IsClosed indicates whether the underlying channel has closed
-//   - — WaitForClose is deferrable and panic-free and waits until the underlying channel has been closed.
-//   - — WaitForCloseCh returns a channel that closes when the underlying channel closes
+//   - — [NBCHan.DidClose] indicates whether Close or CloseNow has been invoked
+//   - — [NBChan.IsClosed] indicates whether the underlying channel has closed
+//   - — [NBChan.WaitForClose] is deferrable and panic-free and waits until the underlying channel has been closed.
+//   - — [NBChan.WaitForCloseCh] returns a channel that closes when the underlying channel closes
 //   - NBChan is designed for error-free operation and only has panics and close errrors. All errors can be collected via:
-//   - — CloseNow WaitForClose GetError
+//   - — [NBChan.CloseNow] [NBChan.WaitForClose] or [NBChan.GetError]
 //   - NBChan has contention-separation between Send/SendMany and Get
-//   - NBChan can be used as an error channel where the sending thread does not
-//     block from a delayed or missing reader.
+//   - NBChan used as an error channel avoids the sending thread blocking
+//     from a delayed or missing reader.
 //
 // Usage:
 //
@@ -83,79 +76,120 @@ const (
 //	err = perrors.Errorf("someFunc: %w", err)
 //	return
 type NBChan[T any] struct {
+	// data items can be retreived one at a time by receiving from this channel via [NBChan.Ch]
+	//	- NBChan must be configured to have thread
 	closableChan ClosableChan[T]
-
 	// size to use for [NBChan.newQueue]
-	//	- atomic
-	//	- set by [NBChan.SetAllocationSize]
-	allocationSize uint64
+	allocationSize atomic.Uint64
 	// number of items held by NBChan
 	//	- one item may be with [NBChan.sendThread]
-	//	- atomic
-	unsentCount uint64
+	//	- only incremented by Send SendMany
+	//	- set to zero by CloseNow
+	//	- decremented by Get and sendThread
+	//	- may exit thread on reaching zero
+	unsentCount atomic.Uint64
 	// number of pending [NBChan.Get] invocations
 	//	- blocks [NBChan.sendThread] from fetching more values
-	//	- atomic
-	gets      uint64
-	getsWait  PeriodWaiter // holds thread waiting while gets > 0
-	sends     uint64
-	sendsWait PeriodWaiter // prevents thread from exiting while sends > 0
+	gets atomic.Uint64
+	// holds thread waiting while gets > 0
+	getsWait PeriodWaiter
+	// number of pending [NBChan.Send] [NBChan.SendMany] invocations
+	sends atomic.Uint64
+	// prevents thread from exiting while sends > 0
+	sendsWait PeriodWaiter
 	// capacity of [NBChan.inputQueue]
-	//	- atomic
 	//	- written behind inputLock
-	inputCapacity uint64
+	inputCapacity atomic.Uint64
 	// capacity of [NBChan.outputQueue]
-	//	- atomic
 	//	- written behind outputLock
-	outputCapacity uint64
-	noThread       atomic.Bool
-	dataWaitCh     atomic.Pointer[chan struct{}]
-
-	availableLock   sync.Mutex
-	isDataAvailable atomic.Bool // written behind availableLock
-
-	// allows to wait for thread exit
-	//	- because thread may relaunch only relevent after isCloseInvoked
-	threadWait atomic.Pointer[chan struct{}]
-	// closesOnThreadSend is a channel created prior to every
-	// sendThread channel send operation
-	//	- when isRunningThread true, closesOnThreadSend is valid
-	//	- the channel will close immediately after thread send completes
-	//	- this allows for the thread’s value to be collected by Get
-	//	- reinitialized behind threadLock
-	closesOnThreadSend atomic.Pointer[chan struct{}]
-	isThreadAlways     atomic.Bool
-	// set to true by sendThread when entering alert-wait
-	//	- reset by winner invocation for alerting sendThread
-	threadAlertPending atomic.Bool
-	threadAlertWait    PeriodWaiter      // wait mechanic for always-thread alert-wait
-	threadAlertValue   atomic.Pointer[T] // possible value sent by winner invocation to sendThread
-	// threadLock bundles isRunningThread updates:
-	//	- isRunningThread false-to-true winner and closesOnThreadSend reinitialized
-	//	- reinitialize closesOnThreadSend
-	//	- isClose isCloseNow transitions and isRunningThread state
-	//	- collecting sendThread value with isRunningThread and closesOnThreadSend
+	outputCapacity atomic.Uint64
+	// indicates threadless NBChan
+	//	- from [NBChanNone] or [NBChan.SetNoThread]
+	//	- [NBChan.Ch] is unavailable
+	//	- [NBChan.DataWaitCh] is used for wait
+	noThread atomic.Bool
+	// a channel that closes when data is available
+	dataWaitCh atomic.Pointer[chan struct{}]
+	// makes data channel wait operations executing serially
+	availableLock sync.Mutex
+	// written behind availableLock
+	isDataAvailable atomic.Bool
+	// indicates thread always running, ie. no on-demand
+	//	- from [NBChanAlways] or [NBChan.SetAlwaysThread]
+	isThreadAlways atomic.Bool
+	// wait mechanic for always-thread alert-wait
+	threadAlertWait PeriodWaiter
+	// possible value sent by winner invocation to sendThread
+	threadAlertValue atomic.Pointer[T]
+	// true if a thread was ever launched
+	tcDidLaunchThread atomic.Bool
+	// tcThreadLock atomizes tcRunningThread access with other actions:
+	//	- tcStartThreadWinner: make set to true serialized execution
+	//	- selectCloseNowWinner: atomize with isCloseNow and isCloseInvoked
+	//	- selectCloseWinner: atomize with isCloseInvoked
+	//	- collectSendThreadValue: determining thread running and collecting its value
 	//	- isClose detection for alway-running alert-wait-entry
-	//	- sendThread exit decision
-	//	- sendThread isCloseNow detection
-	threadLock sync.Mutex
-	// isRunningThread indicates that [NBChan.sendThread] is running
-	//	- winner gets to invoke [NBChan.startThread]
-	isRunningThread atomic.Bool // written behind threadLock
-
-	inputLock         sync.Mutex  // controls inputQueue and close
-	inputQueue        []T         // behind inputLock. One item may be with sendThread
-	isCloseInvoked    atomic.Bool // written behind inputLock
-	isCloseNowInvoked atomic.Bool // written behind inputLock
-
-	isWaitForCloseDone atomic.Bool                   // decides winner to close waitForClose
-	waitForClose       atomic.Pointer[chan struct{}] // mechanic to wait for close completion
-
-	outputLock   sync.Mutex // must not be acquired while holding inputLock
-	outputQueue0 []T        // behind getLock: outputQueue initial state, sliced to zero length
-	outputQueue  []T        // behind getLock: outputQueue sliced off from low to high indexes
-
-	perrors.ParlError // thread panics and channel close errors
+	//	- sendThreadExitCheck: make set to false serialized execution
+	//	- sendThreadIsCloseNow: atomize set to false with isCloseNow
+	tcThreadLock sync.Mutex
+	// tcRunningThread indicates that [NBChan.sendThread] is running or launching
+	//	- set to true when background decides to launch the thread
+	//	- selects winner to invoke [NBChan.tcStartThread]
+	//	- written behind threadLock
+	//	- set to false by thread when:
+	//	- — CloseNow detected
+	//	- — on-demand thread or an always-thread detecting Close that encounters:
+	//		unsent-count zero with no ongoing Send SendMany
+	tcRunningThread atomic.Bool
+	// tcThreadExitAwaitable makes the thread awaitable
+	//	- armed behind tcThreadLock
+	//	- used by CloseNow to ensure thread exit
+	tcThreadExitAwaitable CyclicAwaitable
+	tcSendBlock           atomic.Bool
+	tcCollectRequest      atomic.Bool
+	collectLock           sync.Mutex
+	threadCollect         LacyChan[struct{}]
+	collectChan           LacyChan[struct{}]
+	// inputLock controls input: inputQueue and close
+	//	 - makes mutually exlusive anything affecting the input buffer:
+	//		[NBChan.Close] [NBChan.CloseNow] swapQueues state-access
+	//		[NBChan.Scavenge] [NBChan.Send] [NBChan.SendMany]
+	inputLock sync.Mutex
+	// behind inputLock. One item may be with sendThread
+	inputQueue []T
+	//	A winner of Close or CloseNow was selected
+	//	- close may be deferred while NBChan is not empty
+	//	- written behind inputLock
+	isCloseInvoked atomic.Bool
+	// A winner of CloseNow was selected
+	//	- written behind inputLock
+	isCloseNow OnceCh
+	// mechanic to wait for underlying channel close complete
+	waitForClose Awaitable
+	// threadProgressLock atomizes the thread notify operation
+	// with reset of threadProgressRequired
+	threadProgressLock sync.Mutex
+	// returned by [NBChan.StateCh]
+	tcProgressCheck sync.Mutex
+	// tcState is a channel that sends state names when thgread is in static hold
+	tcState atomic.Pointer[chan NBChanTState]
+	// set by Send and SendMany at any time if:
+	//	- NBChan was empty
+	//	- on-demand or always-on threading is used
+	//	- a thread could not be started or notified
+	threadProgressRequired atomic.Bool
+	// outputLock controls output functions
+	//	- must not be acquired while holding inputLock
+	//	- makes mutually exclusive anything affecting the output buffer:
+	//		[NBChan.Get] [NBCHan.CloseNow] state-operation
+	//		[NBChan.Scavenge] thread-send, output-allocation-to-size
+	outputLock sync.Mutex
+	// behind getLock: outputQueue initial state, sliced to zero length
+	outputQueue0 []T
+	// behind getLock: outputQueue sliced off from low to high indexes
+	outputQueue []T
+	// thread panics and channel close errors
+	perrors.ParlError
 }
 
 // NewNBChan returns a non-blocking trillion-size buffer channel.
@@ -182,83 +216,95 @@ func NewNBChan[T any](threadType ...NBChanThreadType) (nbChan *NBChan[T]) {
 // SetAllocationSize sets the initial element size of the two queues. Thread-safe
 //   - NBChan allocates two queues of size which may be enlarged by item counts
 //   - supports functional chaining
+//   - 0 or less does nothing
 func (n *NBChan[T]) SetAllocationSize(size int) (nb *NBChan[T]) {
 	nb = n
 	if size <= 0 {
 		return // noop return
 	}
-	atomic.StoreUint64(&n.allocationSize, uint64(size))
+	n.allocationSize.Store(uint64(size))
 	n.ensureInput(size)
 	n.ensureOutput(size)
 	return
 }
 
+// SetAlwaysThread configures [NBChanAlways] operation
 func (n *NBChan[T]) SetAlwaysThread() (nb *NBChan[T]) {
 	nb = n
 	n.isThreadAlways.Store(true)
 	return
 }
 
-func (n *NBChan[T]) SetNoThread() {
-	n.noThread.Store(true)
-}
+// SetNoThread configures [NBChanNone] operation
+func (n *NBChan[T]) SetNoThread() { n.noThread.Store(true) }
+
+const (
+	// [NBChan.ThreadStatus] await a blocked thread state or exit
+	AwaitThread = true
+)
 
 // ThreadStatus indicates the current status of a possible thread
-func (n *NBChan[T]) ThreadStatus() (threadStatus string) {
-	if !n.isRunningThread.Load() {
-		return NBChanExit
-	} else if n.threadAlertPending.Load() {
-		return NBChanAlert
-	} else if n.getsWait.Count() > 0 {
-		return NBChanGets
-	} else if n.sendsWait.Count() > 0 {
-		return NBChanSends
-	} else if n.isSendThreadChannelSend() {
-		return NBChanSendBlock
+func (n *NBChan[T]) ThreadStatus(await ...bool) (threadStatus NBChanTState) {
+	if len(await) > 0 && await[0] {
+		// await thread status
+		//	- thread not launched
+		if !n.tcDidLaunchThread.Load() {
+			threadStatus = NBChanNoLaunch
+			return
+		}
+		select {
+		// status from a blocked thread
+		//	- NBChanSendBlock NBChanAlert NBChanGets NBChanSends
+		case threadStatus = <-n.stateCh():
+			// thread did exit
+		case <-n.tcThreadExitAwaitable.Ch():
+			threadStatus = NBChanExit
+		}
+		return
 	}
-	return NBChanRunning
+
+	// obtain current thread status, including running: ie. no idea where
+	select {
+	// status from a blocked thread
+	//	- NBChanSendBlock NBChanAlert NBChanGets NBChanSends
+	case threadStatus = <-n.stateCh():
+		// thread did exit
+	case <-n.tcThreadExitAwaitable.Ch():
+		threadStatus = NBChanExit
+	default:
+		// thread is somewhere else
+		if n.tcDidLaunchThread.Load() {
+			threadStatus = NBChanRunning
+		} else {
+			threadStatus = NBChanNoLaunch
+		}
+	}
+	return
 }
 
 // Ch obtains the receive-only channel
 //   - values can be retrieved using this channel or [NBChan.Get]
-func (n *NBChan[T]) Ch() (ch <-chan T) {
-	return n.closableChan.Ch()
-}
+//   - not available for [NBChanNone] NBChan
+func (n *NBChan[T]) Ch() (ch <-chan T) { return n.closableChan.Ch() }
 
 // Count returns number of unsent values
-func (n *NBChan[T]) Count() (unsentCount int) {
-	return int(atomic.LoadUint64(&n.unsentCount))
-}
+func (n *NBChan[T]) Count() (unsentCount int) { return int(n.unsentCount.Load()) }
 
 // Capacity returns size of allocated queues
 func (n *NBChan[T]) Capacity() (capacity int) {
-	return int(atomic.LoadUint64(&n.inputCapacity) + atomic.LoadUint64(&n.outputCapacity))
+	return int(n.inputCapacity.Load() + n.outputCapacity.Load())
 }
 
-func (n *NBChan[T]) DataWaitCh() (ch <-chan struct{}) {
-	return n.updateDataAvailable()
-}
+// DataWaitCh is a method to wait for additional values
+//   - alternative is [NBChan.Ch]
+//   - DataWaitCh offers more efficient operation
+func (n *NBChan[T]) DataWaitCh() (ch AwaitableCh) { return n.updateDataAvailable() }
 
 // DidClose indicates if Close or CloseNow was invoked
 //   - the channel may remain open until the last item has been read
 //   - [NBChan.CloseNow] immediately closes the channel discarding onread items
 //   - [NBChan.IsClosed] checks if the channel is closed
-func (n *NBChan[T]) DidClose() (didClose bool) {
-	return n.isCloseInvoked.Load()
-}
+func (n *NBChan[T]) DidClose() (didClose bool) { return n.isCloseInvoked.Load() }
 
 // IsClosed indicates whether the channel has actually closed.
-func (n *NBChan[T]) IsClosed() (isClosed bool) {
-	return n.closableChan.IsClosed()
-}
-
-type NBChanThreadType uint8
-
-func (n NBChanThreadType) String() (s string) {
-	return nbChanThreadTypeSet.StringT(n)
-}
-
-var nbChanThreadTypeSet = sets.NewSet[NBChanThreadType]([]sets.SetElement[NBChanThreadType]{
-	{ValueV: NBChanAlways, Name: "alwaysCh"},
-	{ValueV: NBChanNone, Name: "noCh"},
-})
+func (n *NBChan[T]) IsClosed() (isClosed bool) { return n.closableChan.IsClosed() }

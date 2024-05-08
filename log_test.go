@@ -245,6 +245,7 @@ func mocksLogStat() (text1, textNewline, expectedLocation, regexpLocation string
 	regexpLocation = location.FuncName
 	writer = &mockWriterLogStat{}
 	mockOutput = func(n int, s string) (err error) {
+		_ = n
 		if !strings.HasSuffix(s, "\n") {
 			s += "\n"
 		}

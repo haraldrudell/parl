@@ -73,6 +73,9 @@ type SocketListener[C net.Conn] struct {
 //   - C is the type of net.Listener the handler function provided to [SocketListener.AcceptConnections]
 //   - SocketListener provides asynchronous error handling
 //   - handler must invoke net.Conn.Close
+//     -
+//   - default threading is one virtual thread per connection
+//   - [SocketListener.SetThreadSource] allows for any thread model replacing handle
 func NewSocketListener[C net.Conn](
 	listener net.Listener,
 	network Network,
@@ -180,12 +183,12 @@ func (s *SocketListener[C]) AcceptConnections(handler func(C)) (goodClose bool) 
 		// obtain connection receiver from possible thread source
 		if cReceiver, err = s.getReceiver(); err != nil {
 			s.errCh.Send(err)
-			return
+			return // [ThreadSource.Receiver] failed
 		} else if cReceiver != nil {
 			s.connWait.Add(1)
 		} else if handler == nil {
 			s.errCh.Send(perrors.NewPF("handler cannot be nil"))
-			return
+			return // no receiver no handler return
 		}
 
 		// block waiting for incoming connection
@@ -203,7 +206,7 @@ func (s *SocketListener[C]) AcceptConnections(handler func(C)) (goodClose bool) 
 		var c C
 		if c, err = s.assertConnection(conn); err != nil {
 			s.errCh.Send(err)
-			return
+			return // connection cannot asserted to C return: never happens
 		}
 
 		// invoke connection handler
@@ -337,10 +340,10 @@ func (s *SocketListener[C]) waitForConns(cReceiverp *ConnectionReceiver[C], isPa
 	if cReceiver := *cReceiverp; cReceiver != nil {
 		cReceiver.Shutdown()
 	}
-	// if there is panic, it connWait is uncertain
-	if *isPanic {
-		return
-	}
+	// // if there is panic, it connWait is uncertain
+	// if *isPanic {
+	// 	return
+	// }
 	s.connWait.Wait() // wait for connection goroutines
 }
 
@@ -364,7 +367,7 @@ func (s *SocketListener[C]) getReceiver() (cReceiver ConnectionReceiver[C], err 
 		return
 	}
 
-	if cReceiver, err = ts.Receiver(s.connWait.Done, s.errCh.Send); err != nil {
+	if cReceiver, err = ts.Receiver(&s.connWait, s.errCh.Send); err != nil {
 		return // error from [ThreadSource.Receiver]
 	} else if cReceiver == nil {
 		err = perrors.NewPF("Received nil ConnectionReceiver")

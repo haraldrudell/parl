@@ -5,8 +5,6 @@ ISC License
 
 package parl
 
-import "sync/atomic"
-
 // Scavenge attempts to set capacity of the two queues to setCapacity
 //   - Scavenge allows for reducing queue capacity thus reduce memory leaks
 //   - queue capacities are reduced to the setCapacity value,
@@ -18,13 +16,13 @@ func (n *NBChan[T]) Scavenge(setCapacity int) {
 	defer n.outputLock.Unlock()
 
 	var capacity = n.reduceQueue(&n.outputQueue, setCapacity)
-	atomic.StoreUint64(&n.outputCapacity, uint64(capacity))
+	n.outputCapacity.Store(uint64(capacity))
 
 	n.inputLock.Lock()
 	defer n.inputLock.Unlock()
 
 	capacity = n.reduceQueue(&n.inputQueue, setCapacity)
-	atomic.StoreUint64(&n.inputCapacity, uint64(capacity))
+	n.inputCapacity.Store(uint64(capacity))
 }
 
 // reduceQueue reduces the capacity of a queue to avoid memory leaks

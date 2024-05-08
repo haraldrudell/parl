@@ -7,18 +7,19 @@ package parl
 
 import (
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	"github.com/haraldrudell/parl/perrors"
 )
 
 const (
-	NBChanExpectClose  = true
+	// [NBChanLogger] logging thread does not close until channel is closed
+	NBChanExpectClose = true
+	// [NBChanLogger] logging thread exits when channel has been read to empty
 	NBChanWillNotClose = false
 )
 
-// generates labels "1"…
+// generates labels "1"… separating different channel instances
 var nbChanLoggerID UniqueIDUint64
 
 // NBChanLogger is a debug logger for an NBChan instance
@@ -57,8 +58,8 @@ func doLogging[T any](label string, n *NBChan[T], expectClose bool, log PrintfFu
 
 		if n.Count() == 0 &&
 			n.ThreadStatus() == NBChanExit &&
-			atomic.LoadUint64(&n.sends) == 0 &&
-			atomic.LoadUint64(&n.gets) == 0 &&
+			n.sends.Load() == 0 &&
+			n.gets.Load() == 0 &&
 			(!expectClose || n.DidClose()) {
 			return
 		}
@@ -102,13 +103,13 @@ func NBChanState[T any](n *NBChan[T]) (s string) {
 		n.Count(), in, out, hasData, alertValue,
 
 		// “send sends: 0 gets: 0” pending Send/SendMany, Get
-		atomic.LoadUint64(&n.sends), atomic.LoadUint64(&n.gets),
+		n.sends.Load(), n.gets.Load(),
 
 		// “thread: chSend” ThreadStatus
 		n.ThreadStatus(), threadType,
 
 		// “close-now:true-false” Close-CloseNow
-		n.isCloseInvoked.Load(), n.isCloseNowInvoked.Load(), n.IsClosed(),
+		n.isCloseInvoked.Load(), n.isCloseNow.IsInvoked(), n.IsClosed(),
 
 		// “err: false” if NBCHan had panic or close error
 		n.GetError() != nil,

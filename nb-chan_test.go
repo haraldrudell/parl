@@ -157,30 +157,6 @@ func TestNBChanSetAllocationSize(t *testing.T) {
 	}
 }
 
-type NBChanReceiver[T any] struct {
-	isReady      sync.WaitGroup
-	value        T
-	valueIsValid bool
-	didRecive    bool
-	isExit       sync.WaitGroup
-}
-
-func NewNBChanReceiver[T any]() (n *NBChanReceiver[T]) { return &NBChanReceiver[T]{} }
-func (n *NBChanReceiver[T]) Receive(ch <-chan T) (n2 *NBChanReceiver[T]) {
-	n2 = n
-	n.isReady.Add(1)
-	n.isExit.Add(1)
-	go n.thread(ch)
-	return
-}
-func (n *NBChanReceiver[T]) thread(ch <-chan T) {
-	defer n.isExit.Done()
-
-	n.isReady.Done()
-	n.value, n.valueIsValid = <-ch
-	n.didRecive = true
-}
-
 // [NBChan.Ch] channel-read
 func TestNBChanReceive(t *testing.T) {
 	var value = 3
@@ -220,14 +196,18 @@ func TestNBChanGet(t *testing.T) {
 
 	var nbChan NBChan[int]
 
+	D("— GET2 SendMany")
 	// Get with limit
+	// send 3 4 5 6
 	nbChan.SendMany(values)
+	// get 2 first: 3 4
 	actual = nbChan.Get(getArg)
 	if !slices.Equal(actual, exp1) {
 		t.Errorf("Get %d: '%v' exp '%v'", getArg, actual, exp1)
 	}
 
-	// Get all
+	// Get all: 5 6
+	D("— GETALL")
 	actual = nbChan.Get()
 	if !slices.Equal(actual, exp2) {
 		t.Errorf("Get all: '%v' exp '%v'", actual, exp2)
@@ -238,29 +218,6 @@ func TestNBChanGet(t *testing.T) {
 		loc := cL.FuncIdentifier() + ":" + strconv.Itoa(cL.Line)
 		t.Errorf("%s nbChan.GetError: %s", loc, perrors.Short(err))
 	}
-}
-
-type NBChanWaitForClose[T any] struct {
-	isReady  sync.WaitGroup
-	err      error
-	didClose bool
-	isExit   sync.WaitGroup
-}
-
-func NewNBChanWaitForClose[T any]() (n *NBChanWaitForClose[T]) { return &NBChanWaitForClose[T]{} }
-func (n *NBChanWaitForClose[T]) Wait(nbChan *NBChan[T]) (n2 *NBChanWaitForClose[T]) {
-	n2 = n
-	n.isReady.Add(1)
-	n.isExit.Add(1)
-	go n.thread(nbChan)
-	return
-}
-func (n *NBChanWaitForClose[T]) thread(nbChan *NBChan[T]) {
-	defer n.isExit.Done()
-
-	n.isReady.Done()
-	nbChan.WaitForClose(&n.err)
-	n.didClose = true
 }
 
 // [NBChan.Close] [NBChan.DidClose] [NBChan.IsClosed] [NBChan.WaitForClose]
@@ -433,12 +390,12 @@ func TestNBChanCloseNow(t *testing.T) {
 		t.Error("outputQueue not nil")
 	}
 	// thread should have exit
-	if nbChan.isRunningThread.Load() {
+	if nbChan.tcRunningThread.Load() {
 		t.Error("isRunningThread true")
 	}
 	// thread waiter should not wait
 	t.Log("threadWait.Wait…")
-	nbChan.waitForSendThread()
+	<-nbChan.tcThreadExitAwaitable.Ch()
 	t.Log("threadWait.Wait complete")
 	// data waiter should not wait
 	//	- error in 1 ms
@@ -496,46 +453,28 @@ func TestNBChanAlways(t *testing.T) {
 
 	var nbChan NBChan[int]
 	var values []int
-	var timer *time.Timer
+	var threadState NBChanTState
 
 	// an always thread should on idle enter alert state
 	nbChan = *NewNBChan[int](NBChanAlways)
-	// send and receive to make sure thread is up
+	// send 3 and receive to make sure thread is up
 	nbChan.Send(value)
-	// wait for thread to launch
+	// wait for thread to launch, then receive
 	values = []int{<-nbChan.Ch()}
 	if !slices.Equal(values, expValues) {
 		t.Errorf("Get0 '%v' exp '%v'", values, expValues)
 	}
-	// thread should no enter alert status: running but idling
-	//	- wait up to 1 ms for proper thread status
-	timer = time.NewTimer(time.Millisecond)
-	for nbChan.ThreadStatus() != NBChanAlert {
-		select {
-		case <-timer.C:
-		default:
-			continue
-		}
-		break
-	}
-	timer.Stop()
-	if nbChan.ThreadStatus() != NBChanAlert {
-		t.Errorf("ThreadStatus %s exp %s", nbChan.ThreadStatus(), NBChanAlert)
+	// thread should now enter alert status: running but idling
+	threadState = nbChan.ThreadStatus(AwaitThread)
+	if threadState != NBChanAlert {
+		t.Errorf("ThreadStatus %s exp %s", threadState, NBChanAlert)
 	}
 
 	// an always thread with value should be in channel-send block
 	nbChan.Send(value2)
-	timer = time.NewTimer(200 * time.Millisecond)
-	for nbChan.ThreadStatus() != NBChanSendBlock {
-		select {
-		case <-timer.C:
-		default:
-			continue
-		}
-		break
-	}
-	if nbChan.ThreadStatus() != NBChanSendBlock {
-		t.Errorf("ThreadStatus %s exp %s", nbChan.ThreadStatus(), NBChanSendBlock)
+	threadState = nbChan.ThreadStatus(AwaitThread)
+	if threadState != NBChanSendBlock {
+		t.Errorf("ThreadStatus %s exp %s", threadState, NBChanSendBlock)
 	}
 	nbChan.CloseNow()
 }
@@ -607,4 +546,51 @@ func TestNBChanNone(t *testing.T) {
 	if waiter.didClose.Load() {
 		t.Fatal("DataWaitCh2 closed")
 	}
+}
+
+type NBChanReceiver[T any] struct {
+	isReady      sync.WaitGroup
+	value        T
+	valueIsValid bool
+	didRecive    bool
+	isExit       sync.WaitGroup
+}
+
+func NewNBChanReceiver[T any]() (n *NBChanReceiver[T]) { return &NBChanReceiver[T]{} }
+func (n *NBChanReceiver[T]) Receive(ch <-chan T) (n2 *NBChanReceiver[T]) {
+	n2 = n
+	n.isReady.Add(1)
+	n.isExit.Add(1)
+	go n.thread(ch)
+	return
+}
+func (n *NBChanReceiver[T]) thread(ch <-chan T) {
+	defer n.isExit.Done()
+
+	n.isReady.Done()
+	n.value, n.valueIsValid = <-ch
+	n.didRecive = true
+}
+
+type NBChanWaitForClose[T any] struct {
+	isReady  sync.WaitGroup
+	err      error
+	didClose bool
+	isExit   sync.WaitGroup
+}
+
+func NewNBChanWaitForClose[T any]() (n *NBChanWaitForClose[T]) { return &NBChanWaitForClose[T]{} }
+func (n *NBChanWaitForClose[T]) Wait(nbChan *NBChan[T]) (n2 *NBChanWaitForClose[T]) {
+	n2 = n
+	n.isReady.Add(1)
+	n.isExit.Add(1)
+	go n.thread(nbChan)
+	return
+}
+func (n *NBChanWaitForClose[T]) thread(nbChan *NBChan[T]) {
+	defer n.isExit.Done()
+
+	n.isReady.Done()
+	nbChan.WaitForClose(&n.err)
+	n.didClose = true
 }

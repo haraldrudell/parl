@@ -5,9 +5,7 @@ ISC License
 
 package parl
 
-import (
-	"sync/atomic"
-)
+import "math"
 
 // Get returns a slice of n or default all available items held by the channel.
 //   - if channel is empty, 0 items are returned
@@ -19,8 +17,13 @@ func (n *NBChan[T]) Get(elementCount ...int) (allItems []T) {
 
 	// empty NBChan: noop return
 	var unsentCount int
-	if unsentCount = int(atomic.LoadUint64(&n.unsentCount)); unsentCount == 0 {
+	if unsentCount = int(n.unsentCount.Load()); unsentCount == 0 {
 		return // no items available return: nil slice
+	}
+
+	// no Get after CloseNow
+	if n.isCloseNow.IsInvoked() {
+		return
 	}
 
 	// notify of pending Get
@@ -70,7 +73,7 @@ func (n *NBChan[T]) Get(elementCount ...int) (allItems []T) {
 
 // preGet registers a pending Get invocation priot to outputLock
 func (n *NBChan[T]) preGet() {
-	if atomic.AddUint64(&n.gets, 1) == 1 {
+	if n.gets.Add(1) == 1 {
 		n.getsWait.HoldWaiters()
 	}
 }
@@ -84,87 +87,67 @@ func (n *NBChan[T]) postGet() {
 	defer n.outputLock.Unlock()
 
 	// decrement gets
-	var gets = atomic.AddUint64(&n.gets, ^uint64(0))
+	var gets = n.gets.Add(math.MaxUint64)
+	if gets == 0 {
+		n.getsWait.ReleaseWaiters()
+	}
 
 	// update dataAvailable
-	var unsentCount = atomic.LoadUint64(&n.unsentCount)
+	var unsentCount = n.unsentCount.Load()
 	n.setDataAvailable(unsentCount > 0)
 
-	// is thread progress required?
-	if gets > 0 || // more Get invocations pending return: do not alert or launch thread
-		n.noThread.Load() { // this instance has no thread
-		return // no thread progess return
+	// handle thread progress
+	if gets > 0 ||
+		n.sends.Load() > 0 {
+		return // thread progress not required or by later thread
 	}
 
-	// ensure thread progress
-
-	// stop holding sendThread for pending Get invocations
-	var threadIsAtGetWait = n.getsWait.Count() > 0
-	n.getsWait.ReleaseWaiters()
-	if threadIsAtGetWait {
-		return // sendThread was notified return
+	if !n.tcIsDeferredProgress() {
+		return
 	}
 
-	// if an always-thread is idle, alert it
-	//	- always-threads wait for alert when there is no data
-	//	- sends and gets may keep the always thread waiting until this point
-	//	- if data is now available, alert it
-	if unsentCount > 0 && // data is available
-		n.alertThread(nil) {
-		return // always-thread progress guaranteed return
-	}
-
-	// if there is data, sendThread should be running
-	//	- this thread holds outputLock, so data cannot be taken from outputBuffer
-	//	- sendThread may be running and can decrease unsentCount
-	//	- Send/SendMany may be ongoing adding data
-	if n.isRunningThread.Load() {
-		return // thread already running return
-		// ensure there is data available for thread launch
-	} else if len(n.outputQueue) == 0 && // output queue empty
-		!n.swapQueues() { // input queue was empty
-		return // no data available return
-	}
-	if !n.tryStartThread() {
-		return // not winner return
-	}
-
-	// start the thread
-	var value = n.outputQueue[0]
-	n.outputQueue = n.outputQueue[1:]
-	n.startThread(value)
+	n.tcEnsureThreadProgress()
 }
 
 // collectSendThreadValue receives any value in sendThread channel send
+//   - invoked by [NBChan.Get]
+//   - thread receives value from:
+//   - — Send SendMany that launches thread, but only when sent count 0
+//   - — always: thread alert
+//   - —on-demand: GetNextValue
 func (n *NBChan[T]) collectSendThreadValue() (value T, hasValue bool) {
-	n.threadLock.Lock()
-	defer n.threadLock.Unlock()
 
-	if !n.isRunningThread.Load() {
+	// if thread is not running, it does not hold data
+	if !n.tcRunningThread.Load() {
 		return // thread not running
 	}
-	select {
-	case <-*n.closesOnThreadSend.Load():
-	case value, hasValue = <-n.closableChan.Ch():
-	}
-	return
-}
 
-// discardThreadValue ends any sendThread channel send
-func (n *NBChan[T]) isSendThreadChannelSend() (isChannelSendBlock bool) {
-	var chp = n.closesOnThreadSend.Load()
-	if chp == nil {
-		return // thread not initialized return: isChannelSendBlock false
-	}
+	// wait for a held state or thread exit
+	var chanState NBChanTState
 	select {
-	case <-*chp:
-		// received from closesOnThreadSend: thread is not in send
-		//	- isChannelSendBlock: false
-	default:
-		// closesOnThreadSend is not closed yet:
-		//	- thread is headed to or in channel-send block
-		isChannelSendBlock = true
+	// thread exited
+	case <-n.tcThreadExitAwaitable.Ch():
+		return // thread exited return
+	case chanState = <-n.stateCh():
 	}
+	// thread held somewhere
+
+	// if it is not send value block, ignore
+	if chanState != NBChanSendBlock {
+		return // thread is not held in send value
+	}
+
+	// request channel send on send block ending
+	if !n.tcRequestCollect() {
+		return
+	}
+
+	// attempt to fetch value from thread
+	select {
+	case value, hasValue = <-n.closableChan.Ch():
+	case <-n.collectChan.Get(1):
+	}
+
 	return
 }
 
@@ -184,9 +167,9 @@ func (n *NBChan[T]) swapQueues() (hasData bool) {
 
 	// swap the queues
 	n.outputQueue = n.inputQueue
-	atomic.StoreUint64(&n.outputCapacity, uint64(cap(n.outputQueue)))
+	n.outputCapacity.Store(uint64(cap(n.outputQueue)))
 	n.inputQueue = n.outputQueue0
-	atomic.StoreUint64(&n.inputCapacity, uint64(cap(n.inputQueue)))
+	n.inputCapacity.Store(uint64(cap(n.inputQueue)))
 	n.outputQueue0 = n.outputQueue[:0]
 	return
 }
@@ -211,7 +194,7 @@ func (n *NBChan[T]) fetchFromOutput(soughtItemCount *int, isAllItems bool, allIt
 			n.outputQueue[i] = zeroValue
 		}
 		n.outputQueue = n.outputQueue[:0]
-		atomic.AddUint64(&n.unsentCount, uint64(-itemGetCount))
+		n.unsentCount.Add(uint64(-itemGetCount))
 		if !isAllItems {
 			*soughtItemCount -= itemGetCount
 		}
@@ -226,7 +209,7 @@ func (n *NBChan[T]) fetchFromOutput(soughtItemCount *int, isAllItems bool, allIt
 		n.outputQueue[i] = zeroValue
 	}
 	n.outputQueue = n.outputQueue[:endIndex]
-	atomic.AddUint64(&n.unsentCount, uint64(-soughtIC))
+	n.unsentCount.Add(uint64(-soughtIC))
 	*soughtItemCount = 0
 
 	return

@@ -6,38 +6,56 @@ ISC License
 package parl
 
 import (
-	"sync/atomic"
-
 	"github.com/haraldrudell/parl/perrors"
 )
 
-const (
-// dataWaiterAfterClose = true
-)
-
-// Close orders the channel to close once pending sends complete.
-//   - Close is thread-safe, non-blocking, error-free and panic-free
-//   - when Close returns, the channel may still be open and have items
-//   - didClose is true if this Close invocation actually did close the channel
+// Close closes the underlying channel without data loss
+//   - didClose true: this Close invocation executed channel close
 //   - didClose may be false for all invocations if the channel is closed by sendThread
+//   - when Close returns, the channel may still be open and have items
+//   - Close is thread-safe, non-blocking, error-free and panic-free
+//   - underlying channel closes once Send SendMany completes and the channel
+//     is empty
 func (n *NBChan[T]) Close() (didClose bool) {
 	if n.isCloseInvoked.Load() {
 		return // Close was already invoked atomic performance
 	}
-	n.inputLock.Lock()
-	defer n.inputLock.Unlock()
+	// n.inputLock.Lock()
+	// defer n.inputLock.Unlock()
 
 	// determine if this invocation is the closing
 	//	- secondary, if thread is running detect deferred close
-	if !n.tryClose() {
+	var isWinner, isRunningThread = n.selectCloseWinner()
+	if !isWinner {
+		return
+	} else if isRunningThread {
+		// a thread is running, so deferred close
+		//	- await thread state like send block, exit or alert wait
+		//	- holding inputLock and isCloseInvoked so no more items will be added
+		//	- collect next thread state
+		var threadState NBChanTState
+		select {
+		// thread exit
+		case <-n.tcThreadExitAwaitable.Ch():
+			// the thread exited
+
+			// NBChanSendBlock NBChanAlert NBChanSends
+		case threadState = <-n.stateCh():
+		}
+
+		// an always thread in NBChanAlert must be alerted
+		if threadState == NBChanAlert {
+			n.tcAlertThread(nil)
+		}
+
 		return // not this invocation or close deferred to running thread return
 	}
 
 	// do the close
-	didClose, _ = n.close() // invocation is holding inputLock
-
-	// close datawaiter
+	didClose, _ = n.executeChClose() // invocation is holding inputLock
+	// update datawaitCh
 	n.setDataAvailableAfterClose()
+
 	return
 }
 
@@ -48,100 +66,172 @@ func (n *NBChan[T]) Close() (didClose bool) {
 //   - Upon return, errp and err receive any close or panic errors for this [NBChan]
 //   - if errp is non-nil, it is updated with error status
 func (n *NBChan[T]) CloseNow(errp ...*error) (didClose bool, err error) {
-	n.outputLock.Lock()
-	defer n.outputLock.Unlock()
-	n.inputLock.Lock()
-	defer n.inputLock.Unlock()
-	defer n.appendErrors(&err, errp...) // add any errors for this [NBChan]
-
-	// check for closeNow already completed
-	var doCloseNow, isRunningThread bool
-	if doCloseNow, isRunningThread = n.tryCloseNow(); !doCloseNow {
-		return // CloseNow already completed return: noop
+	// atomic performance check
+	if n.isCloseNow.IsInvoked() {
+		// await winner completion
+		<-n.isCloseNow.Ch()
+		return // CloseNow complete
 	}
+	// acquire locks to ensure no Send SendMany Get in progress
+	// n.outputLock.Lock()
+	// defer n.outputLock.Unlock()
+	// n.inputLock.Lock()
+	// defer n.inputLock.Unlock()
+	// add any occuring errors for this [NBChan]
+	defer n.appendErrors(&err, errp...)
+
+	// select close now winner
+	var isWinner, isRunningThread, done = n.selectCloseNowWinner()
+	if !isWinner {
+		// locks ensure CloseNow already completed
+		return // close now loser threads
+	}
+	defer done.Done()
+
+	// wait for any Send SendMany Get to complete
+	//	- Get Collect uses underlying channel
+	n.getsWait.Wait()
+	n.sendsWait.Wait()
 
 	// release thread so it will exit
-	//	- if sendThread is blocked in channel send
-	//	- while another thread closes the channel
-	//	- that is a data race
+	//	- gets and sends is zero, so thread is not held up there
+	//	- isCloseNow.IsInvoked is true
 	if isRunningThread {
-		// empty the channel if thread is in channel send
-		n.discardSendThreadValue()
-		// alert any holding always-threads
-		n.alertThread(nil)
+		// a thread was running when IsCloseNow activated
+		//	- await a state for the thread
+		//	- holding inputLock outputLock so no Send SendMany Get
+		var threadState NBChanTState
+		select {
+		// thread exit
+		case <-n.tcThreadExitAwaitable.Ch():
+			// NBChanSendBlock NBChanAlert
+		case threadState = <-n.stateCh():
+		}
+
+		switch threadState {
+		// alway thread awaiting alert
+		case NBChanAlert:
+			// alert and isclosenow will cause thread to exit
+			n.tcAlertThread(nil)
+			// thread blocked in value send
+		case NBChanSendBlock:
+			select {
+			// discard any data item received from thread
+			//	- thread will exit due to isCloseNow
+			case <-n.closableChan.Ch():
+				// cancel on thread exit
+			case <-n.tcThreadExitAwaitable.Ch():
+			}
+		}
+	}
+
+	// await thread exit
+	if isRunningThread {
+		<-n.tcThreadExitAwaitable.Ch()
 	}
 
 	// execute close
-	didClose, _ = n.close() // invocation is holding inputLock
-
-	// discard pending data
-	if nT := len(n.inputQueue); nT > 0 {
-		atomic.AddUint64(&n.unsentCount, uint64(-nT))
-	}
-	n.inputQueue = nil
-	atomic.StoreUint64(&n.inputCapacity, 0)
-	if nT := len(n.outputQueue); nT > 0 {
-		atomic.AddUint64(&n.unsentCount, uint64(-nT))
-	}
-	n.outputQueue = nil
-	atomic.StoreUint64(&n.outputCapacity, 0)
-
-	// await thread exit
-	n.waitForSendThread()
+	//	- invocation is holding inputLock
+	didClose, _ = n.executeChClose()
 
 	// close data ch waiter
 	n.setDataAvailableAfterClose()
 
-	return
-}
+	// discard pending data
+	n.outputLock.Lock()
+	defer n.outputLock.Unlock()
+	n.inputLock.Lock()
+	defer n.inputLock.Unlock()
 
-// tryCloseNow tries to win didClose execution
-//   - CloseNow holdsinputLock for isClose changes
-//   - CloseNow holds outputLock and inputLock so now thread launch after this
-func (n *NBChan[T]) tryCloseNow() (
-	doCloseNow,
-	isRunningThread bool,
-) {
-	n.threadLock.Lock()
-	defer n.threadLock.Unlock()
-
-	n.isCloseInvoked.CompareAndSwap(false, true)                                   // invocation is holding inputLock
-	if doCloseNow = n.isCloseNowInvoked.CompareAndSwap(false, true); !doCloseNow { // invocation is holding inputLock
-		return
+	if nT := len(n.inputQueue); nT > 0 {
+		n.unsentCount.Add(uint64(-nT))
 	}
-	isRunningThread = n.isRunningThread.Load()
+	n.inputQueue = nil
+	n.inputCapacity.Store(0)
+	if nT := len(n.outputQueue); nT > 0 {
+		n.unsentCount.Add(uint64(-nT))
+	}
+	n.outputQueue = nil
+	n.outputCapacity.Store(0)
 
 	return
 }
 
-// tryClose attempts to win isCloseInvoked and detect if close invocation should be deferred
-//   - Close holds inputLock for isClose changes
-func (n *NBChan[T]) tryClose() (executeCloseNow bool) {
-	n.threadLock.Lock()
-	defer n.threadLock.Unlock()
+// selectCloseNowWinner ensures CloseNow execution
+//   - isWinner true: this thread executes close now
+//   - isRunningThread: a thread was running at time of close now/
+//     if so, tcThreadExitAwaitable is armed
+//   - done: completion Done for winner thread
+//   - caller must hold inputLock: to update isCloseNow and isCloseInvoked
+//   - caller must hold inputLock and outputLock to prevent subsequent thread launch
+func (n *NBChan[T]) selectCloseNowWinner() (
+	isWinner,
+	isRunningThread bool,
+	done Done,
+) {
+	// atomize closeNow winner with running thread state
+	n.tcThreadLock.Lock()
+	defer n.tcThreadLock.Unlock()
 
+	// select CloseNow winner
+	if isWinner, done = n.isCloseNow.IsWinner(); !isWinner {
+		return // CloseNow was completed by another thread
+	} else {
+		defer done.Done()
+	}
+	// is winning CloseNow thread
+
+	// CloseNow also signals Close
+	n.isCloseInvoked.CompareAndSwap(false, true)
+
+	// thread stats at time of CloseNow
+	isRunningThread = n.tcRunningThread.Load()
+	return
+}
+
+// selectCloseWinner selects the winner to execuite close possily deferred to thread
+//   - executeCloseNow true: is winner thread and close is not deferred
+//   - deferred close is setting isCloseInvoked to true while a thread is running
+//   - caller must hold inputLock for isCloseInvoked update
+func (n *NBChan[T]) selectCloseWinner() (isWinner, isRunningThread bool) {
+	// atomize close win with running thread-state
+	n.tcThreadLock.Lock()
+	defer n.tcThreadLock.Unlock()
+
+	// select winner
 	// invocation is holding inputLock
-	if !n.isCloseInvoked.CompareAndSwap(false, true) {
+	if isWinner = n.isCloseInvoked.CompareAndSwap(false, true); !isWinner {
 		return // Close was already invoked return: executeCloseNow: false
 	}
-	if executeCloseNow = !n.isRunningThread.Load(); !executeCloseNow {
-		// alert any waiting always-threads
-		n.alertThread(nil)
-	}
+	// this thread is close winner
+
+	isRunningThread = n.tcRunningThread.Load()
 
 	return // if thread is not running: executeCloseNow: true: execute close now
 }
 
-// close closes the underlying channel
-//   - invoked when isCloseInvoked true.
-//   - isCloseInvoked	was set while holding inputLock
-func (n *NBChan[T]) close() (didClose bool, err error) {
+// executeChClose closes the underlying channel if not already closed
+//   - didClose true if this invocation closed the channel
+//   - err possible error, already submitted: unused
+//   - TODO: invoker must hold inputLock or be sendThread
+//   - invoked by:
+//   - — CloseNow
+//   - — Close if no thread is running
+//   - — send thread on exit if Close was invoked prior to thread exit
+func (n *NBChan[T]) executeChClose() (didClose bool, err error) {
+
+	// wait for any Send SendMany Get to complete
+	//	- Get Collect uses underlying channel
+	n.getsWait.Wait()
+	n.sendsWait.Wait()
+
 	if didClose, err = n.closableChan.Close(); !didClose {
 		return // already closed return: noop
 	} else if err != nil {
 		n.AddError(err) // store possible close error
 	}
-	n.doWaitForClose() // update [NBChan.waitForClose]
+	// update [NBChan.waitForClose]
+	n.waitForClose.Close()
 
 	return
 }
@@ -159,17 +249,5 @@ func (n *NBChan[T]) appendErrors(errp0 *error, errp ...*error) {
 			continue
 		}
 		perrors.AppendErrorDefer(errpx, nil, n.GetError)
-	}
-}
-
-// discardThreadValue ends any sendThread channel send
-func (n *NBChan[T]) discardSendThreadValue() {
-	var chp = n.closesOnThreadSend.Load()
-	if chp == nil {
-		return // thread not initialized return: hasValue false
-	}
-	select {
-	case <-*chp:
-	case <-n.closableChan.Ch():
 	}
 }

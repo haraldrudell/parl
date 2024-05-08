@@ -8,6 +8,7 @@ package parl
 import "sync/atomic"
 
 // CyclicAwaitable is an awaitable that can be re-initialized
+//   - initialization-free, start in Open state
 //   - one-to-many, happens-before
 //   - the synchronization mechanic is closing channel, allowing consumers to await
 //     multiple events

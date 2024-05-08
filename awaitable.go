@@ -9,6 +9,7 @@ import "sync/atomic"
 
 // Awaitable is a semaphore allowing any number of threads to observe
 // and await an event
+//   - initialization-free, starts in Open state
 //   - one-to-many, synchronizes-before, initialization-free
 //   - the synchronization mechanic is closing channel, allowing consumers to await
 //     multiple events
