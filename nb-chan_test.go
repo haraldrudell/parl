@@ -196,7 +196,7 @@ func TestNBChanGet(t *testing.T) {
 
 	var nbChan NBChan[int]
 
-	D("— GET2 SendMany")
+	Log("— GET2 SendMany")
 	// Get with limit
 	// send 3 4 5 6
 	nbChan.SendMany(values)
@@ -207,7 +207,7 @@ func TestNBChanGet(t *testing.T) {
 	}
 
 	// Get all: 5 6
-	D("— GETALL")
+	Log("— GETALL")
 	actual = nbChan.Get()
 	if !slices.Equal(actual, exp2) {
 		t.Errorf("Get all: '%v' exp '%v'", actual, exp2)

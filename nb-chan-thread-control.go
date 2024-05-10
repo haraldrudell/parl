@@ -278,7 +278,6 @@ func (n *NBChan[T]) tcAlertThread(valuep *T) (didAlert bool) {
 	if valuep != nil {
 		n.unsentCount.Add(1)
 	}
-	D("ALERT: %t", valuep != nil)
 	select {
 	case n.threadCh <- valuep:
 	case <-n.threadCh2:
