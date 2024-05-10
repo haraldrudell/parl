@@ -83,19 +83,28 @@ type NBChan[T any] struct {
 	allocationSize atomic.Uint64
 	// number of items held by NBChan
 	//	- one item may be with [NBChan.sendThread]
-	//	- only incremented by Send SendMany
+	//	- only incremented by Send SendMany when appending to input queue
+	//	- decremented by sendThread when value sent on channel
+	//	- decreased by Get when removing from output buffer
 	//	- set to zero by CloseNow
-	//	- decremented by Get and sendThread
-	//	- may exit thread on reaching zero
+	//	- may exit on-demand thread on reaching zero
 	unsentCount atomic.Uint64
 	// number of pending [NBChan.Get] invocations
 	//	- blocks [NBChan.sendThread] from fetching more values
 	gets atomic.Uint64
 	// holds thread waiting while gets > 0
+	//	- [NBChan.CloseNow] uses getsWait to await Get conclusion
+	//	- executeChClose uses getsWait to await Get conclusion
+	//	- thread uses getsWait to reduce outputLock contention by
+	//		not retrieving values while Get invocations in progress or holding at lock
 	getsWait PeriodWaiter
 	// number of pending [NBChan.Send] [NBChan.SendMany] invocations
 	sends atomic.Uint64
 	// prevents thread from exiting while sends > 0
+	//	- [NBChan.CloseNow] uses sendsWait to await Send SendMany conclusion
+	//	- executeChClose uses sendsWait to await Send SendMany conclusion
+	//	- thread uses sendsWait to await the conclusion of possible Send SendMany before
+	//		checking for another item
 	sendsWait PeriodWaiter
 	// capacity of [NBChan.inputQueue]
 	//	- written behind inputLock
@@ -118,9 +127,9 @@ type NBChan[T any] struct {
 	//	- from [NBChanAlways] or [NBChan.SetAlwaysThread]
 	isThreadAlways atomic.Bool
 	// wait mechanic for always-thread alert-wait
-	threadAlertWait PeriodWaiter
-	// possible value sent by winner invocation to sendThread
-	threadAlertValue atomic.Pointer[T]
+	threadCh       chan *T
+	threadCh2      chan struct{}
+	threadChWinner atomic.Bool
 	// true if a thread was ever launched
 	tcDidLaunchThread atomic.Bool
 	// tcThreadLock atomizes tcRunningThread access with other actions:
@@ -147,8 +156,8 @@ type NBChan[T any] struct {
 	tcThreadExitAwaitable CyclicAwaitable
 	tcSendBlock           atomic.Bool
 	tcCollectRequest      atomic.Bool
+	collectorLock         sync.Mutex
 	collectLock           sync.Mutex
-	threadCollect         LacyChan[struct{}]
 	collectChan           LacyChan[struct{}]
 	// inputLock controls input: inputQueue and close
 	//	 - makes mutually exlusive anything affecting the input buffer:
@@ -166,18 +175,20 @@ type NBChan[T any] struct {
 	isCloseNow OnceCh
 	// mechanic to wait for underlying channel close complete
 	waitForClose Awaitable
-	// threadProgressLock atomizes the thread notify operation
-	// with reset of threadProgressRequired
-	threadProgressLock sync.Mutex
-	// returned by [NBChan.StateCh]
-	tcProgressCheck sync.Mutex
-	// tcState is a channel that sends state names when thgread is in static hold
-	tcState atomic.Pointer[chan NBChanTState]
+	// getProgressLock ensures that if Send SendMany detects Get in progress,
+	// on Get conclusion, the last Get is guaranteed to check threadProgressRequired
+	getProgressLock sync.Mutex
+	// getProgressLock bundles write to threadProgressRequired with
+	// its justifying action
+	progressLock sync.Mutex
 	// set by Send and SendMany at any time if:
 	//	- NBChan was empty
 	//	- on-demand or always-on threading is used
 	//	- a thread could not be started or notified
 	threadProgressRequired atomic.Bool
+	// tcState is a channel that sends state names when thread is in static hold
+	//	- returned by [NBChan.StateCh]
+	tcState atomic.Pointer[chan NBChanTState]
 	// outputLock controls output functions
 	//	- must not be acquired while holding inputLock
 	//	- makes mutually exclusive anything affecting the output buffer:

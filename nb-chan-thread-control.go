@@ -42,38 +42,144 @@ func (n *NBChan[T]) tcStartThreadWinner() (isWinner bool) {
 	return
 }
 
-// tcEnsureThreadProgress ensures that thread is not exiting
-func (n *NBChan[T]) tcEnsureThreadProgress() {
-	n.threadProgressLock.Lock()
-	defer n.threadProgressLock.Unlock()
-	defer n.threadProgressRequired.Store(false)
+// tcAlertOrLaunchThreadWithValue attempts to launch thread providing it the value item
+//   - didProvideValue true: value was prrovided to thread via launch or alert,
+//     unsent count was incremented
+//   - Invoked by [NBChan.Send] and [NBChan.SendMany]
+//     while holding [NBChan.inputLock]
+//   - value has not been added to unsentCount yet
+//   - isGetRace indicates pending Get while NBChan is empty
+//   - — only matters if didProvideValue is false
+//   - caller must hold inputLock to prevent parallel invocations where
+//     multiple threads handle unsent count zero
+func (n *NBChan[T]) tcAlertOrLaunchThreadWithValue(value T) (didProvideValue bool) {
 
-	//	- unsent count was at 0, then incremented
-	//	- on-demand or always thread
-	//	- thread was launched at one time
-	//	- all Send SendMany Get completed
+	// if unsent count is zero, a thread may have to be alerted or launched
+	//	- no thread may have been launched
+	//	- on-demand thread may have exited on unsent count zero
+	//	- always thread may await an alert
+	// - no action is necessary if:
+	//	- — threading is not used
+	//	- — unsent count is not zero
+	//	- — Gets are in progress for which a thread would be a detour
+	//	- NBChan may be configured for no-thread on-demand-thread or always-on thread
+	//	- no thread may be running
+	//	- this is the only Send SendMany invocation
+	//	- Get invocations may be ongoing
+
+	// if NBChan is configured for no thread, value cannot be provided
+	if n.noThread.Load() {
+		return // no-thread configuration
+	}
+
+	// if unsent count is not zero, no change is required to threading
+	//	- only Send SendMany which use inputLock can increase this value
+	if n.unsentCount.Load() > 0 {
+		return // channel is not empty return
+	}
+
+	//	- unsent count is zero
+	//	- new Get invocations will return prior to outputLock
+	//	- a lingering Get may be in progress or waiting for inputLock
+	//	- configuration is on-demand-thread or always-thread
+	//	- unsent count is zero
+	//	- this is only Send/SendMany and there is no Get
+	//	- there may be no thread running
+	n.progressLock.Lock()
+	defer n.progressLock.Unlock()
+
+	// if Get is in progress, thread should launch later
+	if n.tcDeferredProgressCheck() {
+		return
+	}
+
+	// starting the thread, that is most important
+	//	- a launched thread will go to send value
+	if n.tcStartThreadWinner() {
+		n.unsentCount.Add(1)
+		var hasValue = true
+		n.tcStartThread(value, hasValue)
+		didProvideValue = true
+		n.threadProgressRequired.CompareAndSwap(true, false)
+		return // thread was started with value
+	}
+
+	// try alerting a waiting always-on thread without waiting
+	//	- if successful, thread will go to send value
+	if n.isThreadAlways.Load() {
+		if didProvideValue = n.tcAlertThread(&value); didProvideValue {
+			n.threadProgressRequired.CompareAndSwap(true, false)
+			return // always-on thread alerted with value
+		}
+	}
+
+	// there is a thread running without holding an item
+	//	- on-demand or always
+	//	- may be executing towards: exit getsWait sendsWait alert
+	//	- Close or CloseNow may have been invoked
+	//	- at end of Send SendMany Get invocations, a static thread-state must be awaited
+	//		so that progress is guaranteed
+	//	- issue is that:
+	//	- — an on-demand thread may exit while items are present
+	//	- — an always thread may soon need an alert
+	//	- flag it to be dealt with once all Send SendMany Get completes
+	n.threadProgressRequired.CompareAndSwap(false, true)
+
+	return
+}
+
+// tcSendEnsureProgress handdles thread progress on final Send SendMany conclusion
+func (n *NBChan[T]) tcSendEnsureProgress() {
+	if !n.threadProgressRequired.Load() {
+		return // thread progress not required
+	} else if n.tcDeferredProgressCheck() {
+		return // deferred to Get conclusion
+	}
+	n.tcEnsureThreadProgress()
+}
+
+// tcEnsureThreadProgress ensures that thread is not exiting
+//   - final Send SendMany concluded while no Get in progress or
+//   - final Get concluded
+//   - invoked when threadProgressRequired observed true
+func (n *NBChan[T]) tcEnsureThreadProgress() {
+
+	//	- Send and SendMany encountered unsent count zero
+	//	- it is on-demand or always thread
+	//	- because a thread could not be started or alerted,
+	//		ensuring thread progress was deferred
+
+	// check for no items
+	if n.tcZeroProgress() {
+		return
+	}
 
 	// await thread static state
 	select {
 	// thread exit
 	case <-n.tcThreadExitAwaitable.Ch():
-		if n.isThreadAlways.Load() {
-			return // exiting always thread: noop
-		}
 		// NBChanSendBlock NBChanAlert NBChanGets NBChanSends
 	case threadState := <-n.stateCh():
-		if threadState == NBChanAlert {
-			// unblock always thread awaiting alert
-			n.tcAlertThread(nil)
+		switch threadState {
+		case NBChanSendBlock:
+			n.tcSendProgress()
+		case NBChanAlert:
+			// unblock always-thread awaiting alert
+			n.tcAlertProgress()
 		}
-		return // thread holding somewhere return: ok
+		return // progress attempted or thread holding in Gets Sends
 	}
-	// thread did exit, it is on-demand thread
+	// thread did exit
+
+	if n.isThreadAlways.Load() {
+		// exiting always thread is close or panic
+		return // exiting always thread: noop
+	}
 
 	// unless unsent count is again zero, the thread must not exit
 
-	// close now or out of items
-	if n.unsentCount.Load() == 0 || n.isCloseNow.IsInvoked() {
+	// close now
+	if n.isCloseNow.IsInvoked() {
 		return // out of items return: thread exit ok
 	}
 
@@ -83,15 +189,20 @@ func (n *NBChan[T]) tcEnsureThreadProgress() {
 	}
 
 	// seek permisssion to start thread
-	if !n.tcStartThreadWinner() {
-		return // already restarted return
+	if !n.tcStartProgress() {
+		return // some other thread started the send thread
 	}
+
 	// start thread without value
 	var value T
 	var hasValue bool
 	n.tcStartThread(value, hasValue)
 }
 
+// isCloseComplete checks for underlying channel closed
+//   - by close
+//   - by thread exit in deferred close
+//   - by close now
 func (n *NBChan[T]) isCloseComplete() (isClosed bool) {
 	n.inputLock.Lock()
 	defer n.inputLock.Unlock()
@@ -101,28 +212,89 @@ func (n *NBChan[T]) isCloseComplete() (isClosed bool) {
 	return
 }
 
-// tcAlertThread alerts any waiting always-threads
-//   - invoked from Send/SendMany
-//   - value has not been added to unsentCount yet
-func (n *NBChan[T]) tcAlertThread(valuep *T) (didAlert bool) {
+// tcSendProgress affirms progress by thread in send block
+func (n *NBChan[T]) tcSendProgress() {
+	n.progressLock.Lock()
+	defer n.progressLock.Unlock()
 
-	// is aleter armed?
-	if !n.threadAlertWait.IsHold() {
-		return // no
+	var threadState NBChanTState
+	select {
+	case <-n.tcThreadExitAwaitable.Ch():
+		return
+	case threadState = <-n.stateCh():
 	}
+	if threadState == NBChanSendBlock {
+		n.threadProgressRequired.Store(false)
+	}
+}
 
-	// alert sendThread
-	if valuep != nil {
-		n.unsentCount.Add(1)
-		n.threadAlertValue.Store(valuep)
-	}
-	n.threadAlertWait.ReleaseWaiters()
+// tcStartProgress affirms progress by obtaining thread-start permission
+func (n *NBChan[T]) tcStartProgress() (isProgress bool) {
+	n.progressLock.Lock()
+	defer n.progressLock.Unlock()
+
+	isProgress = n.tcStartThreadWinner()
 	return
 }
 
+// tcZeroProgress affirms progress by observing unsent count zero
+func (n *NBChan[T]) tcZeroProgress() (isProgress bool) {
+	n.progressLock.Lock()
+	defer n.progressLock.Unlock()
+
+	if isProgress = n.unsentCount.Load() == 0; isProgress {
+		n.threadProgressRequired.Store(false)
+	}
+	return
+}
+
+// tcAlertProgress attempts to alert a thread
+//   - if alert succeeds, threadProgressRequired is reset
+func (n *NBChan[T]) tcAlertProgress() {
+	n.progressLock.Lock()
+	defer n.progressLock.Unlock()
+
+	if n.tcAlertNoValue() {
+		n.threadProgressRequired.Store(false)
+	}
+}
+
+// tcAlertNoValue alerts any waiting always-thread
+func (n *NBChan[T]) tcAlertNoValue() (didAlert bool) { return n.tcAlertThread(nil) }
+
+// tcAlertThread alerts any waiting always-thread
+//   - invoked from Send/SendMany
+//   - value has not been added to unsentCount yet
+//   - increments unsentCount if value is non-nil and was provided to thread
+func (n *NBChan[T]) tcAlertThread(valuep *T) (didAlert bool) {
+
+	// can this thread send?
+	if didAlert = n.gets.Load() == 0 && // only when no Get in progress
+		// only if send winner
+		n.threadChWinner.CompareAndSwap(true, false); !didAlert {
+		return // no
+	}
+
+	if valuep != nil {
+		n.unsentCount.Add(1)
+	}
+	D("ALERT: %t", valuep != nil)
+	select {
+	case n.threadCh <- valuep:
+	case <-n.threadCh2:
+	}
+	return
+}
+
+// tcDeferredProgressCheck may mark threadProgressRequired by Get pending
+//   - may be invoked by Send SendMany when unsent count is zero
+//   - if Get is in progress, it is not efficient to provide items to thread
+//   - the lock ensures that if Send SendMany detects Get in progress,
+//     on Get conclusion, the last Get is guaranteed to check threadProgressRequired
+//   - invoked while holding progressLock
 func (n *NBChan[T]) tcDeferredProgressCheck() (isDeferred bool) {
-	n.tcProgressCheck.Lock()
-	defer n.tcProgressCheck.Unlock()
+	n.getProgressLock.Lock()
+	defer n.getProgressLock.Unlock()
 
 	if isDeferred = n.gets.Load() > 0; !isDeferred {
 		return
@@ -132,8 +304,8 @@ func (n *NBChan[T]) tcDeferredProgressCheck() (isDeferred bool) {
 }
 
 func (n *NBChan[T]) tcIsDeferredProgress() (needProgress bool) {
-	n.tcProgressCheck.Lock()
-	defer n.tcProgressCheck.Unlock()
+	n.getProgressLock.Lock()
+	defer n.getProgressLock.Unlock()
 
 	needProgress = n.threadProgressRequired.Load()
 
@@ -179,19 +351,3 @@ func (n *NBChan[T]) stateCh() (ch chan NBChanTState) {
 	ch = *n.tcState.Load()
 	return
 }
-
-// Thread status values
-const (
-	NBChanExit      NBChanTState = "exit"     // NBChan thread is not running
-	NBChanAlert     NBChanTState = "alert"    // NBChan thread is always running and blocked idle waiting for alert
-	NBChanGets      NBChanTState = "GetWait"  // NBChan thread is blocked waiting for Get invocations to complete
-	NBChanSends     NBChanTState = "SendWait" // NBChan thread is blocked waiting for Send/SendMany invocations to complete
-	NBChanSendBlock NBChanTState = "chSend"   // NBChan thread is blocked in channel send
-	NBChanRunning   NBChanTState = "run"      // NBChan is running
-	NBChanNoLaunch  NBChanTState = "none"     // thread was never launched
-)
-
-// state of NBChan thread
-//   - NBChanExit NBChanAlert NBChanGets NBChanSends NBChanSendBlock
-//     NBChanRunning
-type NBChanTState string

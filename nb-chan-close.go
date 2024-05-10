@@ -45,7 +45,7 @@ func (n *NBChan[T]) Close() (didClose bool) {
 
 		// an always thread in NBChanAlert must be alerted
 		if threadState == NBChanAlert {
-			n.tcAlertThread(nil)
+			n.tcAlertNoValue()
 		}
 
 		return // not this invocation or close deferred to running thread return
@@ -66,30 +66,20 @@ func (n *NBChan[T]) Close() (didClose bool) {
 //   - Upon return, errp and err receive any close or panic errors for this [NBChan]
 //   - if errp is non-nil, it is updated with error status
 func (n *NBChan[T]) CloseNow(errp ...*error) (didClose bool, err error) {
-	// atomic performance check
-	if n.isCloseNow.IsInvoked() {
-		// await winner completion
-		<-n.isCloseNow.Ch()
-		return // CloseNow complete
-	}
-	// acquire locks to ensure no Send SendMany Get in progress
-	// n.outputLock.Lock()
-	// defer n.outputLock.Unlock()
-	// n.inputLock.Lock()
-	// defer n.inputLock.Unlock()
+
 	// add any occuring errors for this [NBChan]
 	defer n.appendErrors(&err, errp...)
 
 	// select close now winner
 	var isWinner, isRunningThread, done = n.selectCloseNowWinner()
 	if !isWinner {
-		// locks ensure CloseNow already completed
 		return // close now loser threads
 	}
 	defer done.Done()
 
 	// wait for any Send SendMany Get to complete
 	//	- Get Collect uses underlying channel
+	//	- new invocations are canceled by
 	n.getsWait.Wait()
 	n.sendsWait.Wait()
 
@@ -112,7 +102,7 @@ func (n *NBChan[T]) CloseNow(errp ...*error) (didClose bool, err error) {
 		// alway thread awaiting alert
 		case NBChanAlert:
 			// alert and isclosenow will cause thread to exit
-			n.tcAlertThread(nil)
+			n.tcAlertNoValue()
 			// thread blocked in value send
 		case NBChanSendBlock:
 			select {
@@ -142,6 +132,10 @@ func (n *NBChan[T]) CloseNow(errp ...*error) (didClose bool, err error) {
 	defer n.outputLock.Unlock()
 	n.inputLock.Lock()
 	defer n.inputLock.Unlock()
+
+	//	- thread has exited
+	//	- Send SendMany Gets have ceased
+	//	- this thread holds both locks
 
 	if nT := len(n.inputQueue); nT > 0 {
 		n.unsentCount.Add(uint64(-nT))

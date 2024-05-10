@@ -87,7 +87,7 @@ func NBChanState[T any](n *NBChan[T]) (s string) {
 		threadType = "-" + NBChanAlways.String()
 	}
 	var alertValue string
-	if n.threadAlertValue.Load() != nil {
+	if len(n.threadCh) > 0 {
 		alertValue = "-alertValue"
 	}
 	var hasData string

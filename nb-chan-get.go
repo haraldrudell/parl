@@ -7,7 +7,7 @@ package parl
 
 import "math"
 
-// Get returns a slice of n or default all available items held by the channel.
+// Get returns a slice of elementCount or default or zero for all available items held by the channel.
 //   - if channel is empty, 0 items are returned
 //   - Get is non-blocking
 //   - n > 0: max this many items
@@ -16,8 +16,7 @@ import "math"
 func (n *NBChan[T]) Get(elementCount ...int) (allItems []T) {
 
 	// empty NBChan: noop return
-	var unsentCount int
-	if unsentCount = int(n.unsentCount.Load()); unsentCount == 0 {
+	if n.unsentCount.Load() == 0 {
 		return // no items available return: nil slice
 	}
 
@@ -41,13 +40,16 @@ func (n *NBChan[T]) Get(elementCount ...int) (allItems []T) {
 	var isAllItems = soughtItemCount == 0
 
 	if isAllItems {
-		allItems = make([]T, unsentCount)[:0] // approximate size
+		if n := n.unsentCount.Load(); n > 0 {
+			allItems = make([]T, 0, n) // approximate size
+		}
 	}
 
 	n.outputLock.Lock()
 	defer n.postGet()
 
 	// get possible item from send thread
+	//	- thread decrements unsent count
 	if item, itemValid := n.collectSendThreadValue(); itemValid {
 		allItems = append(allItems, item)
 		if !isAllItems {
@@ -58,6 +60,7 @@ func (n *NBChan[T]) Get(elementCount ...int) (allItems []T) {
 	}
 
 	// fetch from n.outputQueue
+	//	- updates unsent count
 	allItems = n.fetchFromOutput(&soughtItemCount, isAllItems, allItems)
 	if !isAllItems && soughtItemCount == 0 {
 		return // fetch complete return
@@ -71,46 +74,49 @@ func (n *NBChan[T]) Get(elementCount ...int) (allItems []T) {
 	return
 }
 
-// preGet registers a pending Get invocation priot to outputLock
+// preGet registers a pending Get invocation prior to outputLock
+//   - increases gets and may hold getsWait
+//   - block concurrent always-alert
 func (n *NBChan[T]) preGet() {
 	if n.gets.Add(1) == 1 {
 		n.getsWait.HoldWaiters()
+		if !n.isThreadAlways.Load() {
+			return
+		}
+		// awayt any Send SendMany always-alert operation has ended
+		// and will not be started again before all Get have exited
+		n.collectorLock.Lock()
+		defer n.collectorLock.Unlock()
 	}
 }
 
 // postGet is the deferred ending function for [NBChan.Get]
+//   - release outputLock
+//   - update dataWaitCh
 //   - decrease number of Get invocations
 //   - if more Get invocations are pending, do nothing
-//   - alert or launch thread if last Get
-//   - release outputLock
+//   - otherwise, release getsWait
+//   - check for deferred progress, if so ensure thread progress
 func (n *NBChan[T]) postGet() {
-	defer n.outputLock.Unlock()
-
-	// decrement gets
-	var gets = n.gets.Add(math.MaxUint64)
-	if gets == 0 {
-		n.getsWait.ReleaseWaiters()
-	}
+	n.outputLock.Unlock()
 
 	// update dataAvailable
 	var unsentCount = n.unsentCount.Load()
 	n.setDataAvailable(unsentCount > 0)
 
-	// handle thread progress
-	if gets > 0 ||
-		n.sends.Load() > 0 {
-		return // thread progress not required or by later thread
+	// check for last Get
+	if n.gets.Add(math.MaxUint64) > 0 {
+		return // more Get pending
 	}
-
-	if !n.tcIsDeferredProgress() {
-		return
+	n.getsWait.ReleaseWaiters()
+	if n.tcIsDeferredProgress() {
+		n.tcEnsureThreadProgress()
 	}
-
-	n.tcEnsureThreadProgress()
 }
 
 // collectSendThreadValue receives any value in sendThread channel send
-//   - invoked by [NBChan.Get]
+//   - invoked by [NBChan.Get] while holding output lock
+//   - must await any thread value to ensure values provided in order
 //   - thread receives value from:
 //   - — Send SendMany that launches thread, but only when sent count 0
 //   - — always: thread alert
@@ -123,6 +129,10 @@ func (n *NBChan[T]) collectSendThreadValue() (value T, hasValue bool) {
 	}
 
 	// wait for a held state or thread exit
+	//	- because this thread holds outputLock,
+	//		thread cannot collect additional values
+	//	- the only location send-thread can hold with value is
+	//		NBChanSendBlock
 	var chanState NBChanTState
 	select {
 	// thread exited
@@ -133,6 +143,7 @@ func (n *NBChan[T]) collectSendThreadValue() (value T, hasValue bool) {
 	// thread held somewhere
 
 	// if it is not send value block, ignore
+	//	- NBChanSendBlock is the only wait where thread has value
 	if chanState != NBChanSendBlock {
 		return // thread is not held in send value
 	}
@@ -176,6 +187,7 @@ func (n *NBChan[T]) swapQueues() (hasData bool) {
 
 // fetchFromOutput gets items from [NBChan.outputQueue]
 //   - [NBChan.outputLock] must be held
+//   - decrements unsent count
 func (n *NBChan[T]) fetchFromOutput(soughtItemCount *int, isAllItems bool, allItems0 []T) (allItems []T) {
 	allItems = allItems0
 
@@ -184,10 +196,10 @@ func (n *NBChan[T]) fetchFromOutput(soughtItemCount *int, isAllItems bool, allIt
 	if itemGetCount == 0 {
 		return // no available items return
 	}
-
-	// entire queue case: itemCount items
 	var zeroValue T
 	var soughtIC = *soughtItemCount
+
+	// entire queue case: itemCount items
 	if isAllItems || itemGetCount <= soughtIC {
 		allItems = append(allItems, n.outputQueue...)
 		for i := 0; i < itemGetCount; i++ {

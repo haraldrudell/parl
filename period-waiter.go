@@ -78,7 +78,7 @@ func (p *PeriodWaiter) Count() (waitingThreads int) {
 // IsHold returns true if Wait will currently block
 func (p *PeriodWaiter) IsHold() (isHold bool) { return p.gen.Load() != nil }
 
-// Ch returns a channel tha closes on ReleaseWaiters
+// Ch returns a channel that closes on ReleaseWaiters
 //   - ch is nil if not currently waiting
 func (p *PeriodWaiter) Ch() (ch AwaitableCh) {
 	if pw := p.gen.Load(); pw != nil {

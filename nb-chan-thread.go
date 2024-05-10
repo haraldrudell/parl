@@ -15,6 +15,7 @@ import (
 //   - may be on-demand or always-on thread
 //   - verbose='NBChan.*sendThread'
 func (n *NBChan[T]) sendThread(value T, hasValue bool) {
+	var zeroValue T
 	// signal thread exit to CloseNow if it is waiting
 	defer n.tcThreadExitAwaitable.Close()
 	// execute possible deferred close from Close invocation
@@ -29,8 +30,8 @@ func (n *NBChan[T]) sendThread(value T, hasValue bool) {
 			//	- until consumer receive, Get, CloseNow or panic
 			//	- decrements unsent count
 			n.sendThreadBlockingSend(value)
-			n.updateDataAvailable()
 			hasValue = false
+			value = zeroValue
 		}
 
 		// obtain next value loop
@@ -44,15 +45,16 @@ func (n *NBChan[T]) sendThread(value T, hasValue bool) {
 			// if no data, decide on action
 			if n.unsentCount.Load() == 0 {
 
-				// for always-threads, wait for alert
+				// always-thread not in deferred close: wait for alert
 				if n.isThreadAlways.Load() && !n.isCloseInvoked.Load() {
 					// blocks here
 					if value, hasValue = n.sendThreadWaitForAlert(); hasValue {
 						break // send the value received by alert
 					}
-					continue // re-check for next action
+					continue // re-check closeNow and unsent count for next action
 
-					// normal thread or after close: exit on no data and no pending sends
+					// on-demand thread or always in deferred close:
+					// exit on no data and no pending sends
 				} else if n.sendThreadExitCheck() {
 					// on-demand thread or always-on after Close exits here
 					return // no data, no pending sends: exit thread
@@ -70,8 +72,9 @@ func (n *NBChan[T]) sendThread(value T, hasValue bool) {
 			if ch := n.getsWait.Ch(); ch != nil {
 				for {
 					select {
-					case <-ch:
-					case n.stateCh() <- NBChanGets:
+					case <-ch: // Get ceased
+					case n.stateCh() <- NBChanGets: // respond is in Gets wait
+						continue
 					}
 					break
 				}
@@ -82,13 +85,14 @@ func (n *NBChan[T]) sendThread(value T, hasValue bool) {
 				break // send the value fetched from queues
 			}
 
-			// there was no data so probably sends are in progress
-			//	- wait for any sends to conclude then check for action again
+			// unsent count has reached zero or Get is in progress
+			//	- wait for any sends to conclude that may provide additional items
 			if ch := n.sendsWait.Ch(); ch != nil {
 				for {
 					select {
 					case <-ch:
 					case n.stateCh() <- NBChanSends:
+						continue
 					}
 					break
 				}
@@ -139,6 +143,7 @@ func (n *NBChan[T]) sendThreadOnError(err error) {
 //   - — CloseNow discards the value using discardSendThreadValue
 //   - invoked by sendThread holding inputLock
 func (n *NBChan[T]) sendThreadBlockingSend(value T) {
+	defer n.updateDataAvailable()
 	// count the item just sent — even if panic
 	defer n.unsentCount.Add(math.MaxUint64)
 	// receive value with default has proven to result in default. Therefore:
@@ -203,33 +208,33 @@ func (n *NBChan[T]) sendThreadGetNextValue() (value T, hasValue bool) {
 //   - may receive data item
 func (n *NBChan[T]) sendThreadWaitForAlert() (value T, hasValue bool) {
 
-	// arm alert waiter
-	n.threadAlertWait.HoldWaiters()
-	var awaitableCh = n.threadAlertWait.Ch()
-	if awaitableCh == nil {
-		return // not waiting
+	// prepare channels
+	if n.threadCh == nil {
+		n.threadCh = make(chan *T)
+		n.threadCh2 = make(chan struct{}, 1)
+	} else if len(n.threadCh2) > 0 {
+		<-n.threadCh2
 	}
+	// n.threadChWinner true exposes channels to clients
+	n.threadChWinner.Store(true)
+	defer func() { n.threadCh2 <- struct{}{} }()
+	defer n.threadChWinner.Store(false)
 
 	// blocks here
+	//	- n.threadCh must be unbuffered for effect to be immediate
+	//	- n.threadCh2 is present to prevent client from hanging in threadCh send
 	for {
 		select {
-		// wait for ReleaseWaiters
-		case <-awaitableCh:
+		// wait for alert
+		case valuep := <-n.threadCh:
+			if hasValue = valuep != nil; hasValue {
+				value = *valuep
+			}
+			return
 			// broadcast Alert wait
 		case n.stateCh() <- NBChanAlert:
-			continue
 		}
-		break
 	}
-
-	// collect possible value
-	if valuep := n.threadAlertValue.Load(); valuep != nil {
-		n.threadAlertValue.Store(nil)
-		hasValue = true
-		value = *valuep
-	}
-
-	return
 }
 
 // sendThreadExitCheck stops thread if inside threadLock, unsentCount is 0

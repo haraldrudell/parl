@@ -447,36 +447,51 @@ func TestNBChanExit3(t *testing.T) {
 
 // [NBChanAlways]
 func TestNBChanAlways(t *testing.T) {
-	var value = 3
-	var value2 = 4
-	var expValues = []int{value}
+	var value, value2 = 3, 4
 
-	var nbChan NBChan[int]
-	var values []int
+	var nbChan *NBChan[int]
+	var actualValue int
 	var threadState NBChanTState
+	var didClose bool
+	var err error
 
-	// an always thread should on idle enter alert state
-	nbChan = *NewNBChan[int](NBChanAlways)
-	// send 3 and receive to make sure thread is up
+	// send and receive a value to cause
+	// always thread to enter NBChanAlert static state
+	nbChan = NewNBChan[int](NBChanAlways)
+	// send value 3 and receive to make sure thread is up
 	nbChan.Send(value)
 	// wait for thread to launch, then receive
-	values = []int{<-nbChan.Ch()}
-	if !slices.Equal(values, expValues) {
-		t.Errorf("Get0 '%v' exp '%v'", values, expValues)
+	actualValue = <-nbChan.Ch()
+
+	// should have received value
+	if actualValue != value {
+		t.Errorf("Get %d exp %d", actualValue, value)
 	}
-	// thread should now enter alert status: running but idling
+
+	// thread state should be NBChanAlert
 	threadState = nbChan.ThreadStatus(AwaitThread)
 	if threadState != NBChanAlert {
 		t.Errorf("ThreadStatus %s exp %s", threadState, NBChanAlert)
 	}
 
-	// an always thread with value should be in channel-send block
+	// send another value to cause
+	// always thread to switch to NBChanSendBlock
 	nbChan.Send(value2)
+
+	// thread state should be NBChanSendBlock
 	threadState = nbChan.ThreadStatus(AwaitThread)
 	if threadState != NBChanSendBlock {
 		t.Errorf("ThreadStatus %s exp %s", threadState, NBChanSendBlock)
 	}
-	nbChan.CloseNow()
+
+	// ensure error-free exit
+	didClose, err = nbChan.CloseNow()
+	if !didClose {
+		t.Error("didClose false")
+	}
+	if err != nil {
+		t.Errorf("CloseNow error: %s", perrors.Long(err))
+	}
 }
 
 type ChWaiter struct {
