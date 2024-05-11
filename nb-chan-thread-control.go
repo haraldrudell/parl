@@ -5,37 +5,42 @@ ISC License
 
 package parl
 
-import "github.com/haraldrudell/parl/perrors"
+const (
+	// tcStartThread
+	NoValue = false
+	// tcStartThread
+	HasValue = true
+)
 
-// tcStartThread launches the send thread
-//   - on Send/SendMany when unsentCount was 0 and no gets in progress
-//   - on postGet if unsentCount > 0 and gets in progress went to 0
-//   - isRunningThread.CompareAndSwap winner invokes tcStartThread
-//   - thread runs until unsentCount is 0 inside threadLock
-func (n *NBChan[T]) tcStartThread(value T, hasValue bool) { go n.sendThread(value, hasValue) }
-
-// tcStartThreadWinner attempts to be the thread that gets to launch sendThread
+// tcCreateWinner attempts to be the thread that gets to launch sendThread
 //   - isWinner true: tcStartThread should be invoked by this invocation
 //     this thread won to start a thread
 //   - isWinner false: a thread is running or being started
 //   - inside threadLock
 //   - on isRunningThread true, closesOnThreadSend must be valid
-func (n *NBChan[T]) tcStartThreadWinner() (isWinner bool) {
+func (n *NBChan[T]) tcCreateWinner() (isWinner bool) {
+	// lock creating critical section with setting isCloseInvoked to true
+	//	- once close closeNow set isCloseInvoked to true,
+	//		it is certain no thread will be permitted to launch
+	//	- atomizes isClose false detection with setting tcRunningThread
+	//		to true
 	n.tcThreadLock.Lock()
 	defer n.tcThreadLock.Unlock()
 
 	// no thread launch after Close CloseNow invoked
-	if n.isCloseInvoked.Load() {
+	if n.isCloseInvoked.IsInvoked() {
 		return
 	}
 
 	// note that thread did at one time launch
+	//	- before tcRunningThread is set to true
 	n.tcDidLaunchThread.CompareAndSwap(false, true)
 
 	// check for thread already running or this invocation should not launch it
 	if isWinner = n.tcRunningThread.CompareAndSwap(false, true); !isWinner {
 		return // thread was already running return
 	}
+
 	// arm thread exit awaitable
 	n.tcThreadExitAwaitable.Open()
 
@@ -79,38 +84,32 @@ func (n *NBChan[T]) tcAlertOrLaunchThreadWithValue(value T) (didProvideValue boo
 	}
 
 	//	- unsent count is zero
-	//	- new Get invocations will return prior to outputLock
-	//	- a lingering Get may be in progress or waiting for inputLock
 	//	- configuration is on-demand-thread or always-thread
-	//	- unsent count is zero
-	//	- this is only Send/SendMany and there is no Get
 	//	- there may be no thread running
-	n.progressLock.Lock()
-	defer n.progressLock.Unlock()
+	//	- progress must now be guaranteed by:
+	//	- — launching the send-thread
+	//	- — alerting an always-thread
+	//	- — for on-demand thread in unknown state,
+	//		observing it in a state once data has been added to inputBuffer.
+	//		It may otherwise exit
 
 	// if Get is in progress, thread should launch later
-	if n.tcDeferredProgressCheck() {
-		return
+	if _, isGets := n.tcIsDeferredSend(); isGets {
+		return // deferred: threadProgressRequired true
 	}
 
 	// starting the thread, that is most important
 	//	- a launched thread will go to send value
-	if n.tcStartThreadWinner() {
+	if _, didProvideValue = n.tcCreateProgress(); didProvideValue {
 		n.unsentCount.Add(1)
-		var hasValue = true
-		n.tcStartThread(value, hasValue)
-		didProvideValue = true
-		n.threadProgressRequired.CompareAndSwap(true, false)
+		go n.sendThread(value, HasValue)
 		return // thread was started with value
 	}
 
 	// try alerting a waiting always-on thread without waiting
 	//	- if successful, thread will go to send value
-	if n.isThreadAlways.Load() {
-		if didProvideValue = n.tcAlertThread(&value); didProvideValue {
-			n.threadProgressRequired.CompareAndSwap(true, false)
-			return // always-on thread alerted with value
-		}
+	if didProvideValue = n.tcAlertProgress(&value); didProvideValue {
+		return // always-on thread alerted with value
 	}
 
 	// there is a thread running without holding an item
@@ -121,218 +120,259 @@ func (n *NBChan[T]) tcAlertOrLaunchThreadWithValue(value T) (didProvideValue boo
 	//		so that progress is guaranteed
 	//	- issue is that:
 	//	- — an on-demand thread may exit while items are present
-	//	- — an always thread may soon need an alert
+	//	- — an always thread may enter alert state where it must be alerted
 	//	- flag it to be dealt with once all Send SendMany Get completes
-	n.threadProgressRequired.CompareAndSwap(false, true)
-
 	return
 }
 
-// tcSendEnsureProgress handdles thread progress on final Send SendMany conclusion
-func (n *NBChan[T]) tcSendEnsureProgress() {
-	if !n.threadProgressRequired.Load() {
-		return // thread progress not required
-	} else if n.tcDeferredProgressCheck() {
-		return // deferred to Get conclusion
+// tcCreateProgress seeks progress by creating the send-thread
+//   - honorProgressRaised true: isProgress is only true if tcProgressRaised remains false
+//   - isProgress: isCreateThread is also true, this operation is thread progress
+//   - isCreateThread: should invoke tcStartThread
+func (n *NBChan[T]) tcCreateProgress(honorProgressRaised ...bool) (isProgress, isCreateThread bool) {
+	n.tcProgressLock.Lock()
+	defer n.tcProgressLock.Unlock()
+
+	if isCreateThread = n.tcCreateWinner(); !isCreateThread {
+		return // no progress no thread to be created
+	} else if len(honorProgressRaised) > 0 && honorProgressRaised[0] && n.tcDoProgressRaised() {
+		return // progressRaised true, so this is not progress
 	}
-	n.tcEnsureThreadProgress()
+	isProgress = true
+	return
 }
 
-// tcEnsureThreadProgress ensures that thread is not exiting
-//   - final Send SendMany concluded while no Get in progress or
-//   - final Get concluded
-//   - invoked when threadProgressRequired observed true
-func (n *NBChan[T]) tcEnsureThreadProgress() {
+// HonorProgressRaised ignore any progress made if tcProgressRaised is true
+const HonorProgressRaised = true
 
-	//	- Send and SendMany encountered unsent count zero
-	//	- it is on-demand or always thread
-	//	- because a thread could not be started or alerted,
-	//		ensuring thread progress was deferred
+// record progress regardless of tcProgressRaised
+const IgnoreProgressRaised = false
 
-	// check for no items
-	if n.tcZeroProgress() {
+// tcAlertProgress attempts progress via alert ignoring tcProgressRaised
+func (n *NBChan[T]) tcAlertProgress(valuep ...*T) (isProgress bool) {
+	isProgress, _ = n.tcAlertProgress2(IgnoreProgressRaised, valuep...)
+	return
+}
+
+// tcAlertProgress2 attempts progress via alert optionally honoring tcProgressRaised
+//   - honorProgressRaised true: isProgress is only true if tcProgressRaised remains false
+//   - valuep: optional value provided with alert
+//   - isProgress operation counts as progress
+//   - didAlert an alert was successfully sent
+func (n *NBChan[T]) tcAlertProgress2(honorProgressRaised bool, valuep ...*T) (isProgress, didAlert bool) {
+	n.tcProgressLock.Lock()
+	defer n.tcProgressLock.Unlock()
+
+	// try alerting the thread
+	var valuep0 *T
+	if len(valuep) > 0 {
+		valuep0 = valuep[0]
+	}
+	if didAlert = //
+		n.tcAlertActive.Load() && // only when send-thread awaits alert
+			n.tcAlertThread(valuep0); //
+	!didAlert {
+		return // no successful alert
+	} else if isProgress = !honorProgressRaised || !n.tcDoProgressRaised(); !isProgress {
+		return // was progress raised true
+	}
+	n.tcProgressRequired.Store(false)
+	return
+}
+
+func (n *NBChan[T]) tcAddProgress(count int) {
+	n.tcDoProgressRaised(true)
+	n.tcProgressLock.Lock()
+	defer n.tcProgressLock.Unlock()
+
+	if n.unsentCount.Add(uint64(count)) == uint64(count) && !n.noThread.Load() {
+		n.tcProgressRequired.Store(true)
+	}
+}
+
+// tcAwaitProgress awaits a static state from thread then ensures progress
+func (n *NBChan[T]) tcAwaitProgress() (threadProgressRequired bool) {
+	n.tcAwaitProgressLock.Lock()
+	defer n.tcAwaitProgressLock.Unlock()
+
+	// check if progress action remains required
+	if threadProgressRequired = n.tcProgressRequired.Load(); !threadProgressRequired {
 		return
 	}
+	// reset progress raised, ie.
+	//	- thread observing unsent count zero
+	//	- Send SendMany increasing unsent count from zero
+	n.tcDoProgressRaised(false)
 
-	// await thread static state
+	// await static thread status
+	//	- cannot hold tcProgressLock lock
+	var threadState NBChanTState
 	select {
 	// thread exit
 	case <-n.tcThreadExitAwaitable.Ch():
-		// NBChanSendBlock NBChanAlert NBChanGets NBChanSends
-	case threadState := <-n.stateCh():
-		switch threadState {
-		case NBChanSendBlock:
-			n.tcSendProgress()
-		case NBChanAlert:
-			// unblock always-thread awaiting alert
-			n.tcAlertProgress()
+		if !n.isThreadAlways.Load() {
+			var isProgress, isCreateThread = n.tcCreateProgress(HonorProgressRaised)
+			if isCreateThread {
+				// start thread without value
+				var value T
+				go n.sendThread(value, NoValue)
+			}
+			threadProgressRequired = !isProgress
 		}
-		return // progress attempted or thread holding in Gets Sends
-	}
-	// thread did exit
-
-	if n.isThreadAlways.Load() {
-		// exiting always thread is close or panic
-		return // exiting always thread: noop
-	}
-
-	// unless unsent count is again zero, the thread must not exit
-
-	// close now
-	if n.isCloseNow.IsInvoked() {
-		return // out of items return: thread exit ok
-	}
-
-	// check close status
-	if n.isCloseComplete() {
-		return // underlying channel has closed: noop
-	}
-
-	// seek permisssion to start thread
-	if !n.tcStartProgress() {
-		return // some other thread started the send thread
-	}
-
-	// start thread without value
-	var value T
-	var hasValue bool
-	n.tcStartThread(value, hasValue)
-}
-
-// isCloseComplete checks for underlying channel closed
-//   - by close
-//   - by thread exit in deferred close
-//   - by close now
-func (n *NBChan[T]) isCloseComplete() (isClosed bool) {
-	n.inputLock.Lock()
-	defer n.inputLock.Unlock()
-
-	isClosed = n.closableChan.IsClosed()
-
-	return
-}
-
-// tcSendProgress affirms progress by thread in send block
-func (n *NBChan[T]) tcSendProgress() {
-	n.progressLock.Lock()
-	defer n.progressLock.Unlock()
-
-	var threadState NBChanTState
-	select {
-	case <-n.tcThreadExitAwaitable.Ch():
 		return
 	case threadState = <-n.stateCh():
 	}
-	if threadState == NBChanSendBlock {
-		n.threadProgressRequired.Store(false)
+	// received thread status
+
+	// alert
+	if threadState == NBChanAlert {
+		if isProgress, _ := n.tcAlertProgress2(HonorProgressRaised); isProgress {
+			threadProgressRequired = false
+		}
+		return
 	}
-}
 
-// tcStartProgress affirms progress by obtaining thread-start permission
-func (n *NBChan[T]) tcStartProgress() (isProgress bool) {
-	n.progressLock.Lock()
-	defer n.progressLock.Unlock()
+	// all other states are good states
+	//	- if a zero unsent period occurred in the meantime,
+	//	- tcProgressRaised is true and
+	//	- the operation was not progress
+	threadProgressRequired = n.tcDoProgressRaised()
 
-	isProgress = n.tcStartThreadWinner()
 	return
 }
 
-// tcZeroProgress affirms progress by observing unsent count zero
-func (n *NBChan[T]) tcZeroProgress() (isProgress bool) {
-	n.progressLock.Lock()
-	defer n.progressLock.Unlock()
-
-	if isProgress = n.unsentCount.Load() == 0; isProgress {
-		n.threadProgressRequired.Store(false)
+// tcDoProgressRaised updates and or returns tcProgressRaised
+//   - tcProgressRaised is used when awaiting thread-state since tcProgressLock
+//     cannot be held
+//   - when tcProgressRequired is to be reset, this opeation is ignored if
+//     tcProgressRaised is true, ie.
+//   - — the send-thread took action on unsent count zero or
+//   - — Send SendMany added items from unsent count zero
+func (n *NBChan[T]) tcDoProgressRaised(isRaised ...bool) (wasRaised bool) {
+	if len(isRaised) == 0 {
+		wasRaised = n.tcProgressRaised.Load()
+		return
 	}
+	wasRaised = n.tcProgressRaised.Swap(isRaised[0])
 	return
 }
-
-// tcAlertProgress attempts to alert a thread
-//   - if alert succeeds, threadProgressRequired is reset
-func (n *NBChan[T]) tcAlertProgress() {
-	n.progressLock.Lock()
-	defer n.progressLock.Unlock()
-
-	if n.tcAlertNoValue() {
-		n.threadProgressRequired.Store(false)
-	}
-}
-
-// tcAlertNoValue alerts any waiting always-thread
-func (n *NBChan[T]) tcAlertNoValue() (didAlert bool) { return n.tcAlertThread(nil) }
 
 // tcAlertThread alerts any waiting always-thread
 //   - invoked from Send/SendMany
 //   - value has not been added to unsentCount yet
 //   - increments unsentCount if value is non-nil and was provided to thread
-func (n *NBChan[T]) tcAlertThread(valuep *T) (didAlert bool) {
+func (n *NBChan[T]) tcAlertThread(valuep ...*T) (didAlert bool) {
+	// atomizes always-alert with detecting no Get in progress
+	n.collectorLock.Lock()
+	defer n.collectorLock.Unlock()
 
-	// can this thread send?
-	if didAlert = n.gets.Load() == 0 && // only when no Get in progress
-		// only if send winner
-		n.threadChWinner.CompareAndSwap(true, false); !didAlert {
-		return // no
+	// filter send request
+	if n.gets.Load() > 0 || // not when no Get in progress
+		!n.tcAlertActive.Load() { // only when send-thread awaits alert
+		return // no alert now
 	}
 
-	if valuep != nil {
-		n.unsentCount.Add(1)
+	// prepare two-chan send second channel
+	var alertChan2 = n.alertChan2.Get(1)
+	if len(alertChan2) > 0 {
+		<-alertChan2
 	}
-	select {
-	case n.threadCh <- valuep:
-	case <-n.threadCh2:
-	}
-	return
-}
+	n.alertChan2Active.Store(&alertChan2)
 
-// tcDeferredProgressCheck may mark threadProgressRequired by Get pending
-//   - may be invoked by Send SendMany when unsent count is zero
-//   - if Get is in progress, it is not efficient to provide items to thread
-//   - the lock ensures that if Send SendMany detects Get in progress,
-//     on Get conclusion, the last Get is guaranteed to check threadProgressRequired
-//   - invoked while holding progressLock
-func (n *NBChan[T]) tcDeferredProgressCheck() (isDeferred bool) {
-	n.getProgressLock.Lock()
-	defer n.getProgressLock.Unlock()
-
-	if isDeferred = n.gets.Load() > 0; !isDeferred {
+	// verify that two-chan send still available
+	if !n.tcAlertActive.CompareAndSwap(true, false) {
 		return
 	}
-	n.threadProgressRequired.Store(true)
+
+	// send value to always-thread
+	//	- always thread increments unsentCount on reception
+	var valuep0 *T
+	if len(valuep) > 0 {
+		valuep0 = valuep[0]
+	}
+	select {
+	case n.alertChan.Get() <- valuep0:
+		didAlert = true
+	case <-alertChan2:
+	}
 	return
 }
 
-func (n *NBChan[T]) tcIsDeferredProgress() (needProgress bool) {
-	n.getProgressLock.Lock()
-	defer n.getProgressLock.Unlock()
+// tcIsDeferredSend checks for a progress requirement
+//   - invoked by the last ending Get invocation
+func (n *NBChan[T]) tcIsDeferredSend() (isProgressRequired, isGets bool) {
+	n.tcGetProgressLock.Lock()
+	defer n.tcGetProgressLock.Unlock()
 
-	needProgress = n.threadProgressRequired.Load()
+	isProgressRequired = n.tcProgressRequired.Load()
+	isGets = n.gets.Load() > 0
 
 	return
 }
 
-// request from thread to send value on end of send block
-//   - lock to ensure thread does not exit during preparations
-//   - only succeeds if a thread is in send block
-func (n *NBChan[T]) tcRequestCollect() (collectIsActive bool) {
-	n.collectLock.Lock()
-	defer n.collectLock.Unlock()
+// tcCollectThreadValue receives any value in sendThread channel send
+//   - invoked by [NBChan.Get] while holding output lock
+//   - must await any thread value to ensure values provided in order
+//   - thread receives value from:
+//   - — Send SendMany that launches thread, but only when sent count 0
+//   - — always: thread alert
+//   - —on-demand: GetNextValue
+func (n *NBChan[T]) tcCollectThreadValue() (value T, hasValue bool) {
 
+	// if thread is not running, it does not hold data
+	if !n.tcRunningThread.Load() {
+		return // thread not running
+	}
+
+	// await static thread state
+	//	- state must be awaited since the thread may be in progress
+	//		with a value towards NBChanSendBlock
+	//	- if NBChanSendBlock, threads hold a value
+	//	- in all other static thread states, thread holds no value
+	//	- because this thread holds outputLock,
+	//		on-demand thread cannot collect additional values
+	//	- collectorLock ensures that no always-thread alerts are carried out
+	//		while Get is in progress
+	select {
+	// thread exited
+	case <-n.tcThreadExitAwaitable.Ch():
+		return // thread exited return
+	case chanState := <-n.stateCh():
+		// if it is not send value block, ignore
+		//	- NBChanSendBlock is the only wait where thread has value
+		if chanState != NBChanSendBlock {
+			return // thread is not held in send value
+		}
+	}
+	// thread holds value in state NBChanSendBlock
+
+	// because this thread holds outputLock,
+	// only one thread at a time may arrive here
+	//	- competing with consumers and closeNow for the value
+
+	// ensure two-chan receive operation is available
 	if !n.tcSendBlock.Load() {
-		return
+		return // the value went to another thread
 	}
 
+	// prepare two-chan receive second channel
 	var collectChan = n.collectChan.Get(1)
-	select {
-	case <-collectChan:
-	default:
-	}
 	if len(collectChan) > 0 {
-		panic(perrors.NewPF("collectChanreadfailed"))
+		<-collectChan
+	}
+	n.collectChanActive.Store(&collectChan)
+
+	// seek permission for two-chan receive
+	if !n.tcSendBlock.CompareAndSwap(true, false) {
+		return // the value went to another thread
 	}
 
-	n.tcCollectRequest.Store(true)
-	collectIsActive = true
+	// two-chan fetch of value
+	select {
+	case value, hasValue = <-n.closableChan.Ch():
+	case <-collectChan:
+	}
+
 	return
 }
 

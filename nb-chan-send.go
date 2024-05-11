@@ -11,7 +11,7 @@ import "math"
 //   - non-blocking, thread-safe, panic-free and error-free
 //   - if Close or CloseNow was invoked, items are discarded
 func (n *NBChan[T]) Send(value T) {
-	if n.isCloseInvoked.Load() {
+	if n.isCloseInvoked.IsInvoked() {
 		return // no send after Close(), atomic performance: noop
 	}
 	n.preSend()
@@ -19,7 +19,7 @@ func (n *NBChan[T]) Send(value T) {
 	defer n.postSend()
 
 	// if Close or CloseNow was invoked, items are discarded
-	if n.isCloseInvoked.Load() {
+	if n.isCloseInvoked.IsInvoked() {
 		return // no send after Close() return: noop
 	}
 
@@ -36,21 +36,21 @@ func (n *NBChan[T]) Send(value T) {
 	}
 	n.inputQueue = append(n.inputQueue, value)
 	n.inputCapacity.Store(uint64(cap(n.inputQueue)))
-	n.unsentCount.Add(1)
+	n.tcAddProgress(1)
 }
 
 // Send sends many values non-blocking, thread-safe, panic-free and error-free on the channel
 //   - if values is length 0 or nil, SendMany only returns count and capacity
 func (n *NBChan[T]) SendMany(values []T) {
 	var valueCount = len(values)
-	if n.isCloseInvoked.Load() || valueCount == 0 {
+	if n.isCloseInvoked.IsInvoked() || valueCount == 0 {
 		return // no send after Close(), atomic performance: noop
 	}
 	n.preSend()
 	n.inputLock.Lock()
 	defer n.postSend()
 
-	if n.isCloseInvoked.Load() {
+	if n.isCloseInvoked.IsInvoked() {
 		return // no send after Close() return: noop
 	}
 
@@ -68,7 +68,7 @@ func (n *NBChan[T]) SendMany(values []T) {
 	}
 	n.inputQueue = append(n.inputQueue, values...)
 	n.inputCapacity.Store(uint64(cap(n.inputQueue)))
-	n.unsentCount.Add(uint64(valueCount))
+	n.tcAddProgress(valueCount)
 }
 
 // preSend registers a Send or SendMany invocation pre-inputLock
@@ -88,17 +88,31 @@ func (n *NBChan[T]) postSend() {
 	n.inputLock.Unlock()
 
 	// update dataWaitCh
-	var unsentCount = n.unsentCount.Load()
-	n.setDataAvailable(unsentCount > 0)
+	n.updateDataAvailable()
 
 	// decrement sends
-	if n.sends.Add(math.MaxUint64) > 0 {
-		return // more Send SendMany pending
+	if n.sends.Add(math.MaxUint64) == 0 {
+		n.sendsWait.ReleaseWaiters()
 	}
-	n.sendsWait.ReleaseWaiters()
-	n.tcSendEnsureProgress()
+
+	// ensure progress
+	for {
+		if isZeroObserved, isGets := n.tcIsDeferredSend(); !isZeroObserved || isGets {
+			// progress not required or
+			// deferred by Get invocations
+			return
+		} else if !n.tcAwaitProgress() {
+			// progress was secured
+			return
+		} else if n.gets.Load() > 0 {
+			// subsequent Send SendMany exist
+			//	- after sends decrement, those will arrive at ensure progress
+			return
+		}
+	}
 }
 
+// ensureInput allocates or enlarges for [NBChan.SetAllocationSize]
 func (n *NBChan[T]) ensureInput(size int) (queue []T) {
 	n.inputLock.Lock()
 	defer n.inputLock.Unlock()

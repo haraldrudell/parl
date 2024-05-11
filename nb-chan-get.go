@@ -50,7 +50,7 @@ func (n *NBChan[T]) Get(elementCount ...int) (allItems []T) {
 
 	// get possible item from send thread
 	//	- thread decrements unsent count
-	if item, itemValid := n.collectSendThreadValue(); itemValid {
+	if item, itemValid := n.tcCollectThreadValue(); itemValid {
 		allItems = append(allItems, item)
 		if !isAllItems {
 			if soughtItemCount--; soughtItemCount == 0 {
@@ -83,7 +83,7 @@ func (n *NBChan[T]) preGet() {
 		if !n.isThreadAlways.Load() {
 			return
 		}
-		// awayt any Send SendMany always-alert operation has ended
+		// await any Send SendMany always-alert operation has ended
 		// and will not be started again before all Get have exited
 		n.collectorLock.Lock()
 		defer n.collectorLock.Unlock()
@@ -109,57 +109,27 @@ func (n *NBChan[T]) postGet() {
 		return // more Get pending
 	}
 	n.getsWait.ReleaseWaiters()
-	if n.tcIsDeferredProgress() {
-		n.tcEnsureThreadProgress()
+
+	// last ending Get handles progress
+	//	- Send and SendMany was invoked finding unsent count zero
+	//	- this is endangers thread progress because:
+	//	- — an on-demand thread may exit
+	//	- — an always-thread may enter alert wait
+	//	- sends may still be in progress
+	//	- sends will not take action while Get active.
+	//		This is after the final Get ended
+	//	- it is on-demand or always thread
+	//	- a progress guaranteeing event must be observed
+	for {
+		if isZeroObserved, isGets := n.tcIsDeferredSend(); !isZeroObserved || isGets {
+			// progress not required or
+			// additional Get invocations exist
+			return
+		} else if !n.tcAwaitProgress() {
+			// progress was secured
+			return
+		}
 	}
-}
-
-// collectSendThreadValue receives any value in sendThread channel send
-//   - invoked by [NBChan.Get] while holding output lock
-//   - must await any thread value to ensure values provided in order
-//   - thread receives value from:
-//   - — Send SendMany that launches thread, but only when sent count 0
-//   - — always: thread alert
-//   - —on-demand: GetNextValue
-func (n *NBChan[T]) collectSendThreadValue() (value T, hasValue bool) {
-
-	// if thread is not running, it does not hold data
-	if !n.tcRunningThread.Load() {
-		return // thread not running
-	}
-
-	// wait for a held state or thread exit
-	//	- because this thread holds outputLock,
-	//		thread cannot collect additional values
-	//	- the only location send-thread can hold with value is
-	//		NBChanSendBlock
-	var chanState NBChanTState
-	select {
-	// thread exited
-	case <-n.tcThreadExitAwaitable.Ch():
-		return // thread exited return
-	case chanState = <-n.stateCh():
-	}
-	// thread held somewhere
-
-	// if it is not send value block, ignore
-	//	- NBChanSendBlock is the only wait where thread has value
-	if chanState != NBChanSendBlock {
-		return // thread is not held in send value
-	}
-
-	// request channel send on send block ending
-	if !n.tcRequestCollect() {
-		return
-	}
-
-	// attempt to fetch value from thread
-	select {
-	case value, hasValue = <-n.closableChan.Ch():
-	case <-n.collectChan.Get(1):
-	}
-
-	return
 }
 
 // swapQueues swaps n.inputQueue and n.outputQueue0

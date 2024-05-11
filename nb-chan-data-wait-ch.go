@@ -8,11 +8,13 @@ package parl
 // updateDataAvailable obtains a properly configured dataWaitCh
 //   - used by DataWaitCh to obtain the channel
 //   - by thread after sending an item
-//   - by thread when exiting from CloseNow
+//   - by thread on detecting CloseNow
 func (n *NBChan[T]) updateDataAvailable() (dataCh chan struct{}) {
 	if n.closableChan.IsClosed() {
+		// after underlying channel close, a triggered channel is returned
 		return n.setDataAvailableAfterClose()
 	}
+	// return channel from current state
 	return n.setDataAvailable(n.unsentCount.Load() > 0)
 }
 

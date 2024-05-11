@@ -87,7 +87,7 @@ func NBChanState[T any](n *NBChan[T]) (s string) {
 		threadType = "-" + NBChanAlways.String()
 	}
 	var alertValue string
-	if len(n.threadCh) > 0 {
+	if n.tcAlertActive.Load() || n.alertChan2Active.Load() != nil {
 		alertValue = "-alertValue"
 	}
 	var hasData string
@@ -109,7 +109,7 @@ func NBChanState[T any](n *NBChan[T]) (s string) {
 		n.ThreadStatus(), threadType,
 
 		// “close-now:true-false” Close-CloseNow
-		n.isCloseInvoked.Load(), n.isCloseNow.IsInvoked(), n.IsClosed(),
+		n.isCloseInvoked.IsInvoked(), n.isCloseNow.IsInvoked(), n.IsClosed(),
 
 		// “err: false” if NBCHan had panic or close error
 		n.GetError() != nil,

@@ -44,9 +44,10 @@ func (n *NBChan[T]) sendThread(value T, hasValue bool) {
 
 			// if no data, decide on action
 			if n.unsentCount.Load() == 0 {
+				n.sendThreadZero()
 
 				// always-thread not in deferred close: wait for alert
-				if n.isThreadAlways.Load() && !n.isCloseInvoked.Load() {
+				if n.isThreadAlways.Load() && !n.isCloseInvoked.IsInvoked() {
 					// blocks here
 					if value, hasValue = n.sendThreadWaitForAlert(); hasValue {
 						break // send the value received by alert
@@ -107,23 +108,46 @@ func (n *NBChan[T]) sendThread(value T, hasValue bool) {
 	}
 }
 
-// sendThreadDeferredClose may closes the underlying channel
+// sendThreadDeferredClose may close the underlying channel
 //   - is how sendThread executes deferred close
 //   - closes if Close was invoked while thread running and not CloseNow
 //   - invoked by sendThread on exit
 //   - updates dataWaitCh
 func (n *NBChan[T]) sendThreadDeferredClose() {
-	if !n.isCloseInvoked.Load() || // - deferred close if isCloseInvoked has become true
-		n.isCloseNow.IsInvoked() { // no deferred close for CloseNow
+
+	// is it deferred close?
+	if !n.isCloseInvoked.IsInvoked() || // no: Close has not been invoked
+		n.isCloseNow.IsInvoked() { // CloseNow overrides deferred close
 		n.updateDataAvailable()
 		return // no deferred close pending return: noop
 	}
 
+	// for on-demand thread, ensure out of data
+	if !n.isThreadAlways.Load() {
+
+		if n.unsentCount.Load() > 0 {
+			return
+		}
+		// tcThread
+	}
+
 	// execute deferred close
-	//	- // error is stored in error container. isClosed is active
+	//	- error is stored in error container. isClosed is active
 	n.executeChClose()
 	// close data waiter
 	n.setDataAvailableAfterClose()
+}
+
+// sendThreadZero notifies background that thread
+// took action on unsent count zero
+func (n *NBChan[T]) sendThreadZero() {
+	n.tcDoProgressRaised(true)
+	n.tcProgressLock.Lock()
+	defer n.tcProgressLock.Unlock()
+
+	if n.unsentCount.Load() == 0 {
+		n.tcProgressRequired.Store(true)
+	}
 }
 
 // sendThreadOnError submits thread panic
@@ -146,16 +170,23 @@ func (n *NBChan[T]) sendThreadBlockingSend(value T) {
 	defer n.updateDataAvailable()
 	// count the item just sent — even if panic
 	defer n.unsentCount.Add(math.MaxUint64)
+	// clear two-chan receive second channel
+	n.collectChanActive.Store(nil)
 	// receive value with default has proven to result in default. Therefore:
-	//	- background may request value sent on collectChan at end of send block
-	//	- background can then receive from both channels which is gauranteed to end
-	//	- there can only be one thread and only one background Get may execute at any time
+	//	- two-chan receive is used by tcCollectThreadValue to prevent deadlock and aba
+	//	- send-thread provides an atomic true and a nil atomic channel value
+	//		upon commencing send operation
+	//	- the atomic true allows other threads to write the atomic channel value and
+	//		reset the atomic true to false
+	//	- a winner thread observing the atomic true value stores a 1-size empty channel,
+	//		and proceeds if it is able to set the atomic true value to false
+	//	- at end of send operation, send-thread attempts to change the atomic value from true to false
+	//	- if the atomic value was true, no two-chan receive is in progress
+	//	- otherwise, send-thread sends on the atomic channel
+	//	- thereby, send-thread will not enter dead-lock and avoids aba-issue
 	defer n.sendThreadBlockingSendEnd()
-	// reset collect request
-	n.tcCollectRequest.CompareAndSwap(true, false)
-	// indicate thread in send block
+	// tcSendBlock makes collectChanActive available to tcCollectThreadValue threads
 	n.tcSendBlock.Store(true)
-	defer n.tcSendBlock.Store(false)
 
 	for {
 		select {
@@ -168,18 +199,17 @@ func (n *NBChan[T]) sendThreadBlockingSend(value T) {
 	}
 }
 
+// sendThreadBlockingSendEnd completes any two-chan receive operation
 func (n *NBChan[T]) sendThreadBlockingSendEnd() {
-	n.collectLock.Lock()
-	defer n.collectLock.Unlock()
-
-	// was there a collect request during send block?
-	if !n.tcCollectRequest.CompareAndSwap(true, false) {
-		return
+	// check if two-chan send was initiated
+	if n.tcSendBlock.CompareAndSwap(true, false) {
+		return // no value collect
 	}
 
-	// send
-	var collectChan = n.collectChan.Get(1)
-	collectChan <- struct{}{}
+	// send to ensure tcCollectThreadValue is not blocked
+	if cp := n.collectChanActive.Load(); cp != nil {
+		*cp <- struct{}{}
+	}
 }
 
 // sendThreadGetNextValue gets the next value for thread
@@ -188,6 +218,17 @@ func (n *NBChan[T]) sendThreadBlockingSendEnd() {
 func (n *NBChan[T]) sendThreadGetNextValue() (value T, hasValue bool) {
 	if n.gets.Load() > 0 || n.unsentCount.Load() == 0 {
 		return // send thread suspended by Get return: hasValue: false
+	}
+	// if a thread holding outputLock awaited thread state,
+	// acquiring outputLock here could cause dead-lock
+	//	- only Get invocations do this
+	//	- therefore, ensure outputLock is not acquired while Get
+	//		in progress
+	n.collectorLock.Lock()
+	defer n.collectorLock.Unlock()
+
+	if n.gets.Load() > 0 {
+		return // cancel: Get in progress
 	}
 	n.outputLock.Lock()
 	defer n.outputLock.Unlock()
@@ -200,25 +241,21 @@ func (n *NBChan[T]) sendThreadGetNextValue() (value T, hasValue bool) {
 	return // have item return: value: valid, hasValue: true
 }
 
-// sendThreadWaitForAlert allows an always-on thread to wait for an alert
+// sendThreadWaitForAlert allows an always-on thread to await alert
+//   - the alert is a two-chan send that may provide a value
 //   - always threads do not exit, instead at end of data
 //     they wait for background events:
 //   - not if didClose
 //   - not if data available
-//   - may receive data item
+//   - an alert that may provide a data item
 func (n *NBChan[T]) sendThreadWaitForAlert() (value T, hasValue bool) {
 
-	// prepare channels
-	if n.threadCh == nil {
-		n.threadCh = make(chan *T)
-		n.threadCh2 = make(chan struct{}, 1)
-	} else if len(n.threadCh2) > 0 {
-		<-n.threadCh2
-	}
+	// reset atomic channel
+	n.alertChan2Active.Store(nil)
 	// n.threadChWinner true exposes channels to clients
-	n.threadChWinner.Store(true)
-	defer func() { n.threadCh2 <- struct{}{} }()
-	defer n.threadChWinner.Store(false)
+	n.tcAlertActive.Store(true)
+	// sending on threadCh2 ensures no client is hanging
+	defer n.sendThreadAlertEnd()
 
 	// blocks here
 	//	- n.threadCh must be unbuffered for effect to be immediate
@@ -226,14 +263,24 @@ func (n *NBChan[T]) sendThreadWaitForAlert() (value T, hasValue bool) {
 	for {
 		select {
 		// wait for alert
-		case valuep := <-n.threadCh:
+		case valuep := <-n.alertChan.Get():
 			if hasValue = valuep != nil; hasValue {
 				value = *valuep
+				n.unsentCount.Add(1)
 			}
 			return
 			// broadcast Alert wait
 		case n.stateCh() <- NBChanAlert:
 		}
+	}
+}
+
+func (n *NBChan[T]) sendThreadAlertEnd() {
+	// see if two-chan send operation in progress
+	if n.tcAlertActive.CompareAndSwap(true, false) {
+		return // no
+	} else if cp := n.alertChan2Active.Load(); cp != nil {
+		*cp <- struct{}{}
 	}
 }
 
@@ -244,12 +291,13 @@ func (n *NBChan[T]) sendThreadExitCheck() (doStop bool) {
 	n.tcThreadLock.Lock()
 	defer n.tcThreadLock.Unlock()
 
-	if n.unsentCount.Load() > 0 {
-		return // no exit while data available
-	} else if n.sends.Load() > 0 {
-		return // no exit while sends in progress
+	if doStop = //
+		n.unsentCount.Load() == 0 && // only stop if out of data
+			n.sends.Load() == 0; // while no sends in progress
+	!doStop {
+		return
 	}
-	doStop = true
+
 	n.tcRunningThread.Store(false)
 
 	return
@@ -269,7 +317,7 @@ func (n *NBChan[T]) sendThreadNewSendCheck() (doSend bool) {
 	return // doSend: true
 }
 
-// sendThreadIsCloseNow checks for CloseNow
+// sendThreadIsCloseNow checks for CloseNow invocation
 //   - isExit true: CloseNow was invoked
 func (n *NBChan[T]) sendThreadIsCloseNow() (isExit bool) {
 	if !n.isCloseNow.IsInvoked() {
