@@ -47,7 +47,7 @@ func (n *NBChan[T]) sendThread(value T, hasValue bool) {
 				n.sendThreadZero()
 
 				// always-thread not in deferred close: wait for alert
-				if n.isThreadAlways.Load() && !n.isCloseInvoked.IsInvoked() {
+				if !n.isOnDemandThread.Load() && !n.isCloseInvoked.IsInvoked() {
 					// blocks here
 					if value, hasValue = n.sendThreadWaitForAlert(); hasValue {
 						break // send the value received by alert
@@ -123,7 +123,7 @@ func (n *NBChan[T]) sendThreadDeferredClose() {
 	}
 
 	// for on-demand thread, ensure out of data
-	if !n.isThreadAlways.Load() {
+	if n.isOnDemandThread.Load() {
 
 		if n.unsentCount.Load() > 0 {
 			return
@@ -288,7 +288,7 @@ func (n *NBChan[T]) sendThreadAlertEnd() {
 //   - doStop true: channel has been read to end and no Send SendMany active
 //   - invoked when thread has detected Close invocation and is in deferred close
 func (n *NBChan[T]) sendThreadExitCheck() (doStop bool) {
-	n.tcThreadLock.Lock()
+	n.tcThreadLock.Lock() // atomizes unsentCount sends tcRunningThread
 	defer n.tcThreadLock.Unlock()
 
 	if doStop = //
@@ -323,7 +323,7 @@ func (n *NBChan[T]) sendThreadIsCloseNow() (isExit bool) {
 	if !n.isCloseNow.IsInvoked() {
 		return // no CloseNow invocation return
 	}
-	n.tcThreadLock.Lock()
+	n.tcThreadLock.Lock() // atomizes CloseNow tcRunningThread
 	defer n.tcThreadLock.Unlock()
 
 	if isExit = n.isCloseNow.IsInvoked(); !isExit {

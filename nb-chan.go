@@ -123,7 +123,7 @@ type NBChan[T any] struct {
 	//	- from [NBChanNone] or [NBChan.SetNoThread]
 	//	- [NBChan.Ch] is unavailable
 	//	- [NBChan.DataWaitCh] is used for wait
-	noThread atomic.Bool
+	isNoThread atomic.Bool
 	// a channel that closes when data is available
 	dataWaitCh atomic.Pointer[chan struct{}]
 	// makes data channel wait operations executing serially
@@ -132,7 +132,7 @@ type NBChan[T any] struct {
 	isDataAvailable atomic.Bool
 	// indicates thread always running, ie. no on-demand
 	//	- from [NBChanAlways] or [NBChan.SetAlwaysThread]
-	isThreadAlways atomic.Bool
+	isOnDemandThread atomic.Bool
 	// wait mechanic with value for always-thread alert-wait
 	//	- used in two-chan send with threadCh2
 	alertChan LacyChan[*T]
@@ -149,6 +149,7 @@ type NBChan[T any] struct {
 	//		NBChanNoLaunch and NBChanRunning
 	tcDidLaunchThread atomic.Bool
 	// tcThreadLock atomizes tcRunningThread with other actions:
+	//	- tcThreadLock enforces order so that no thread is created after CloseNow
 	//	- tcStartThreadWinner: atomize isCloseNow detection with setting tcRunningThread to true
 	//	- selectCloseNowWinner: atomize tcRunningThread read with isCloseNow and isCloseInvoked set to true
 	//	- selectCloseWinner: atomize tcRunningThread read with setting isCloseInvoked to true
@@ -260,10 +261,10 @@ func NewNBChan[T any](threadType ...NBChanThreadType) (nbChan *NBChan[T]) {
 	n := NBChan[T]{}
 	if len(threadType) > 0 {
 		switch threadType[0] {
-		case NBChanAlways:
-			n.isThreadAlways.Store(true)
+		case NBChanOnDemand:
+			n.isOnDemandThread.Store(true)
 		case NBChanNone:
-			n.noThread.Store(true)
+			n.isNoThread.Store(true)
 		}
 	}
 	return &n
@@ -284,15 +285,19 @@ func (n *NBChan[T]) SetAllocationSize(size int) (nb *NBChan[T]) {
 	return
 }
 
-// SetAlwaysThread configures [NBChanAlways] operation
-func (n *NBChan[T]) SetAlwaysThread() (nb *NBChan[T]) {
+// SetOnDemandThread configures [NBChanAlways] operation
+func (n *NBChan[T]) SetOnDemandThread() (nb *NBChan[T]) {
 	nb = n
-	n.isThreadAlways.Store(true)
+	n.isOnDemandThread.Store(true)
+	n.isNoThread.Store(false)
 	return
 }
 
 // SetNoThread configures [NBChanNone] operation
-func (n *NBChan[T]) SetNoThread() { n.noThread.Store(true) }
+func (n *NBChan[T]) SetNoThread() {
+	n.isNoThread.Store(true)
+	n.isOnDemandThread.Store(false)
+}
 
 const (
 	// [NBChan.ThreadStatus] await a blocked thread state or exit

@@ -80,8 +80,8 @@ func (n *NBChan[T]) Get(elementCount ...int) (allItems []T) {
 func (n *NBChan[T]) preGet() {
 	if n.gets.Add(1) == 1 {
 		n.getsWait.HoldWaiters()
-		if !n.isThreadAlways.Load() {
-			return
+		if n.isOnDemandThread.Load() || n.isNoThread.Load() {
+			return // not always thread
 		}
 		// await any Send SendMany always-alert operation has ended
 		// and will not be started again before all Get have exited
@@ -194,5 +194,16 @@ func (n *NBChan[T]) fetchFromOutput(soughtItemCount *int, isAllItems bool, allIt
 	n.unsentCount.Add(uint64(-soughtIC))
 	*soughtItemCount = 0
 
+	return
+}
+
+func (n *NBChan[T]) ensureOutput(size int) (queue []T) {
+	n.outputLock.Lock()
+	defer n.outputLock.Unlock()
+
+	if n.outputQueue != nil {
+		return
+	}
+	n.outputQueue = n.newQueue(size)
 	return
 }

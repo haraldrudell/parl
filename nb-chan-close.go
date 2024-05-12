@@ -191,10 +191,7 @@ func (n *NBChan[T]) selectCloseNowWinner() (
 	isRunningThread bool,
 	done, doneClose Done,
 ) {
-	// atomize closeNow winner selection with:
-	//	- retrieving running thread state and
-	//	- setting isCloseInvoked true
-	n.tcThreadLock.Lock()
+	n.tcThreadLock.Lock() // atomizes CloseNow true with tcRunningThread
 	defer n.tcThreadLock.Unlock()
 
 	// select CloseNow winner
@@ -218,7 +215,7 @@ func (n *NBChan[T]) selectCloseNowWinner() (
 //   - caller must hold inputLock for isCloseInvoked update
 func (n *NBChan[T]) selectCloseWinner() (isWinner, isRunningThread bool, done Done) {
 	// atomize close win with reading running thread-state
-	n.tcThreadLock.Lock()
+	n.tcThreadLock.Lock() // atomizes Close:true tcRunningThread
 	defer n.tcThreadLock.Unlock()
 
 	var _ OnceCh

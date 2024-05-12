@@ -81,10 +81,10 @@ func NBChanState[T any](n *NBChan[T]) (s string) {
 	var out = len(n.outputQueue)
 	n.outputLock.Unlock()
 	var threadType string
-	if n.noThread.Load() {
+	if n.isNoThread.Load() {
 		threadType = "-" + NBChanNone.String()
-	} else if n.isThreadAlways.Load() {
-		threadType = "-" + NBChanAlways.String()
+	} else if n.isOnDemandThread.Load() {
+		threadType = "-" + NBChanOnDemand.String()
 	}
 	var alertValue string
 	if n.tcAlertActive.Load() || n.alertChan2Active.Load() != nil {

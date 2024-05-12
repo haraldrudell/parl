@@ -12,23 +12,18 @@ const (
 	HasValue = true
 )
 
-// tcCreateWinner attempts to be the thread that gets to launch sendThread
-//   - isWinner true: tcStartThread should be invoked by this invocation
-//     this thread won to start a thread
-//   - isWinner false: a thread is running or being started
-//   - inside threadLock
-//   - on isRunningThread true, closesOnThreadSend must be valid
+// tcCreateWinner seeks permission to create sendThread
+//   - isWinner true: go n.sendThread should be invoked by this invocation
+//   - isWinner false: a thread is running, being started or it is Close/CloseNow
 func (n *NBChan[T]) tcCreateWinner() (isWinner bool) {
-	// lock creating critical section with setting isCloseInvoked to true
-	//	- once close closeNow set isCloseInvoked to true,
-	//		it is certain no thread will be permitted to launch
-	//	- atomizes isClose false detection with setting tcRunningThread
-	//		to true
-	n.tcThreadLock.Lock()
+	n.tcThreadLock.Lock() // atomizes Close/CloseNow tcRunningThread
 	defer n.tcThreadLock.Unlock()
 
-	// no thread launch after Close CloseNow invoked
-	if n.isCloseInvoked.IsInvoked() {
+	// no thread creation after CloseNow
+	if n.isCloseNow.IsInvoked() {
+		return
+		// no thread creation after Close if channel object empty
+	} else if n.isCloseInvoked.IsInvoked() && n.unsentCount.Load() == 0 {
 		return
 	}
 
@@ -47,16 +42,13 @@ func (n *NBChan[T]) tcCreateWinner() (isWinner bool) {
 	return
 }
 
-// tcAlertOrLaunchThreadWithValue attempts to launch thread providing it the value item
-//   - didProvideValue true: value was prrovided to thread via launch or alert,
+// tcAlertOrLaunchThreadWithValue ensures thread progress from a Send endMany during unsent count zero
+//   - didProvideValue true: value was provided to thread via launch or alert and
 //     unsent count was incremented
+//   - if on-demand or always thread and a unsent count zero, thread progress must be guaranteed
+//   - thread progress is deferred if Get is in progress
 //   - Invoked by [NBChan.Send] and [NBChan.SendMany]
-//     while holding [NBChan.inputLock]
-//   - value has not been added to unsentCount yet
-//   - isGetRace indicates pending Get while NBChan is empty
-//   - — only matters if didProvideValue is false
-//   - caller must hold inputLock to prevent parallel invocations where
-//     multiple threads handle unsent count zero
+//   - on invocation, value is not part of unsentCount
 func (n *NBChan[T]) tcAlertOrLaunchThreadWithValue(value T) (didProvideValue bool) {
 
 	// if unsent count is zero, a thread may have to be alerted or launched
@@ -73,7 +65,7 @@ func (n *NBChan[T]) tcAlertOrLaunchThreadWithValue(value T) (didProvideValue boo
 	//	- Get invocations may be ongoing
 
 	// if NBChan is configured for no thread, value cannot be provided
-	if n.noThread.Load() {
+	if n.isNoThread.Load() {
 		return // no-thread configuration
 	}
 
@@ -127,8 +119,8 @@ func (n *NBChan[T]) tcAlertOrLaunchThreadWithValue(value T) (didProvideValue boo
 
 // tcCreateProgress seeks progress by creating the send-thread
 //   - honorProgressRaised true: isProgress is only true if tcProgressRaised remains false
-//   - isProgress: isCreateThread is also true, this operation is thread progress
-//   - isCreateThread: should invoke tcStartThread
+//   - isProgress true: this operation is thread progress, isCreateThread is also true
+//   - isCreateThread true: caller should invoke go n.sendThread
 func (n *NBChan[T]) tcCreateProgress(honorProgressRaised ...bool) (isProgress, isCreateThread bool) {
 	n.tcProgressLock.Lock()
 	defer n.tcProgressLock.Unlock()
@@ -149,6 +141,8 @@ const HonorProgressRaised = true
 const IgnoreProgressRaised = false
 
 // tcAlertProgress attempts progress via alert ignoring tcProgressRaised
+//   - valuep: if present and non-nil provided in alert
+//   - isProgress true: value was provided, operation was thread progress
 func (n *NBChan[T]) tcAlertProgress(valuep ...*T) (isProgress bool) {
 	isProgress, _ = n.tcAlertProgress2(IgnoreProgressRaised, valuep...)
 	return
@@ -158,7 +152,8 @@ func (n *NBChan[T]) tcAlertProgress(valuep ...*T) (isProgress bool) {
 //   - honorProgressRaised true: isProgress is only true if tcProgressRaised remains false
 //   - valuep: optional value provided with alert
 //   - isProgress operation counts as progress
-//   - didAlert an alert was successfully sent
+//   - didAlert an alert was successfully sent, if a value was present is was provided
+//   - sendThread upon receiving the value, increases unsent count
 func (n *NBChan[T]) tcAlertProgress2(honorProgressRaised bool, valuep ...*T) (isProgress, didAlert bool) {
 	n.tcProgressLock.Lock()
 	defer n.tcProgressLock.Unlock()
@@ -185,14 +180,21 @@ func (n *NBChan[T]) tcAddProgress(count int) {
 	n.tcProgressLock.Lock()
 	defer n.tcProgressLock.Unlock()
 
-	if n.unsentCount.Add(uint64(count)) == uint64(count) && !n.noThread.Load() {
+	if n.unsentCount.Add(uint64(count)) == uint64(count) && !n.isNoThread.Load() {
 		n.tcProgressRequired.Store(true)
 	}
 }
 
 // tcAwaitProgress awaits a static state from thread then ensures progress
+//   - threadProgressRequired true: progress is currently not guaranteed
+//   - progress is:
+//   - — creating sendThread
+//   - — alerting sendThread
+//   - — a non-exit thread-state observed
+//   - if tcProgressRequired was true on invocation and a zero-count event occured during wait,
+//     threadProgressRequired is true
 func (n *NBChan[T]) tcAwaitProgress() (threadProgressRequired bool) {
-	n.tcAwaitProgressLock.Lock()
+	n.tcAwaitProgressLock.Lock() // ensures critical section
 	defer n.tcAwaitProgressLock.Unlock()
 
 	// check if progress action remains required
@@ -210,7 +212,7 @@ func (n *NBChan[T]) tcAwaitProgress() (threadProgressRequired bool) {
 	select {
 	// thread exit
 	case <-n.tcThreadExitAwaitable.Ch():
-		if !n.isThreadAlways.Load() {
+		if n.isOnDemandThread.Load() {
 			var isProgress, isCreateThread = n.tcCreateProgress(HonorProgressRaised)
 			if isCreateThread {
 				// start thread without value
@@ -242,12 +244,16 @@ func (n *NBChan[T]) tcAwaitProgress() (threadProgressRequired bool) {
 }
 
 // tcDoProgressRaised updates and or returns tcProgressRaised
+//   - wasRaised is the tcProgressRaised at time of invocation
+//   - isRaised missing: read operation, otherwise tcProgressRaised is set to isRaised
+//   - tcProgressRaised is set upon:
+//     on Send SendMany adding from unsent count zero
+//   - — the send-thread taking action on unsent count zero or
+//   - — Send SendMany adding items from unsent count zero
+//   - it indicates that sendThread progress may fail if not ensured
 //   - tcProgressRaised is used when awaiting thread-state since tcProgressLock
 //     cannot be held
-//   - when tcProgressRequired is to be reset, this opeation is ignored if
-//     tcProgressRaised is true, ie.
-//   - — the send-thread took action on unsent count zero or
-//   - — Send SendMany added items from unsent count zero
+//   - if a zero condition occured during await of thread-state, the wait operation must be retried
 func (n *NBChan[T]) tcDoProgressRaised(isRaised ...bool) (wasRaised bool) {
 	if len(isRaised) == 0 {
 		wasRaised = n.tcProgressRaised.Load()

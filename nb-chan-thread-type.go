@@ -17,6 +17,8 @@ const (
 	//	- benefit: lower cpu
 	//	- cost: data can only be received using [NBChan.Get]
 	NBChanNone
+	// NBChanOnDemand configures on-demand thread
+	NBChanOnDemand
 )
 
 // NBChanThreadType defines how NBChan is operating

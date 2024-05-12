@@ -124,17 +124,6 @@ func (n *NBChan[T]) ensureInput(size int) (queue []T) {
 	return
 }
 
-func (n *NBChan[T]) ensureOutput(size int) (queue []T) {
-	n.outputLock.Lock()
-	defer n.outputLock.Unlock()
-
-	if n.outputQueue != nil {
-		return
-	}
-	n.outputQueue = n.newQueue(size)
-	return
-}
-
 // newQueue allocates a new queue slice
 //   - capacity is at least count elements
 //   - the slice is empty
