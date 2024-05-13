@@ -7,6 +7,7 @@ package parl
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/haraldrudell/parl/perrors"
@@ -184,6 +185,7 @@ func invokeOnError(onError OnError, err error) {
 		return
 	}
 	Log("Recover: %+v\n", err)
+	Log("invokeOnError parl.recover %s", debug.Stack())
 }
 
 // processRecoverValue returns an error value with stack from annotation and panicValue

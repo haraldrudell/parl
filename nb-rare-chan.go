@@ -1,5 +1,5 @@
 /*
-© 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+© 2024–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 ISC License
 */
 
@@ -15,9 +15,9 @@ import (
 // NBRareChan is a simplified [NBChan] using on-demand thread
 //   - NBRareChan is a channel with unbound buffer
 //     like an unbuffered channel reading from a thread-safe slice
-//   - [NBRareChan.Send] provides value send that is non-blocking, thread-safe, panic, dead-lock and error-free
+//   - [NBRareChan.Send] provides value send that is non-blocking-send, thread-safe, panic, deadlock and error-free
 //   - [NBRareChan.Ch] provides real-time value stream or
-//   - [NBRareChan.Close] provides value collection
+//   - [NBRareChan.Close] provides all buffered values
 //   - [NBRareChan.StopSend] blocks further Send allowing for graceful shutdown
 //   - [NBRareChan.IsClose] returns whether the underlying channel is closed
 //   - [NBRareChan.PanicCh] provides real-time notice of thread panic, should not happen
@@ -41,6 +41,9 @@ import (
 //   - — there is no contention-separation between Send and reading Ch
 //   - — no multiple-item operations like SendMany or Get
 //   - — less observable and configurable
+//   - see also:
+//   - — [NBChan] fully-featured unbound channel
+//   - — [AwaitableSlice] unbound awaitable queue
 type NBRareChan[T any] struct {
 	// underlying channel
 	closableChan ClosableChan[T]
@@ -67,14 +70,12 @@ type NBRareChan[T any] struct {
 	closeOnce OnceCh
 }
 
-// Ch obtains the receive-only channel
-//   - values can be retrieved using this channel or [NBChan.Get]
-//   - not available for [NBChanNone] NBChan
+// Ch obtains the underlying channel for channel receive operations
 func (n *NBRareChan[T]) Ch() (ch <-chan T) { return n.closableChan.Ch() }
 
 // Send sends a single value on the channel
-//   - non-blocking, thread-safe, panic-free and error-free
-//   - if Close or CloseNow was invoked, items are discarded
+//   - non-blocking-send, thread-safe, deadlock-free, panic-free and error-free
+//   - if Close or StopSend was invoked, value is discarded
 func (n *NBRareChan[T]) Send(value T) {
 	n.queueLock.Lock()
 	defer n.queueLock.Unlock()
@@ -193,7 +194,7 @@ func (n *NBRareChan[T]) sendThread(value T) {
 	}
 }
 
-// sendThreadNextValue obtains the next valkue to send for thread if any
+// sendThreadNextValue obtains the next value to send for thread if any
 func (n *NBRareChan[T]) sendThreadNextValue() (value T, hasValue bool) {
 	n.queueLock.Lock()
 	defer n.queueLock.Unlock()
@@ -203,7 +204,11 @@ func (n *NBRareChan[T]) sendThreadNextValue() (value T, hasValue bool) {
 		n.queue = n.queue[1:]
 		return
 	}
+
+	// channel detected empty
+	//	- notify that sendThread is no longer awaiting values
 	n.threadReadingValues.Close()
+	// if StopSend was invoked, notify its awaitable
 	if n.isStopSend.Load() {
 		n.isEmpty.Close()
 	}

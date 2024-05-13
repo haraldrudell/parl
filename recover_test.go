@@ -24,7 +24,12 @@ func TestRecoverDA(t *testing.T) {
 			message = recover().(error).Error()
 		}()
 
-		_ = *(*int)(nil)
+		var intp *int
+		if false {
+			var i int
+			intp = &i
+		}
+		_ = *intp
 		return
 	}()
 
@@ -38,6 +43,7 @@ func TestRecoverDA(t *testing.T) {
 	var err error
 	var message string
 
+	tStatic = t
 	deferCL, panicCL, err = recoverDaPanic()
 
 	// should be error
@@ -66,13 +72,19 @@ func TestRecoverDA(t *testing.T) {
 	}
 }
 
+var tStatic *testing.T
+
+func diagnosingNoOnerror(err error) {
+	tStatic.Logf("OnError function at %s: Recovered err: %s", pruntime.NewCodeLocation(0).Short(), perrors.Short(err))
+}
+
 // recovers a panic in a called function
 //   - deferLocation is the function where ercovery takes place
 //   - panicLocation is the called function where the panic occurred
 //   - err is the resultfrom [Recover]
 func recoverDaPanic() (deferLocation, panicLocation *pruntime.CodeLocation, err error) {
 	deferLocation = pruntime.NewCodeLocation(0)
-	defer Recover(func() DA { return A() }, &err, NoOnError)
+	defer Recover(func() DA { return A() }, &err, diagnosingNoOnerror)
 
 	panickingFunction(&panicLocation)
 	return
@@ -80,7 +92,12 @@ func recoverDaPanic() (deferLocation, panicLocation *pruntime.CodeLocation, err 
 
 // provides a code location on the same line as a panic is caused
 func panickingFunction(panicLine **pruntime.CodeLocation) {
-	if *panicLine = pruntime.NewCodeLocation(0); *(*int)(nil) != 0 {
+	var intp *int
+	if false {
+		var i int
+		intp = &i
+	}
+	if *panicLine = pruntime.NewCodeLocation(0); *intp != 0 {
 		_ = 1
 	}
 }

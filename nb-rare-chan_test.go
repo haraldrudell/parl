@@ -1,5 +1,5 @@
 /*
-© 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
+© 2024–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 ISC License
 */
 
@@ -86,13 +86,15 @@ func TestNBRareChan(t *testing.T) {
 	case <-timerC():
 	}
 
-	// StopSend emptyAwaitable should work
+	// StopSend: emptyAwaitable should work
 	reset()
 	nbChan.Send(value1)
 	emptyAwaitable = nbChan.StopSend()
+	// StopSend should return non-nil channel
 	if emptyAwaitable == nil {
 		t.Fatal("StopSend emptyawaitable nil")
 	}
+	// StopSend should return untriggered open awaitable for non-empty channel
 	select {
 	case <-emptyAwaitable:
 		t.Error("StopSend emptyAwaitable closed before channel empty")
@@ -103,6 +105,10 @@ func TestNBRareChan(t *testing.T) {
 	case <-timerC():
 		t.Fatal("nbChan.Ch timeout")
 	}
+	// StopSend-provided awaitable should close upon channel emptying
+	//	- in race condition with exiting sendThread
+	//	- use sync.WaitGroup to proivide synchronization
+	nbChan.threadWait.Wait()
 	select {
 	case <-emptyAwaitable:
 	default:

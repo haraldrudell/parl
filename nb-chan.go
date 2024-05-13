@@ -58,6 +58,9 @@ const (
 //   - NBChan has contention-separation between Send/SendMany and Get
 //   - NBChan used as an error channel avoids the sending thread blocking
 //     from a delayed or missing reader.
+//   - see also:
+//   - — [AwaitableSlice] unbound awaitable queue
+//   - — [NBRareChan] low-usage unbound channel
 //
 // Usage:
 //
