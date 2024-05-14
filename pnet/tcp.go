@@ -8,14 +8,12 @@ package pnet
 import (
 	"net"
 	"net/http"
-	"sync"
 )
 
 type Tcp struct {
 	net.Addr // interface
 	http.ServeMux
 	http.Server
-	mutex sync.Mutex
 }
 
 /*

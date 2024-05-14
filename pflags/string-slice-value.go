@@ -19,8 +19,10 @@ type Value interface {
 
 // StringSliceValue manages a string-slice value for [flag.Var]
 type StringSliceValue struct {
-	p         *[]string
-	didUpdate bool // didUpdate allows to erase the default value on first Set invocation
+	providedStringsp *[]string
+	// didUpdate allows to erase the default value on first Set invocation
+	//	- on first provided option, any default strings should be discarded
+	didUpdate bool
 }
 
 // NewStringSliceValue initializes a slice option
@@ -29,7 +31,7 @@ type StringSliceValue struct {
 //   - [flag.Value] is an interface of the flag package storing non-standard value types
 func NewStringSliceValue(slicePointer *[]string, defaultValue []string) (v flag.Value) {
 	*slicePointer = append([]string{}, defaultValue...)
-	v = &StringSliceValue{p: slicePointer}
+	v = &StringSliceValue{providedStringsp: slicePointer}
 	return
 }
 
@@ -39,15 +41,21 @@ func NewStringSliceValue(slicePointer *[]string, defaultValue []string) (v flag.
 func (v *StringSliceValue) Set(optionValue string) (err error) {
 	if !v.didUpdate {
 		v.didUpdate = true
-		*v.p = nil // clear the slice
+		*v.providedStringsp = nil // clear the slice
 	}
-	*v.p = append(*v.p, optionValue)
+	*v.providedStringsp = append(*v.providedStringsp, optionValue)
 
 	return
 }
 
+// StringSliceValue implements flag.Value
+//   - type Value interface { String() string; Set(string) error }
+var _ flag.Value = &StringSliceValue{}
+
 // flag package invoke String to render default value
 func (v StringSliceValue) String() (s string) {
-	s = strings.Join(*v.p, "\x20")
+	if stringSlicep := v.providedStringsp; stringSlicep != nil {
+		s = strings.Join(*stringSlicep, "\x20")
+	}
 	return
 }

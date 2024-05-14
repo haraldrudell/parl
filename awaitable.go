@@ -53,9 +53,23 @@ func (a *Awaitable) Close() (didClose bool) {
 	return // didClose return
 }
 
+// CloseEv triggers awaitable by closing the channel
+//   - the Awaiatable will eventually close but
+//     threads may return prior the channel actually closed
+//   - idempotent, deferrable, panic-free, thread-safe
+func (a *Awaitable) CloseEv() (didClose bool) {
+	var ch = a.atomicCh()
+	if didClose = a.isClosed.CompareAndSwap(false, true); !didClose {
+		return // already closed return
+	}
+	close(ch)
+	return // didClose return
+}
+
 // atomicCh returns a non-nil channel using atomic mechanic
 func (a *Awaitable) atomicCh() (ch chan struct{}) {
-	var newChan chan struct{}
+	// as pointer defers allocation
+	var newChanp *chan struct{}
 	for {
 		var loadedChanp = a.chanp.Load()
 		if loadedChanp != nil {
@@ -63,11 +77,13 @@ func (a *Awaitable) atomicCh() (ch chan struct{}) {
 				return // channel from atomic pointer
 			}
 		}
-		if newChan == nil {
-			newChan = make(chan struct{})
+		if newChanp == nil {
+			// allocation here
+			var newChan = make(chan struct{})
+			newChanp = &newChan
 		}
-		if a.chanp.CompareAndSwap(loadedChanp, &newChan) {
-			ch = newChan
+		if a.chanp.CompareAndSwap(loadedChanp, newChanp) {
+			ch = *newChanp
 			return // channel written to atomic pointer
 		}
 	}

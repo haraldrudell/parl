@@ -58,7 +58,7 @@ type SocketListener[C net.Conn] struct {
 	// allows waiting for close complete
 	closeWait chan struct{}
 	// the channel never closes
-	errCh parl.NBChan[error]
+	errs parl.ErrSlice
 	// cached error from [SocketListener.close]
 	closeErr     atomic.Pointer[error]
 	threadSource atomic.Pointer[ThreadSource[C]]
@@ -147,33 +147,31 @@ func (s *SocketListener[C]) Listen(socketString string) (err error) {
 // Ch returns a real-time error channel
 //   - the channel never closes
 //   - unread errors can also be collected using [TCPListener.Err]
-func (s *SocketListener[C]) Ch() (ch <-chan error) {
-	return s.errCh.Ch()
-}
+func (s *SocketListener[C]) Errs() (errs parl.Errs) { return &s.errs }
 
 func (s *SocketListener[C]) SetThreadSource(threadSource ThreadSource[C]) {
 	s.threadSource.Store(&threadSource)
 }
 
 // AcceptConnections is a blocking function handling inbound connections
-//   - AcceptConnections can only be invoked once
-//   - handler must be non-nil or
-//   - socket state must be Listening
-//   - accepts connections until Close is invoked despite errors
-//   - handler must invoke net.Conn.Close
+//   - handler: must be non-nil or a ThreadSource must be active
+//   - goodClose true: Accept ended with net.ErrClosed
+//   - goodClose false: Accept ended with an unknown error
+//   - AcceptConnections:
+//   - — accepts connections until the socket is closed by invoking Close
+//   - — can only be invoked once and socket state must be Listening
+//   - handler or ThreadSouce must invoke [net.Conn.Close]
 func (s *SocketListener[C]) AcceptConnections(handler func(C)) (goodClose bool) {
 	var isPanic bool
 	var cReceiver ConnectionReceiver[C]
 	defer s.close(threadExitSendsErrorOnChannel)
 	if err := s.setAcceptState(); err != nil {
-		s.errCh.Send(err)
+		s.errs.AddError(err)
 		return
 	}
 	defer s.acceptWait.Done()                  // indicate accept thread exited
 	defer s.waitForConns(&cReceiver, &isPanic) // wait for connection goroutines
-	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, func(err error) {
-		s.errCh.AddErrorProc(err)
-	})
+	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errs.AddError)
 
 	s.handler = handler
 	var err error
@@ -182,12 +180,12 @@ func (s *SocketListener[C]) AcceptConnections(handler func(C)) (goodClose bool) 
 
 		// obtain connection receiver from possible thread source
 		if cReceiver, err = s.getReceiver(); err != nil {
-			s.errCh.Send(err)
+			s.errs.AddError(err)
 			return // [ThreadSource.Receiver] failed
 		} else if cReceiver != nil {
 			s.connWait.Add(1)
 		} else if handler == nil {
-			s.errCh.Send(perrors.NewPF("handler cannot be nil"))
+			s.errs.AddError(perrors.NewPF("handler cannot be nil"))
 			return // no receiver no handler return
 		}
 
@@ -198,14 +196,14 @@ func (s *SocketListener[C]) AcceptConnections(handler func(C)) (goodClose bool) 
 					return // use of closed: assume shutdown: ListenTCP4 is closed
 				}
 			}
-			s.errCh.Send(perrors.ErrorfPF("TCPListener.Accept: %T '%[1]w'", err)) // some error
+			s.errs.AddError(perrors.ErrorfPF("TCPListener.Accept: %T '%[1]w'", err)) // some error
 			continue
 		}
 
 		// type assert connection: closes conn if assertion fails
 		var c C
 		if c, err = s.assertConnection(conn); err != nil {
-			s.errCh.Send(err)
+			s.errs.AddError(err)
 			return // connection cannot asserted to C return: never happens
 		}
 
@@ -257,7 +255,7 @@ func (s *SocketListener[C]) Err(errp *error) {
 	if errp == nil {
 		panic(perrors.NewPF("errp cannot be nil"))
 	}
-	for _, err := range s.errCh.Get() {
+	for _, err := range s.errs.Errors() {
 		*errp = perrors.AppendError(*errp, err)
 	}
 }
@@ -318,7 +316,7 @@ func (s *SocketListener[C]) close(sendError bool) (didClose bool, err error) {
 	if parl.Close(s.netListener, &err); perrors.Is(&err, "TCPListener.Close %w", err) {
 		s.closeErr.Store(&err)
 		if sendError {
-			s.errCh.Send(err)
+			s.errs.AddError(err)
 		}
 	}
 
@@ -337,6 +335,7 @@ func (s *SocketListener[C]) invokeHandle(connImpl C, cReceiver ConnectionReceive
 }
 
 func (s *SocketListener[C]) waitForConns(cReceiverp *ConnectionReceiver[C], isPanic *bool) {
+	_ = isPanic
 	if cReceiver := *cReceiverp; cReceiver != nil {
 		cReceiver.Shutdown()
 	}
@@ -351,7 +350,7 @@ func (s *SocketListener[C]) waitForConns(cReceiverp *ConnectionReceiver[C], isPa
 //   - invokeHandler recovers panic in handler function
 func (s *SocketListener[C]) invokeHandler(connImpl C) {
 	defer s.connWait.Done()
-	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errCh.AddErrorProc)
+	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errs.AddError)
 
 	s.handler(connImpl)
 }
@@ -367,7 +366,7 @@ func (s *SocketListener[C]) getReceiver() (cReceiver ConnectionReceiver[C], err 
 		return
 	}
 
-	if cReceiver, err = ts.Receiver(&s.connWait, s.errCh.Send); err != nil {
+	if cReceiver, err = ts.Receiver(&s.connWait, s.errs.AddError); err != nil {
 		return // error from [ThreadSource.Receiver]
 	} else if cReceiver == nil {
 		err = perrors.NewPF("Received nil ConnectionReceiver")

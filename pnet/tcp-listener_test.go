@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -87,20 +88,20 @@ func (c *connectionHandlerFixture) connFunc(conn *net.TCPConn) {
 }
 
 func (c *connectionHandlerFixture) errorListenerThread(
-	socketErrCh <-chan error,
+	errs parl.Errs,
 	socketCloseCh <-chan struct{},
 	wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	var err error
-	var ok bool
 	for {
 		select {
 		case <-socketCloseCh:
 			return
-		case err, ok = <-socketErrCh:
-			if !ok {
-				panic(perrors.New("socket error channel closed"))
+		case <-errs.WaitCh():
+			err, _ = errs.Error()
+			if err == nil {
+				panic(perrors.New("socket error nil"))
 			}
 			panic(err)
 		}
@@ -127,7 +128,7 @@ func TestAcceptThread(t *testing.T) {
 
 	// error listener thread
 	threadWait.Add(1)
-	go fixture.errorListenerThread(socket.Ch(), socket.WaitCh(), &threadWait)
+	go fixture.errorListenerThread(socket.Errs(), socket.WaitCh(), &threadWait)
 
 	// invoke AcceptConnections
 	t.Log("socket.AcceptThread…")

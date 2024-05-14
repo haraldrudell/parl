@@ -5,7 +5,10 @@ ISC License
 
 package parl
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestAwaitableSlice(t *testing.T) {
 	var value1, value2, value3 = 1, 2, 3
@@ -29,14 +32,15 @@ func TestAwaitableSlice(t *testing.T) {
 	slice.Send(value1)
 	slice.SendSlice([]int{value2})
 	slice.Send(value3)
-	t.Logf("q: %v slices: %v", slice.queue, slice.slices)
+	// populated Slice: q: [1] slices: [[2] [3]]
+	t.Logf("populated Slice: q: %v slices: %v", slice.queue, slice.slices)
 	for i, v := range values {
 		actual, hasValue = slice.Get1()
 		if !hasValue {
-			t.Errorf("Get1:%d hasValue false", i)
+			t.Errorf("Get1#%d hasValue false", i)
 		}
 		if actual != v {
-			t.Errorf("Get1:%d %d exp %d", i, actual, v)
+			t.Errorf("Get1#%d %d exp %d", i, actual, v)
 		}
 	}
 	// Get1 empty returns hasValue false
@@ -54,16 +58,30 @@ func TestAwaitableSlice(t *testing.T) {
 	for i, v := range values {
 		actuals = slice.Get()
 		if len(actuals) != 1 {
-			t.Error("Get hasValue false")
+			t.Fatalf("Get#%d hasValue false", i)
 		}
 		if actuals[0] != v {
-			t.Errorf("Get%d %d exp %d", i, actuals[0], v)
+			t.Errorf("Get#%d %d exp %d", i, actuals[0], v)
 		}
 	}
 	// Get empty returns nil
 	actuals = slice.Get()
 	if actuals != nil {
 		t.Errorf("Get actuals not nil: %d%v", len(actuals), actuals)
+	}
+
+	// GetAll returns single slice
+	reset()
+	slice.Send(value1)
+	slice.SendSlice([]int{value2})
+	slice.Send(value3)
+	actuals = slice.GetAll()
+	if !slices.Equal(actuals, values) {
+		t.Errorf("GetAll %v exp %v", actuals, values)
+	}
+	actuals = slice.GetAll()
+	if actuals != nil {
+		t.Errorf("GetAll empty not nil: %d%v", len(actuals), actuals)
 	}
 
 	// SetSize should be effective
@@ -101,5 +119,45 @@ func TestAwaitableSlice(t *testing.T) {
 	}
 	if isOpen {
 		t.Error("DataWaitCh hasData ch not closed")
+	}
+
+	// EndCh for empty returns Closed
+	reset()
+	ch = slice.EmptyCh()
+	isOpen = true
+	select {
+	case <-ch:
+		isOpen = false
+	default:
+	}
+	if isOpen {
+		t.Error("EndCh empty ch not closed")
+	}
+
+	// EndCh for hasData returns Open
+	reset()
+	slice.Send(value1)
+	ch = slice.EmptyCh()
+	isOpen = true
+	select {
+	case <-ch:
+		isOpen = false
+	default:
+	}
+	if !isOpen {
+		t.Error("EndCh hasData ch closed")
+	}
+	// EndCh closes on out-of-data
+	actual, hasValue = slice.Get1()
+	_ = actual
+	_ = hasValue
+	isOpen = true
+	select {
+	case <-ch:
+		isOpen = false
+	default:
+	}
+	if isOpen {
+		t.Error("EndCh empty ch not closed")
 	}
 }

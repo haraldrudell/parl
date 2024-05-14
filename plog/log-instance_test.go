@@ -165,10 +165,11 @@ func TestRegexpLogI(t *testing.T) {
 	lg.Debug(textNewline)
 	actualSlice = writer.getData()
 	if len(actualSlice) != 1 {
+		var r = lg.infoRegexp.Load()
 		t.Logf("matching regexp did not print 1: %d regexp input:\n%q compiled:\n%+v",
 			len(actualSlice),
 			matchingRegexp,
-			lg.infoRegexp)
+			r)
 		t.Fail()
 	}
 	actual = actualSlice[0]

@@ -107,7 +107,7 @@ func TestNBRareChan(t *testing.T) {
 	}
 	// StopSend-provided awaitable should close upon channel emptying
 	//	- in race condition with exiting sendThread
-	//	- use sync.WaitGroup to proivide synchronization
+	//	- use sync.WaitGroup to provide synchronization
 	nbChan.threadWait.Wait()
 	select {
 	case <-emptyAwaitable:

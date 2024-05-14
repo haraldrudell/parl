@@ -62,10 +62,6 @@ type ErrorManager interface {
 	Ch() (ch <-chan GoError)
 }
 
-type ErrorSink interface {
-	AddError(err error)
-}
-
 type ErrorCloser interface {
 	InvokeIfError(addError func(err error))
 	Close()

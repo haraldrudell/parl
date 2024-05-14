@@ -7,6 +7,7 @@ package errorglue
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/haraldrudell/parl/perrors/panicdetector"
 	"github.com/haraldrudell/parl/pruntime"
@@ -14,8 +15,19 @@ import (
 
 // FirstPanicStack checks all stack traces, oldest first, for
 // a panic and returns:
+//   - stack:
 //   - — the panic stack if any
 //   - — otherwise, the oldest stack if any
+//   - — otherwise nil
+//   - isPanic true: a panic stack was found
+//   - — recoveryIndex panicIndex are valid
+//   - numberOfStacks: the number of stacks until the panic stack including it,
+//     or the total number of stacks
+//   - errorWithStack:
+//   - — if panic, the error providing the oldest panic stack
+//   - — otherwise, the oldest error with a stack
+//   - — otherwise, the oldest error
+//   - — otherwise nil
 //   - this enables consumer to print:
 //   - — panic location if any
 //   - — otherwise, oldest error location if any
@@ -42,33 +54,51 @@ func FirstPanicStack(err error) (
 	errorWithStack error,
 ) {
 
-	// need to associate any panic stack with its exact error
-	// must traverse errors from oldest to newest
-	//	- an error chain is a single-linked list newest first
-	//	- this list must be reversed
+	// any panic stack need to be associated with its exact error
+	//	- normally, the returned stack is from any older error in the chain
+	//	- therefore, the err’s error chain must be traversed
+	//	- the error chain is a directed single-linked list newest error first
+	//	- —
+	//	- if there is no panic, the oldest stack trace is what will be displayed, ie. the source of the error
+	//	- a panic can be in a newer stack trace if an error with a stack trace is provided to panic
+	//	- therefore, the oldest panic stack trace should be provided
+
+	// errs is the expanded error chain
+	//	- err first that is newest, then older errrors
 	var errs []error
 	for e := err; e != nil; e = errors.Unwrap(e) {
 		errs = append(errs, e)
 	}
+	// errs now begin with oldest error, ending with err
+	slices.Reverse(errs)
 
-	// if there is no panic,
-	// the oldest stack should be returned
-	//	- keep track of it here
+	// oldestStack contains the oldest stack trace
+	//	- if there is no panic, this should be returned
 	var oldestStack pruntime.Stack
+	// the oldest error, or
+	// if a stack was found, the oldest error with a stack
 	var oldestErr error
 
 	// scan for panic-stack, oldest error first
 	for _, e := range errs {
+
+		// check if e contains a stack trace
 		if errWithStack, ok := e.(ErrorCallStacker); ok {
+			// save stack
 			stack = errWithStack.StackTrace()
 			if oldestStack == nil {
+				// store oldest stack
 				oldestStack = stack
+				// store oldest error or oldest error with stack
 				oldestErr = e
 			}
+			// store the error providing stack
 			errorWithStack = e
 		} else {
 			continue // an error without stack
 		}
+		// increase number of stack until panic,
+		// or total number of stacks
 		numberOfStacks++
 
 		// check if the stack trace has a panic
@@ -84,5 +114,4 @@ func FirstPanicStack(err error) (
 	errorWithStack = oldestErr
 
 	return // no panic-stack return
-
 }

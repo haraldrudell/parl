@@ -19,8 +19,19 @@ const (
 	YamlYes YamlOption = true
 	// indicates silent: no banner. Must be first option on command-line ‘-silent’
 	SilentString = "-" + silentOption
+	// name of version option
+	Version = "version"
+)
+
+const (
+	// name of silent option
 	silentOption = "silent"
-	Version      = "version"
+	// help text for =-verbose
+	verboseOptionHelp = "Regular expression for selective debug matched against CodeLocation FuncName" +
+		"\nmain.main: -verbose=main.main" +
+		"\ngithub.com/haraldrudell/parl/mains.(*Executable).Init: -verbose=mains...Executable" +
+		"\ngithub.com/haraldrudell/parl/mains.Func: -verbose=mains.Func" +
+		"\nper https://github.com/google/re2/wiki/Syntax"
 )
 
 // type for second argument to [BaseOptionData]
@@ -43,7 +54,7 @@ func BaseOptionData(program string, yaml YamlOption) (optionData []pflags.Option
 
 	var nonYamlOptions = []pflags.OptionData{
 		{P: &BaseOptions.Version, Name: Version, Value: false, Usage: "displays version"},
-		{P: &BaseOptions.Verbosity, Name: "verbose", Value: "", Usage: "Regular expression for selective debug, eg. main.main: https://github.com/google/re2/wiki/Syntax"},
+		{P: &BaseOptions.Verbosity, Name: "verbose", Value: "", Usage: verboseOptionHelp},
 		{P: &BaseOptions.Debug, Name: pflags.DebugOptionName, Value: false, Usage: "Global debug printing with code locations and long stack traces"},
 		{P: &BaseOptions.Silent, Name: silentOption, Value: false, Usage: "Suppresses banner and informational output. Must be first option"},
 	}
