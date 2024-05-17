@@ -12,7 +12,7 @@ type ErrSlice struct {
 var _ Errs = &ErrSlice{}
 var _ ErrorSink = &ErrSlice{}
 
-func (e *ErrSlice) Error() (error, bool)     { return e.errs.Get1() }
+func (e *ErrSlice) Error() (error, bool)     { return e.errs.Get() }
 func (e *ErrSlice) Errors() (errs []error)   { return e.errs.GetAll() }
 func (e *ErrSlice) WaitCh() (ch AwaitableCh) { return e.errs.DataWaitCh() }
 func (e *ErrSlice) AddError(err error)       { e.errs.Send(err) }

@@ -20,14 +20,14 @@ func TestAwaitableSlice(t *testing.T) {
 	var hasValue, isOpen bool
 	var ch AwaitableCh
 
-	// DataWaitCh Get Get1 Send SendSlice SetSize
+	// DataWaitCh EmptyCh Get Get1 GetAll Send SendSlice SetSize
 	var slice *AwaitableSlice[int]
 	var reset = func() {
 		slice = &AwaitableSlice[int]{}
 	}
 
-	// Get1 returns one value at a a time
-	//	- Send SendSlice
+	// Get1 should return one value at a a time
+	//	- Send SendSlice should work
 	reset()
 	slice.Send(value1)
 	slice.SendSlice([]int{value2})
@@ -35,7 +35,7 @@ func TestAwaitableSlice(t *testing.T) {
 	// populated Slice: q: [1] slices: [[2] [3]]
 	t.Logf("populated Slice: q: %v slices: %v", slice.queue, slice.slices)
 	for i, v := range values {
-		actual, hasValue = slice.Get1()
+		actual, hasValue = slice.Get()
 		if !hasValue {
 			t.Errorf("Get1#%d hasValue false", i)
 		}
@@ -43,20 +43,20 @@ func TestAwaitableSlice(t *testing.T) {
 			t.Errorf("Get1#%d %d exp %d", i, actual, v)
 		}
 	}
-	// Get1 empty returns hasValue false
-	actual, hasValue = slice.Get1()
+	// Get1 empty should returns hasValue false
+	actual, hasValue = slice.Get()
 	_ = actual
 	if hasValue {
 		t.Error("Get1 hasValue true")
 	}
 
-	// Get returns a slice at a a time
+	// Get should return one slice at a a time
 	reset()
 	slice.Send(value1)
 	slice.SendSlice([]int{value2})
 	slice.Send(value3)
 	for i, v := range values {
-		actuals = slice.Get()
+		actuals = slice.GetSlice()
 		if len(actuals) != 1 {
 			t.Fatalf("Get#%d hasValue false", i)
 		}
@@ -65,12 +65,12 @@ func TestAwaitableSlice(t *testing.T) {
 		}
 	}
 	// Get empty returns nil
-	actuals = slice.Get()
+	actuals = slice.GetSlice()
 	if actuals != nil {
 		t.Errorf("Get actuals not nil: %d%v", len(actuals), actuals)
 	}
 
-	// GetAll returns single slice
+	// GetAll should return all values in a single slice
 	reset()
 	slice.Send(value1)
 	slice.SendSlice([]int{value2})
@@ -88,14 +88,14 @@ func TestAwaitableSlice(t *testing.T) {
 	reset()
 	slice.SetSize(size)
 	slice.Send(value1)
-	actuals = slice.Get()
+	actuals = slice.GetSlice()
 	if cap(actuals) != size {
 		t.Errorf("SetSize %d exp %d", cap(actuals), size)
 	}
 
-	// DataWaitCh starts open
+	// DataWaitCh
 	reset()
-	// DataWaitCh empty should return non-nil open channel
+	// DataWaitCh on creation should return non-nil, open channel
 	ch = slice.DataWaitCh()
 	if ch == nil {
 		t.Error("DataWaitCh nil")
@@ -109,7 +109,7 @@ func TestAwaitableSlice(t *testing.T) {
 	if !isOpen {
 		t.Error("DataWaitCh ch not open")
 	}
-	// DataWaitCh hasData should close
+	// hasData true should close the returned channel
 	slice.Send(value1)
 	isOpen = true
 	select {
@@ -121,7 +121,7 @@ func TestAwaitableSlice(t *testing.T) {
 		t.Error("DataWaitCh hasData ch not closed")
 	}
 
-	// EndCh for empty returns Closed
+	// EndCh on creation should return non-nil closed channel
 	reset()
 	ch = slice.EmptyCh()
 	isOpen = true
@@ -134,7 +134,7 @@ func TestAwaitableSlice(t *testing.T) {
 		t.Error("EndCh empty ch not closed")
 	}
 
-	// EndCh for hasData returns Open
+	// EndCh for hasData true returns open channel
 	reset()
 	slice.Send(value1)
 	ch = slice.EmptyCh()
@@ -145,10 +145,10 @@ func TestAwaitableSlice(t *testing.T) {
 	default:
 	}
 	if !isOpen {
-		t.Error("EndCh hasData ch closed")
+		t.Error("EmptyCh hasData ch closed")
 	}
-	// EndCh closes on out-of-data
-	actual, hasValue = slice.Get1()
+	// hasData to false should close the returned channel
+	actual, hasValue = slice.Get()
 	_ = actual
 	_ = hasValue
 	isOpen = true
@@ -158,6 +158,30 @@ func TestAwaitableSlice(t *testing.T) {
 	default:
 	}
 	if isOpen {
-		t.Error("EndCh empty ch not closed")
+		t.Error("EmptyCh empty ch not closed")
+	}
+
+	// EmptyCh CloseAwaiter should defer empty detection
+	reset()
+	ch = slice.EmptyCh(CloseAwaiter)
+	isOpen = true
+	select {
+	case <-ch:
+		isOpen = false
+	default:
+	}
+	if !isOpen {
+		t.Error("EmptyCh CloseAwaiter doe not defer empty detection")
+	}
+	// EmptyCh without CloseAwaiter should close the returned channel
+	_ = slice.EmptyCh()
+	isOpen = true
+	select {
+	case <-ch:
+		isOpen = false
+	default:
+	}
+	if isOpen {
+		t.Error("subsequent EmptyCh does not close the channel")
 	}
 }

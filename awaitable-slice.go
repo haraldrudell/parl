@@ -20,9 +20,9 @@ const (
 )
 
 // AwaitableSlice is a queue as thread-safe awaitable unbound slice of element value T or slices of value T
-//   - [AwaitableSlice.Send] [AwaitableSlice.Get1] allows efficient
+//   - [AwaitableSlice.Send] [AwaitableSlice.Get] allows efficient
 //     transfer of single values
-//   - [AwaitableSlice.SendSlice] [AwaitableSlice.Get] allows efficient
+//   - [AwaitableSlice.SendSlice] [AwaitableSlice.GetSlice] allows efficient
 //     transfer of slices where
 //     a sender relinquish slice ownership by invoking SendSlice and
 //     a receiving thread gains slice ownership by invoking Get
@@ -38,9 +38,28 @@ const (
 //   - — offers high-throughput multiple-value operations SendSlice Get
 //   - — avoids temporary large-slice memory leaks by using size
 //   - — avoids temporary memory leaks by zero-out of unused slice elements
+//   - — although the slice can transfer values almost allocation free or
+//     multiple values at a time,
+//     the wait mechanic requires pointer allocation 10 ns,
+//     channel make 21 ns, channel close 9 ns as well as
+//     CAS operations 8/21 ns
 //   - see also:
 //   - — [NBChan] fully-featured unbound channel
 //   - — [NBRareChan] low-usage unbound channel
+//
+// Usage:
+//
+//	var dataSink parl.AwaitableSlice[*Value]
+//	var sender parl.Send = &dataSink
+//	go someWhere(sender)
+//	for {
+//	  select {
+//	  case <-dataSink.DataWaitCh():
+//	    for i, hasValue := 0, true; i < 100 && hasValue; i++ {
+//	      var value *Value
+//	      if value, hasValue = dataSink.Get1(); hasValue {
+//	        doSomething(value)
+//	…
 type AwaitableSlice[T any] struct {
 	// allocation size for new slices, effective if > 0
 	//	- 10 or larger value from SetSize
@@ -65,16 +84,24 @@ type AwaitableSlice[T any] struct {
 	// indicates at all times whether the queue is empty
 	//	- allows for updateDataWait to be invoked without any locks held
 	//	- written behind queueLock
-	hasData     atomic.Bool
+	hasData atomic.Bool
+	// a pre-allocated slice for queue
+	//	- behind queueLock
+	//	- allocated by Get Get1 GetAll prior to acquiring queueLock
 	cachedInput []T
 	// outputLock makes output thread-safe
 	//	- outputLock also makes Get1 Get critical sections
 	outputLock sync.Mutex
 	// output is a slice being sliced away from
 	//	- behind outputLock, slice-away slice
-	output, output0   []T
+	output, output0 []T
+	// outputs contains entire-slice values
+	//	- behind outputLock, slice-away slice
 	outputs, outputs0 [][]T
-	cachedOutput      []T
+	// a pre-allocated slice for queue
+	//	- behind outputLock
+	//	- allocated by Get Get1 GetAll prior to acquiring queueLock
+	cachedOutput []T
 	// lazy DataWaitCh
 	dataWait LazyCyclic
 	// lazy emptyWait
@@ -165,12 +192,23 @@ func (s *AwaitableSlice[T]) DataWaitCh() (ch AwaitableCh) {
 	return
 }
 
-func (s *AwaitableSlice[T]) EmptyCh() (ch AwaitableCh) {
+// [AwaitableSlice.EmptyCh] initialize: this invocation
+// will wait for close-like state, do not activate EmptyCh awaitable
+const CloseAwaiter = false
+
+// EmptyCh returns an awaitable channel that closes on queue being or
+// becoming empty
+//   - doNotInitialize missing: enable closing of ch which will happen as soon
+//     as the slice is empty, possibly prior to return
+//   - doNotInitialize CloseAwaiter: obtain the channel but do not enable it closing.
+//     A subsequent invocation with doNotInitialize missing will enable its closing thus
+//     act as a deferred Close function
+func (s *AwaitableSlice[T]) EmptyCh(doNotInitialize ...bool) (ch AwaitableCh) {
 	// this may initialize the cyclic awaitable
 	ch = s.emptyWait.Cyclic.Ch()
 
 	// if previously invoked, no need for initialization
-	if s.emptyWait.IsActive.Load() {
+	if len(doNotInitialize) > 0 || s.emptyWait.IsActive.Load() {
 		return // not first invocation
 	}
 
@@ -188,12 +226,14 @@ func (s *AwaitableSlice[T]) EmptyCh() (ch AwaitableCh) {
 	return
 }
 
-// Get1 returns one value if the queue is not empty
+// Get returns one value if the queue is not empty
 //   - hasValue true: value is valid
 //   - hasValue false: the queue is empty
-//   - Get1 may attain allocation-free receive or allocation-free operation
-//   - Thread-safe
-func (s *AwaitableSlice[T]) Get1() (value T, hasValue bool) {
+//   - Get may attain allocation-free receive or allocation-free operation
+//   - — a slice is not returned
+//   - — an internal slice may be reused reducing allocations
+//   - thread-safe
+func (s *AwaitableSlice[T]) Get() (value T, hasValue bool) {
 	if !s.hasData.Load() {
 		return
 	}
@@ -235,18 +275,19 @@ func (s *AwaitableSlice[T]) Get1() (value T, hasValue bool) {
 	return
 }
 
-// Get returns a slice of values from the queue
+// GetSlice returns a slice of values from the queue
 //   - values non-nil: a non-empty slice at a time, not necessarily all data.
 //     values is never non-nil and empty
-//   - — if data arrives via Send, each Get empties the queue
-//   - — if data arrives via SendMany, each Get receives one SendMany slice
+//   - — Send-GetSlice: each GetSlice empties the queue
+//   - — SendMany-GetSlice: each GetSlice receives one SendMany slice
 //   - values nil: the queue is empty
-//   - Get may increase performance by slice-at-a-time operation
-//   - SendMany-Get operation is low allocation operation but requires
-//     sender to allocate slices
-//   - Send-Get operation causes Get to allocate the slices returned
-//   - Thread-safe
-func (s *AwaitableSlice[T]) Get() (values []T) {
+//   - GetSlice may increase performance by slice-at-a-time operation, however,
+//     slices need to be allocated:
+//   - — Send-GetSlice requires internal slice allocation
+//   - — SendMany-GetSlice requires sender to allocate slices
+//   - — Send-Get1 may reduce allocations
+//   - thread-safe
+func (s *AwaitableSlice[T]) GetSlice() (values []T) {
 	if !s.hasData.Load() {
 		return
 	}
@@ -276,6 +317,8 @@ func (s *AwaitableSlice[T]) Get() (values []T) {
 	return
 }
 
+// GetAll returns a single slice of all unread values in the queue
+//   - values nil: the queue is empty
 func (s *AwaitableSlice[T]) GetAll() (values []T) {
 	if !s.hasData.Load() {
 		return
@@ -347,6 +390,7 @@ func (s *AwaitableSlice[T]) SetSize(size int) {
 	s.maxRetainSize.Store(maxSize)
 }
 
+// fetch1 retrieves the next value if any from the slice-away slice slicep
 func (s *AwaitableSlice[T]) fetch1(slicep *[]T) (value T, hasValue bool) {
 	var slice = *slicep
 	if hasValue = len(slice) > 0; hasValue {
@@ -471,6 +515,7 @@ func (s *AwaitableSlice[T]) updateWait() {
 		if s.hasData.Load() == s.dataWait.Cyclic.IsClosed() {
 			return // atomically state was ok
 		}
+		// atomic check based on emptyWait
 	} else if !s.emptyWait.IsActive.Load() {
 		return // neither is active
 		// close emptyCh if empty
@@ -500,7 +545,9 @@ func (s *AwaitableSlice[T]) updateWait() {
 			// hasData false: open dataWait
 			s.dataWait.Cyclic.Open()
 			// hasData false: trigger emptyWait
-			s.emptyWait.Cyclic.Close()
+			if s.emptyWait.IsActive.Load() {
+				s.emptyWait.Cyclic.Close()
+			}
 			return
 		}
 	}
@@ -514,6 +561,8 @@ func (s *AwaitableSlice[T]) updateWait() {
 	s.emptyWait.Cyclic.Close()
 }
 
+// ensureSize ensures that size and maxRetainSize are initialized
+//   - size: the configured allocation-size of a new queue slice
 func (s *AwaitableSlice[T]) ensureSize() (size int) {
 	// ensure size sizeMax are initialized
 	if size = s.size.Load(); size == 0 {
@@ -523,6 +572,9 @@ func (s *AwaitableSlice[T]) ensureSize() (size int) {
 	return
 }
 
+// preAlloc ensures that output0 and cachedOutput are allocated
+// to configured size
+//   - must hold outputLock
 func (s *AwaitableSlice[T]) preAlloc() {
 
 	// output0 first pre-allocation
@@ -551,6 +603,9 @@ func (s *AwaitableSlice[T]) preAlloc() {
 	}
 }
 
+// transferCached transfers cachedOutput from
+// outputLock to queueLock if possible
+//   - invoked while holding outputLock queueLock
 func (s *AwaitableSlice[T]) transferCached() {
 
 	// transfer cachedOutput to queueLock
@@ -560,11 +615,18 @@ func (s *AwaitableSlice[T]) transferCached() {
 	}
 }
 
+// postGet relinquishes outputLock and
+// initializes eventual update of DataWaitCh and EmptyCh
+//   - aggregates deferred actions to reduce latency
+//   - invoked while holding outputLock
 func (s *AwaitableSlice[T]) postGet() {
 	s.outputLock.Unlock()
 	s.updateWait()
 }
 
+// singleSlice fetches values if contained in a single slice
+//   - reduces slice allocations by using an existing slice
+//   - invoked while holding outputLock queueLock
 func (s *AwaitableSlice[T]) singleSlice(size int) (values []T) {
 
 	// only output
@@ -611,6 +673,10 @@ func (s *AwaitableSlice[T]) singleSlice(size int) (values []T) {
 	return // got values or is aggregate
 }
 
+// postSend set hasData true, relinquishes queueuLock and
+// initializes eventual update of DataWaitCh and EmptyCh
+//   - aggregates deferred actions to reduce latency
+//   - invoked while holding queueLock
 func (s *AwaitableSlice[T]) postSend() {
 	s.hasData.Store(true)
 	s.queueLock.Unlock()

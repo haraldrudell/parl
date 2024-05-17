@@ -55,31 +55,49 @@ func (a *CyclicAwaitable) IsClosed() (isClosed bool) { return a.aw().IsClosed() 
 
 // Close triggers awaitable by closing the channel
 //   - upon return, the channel is guaranteed to be closed
-//   - idempotent, thread-safe
-func (a *CyclicAwaitable) Close() (didClose bool) { return a.aw().Close() }
-
-// Close triggers awaitable by closing the channel
-//   - upon return, the channel is guaranteed to be closed
-//   - idempotent, thread-safe
-func (a *CyclicAwaitable) CloseEv() (didClose bool) { return a.aw().CloseEv() }
+//   - eventuallyConsistent [EvCon]: may return before the channel is atcually closed
+//     for higher performance
+//   - idempotent, deferrable, panic-free, thread-safe
+func (a *CyclicAwaitable) Close(eventuallyConsistent ...bool) (didClose bool) { return a.aw().Close() }
 
 // Open rearms the awaitable for another cycle
-//   - ch is guaranteed to have been open at time of invocation
+//   - ch is guaranteed to have been open at time of invocation.
+//     Because each Open may return a different channel,
+//     use of the returned ch offers consistent state
 //   - didOpen is true if the channel was encountered closed
-//   - idempotent, thread-safe
+//   - idempotent, thread-safe, panic-free
 func (a *CyclicAwaitable) Open() (didOpen bool, ch AwaitableCh) {
+
+	// eventually consistency does not work for Open
+	//	- Close involves competing threads operating on a unqiue Awaitable
+	//		that has only one event
+	//	- eventual consistency for Open would require synchronization
+	//		of Close and Open invocations
+	//	- this would cost 0.4955 ns for every Close and Open
+	//	- potential savings is only 1.5 ns for detecting an Open following another Open
+
 	// openAwaitable as pointer defers allocation
 	var openAwaitable *Awaitable
 	for {
+
+		// inspect existing Awaitable
 		var awaitable = a.awp.Load()
 		if awaitable != nil && !awaitable.IsClosed() {
+			// at time of IsClosed, the channel was open
 			ch = awaitable.Ch()
 			return // was open return
-		} else if openAwaitable == nil {
-			// allocation here
+		}
+
+		// an Awaitable must be created. It was either:
+		//	- uninitialized or
+		//	- closed
+
+		// create Awaitable candidate
+		if openAwaitable == nil {
 			openAwaitable = &Awaitable{}
 		}
 		if didOpen = a.awp.CompareAndSwap(awaitable, openAwaitable); didOpen {
+			// at time of CAS, channel was open
 			ch = openAwaitable.Ch()
 			return // did open the channel return
 		}
@@ -88,23 +106,18 @@ func (a *CyclicAwaitable) Open() (didOpen bool, ch AwaitableCh) {
 
 // aw returns the active awaitable using atomic mechanic
 func (a *CyclicAwaitable) aw() (aw *Awaitable) {
-	if a == nil {
-		panic(NilError("CyclicAwaitable pointer"))
+
+	// read allocated Awaitable
+	if aw = a.awp.Load(); aw != nil {
+		return // existing awaitable return
 	}
-	// newAwaitable as pointer defers allocation
-	var newAwaitable *Awaitable
-	for {
-		if aw = a.awp.Load(); aw != nil {
-			return // existing awaitable return
-		} else {
-			if newAwaitable == nil {
-				// allocation happens here
-				newAwaitable = &Awaitable{}
-			}
-			if a.awp.CompareAndSwap(nil, newAwaitable) {
-				aw = newAwaitable
-				return // wrote new awaitable return
-			}
-		}
+
+	// create authoritative Awaitable
+	aw = &Awaitable{}
+	if a.awp.CompareAndSwap(nil, aw) {
+		return // wrote new awaitable return
 	}
+
+	// return other thread’s Awaitable
+	return a.awp.Load()
 }

@@ -46,17 +46,24 @@ import (
 //   - — [AwaitableSlice] unbound awaitable queue
 type NBRareChan[T any] struct {
 	// underlying channel
+	//	- closed by first Close invocation
 	closableChan ClosableChan[T]
-	// makes all created threads awaitable
+	// threadWait makes all created send threads awaitable
 	threadWait sync.WaitGroup
 	// queueLock ensures thread-safety of queue
 	//	- also ensures sequenced access to isThread isStopSend
 	queueLock sync.Mutex
-	// accessed behind queueLock
+	// didSend idicates that Send did create a send-thread
+	// whose value may need to be collected on Close
+	//	- behind queueLock
 	didSend bool
-	// accessed behind queueLock
+	// queue is a slice-away slice of unsent data
+	//	- Send appends to queue
+	//	- behind queueLock
 	queue []T
-	// accessed behind queueLock
+	// threadReadingValues indicates that a send thread is
+	// currently reading values from queue
+	//	- accessed behind queueLock
 	threadReadingValues CyclicAwaitable
 	// accessed behind queueLock
 	isStopSend atomic.Bool
@@ -64,7 +71,8 @@ type NBRareChan[T any] struct {
 	isEmpty Awaitable
 	// sendThread panics, should be none
 	errs atomic.Pointer[error]
-	// returned by PanicCh await thread panic
+	// isPanic indicates that a send thread suffered a panic
+	//	- triggers PanicCh awaitable
 	isPanic Awaitable
 	// ensures close executed once
 	closeOnce OnceCh
@@ -124,7 +132,7 @@ func (n *NBRareChan[T]) PanicCh() (emptyAwaitable AwaitableCh) { return n.isPani
 // IsClose returns true if underlying channel is closed
 func (n *NBRareChan[T]) IsClose() (isClose bool) { return n.closableChan.IsClosed() }
 
-// Close immediately closes the channel returning any contained values
+// Close immediately closes the channel returning any unsent values
 //   - values: possible values that were in channel, may be nil
 //   - errp: receives any panics from thread. Should be none. may be nil
 //   - upon return, resources are released and further Send ineffective
@@ -204,19 +212,23 @@ func (n *NBRareChan[T]) sendThreadNextValue() (value T, hasValue bool) {
 		n.queue = n.queue[1:]
 		return
 	}
-
 	// channel detected empty
+
 	//	- notify that sendThread is no longer awaiting values
 	n.threadReadingValues.Close()
+
 	// if StopSend was invoked, notify its awaitable
 	if n.isStopSend.Load() {
 		n.isEmpty.Close()
 	}
+
 	return
 }
 
 // sendThreadPanic aggregates thread panics
 func (n *NBRareChan[T]) sendThreadPanic(err error) {
+
+	// provide panic error to errs
 	for {
 		var errp0 = n.errs.Load()
 		if errp0 == nil && n.errs.CompareAndSwap(nil, &err) {
@@ -227,6 +239,8 @@ func (n *NBRareChan[T]) sendThreadPanic(err error) {
 			break // appended error
 		}
 	}
+
+	// notify awaitable that a panic occured
 	n.isPanic.Close()
 	n.queueLock.Lock()
 	defer n.queueLock.Unlock()

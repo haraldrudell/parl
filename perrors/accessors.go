@@ -107,6 +107,9 @@ func PackFuncN(skipFrames int) (packageDotFunction string) {
 	return
 }
 
+// ErrpString returns the error message possibly
+// contained in *errp
+//   - if errp or *errp is nil: “OK”
 func ErrpString(errp *error) (s string) {
 	var err error
 	if errp != nil {

@@ -13,27 +13,52 @@ import (
 const NoZeroOut = true
 
 // SliceAwayAppend avoids allocations when a slice is
-// sliced away from the beginning and appended to at the end
+// sliced away from the beginning while being appended to at the end
 //   - sliceAway: the slice of active values, sliced away and appended to
 //   - slice0: the original sliceAway
 //   - values: values that should be appended to sliceAway
+//   - noZeroOut NoZeroOut: do not set unused element to zero-value.
+//     Slices retaining values containing pointers in unused elements
+//     is a temporary memory leak. Zero-out prevents this memory leak
 //   - by storing the initial slice along with the slice-away slice,
 //     the initial slice can be retrieved which may avoid allocations
-//   - SliceAwayAppend avoid such allocations based on two pointers to slice
+//   - SliceAwayAppend takes pointer to slice so it can
+//     update slicedAway and slice0
+//   - There are three outcomes for a slice-away append:
+//   - — 1 realloc: the result is larger than the underlying array
+//   - — 2 append: appending fits slicedAway capacity
+//   - — 3 copy: appending to SlicedAway fits the underlying array but
+//     not slicedAway capacity
 func SliceAwayAppend[T any](slicedAway, slice0 *[]T, values []T, noZeroOut ...bool) {
 	// awaySlice is slicedAway prior to append
 	var awaySlice = *slicedAway
-	// sliceZero is slice0 length and capacity prior to append
+	// sliceZero is slice0 pointer and capacity from make
 	var sliceZero = *slice0
 
-	// if insufficient capacity, use regular append
-	if len(awaySlice)+len(values) > cap(sliceZero) {
+	// useRegularAppend indicates that a normal append
+	// should be used
+	//	- true for case 1 realloc and case 2 append
+	//	- false for case 3 copy
+	var valueLength = len(awaySlice) + len(values)
+
+	// 2 append: appending fits slicedAway capacity
+	if valueLength <= cap(awaySlice) {
+		*slicedAway = append(awaySlice, values...)
+		return
+	}
+
+	// 1 realloc: the result is larger than the underlying array
+	if valueLength > cap(sliceZero) {
 		awaySlice = append(awaySlice, values...)
 		// update sliceAway and slice0
 		*slicedAway = awaySlice
 		*slice0 = awaySlice
 		return
 	}
+	// 3 copy: appending to SlicedAway fits the underlying array but
+	// not slicedAway capacity
+	//	- slicedAway values need to be copied to
+	//		the beginning of sliceZero
 
 	// re-use slice0
 	//	- cannot arbitrary set length to do copy
@@ -42,10 +67,11 @@ func SliceAwayAppend[T any](slicedAway, slice0 *[]T, values []T, noZeroOut ...bo
 		sliceZero = sliceZero[:0]
 	}
 	// newSlice is at beginning of array and has the new aggregate length
+	//	- appends do not cause allocation
 	var newSlice = append(append(sliceZero, awaySlice...), values...)
 	*slicedAway = newSlice
 
-	// is zero-out disabled?
+	// zero-out if not disabled
 	if len(noZeroOut) > 0 && noZeroOut[0] {
 		return // no zero-out
 	}
@@ -60,21 +86,36 @@ func SliceAwayAppend[T any](slicedAway, slice0 *[]T, values []T, noZeroOut ...bo
 //   - by storing the initial slice along with the slice-away slice,
 //     the initial slice can be retrieved which may avoid allocations
 //   - SliceAwayAppend avoid such allocations based on two pointers to slice
-func SliceAwayAppend1[T any](sliceAway, slice0 *[]T, value T, noZeroOut ...bool) {
+func SliceAwayAppend1[T any](slicedAway, slice0 *[]T, value T, noZeroOut ...bool) {
 	// awaySlice is slicedAway prior to append
-	var awaySlice = *sliceAway
+	var awaySlice = *slicedAway
 	// sliceZero is slice0 length and capacity prior to append
 	var sliceZero = *slice0
 
-	// if insufficient capacity, use regular append
-	//	- no elements to zero out
-	if len(awaySlice)+1 > cap(sliceZero) {
+	// useRegularAppend indicates that a normal append
+	// should be used
+	//	- true for case 1 realloc and case 2 append
+	//	- false for case 3 copy
+	var valueLength = len(awaySlice) + 1
+
+	// 2 append: appending fits slicedAway capacity
+	if valueLength <= cap(awaySlice) {
+		*slicedAway = append(awaySlice, value)
+		return
+	}
+
+	// 1 realloc: the result is larger than the underlying array
+	if valueLength > cap(sliceZero) {
 		awaySlice = append(awaySlice, value)
 		// update sliceAway and slice0
-		*sliceAway = awaySlice
+		*slicedAway = awaySlice
 		*slice0 = awaySlice
 		return
 	}
+	// 3 copy: appending to SlicedAway fits the underlying array but
+	// not slicedAway capacity
+	//	- slicedAway values need to be copied to
+	//		the beginning of sliceZero
 
 	// re-use slice0
 	//	- cannot arbitrary set length to do copy
@@ -82,8 +123,10 @@ func SliceAwayAppend1[T any](sliceAway, slice0 *[]T, value T, noZeroOut ...bool)
 	if len(sliceZero) > 0 {
 		sliceZero = sliceZero[:0]
 	}
+	// newSlice is at beginning of array and has the new aggregate length
+	//	- appends do not cause allocation
 	var newSlice = append(append(sliceZero, awaySlice...), value)
-	*sliceAway = newSlice
+	*slicedAway = newSlice
 
 	// is zero-out disabled?
 	if len(noZeroOut) > 0 && noZeroOut[0] {
@@ -93,9 +136,12 @@ func SliceAwayAppend1[T any](sliceAway, slice0 *[]T, value T, noZeroOut ...bool)
 }
 
 // zero-out emptied values
-//   - newSlice is at beginning of array with the new length
-//   - slicedAway is the previously slicedAway slice
-//   - elements to zero are at at end of slicedAway
+//   - newSlice begins at the beginning of the underlying array and
+//     contains all the newly appended aggregate data
+//   - slicedAway is the previously slicedAway slice containing
+//     data from before the append
+//   - elements to zero out are those at end of slicedAway that
+//     are not part of newSlice
 func zeroOut[T any](newSlice, slicedAway []T) {
 
 	// offset his how many elements slicedAway is off from newSlice
@@ -105,13 +151,15 @@ func zeroOut[T any](newSlice, slicedAway []T) {
 	}
 
 	// number of elements to zero out at end of slicedAway
+	var elementCount int
 	var newEnd = len(newSlice)
 	var oldEnd = offset + len(slicedAway)
 	if newEnd >= oldEnd {
 		return // no elements to zero-out
 	}
-	var elementCount = oldEnd - newEnd
+	elementCount = oldEnd - newEnd
 
+	// zero out elementCount elements at the end of slicedAway
 	var zeroValue T
 	for index := len(slicedAway) - elementCount; index < len(slicedAway); index++ {
 		slicedAway[index] = zeroValue
@@ -135,7 +183,10 @@ func Offset[T any](slice0, slicedAway []T) (offset int, isValid bool) {
 	//	- current slice length: int
 	//	- current slice capacity: int
 	//	- by casting uintptr to uint, pointer arithmetic becomes possible
+
+	// slice0p is the uint memory address of the underlying array of slice0
 	var slice0p = *((*uint)(unsafe.Pointer(&slice0)))
+	// slicedAwayp is the uint memory address of the underlying array of slicedAway
 	var slicedAwayp = *((*uint)(unsafe.Pointer(&slicedAway)))
 
 	// // slice0p 0x14000016160
@@ -163,16 +214,13 @@ func Offset[T any](slice0, slicedAway []T) (offset int, isValid bool) {
 	//fmt.Fprintf(os.Stderr, "int 64-bit elementSize 0x%x\n", elementSize)
 
 	// offset is how many elements have been sliced off from slice0
-	var offsetu = (slicedAwayp - slice0p) / elementSize
-	if isValid =
-		// byte difference must be even divisible by element size
-		slice0p+offsetu*elementSize == slicedAwayp &&
-			// slicedAway and offest cannot beyond the end of slice0
-			offset+len(slicedAway) <= cap(slice0); //
-	!isValid {
-		return // bad offset or not divisible by element size
-	}
-	offset = int(offsetu)
+	//	- not negative
+	offset = int((slicedAwayp - slice0p) / elementSize)
+	isValid =
+		// slicedAwayp - slice0p must be even divisible by element size
+		slice0p+uint(offset)*elementSize == slicedAwayp &&
+			// slicedAway and offset cannot beyond the end of slice0
+			offset+len(slicedAway) <= cap(slice0)
 
 	return
 }

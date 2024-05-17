@@ -60,7 +60,11 @@ const (
 //     from a delayed or missing reader.
 //   - see also:
 //   - — [AwaitableSlice] unbound awaitable queue
+//   - — preferred for any situation, has parl.AwaitableCh receive and
+//     lacks close mechanic
 //   - — [NBRareChan] low-usage unbound channel
+//   - — use for channel receive of data when rarely used, ie.
+//     an error channel
 //
 // Usage:
 //

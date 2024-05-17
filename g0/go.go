@@ -98,7 +98,7 @@ func (g *Go) AddError(err error) {
 //   - errp can be nil
 func (g *Go) Done(errp *error) {
 	if !g.ensureThreadData().endCh.Close() {
-		panic(perrors.ErrorfPF("Go received multiple Done: ", perrors.ErrpString(errp)))
+		panic(perrors.ErrorfPF("Go received multiple Done: “%s”", perrors.ErrpString(errp)))
 	}
 
 	// obtain fatal error and ensure it has stack

@@ -6,16 +6,11 @@ All rights reserved
 package parl
 
 import (
-	"strings"
 	"testing"
-
-	"github.com/haraldrudell/parl/perrors"
 )
 
 func TestCyclicAwaitable(t *testing.T) {
-	var expPanicMsg = "CyclicAwaitable pointer"
 
-	var err error
 	var ch, ch2 AwaitableCh
 	var isClosed, didClose, didOpen bool
 
@@ -104,23 +99,4 @@ func TestCyclicAwaitable(t *testing.T) {
 	if didClose {
 		t.Errorf("didClose true")
 	}
-
-	err = testNilPointer()
-
-	// use of nil pointer should error
-	if err == nil {
-		t.Errorf("CyclicAwaitable nil pointer missing error")
-	}
-	// panic should be specific
-	if !strings.Contains(err.Error(), expPanicMsg) {
-		t.Errorf("CyclicAwaitable nil pointer bad error: %s", perrors.LongShort(err))
-	}
-}
-
-func testNilPointer() (err error) {
-	defer PanicToErr(&err)
-
-	var cyclicAwaitablep *CyclicAwaitable
-	cyclicAwaitablep.Ch()
-	return
 }

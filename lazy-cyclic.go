@@ -15,6 +15,7 @@ type LazyCyclic struct {
 	IsActive atomic.Bool
 	// Lock atomizes operations Cyclic.Open and Cyclic.Close
 	// with its justifying observations
-	Lock   sync.Mutex
+	Lock sync.Mutex
+	// Cyclic contains a closing channel
 	Cyclic CyclicAwaitable
 }
