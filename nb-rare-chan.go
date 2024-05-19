@@ -44,6 +44,9 @@ import (
 //   - see also:
 //   - — [NBChan] fully-featured unbound channel
 //   - — [AwaitableSlice] unbound awaitable queue
+//
+// Deprecated: NBRareChan is replaced by [github.com/haraldrudell/parl.AwaitableSlice] for performance and
+// efficiency reasons. [github.com/haraldrudell/parl.ErrSlice] is an error container implementation
 type NBRareChan[T any] struct {
 	// underlying channel
 	//	- closed by first Close invocation

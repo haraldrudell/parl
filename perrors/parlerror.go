@@ -19,6 +19,8 @@ const (
 // send errors non-blocking on a channel.
 // ParlError is a 2018 construct and is deprecated in favor of parl.NBChan[error].
 // NBChan is both a channel and a store, providing the consumer additional freedoms.
+//
+// Depreacted: use [github.com/haraldrudell/parl.ErrSlice] error container
 type ParlError struct {
 	errLock sync.RWMutex
 	err     error // inside lock

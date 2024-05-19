@@ -6,7 +6,9 @@ ISC License
 package parl
 
 // AddError is a function to submit non-fatal errors
-//   - should use [ErrorSink]
+//
+// Deprecated: should use [github.com/haraldrudell/parl.ErrorSink]
+// possibly the error container [github.com/haraldrudell/parl.ErrSlice]
 type AddError func(err error)
 
 // ErrorSink provides send of non-fatal errors
@@ -31,7 +33,10 @@ type ErrorSource interface {
 // Errs provides receiving errors,
 // one at a time or multiple
 type Errs interface {
+	// ErrorSource provides receive of errors one at a time using
+	// WaitCh Error
 	ErrorSource
+	// Errors returns a slice of errors
 	ErrorsSource
 }
 
@@ -43,4 +48,7 @@ type ErrorsSource interface {
 }
 
 // absent [parl.AddError] argument
+//
+// Deprecated: should use [github.com/haraldrudell/parl.ErrorSink]
+// possibly the error container [github.com/haraldrudell/parl.ErrSlice]
 var NoAddErr AddError

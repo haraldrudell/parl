@@ -19,7 +19,12 @@ func TestPanicToErr(t *testing.T) {
 	// "runtime error: invalid memory address or nil pointer dereference"
 	var panicMessage = func() (message string) {
 		defer func() { message = recover().(error).Error() }()
-		_ = *(*int)(nil) // causes nil pointer dereference panic
+		var intp *int
+		if false {
+			var i int
+			intp = &i
+		}
+		_ = *intp // causes nil pointer dereference panic
 		return
 	}()
 	// “runtime error: invalid memory address or nil pointer dereference”
@@ -97,7 +102,12 @@ func panicFunction() (panicLine *pruntime.CodeLocation, err error) {
 	defer PanicToErr(&err)
 
 	// get exact code line and generate a nil pointer dereference panic
-	if panicLine = pruntime.NewCodeLocation(0); *(*int)(nil) != 0 {
+	var intp *int
+	if false {
+		var i int
+		intp = &i
+	}
+	if panicLine = pruntime.NewCodeLocation(0); *intp != 0 {
 		_ = 1
 	}
 

@@ -5,14 +5,50 @@ ISC License
 
 package parl
 
+// ErrSlice is a thread-safe unbound awaitable error container
+//   - [ErrSlice.AddError] is a function to submit errors
+//   - [ErrSlice.WaitCh] returns a closing channel to await the next error
+//   - [ErrSlice.Error] returns the next error value if any
+//   - [ErrSlice.Errors] returns a slice of all errors if any
+//   - [ErrSlice.EmptyCh] returns a closing channel to await container empty
+//     providing deferred-close functionality
+//   - ErrSlice features:
+//   - — real-time error stream or
+//   - — collect errors at end and
+//   - — close then read-to-end function
+//   - implements [parl.Errs] [parl.ErrorSink]
 type ErrSlice struct {
+	// errs is a thread-safe, unbound awaitable slice of errors
 	errs AwaitableSlice[error]
 }
 
+// ErrSlice provides error one-at-a-time or all-at-once
 var _ Errs = &ErrSlice{}
+
+// ErrSlice has AddError error sink method
 var _ ErrorSink = &ErrSlice{}
 
-func (e *ErrSlice) Error() (error, bool)     { return e.errs.Get() }
-func (e *ErrSlice) Errors() (errs []error)   { return e.errs.GetAll() }
+// Error returns the next error value
+//   - hasValue true: err is valid
+//   - hasValue false: the error source is empty
+func (e *ErrSlice) Error() (error, bool) { return e.errs.Get() }
+
+// Errors returns a slice of errors or nil
+func (e *ErrSlice) Errors() (errs []error) { return e.errs.GetAll() }
+
+// WaitCh waits for the next error, possibly indefinitely
+//   - a received channel closes on errors available
+//   - the next invocation may return a different channel object
 func (e *ErrSlice) WaitCh() (ch AwaitableCh) { return e.errs.DataWaitCh() }
-func (e *ErrSlice) AddError(err error)       { e.errs.Send(err) }
+
+// AddError is a function to submit non-fatal errors
+func (e *ErrSlice) AddError(err error) { e.errs.Send(err) }
+
+// EmptyCh returns an awaitable channel that closes on queue being or
+// becoming empty
+//   - doNotInitialize CloseAwaiter: obtain the channel but do not enable it closing.
+//     A subsequent invocation with doNotInitialize missing will enable its closing thus
+//     act as a deferred Close function
+func (e *ErrSlice) EmptyCh(doNotInitialize ...bool) (ch AwaitableCh) {
+	return e.errs.EmptyCh(doNotInitialize...)
+}

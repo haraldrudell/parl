@@ -82,6 +82,9 @@ const (
 //	if err = someFunc(); err != nil {
 //	err = perrors.Errorf("someFunc: %w", err)
 //	return
+//
+// Deprecated: NBChan is replaced by [github.com/haraldrudell/parl.AwaitableSlice] for performance and
+// efficiency reasons. [github.com/haraldrudell/parl.ErrSlice] is an error container implementation
 type NBChan[T any] struct {
 	// [NBChan.Ch] returns this channel allowing consumers to await data items one at a time
 	//	- NBChan must be configured to have thread
