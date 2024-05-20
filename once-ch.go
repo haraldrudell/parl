@@ -10,6 +10,8 @@ import "sync/atomic"
 const (
 	// [OnceCh.IsWinner] loser threads do not wait
 	NoOnceWait = true
+	// [OnceCh.IsWinner] loser threads wait
+	LoserWait = false
 )
 
 // OnceCh implements a one-time execution filter
@@ -51,10 +53,13 @@ func (d *doneOnce) Done() {
 	d.awaitable.Close()
 }
 
-// IsWinner returns true for the first invoker
-//   - subsequent invokers wait for the awaitable then return false
-//   - if noWait is NoOnceWait, loser threads do not wait
-//   - isWinner true has closeFunc non-nil
+// IsWinner selects winner thread as the first of invokers
+//   - noWait missing or LoserWait: loser thread wait for winner thread invoking done.Done
+//   - noWait NoOnceWait: eventually consistent: loser threads immediately return
+//   - isWinner true: this is the winner first invocation.
+//   - — must invoke done.Done upon task completion
+//   - isWinner false: loser thread, done is nil.
+//     May have already awaited winner thread completion
 func (o *OnceCh) IsWinner(noWait ...bool) (isWinner bool, done Done) {
 
 	// pick winner thread

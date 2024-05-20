@@ -10,7 +10,12 @@ import (
 )
 
 // [SliceAwayAppend] [SliceAwayAppend1] do not zero-out obsolete slice elements
+//   - [SetLength] noZero
 const NoZeroOut = true
+
+// [SliceAwayAppend] [SliceAwayAppend1] do zero-out obsolete slice elements
+//   - [SetLength] noZero
+const DoZeroOut = false
 
 // SliceAwayAppend avoids allocations when a slice is
 // sliced away from the beginning while being appended to at the end
@@ -152,12 +157,20 @@ func zeroOut[T any](newSlice, slicedAway []T) {
 
 	// number of elements to zero out at end of slicedAway
 	var elementCount int
+	// the first index not used in newSlice now
 	var newEnd = len(newSlice)
+	// the first index not used before in newSlice
 	var oldEnd = offset + len(slicedAway)
+	// newEnd is greater or equal, there are no element to zero out
 	if newEnd >= oldEnd {
 		return // no elements to zero-out
 	}
+	// number of elements to zero out at the end of slicedAway
 	elementCount = oldEnd - newEnd
+	// limit elementCount to length of slicedAway
+	if elementCount > len(slicedAway) {
+		elementCount = len(slicedAway)
+	}
 
 	// zero out elementCount elements at the end of slicedAway
 	var zeroValue T
@@ -167,7 +180,7 @@ func zeroOut[T any](newSlice, slicedAway []T) {
 }
 
 // Offset calculates how many items a slice-away slice is off
-// from the initiaal slice
+// from the initial slice
 //   - slice0 is a slice containing the beginning of the underlying array
 //   - slicedAway is a slice that has been sliced-off at the beginning
 func Offset[T any](slice0, slicedAway []T) (offset int, isValid bool) {

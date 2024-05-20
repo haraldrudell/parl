@@ -25,17 +25,19 @@ const (
 //   - [AwaitableSlice.SendSlice] [AwaitableSlice.GetSlice] allows efficient
 //     transfer of slices where
 //     a sender relinquish slice ownership by invoking SendSlice and
-//     a receiving thread gains slice ownership by invoking Get
+//     a receiving thread gains slice ownership by invoking GetSlice
 //   - [AwaitableSlice.DataWaitCh] returns a channel that closes once data is available
 //     making the queue awaitable
+//   - [AwaitableSlice.EndCh] returns a channel that closes on slice empty,
+//     providing close-like behavior
 //   - [AwaitableSlice.SetSize] allows for setting initial slice capacity
 //   - AwaitableSlice benefits:
 //   - — is trouble-free data-sink: non-blocking-unbound-send non-deadlocking panic-free error-free
 //   - — is initialization-free awaitable thread-less thread-safe
 //   - — features channel-based wait usable with Go select and default
 //   - — is unbound configurable low-allocation
-//   - — features contention-separation between Send SendSlice and Get1 Get
-//   - — offers high-throughput multiple-value operations SendSlice Get
+//   - — features contention-separation between Send SendSlice and Get GetSlice
+//   - — offers high-throughput multiple-value operations SendSlice GetSlice
 //   - — avoids temporary large-slice memory leaks by using size
 //   - — avoids temporary memory leaks by zero-out of unused slice elements
 //   - — although the slice can transfer values almost allocation free or
@@ -43,23 +45,46 @@ const (
 //     the wait mechanic requires pointer allocation 10 ns,
 //     channel make 21 ns, channel close 9 ns as well as
 //     CAS operations 8/21 ns
-//   - see also:
+//   - compared to Go channel:
+//   - — AwaitableSlice is unbound, non-blocking-send error and panic free
+//   - — happens-before with each received value or value and close detection
+//     similar to unbuffered channel guarantees
+//   - — closable by any thread, observable close while also transmitting data
+//   - — AwaitableSlice uses closing channel mechanic for wait and close.
+//     Data synchronization is [sync.Mutex] and the queue is slice.
+//     All is shielded by atomic performance
+//   - — for high parallelism, AwaitableSlice has predominately atomic performance while
+//     channel has 100× deteriorating unshielded lock performance go1.22.3
+//   - AwaitableSlice deprecates:
 //   - — [NBChan] fully-featured unbound channel
 //   - — [NBRareChan] low-usage unbound channel
 //
 // Usage:
 //
-//	var dataSink parl.AwaitableSlice[*Value]
-//	var sender parl.Send = &dataSink
-//	go someWhere(sender)
+//	var valueQueue parl.AwaitableSlice[*Value]
+//	go func(valueSink parl.ValueSink) {
+//	  defer valueSink.EmptyCh()
+//	  …
+//	  valueSink.Send(value)
+//	  …
+//	}(&valueQueue)
+//	endCh := valueQueue.EmptyCh(parl.CloseAwait)
 //	for {
 //	  select {
-//	  case <-dataSink.DataWaitCh():
-//	    for i, hasValue := 0, true; i < 100 && hasValue; i++ {
-//	      var value *Value
-//	      if value, hasValue = dataSink.Get1(); hasValue {
-//	        doSomething(value)
+//	  case <-valueQueue.DataWaitCh():
+//	    for value := valueQueue.Init(); valueQueue.Condition(&value); {
+//	      doSomething(value)
+//	    }
+//	  case <-endCh:
+//	    break
+//	}
+//	// the slice closed
 //	…
+//	// to reduce blocking, at most 100 at a time
+//	for i, hasValue := 0, true; i < 100 && hasValue; i++ {
+//	  var value *Value
+//	  if value, hasValue = valueQueue.Get(); hasValue {
+//	    doSomething(value)
 type AwaitableSlice[T any] struct {
 	// allocation size for new slices, effective if > 0
 	//	- 10 or larger value from SetSize
@@ -72,6 +97,7 @@ type AwaitableSlice[T any] struct {
 	queueLock sync.Mutex
 	// queue is a locally made slice for individual values
 	//	- behind queueLock
+	//	- not a slice-away slie
 	queue []T
 	// slices contains slices of values transferred by SendSlice and
 	// possible subsequent locally made slices of values
@@ -115,42 +141,38 @@ func (s *AwaitableSlice[T]) Send(value T) {
 
 	// add to queue if no slices
 	if len(s.slices) == 0 {
-		if s.queue == nil {
-			// new queue
-			var q []T
-			if s.cachedInput != nil {
-				q = s.cachedInput
-				s.cachedInput = nil
-				q[0] = value
-				s.queue = q
-			} else {
-				s.queue = s.make(value)
-			}
-		} else {
+		if s.queue != nil {
 			s.queue = append(s.queue, value)
+			// create s.queue
+		} else if s.cachedInput != nil {
+			// use cachedInput allocated under outputLock
+			s.queue = append(s.cachedInput, value)
+			s.cachedInput = nil
+		} else {
+			s.queue = s.make(value)
 		}
-		return
+		return // value in queue return
 	}
 
 	// add to slices
 	//	- if last slice not locally created, append to new slice
-	if !s.isLocalSlice {
-		var q []T
-		if s.cachedInput != nil {
-			q = s.cachedInput
-			s.cachedInput = nil
-			q[0] = value
-		} else {
-			q = s.make(value)
-		}
-		// try to save allocations on adding a slice to slicedAway s.slices
-		pslices.SliceAwayAppend1(&s.slices, &s.slices0, q)
-		s.isLocalSlice = true
-	} else {
-		// otherwise append to the local slice
+	if s.isLocalSlice {
+		// append to ending local slice
 		var index = len(s.slices) - 1
 		s.slices[index] = append(s.slices[index], value)
+		return
 	}
+
+	// append local slice
+	var q []T
+	if s.cachedInput != nil {
+		q = append(s.cachedInput, value)
+		s.cachedInput = nil
+	} else {
+		q = s.make(value)
+	}
+	pslices.SliceAwayAppend1(&s.slices, &s.slices0, q)
+	s.isLocalSlice = true
 }
 
 // SendSlice provides values by transferring ownership of a slice to the queue
@@ -203,6 +225,7 @@ const CloseAwaiter = false
 //   - doNotInitialize CloseAwaiter: obtain the channel but do not enable it closing.
 //     A subsequent invocation with doNotInitialize missing will enable its closing thus
 //     act as a deferred Close function
+//   - thread-safe
 func (s *AwaitableSlice[T]) EmptyCh(doNotInitialize ...bool) (ch AwaitableCh) {
 	// this may initialize the cyclic awaitable
 	ch = s.emptyWait.Cyclic.Ch()
@@ -240,7 +263,7 @@ func (s *AwaitableSlice[T]) Get() (value T, hasValue bool) {
 	defer s.postGet()
 	s.outputLock.Lock()
 
-	// if output empty, fetch it from outputs
+	// if output empty, transfer outputs[0] to output
 	if len(s.output) == 0 && len(s.outputs) > 0 {
 		// possibly save output to cachedOutput
 		if c := cap(s.output); c == defaultSize && s.cachedOutput == nil {
@@ -255,11 +278,15 @@ func (s *AwaitableSlice[T]) Get() (value T, hasValue bool) {
 	}
 
 	// try output
-	if value, hasValue = s.fetch1(&s.output); hasValue {
+	if hasValue = len(s.output) > 0; hasValue {
+		value = s.output[0]
+		var zeroValue T
+		s.output[0] = zeroValue
+		s.output = s.output[1:]
 		return // got value from s.output
 	}
 
-	// fetch values from queue
+	// transfer from queueLock
 	var slice = s.sliceFromQueue(isOne)
 	if hasValue = len(slice) > 0; !hasValue {
 		return // no value available
@@ -311,7 +338,8 @@ func (s *AwaitableSlice[T]) GetSlice() (values []T) {
 		return
 	}
 
-	// get slice from queue
+	// transfer from queueLock
+	//	- values may be nil
 	values = s.sliceFromQueue(isSlice)
 
 	return
@@ -319,6 +347,7 @@ func (s *AwaitableSlice[T]) GetSlice() (values []T) {
 
 // GetAll returns a single slice of all unread values in the queue
 //   - values nil: the queue is empty
+//   - thread-safe
 func (s *AwaitableSlice[T]) GetAll() (values []T) {
 	if !s.hasData.Load() {
 		return
@@ -326,15 +355,17 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 	defer s.postGet()
 	s.outputLock.Lock()
 
-	// aggregate output data
+	// aggregate outputLock data
+	// output is a copy of s.output since preAlloc may destroy it
 	var size = len(s.output)
 	for _, o := range s.outputs {
 		size += len(o)
 	}
 
-	s.preAlloc()
-	s.queueLock.Lock()
+	// aggregate queueLock data
+	s.preAlloc(onlyCachedTrue)
 	defer s.queueLock.Unlock()
+	s.queueLock.Lock()
 	s.transferCached()
 
 	// aggregate queueLock data
@@ -342,14 +373,19 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 	for _, s := range s.slices {
 		size += len(s)
 	}
+	// size is now length of the returned slice
 
 	// no data
 	if size == 0 {
-		return
+		return // no data return
 	}
+
 	// will return all data so queue will be empty
+	//	- because size is not zero, hasData is changing
+	//	- written while holding queueLock
 	s.hasData.Store(false)
 
+	// attempt allocation-free single slice return
 	if values = s.singleSlice(size); len(values) > 0 {
 		return // single slice
 	}
@@ -363,7 +399,7 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 	for _, s := range s.outputs {
 		values = append(values, s...)
 	}
-	pslices.SliceAwayAppend(&s.outputs, &s.outputs0, nil)
+	pslices.SetLength(&s.outputs, 0)
 	if len(s.queue) > 0 {
 		values = append(values, s.queue...)
 		pslices.SetLength(&s.queue, 0)
@@ -371,9 +407,74 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 	for _, s := range s.slices {
 		values = append(values, s...)
 	}
-	pslices.SliceAwayAppend(&s.slices, &s.slices0, nil)
+	pslices.SetLength(&s.slices, 0)
 
 	return
+}
+
+// Init allows for AwaitableSlice to be used in a for clause
+//   - returns zero-value for a short variable declaration in
+//     a for init statement
+//   - thread-safe
+//
+// Usage:
+//
+//	var a AwaitableSlice[…] = …
+//	for value := a.Init(); a.Condition(&value); {
+//	  // process received value
+//	}
+//	// the AwaitableSlice closed
+func (s *AwaitableSlice[T]) Init() (value T) { return }
+
+// Condition allows for AwaitableSlice to be used in a for clause
+//   - updates a value variable and returns whether values are present
+//   - thread-safe
+//
+// Usage:
+//
+//	var a AwaitableSlice[…] = …
+//	for value := a.Init(); a.Condition(&value); {
+//	  // process received value
+//	}
+//	// the AwaitableSlice closed
+func (s *AwaitableSlice[T]) Condition(valuep *T) (hasValue bool) {
+	var endCh AwaitableCh
+	for {
+
+		// try obtaining value
+		if s.hasData.Load() {
+			var v T
+			if v, hasValue = s.Get(); hasValue {
+				*valuep = v
+				return // value obtained: *valuep valid, hasValue true
+			}
+			continue
+		}
+		// hasData is false
+		//	- wait until the slice has data or
+		//	- the slice closes
+
+		// atomic-performance check for channel end
+		if s.emptyWait.IsActive.Load() {
+			// channel is out of items and closed
+			return // closed: hasValue false, *valuep unchanged
+		}
+
+		// await data or close
+		if endCh == nil {
+			// get endCh without initializing close mechanic
+			endCh = s.EmptyCh(CloseAwaiter)
+		}
+		select {
+
+		// await data, possibly initializing dataWait
+		case <-s.DataWaitCh():
+
+			// await close and end of data
+		case <-endCh:
+			return // closed: hasValue false, *valuep unchanged
+		}
+	}
 }
 
 // SetSize set initial allocation size of slices. Thread-safe
@@ -390,32 +491,23 @@ func (s *AwaitableSlice[T]) SetSize(size int) {
 	s.maxRetainSize.Store(maxSize)
 }
 
-// fetch1 retrieves the next value if any from the slice-away slice slicep
-func (s *AwaitableSlice[T]) fetch1(slicep *[]T) (value T, hasValue bool) {
-	var slice = *slicep
-	if hasValue = len(slice) > 0; hasValue {
-		var p0 = &slice[0]
-		value = *p0
-		var zeroValue T
-		*p0 = zeroValue
-		*slicep = slice[1:]
-	}
-	return
-}
-
-// make returns a new slice
+// make returns a new slice of length 0 and configured capacity
 //   - value, if present, is added to the new slice
 func (s *AwaitableSlice[T]) make(value ...T) (newSlice []T) {
+
 	// ensure size sizeMax are initialized
 	var size = s.size.Load()
 	if size == 0 {
 		s.SetSize(0)
 		size = s.size.Load()
 	}
+
+	//create slice optionally with value
 	newSlice = make([]T, len(value), size)
 	if len(value) > 0 {
 		newSlice[0] = value[0]
 	}
+
 	return
 }
 
@@ -424,17 +516,21 @@ const (
 	isSlice = true
 )
 
-// getSliceFromQueue fetches a slice to output from queue
+// sliceFromQueue fetches slices from queue to output
 //   - getSlice true: seeking entire slice
 //   - getSlice false: seeking single value
 //   - invoked when output empty
 func (s *AwaitableSlice[T]) sliceFromQueue(getSlice bool) (slice []T) {
-
-	// fetch slices from queue
+	//prealloc outside queueLock
 	s.preAlloc()
 	s.queueLock.Lock()
 	defer s.queueLock.Unlock()
 	s.transferCached()
+
+	// three tasks while holding queueLock:
+	//	- find what slice to return
+	//	- transfer all other slices to outputLock
+	//	- update hasData
 
 	// retrieve queue if non-empty
 	if len(s.queue) > 0 {
@@ -448,50 +544,31 @@ func (s *AwaitableSlice[T]) sliceFromQueue(getSlice bool) (slice []T) {
 		s.output0 = nil
 	}
 
-	// if slice retrieved
-	if len(slice) > 0 {
-		// retrieve all but one from s.slices
-		if len(s.slices) > 1 {
-			// transfer from s.slices to s.outputs
-			pslices.SliceAwayAppend(&s.outputs, &s.outputs0, s.slices[:len(s.slices)-1])
-			s.slices = s.slices[len(s.slices)-1:]
-			// zero out unused elements
-			//	- returns slice-away s.slices to s.slices0
-			pslices.SliceAwayAppend(&s.slices, &s.slices0, nil)
-		}
-		// if slice is non-empty this is not the last data
-		if len(s.slices) > 0 {
-			return
-			// if fetching single value and only one value in slice,
-			//	- thisis end of data
-		} else if !getSlice && len(slice) > 1 {
-			return // no, single-value fetch and more than one value
-		}
-		// fetching single value in slice length 1 or
-		// the last available slice
-		//	- flag end of data
-		s.hasData.Store(false)
-		return
-	}
-	// queue was empty
-	//	- s.slices may have data
-
-	// take the first slice from s.slices, if any
-	if len(s.slices) > 0 {
+	// if slice empty, try first of slices
+	if len(slice) == 0 && len(s.slices) > 0 {
 		slice = s.slices[0]
-		if len(s.slices) == 1 {
-			s.slices[0] = nil
-			s.slices = s.slices[1:]
-		} else if len(s.slices) > 2 {
-			// transfer all but 1 of remaining to s.outputs
-			pslices.SliceAwayAppend(&s.outputs, &s.outputs0, s.slices[1:len(s.slices)-1])
-			s.slices = s.slices[len(s.slices)-1:]
-			// zero out unused elements
-			pslices.SliceAwayAppend(&s.slices, &s.slices0, nil)
-		}
-		return
+		s.slices[0] = nil
+		s.slices = s.slices[1:]
 	}
-	// it is end of data
+
+	// transfer any remaining slices
+	if len(s.slices) > 0 {
+		pslices.SliceAwayAppend(&s.outputs, &s.outputs0, s.slices)
+		// empty and zero-out s.slices
+		pslices.SetLength(&s.slices, 0)
+		s.slices = s.slices0[:0]
+	}
+
+	// hasData must be updated while holding queueLock
+	//	- it is currently true
+	if len(s.outputs) > 0 {
+		return // slices in outputs mean data still available: no change
+
+		// if fetching single value and more than one value in that slice,
+		// not end of data
+	} else if !getSlice && len(slice) > 1 {
+		return // no, single-value fetch and more than one value
+	}
 
 	// the queue is empty: update hasData while holding queueLock
 	s.hasData.Store(false)
@@ -500,6 +577,9 @@ func (s *AwaitableSlice[T]) sliceFromQueue(getSlice bool) (slice []T) {
 }
 
 // setData updates dataWaitCh if DataWaitCh was invoked
+//   - eventually consistent
+//   - atomized hasData observation with dataWait emptyWait update
+//   - shielded atomic performance
 func (s *AwaitableSlice[T]) updateWait() {
 
 	// dataWait closes on data available, then re-opens
@@ -508,6 +588,7 @@ func (s *AwaitableSlice[T]) updateWait() {
 	//	- hasData observed false, emptyWait should be closed
 
 	// is dataWait or emptyWait in use?
+	//	- both only go once from false to true
 	var dataWait = s.dataWait.IsActive.Load()
 
 	if dataWait {
@@ -572,27 +653,34 @@ func (s *AwaitableSlice[T]) ensureSize() (size int) {
 	return
 }
 
+// preAlloc onlyCached
+const onlyCachedTrue = true
+
 // preAlloc ensures that output0 and cachedOutput are allocated
 // to configured size
 //   - must hold outputLock
-func (s *AwaitableSlice[T]) preAlloc() {
+func (s *AwaitableSlice[T]) preAlloc(onlyCached ...bool) {
 
-	// output0 first pre-allocation
-	//	- ensure output0 is a slice of good capacity
-	//	- may be transferred to queueLock
-	//	- avoids allocation while holding queueLock
 	var size = s.ensureSize()
-	// should output0 be allocated?
-	var makeOutput = s.output0 == nil
-	if !makeOutput {
-		// check capacity of existing output
-		var c = cap(s.output0)
-		// only for defaultSize–maxRetainSize
-		makeOutput = c < defaultSize || c > s.maxRetainSize.Load()
-	}
-	if makeOutput {
-		var so = s.make()
-		s.output0 = so
+	if len(onlyCached) == 0 || !onlyCached[0] {
+
+		// output0 first pre-allocation
+		//	- ensure output0 is a slice of good capacity
+		//	- may be transferred to queueLock
+		//	- avoids allocation while holding queueLock
+		// should output0 be allocated?
+		var makeOutput = s.output0 == nil
+		if !makeOutput {
+			// check capacity of existing output
+			var c = cap(s.output0)
+			// reuse for capcities defaultSize–maxRetainSize
+			makeOutput = c < defaultSize || c > s.maxRetainSize.Load()
+		}
+		if makeOutput {
+			var so = s.make()
+			s.output0 = so
+			s.output = so
+		}
 	}
 
 	// cachedOutput second pre-allocation

@@ -5,6 +5,19 @@ ISC License
 
 package parl
 
+// DeferredErrorSink is a deferrable function that provides
+// an error to ErrorSink if
+// errp is non-nil pointer to non-nil error
+func DeferredErrorSink(errorSink ErrorSink, errp *error) {
+	var err error
+	if errp == nil {
+		return
+	} else if err = *errp; err == nil {
+		return
+	}
+	errorSink.AddError(err)
+}
+
 // AddError is a function to submit non-fatal errors
 //
 // Deprecated: should use [github.com/haraldrudell/parl.ErrorSink]

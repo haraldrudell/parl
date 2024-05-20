@@ -5,9 +5,13 @@ ISC License
 
 package pslices
 
-// SetLength adjusts the lenght of *slicep extending with append if necessary.
-//   - slicep’s length is adjusted
-//   - if newLength > cap, slice may be reallocated
+// SetLength adjusts the lenght of *slicep extending with append if necessary
+//   - slicep: pointer to slice whose length is adjusted
+//   - newLength : the length of *slicep on return
+//   - — if newLength > cap, slice may be reallocated
+//   - noZero missing or DoZeroOut: elements becoming unused are set to zero-value
+//   - — if element contain pointers, such elements are a temporary memory leak
+//   - noZero NoZeroOut: no zero-out of elements
 func SetLength[E any](slicep *[]E, newLength int, noZero ...bool) {
 
 	s := *slicep
@@ -38,12 +42,6 @@ func SetLength[E any](slicep *[]E, newLength int, noZero ...bool) {
 	if cap := cap(s); newLength > cap {
 		if length < cap {
 			s = s[:cap] // extend up to cap
-			if doZero {
-				var e E
-				for i := length; i < cap; i++ {
-					s[i] = e
-				}
-			}
 		}
 		*slicep = append(s, make([]E, newLength-cap)...)
 		return
