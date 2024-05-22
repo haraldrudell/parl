@@ -6,6 +6,7 @@ ISC License
 package parl
 
 import (
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -23,38 +24,42 @@ const (
 //   - [AwaitableSlice.Send] [AwaitableSlice.Get] allows efficient
 //     transfer of single values
 //   - [AwaitableSlice.SendSlice] [AwaitableSlice.GetSlice] allows efficient
-//     transfer of slices where
+//     transfer of slices where:
 //     a sender relinquish slice ownership by invoking SendSlice and
 //     a receiving thread gains slice ownership by invoking GetSlice
+//   - lower performing [AwaitableSlice.SendClone]
 //   - [AwaitableSlice.DataWaitCh] returns a channel that closes once data is available
 //     making the queue awaitable
 //   - [AwaitableSlice.EndCh] returns a channel that closes on slice empty,
-//     providing close-like behavior
+//     configurable to provide close-like behavior
 //   - [AwaitableSlice.SetSize] allows for setting initial slice capacity
 //   - AwaitableSlice benefits:
-//   - — is trouble-free data-sink: non-blocking-unbound-send non-deadlocking panic-free error-free
-//   - — is initialization-free awaitable thread-less thread-safe
-//   - — features channel-based wait usable with Go select and default
-//   - — is unbound configurable low-allocation
-//   - — features contention-separation between Send SendSlice and Get GetSlice
-//   - — offers high-throughput multiple-value operations SendSlice GetSlice
-//   - — avoids temporary large-slice memory leaks by using size
-//   - — avoids temporary memory leaks by zero-out of unused slice elements
+//   - — trouble-free data-sink: non-blocking-unbound-send, non-deadlocking, panic-free and error-free
+//   - — initialization-free, awaitable, thread-less and thread-safe
+//   - — features channel-based wait usable with Go select and default:
+//     a consumer may wait for many events or poll for value or close
+//   - — unbound with tunable low-allocation
+//   - — contention-separation between Send SendSlice SendClone and Get GetSlice
+//   - — high-throughput multiple-value operation using SendSlice GetSlice
+//   - — slice size logic avoids large-slice memory leaks
+//   - — zero-out of unused slice elements avoids temporary memory leaks
 //   - — although the slice can transfer values almost allocation free or
 //     multiple values at a time,
 //     the wait mechanic requires pointer allocation 10 ns,
 //     channel make 21 ns, channel close 9 ns as well as
-//     CAS operations 8/21 ns
+//     CAS operation 8/21 ns
 //   - compared to Go channel:
-//   - — AwaitableSlice is unbound, non-blocking-send error and panic free
-//   - — happens-before with each received value or value and close detection
-//     similar to unbuffered channel guarantees
-//   - — closable by any thread, observable close while also transmitting data
-//   - — AwaitableSlice uses closing channel mechanic for wait and close.
+//   - — unbound, non-blocking-send that is error and panic free
+//   - — happens-before with each received value or detection of value avaliable or close:
+//     similar to unbuffered channel guarantees while being buffered
+//   - — closable by any thread without race condition
+//   - — observable, idempotent, panic-free and error-free close
+//     while also able to transmit values
+//   - — closing channel one-to-many mechanic for awaiting data and close.
 //     Data synchronization is [sync.Mutex] and the queue is slice.
 //     All is shielded by atomic performance
-//   - — for high parallelism, AwaitableSlice has predominately atomic performance while
-//     channel has 100× deteriorating unshielded lock performance go1.22.3
+//   - — for high parallelism, AwaitableSlice sustains predominately atomic performance while
+//     channel has 100× deteriorating unshielded lock performance as of go1.22.3
 //   - AwaitableSlice deprecates:
 //   - — [NBChan] fully-featured unbound channel
 //   - — [NBRareChan] low-usage unbound channel
@@ -189,6 +194,17 @@ func (s *AwaitableSlice[T]) SendSlice(values []T) {
 	// append to slices
 	s.slices = append(s.slices, values)
 	s.isLocalSlice = false
+}
+
+// SendClone provides a value-slice without transferring ownership of a slice to the queue
+//   - allocation
+//   - Thread-safe
+func (s *AwaitableSlice[T]) SendClone(values []T) {
+	// ignore empty slice
+	if len(values) == 0 {
+		return
+	}
+	s.SendSlice(slices.Clone(values))
 }
 
 // DataWaitCh returns a channel that closes once values becomes available
