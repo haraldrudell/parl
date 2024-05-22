@@ -58,7 +58,7 @@ func NewKeystrokes() (keystrokes *Keystrokes) { return &Keystrokes{} }
 //   - supports functional chaining
 //   - silent [SilentClose] does not echo anything on [os.Stdin] closing
 //   - addError if present receives errors from [os.Stdin.Read]
-func (k *Keystrokes) Launch(addError parl.AddError, silent ...bool) (keystrokes *Keystrokes) {
+func (k *Keystrokes) Launch(errorSink parl.ErrorSink, silent ...bool) (keystrokes *Keystrokes) {
 	keystrokes = k
 
 	// ensure only launched once
@@ -73,7 +73,7 @@ func (k *Keystrokes) Launch(addError parl.AddError, silent ...bool) (keystrokes 
 		isSilent = silent[0]
 	}
 
-	go keystrokesThread(isSilent, addError, &k.stdin)
+	go keystrokesThread(isSilent, errorSink, &k.stdin)
 
 	return
 }

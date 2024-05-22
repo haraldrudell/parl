@@ -21,7 +21,7 @@ import (
 //   - [parl.Infallible] prints any errors to standard error, should not be any
 //   - —
 //   - -verbose=mains.keystrokesThread
-func keystrokesThread(silent bool, addError parl.AddError, stdin *parl.NBChan[string]) {
+func keystrokesThread(silent bool, errorSink parl.ErrorSink, stdin *parl.NBChan[string]) {
 	var err error
 	defer parl.Debug("keystrokes.scannerThread exiting: err: %s", perrors.Short(err))
 	// if a panic is recovered, or err holds an error, both are printed to standard error
@@ -30,7 +30,7 @@ func keystrokesThread(silent bool, addError parl.AddError, stdin *parl.NBChan[st
 	defer stdin.Close()
 
 	var isError atomic.Bool
-	var scanner = bufio.NewScanner(NewStdinReader(addError, &isError))
+	var scanner = bufio.NewScanner(NewStdinReader(errorSink.AddError, &isError))
 	parl.Debug("keystrokes.scannerThread scanning: stdin.Ch: 0x%x", stdin.Ch())
 
 	// blocks here

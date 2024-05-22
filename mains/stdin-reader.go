@@ -32,7 +32,7 @@ var _ io.Reader = &StdinReader{}
 //   - addError is an optional function receiving errors occurring in [os.Stdin.Read].
 //     if missing, errors are printed to stderr
 //   - isError is an optional atomic set to true on first error
-func NewStdinReader(addError parl.AddError, isError *atomic.Bool) (reader *StdinReader) {
+func NewStdinReader(addError func(err error), isError *atomic.Bool) (reader *StdinReader) {
 	return &StdinReader{
 		addError: addError,
 		isError:  isError,

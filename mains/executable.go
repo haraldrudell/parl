@@ -122,6 +122,9 @@ type Executable struct {
 	optionsWereParsed atomic.Bool
 }
 
+// Executable is an error sink
+var _ parl.ErrorSink = &Executable{}
+
 // Init initializes a created [mains.Executable] value
 //   - the value should have relevant fields populates such as exeuctable name and more
 //   - — Program Version Comment Copyright License Arguments
@@ -296,7 +299,7 @@ func (x *Executable) Recover(errp ...*error) {
 	if len(errp) > 0 {
 		if errp0 := errp[0]; errp0 != nil {
 			if err := *errp0; err != nil && err != errEarlyPanicError {
-				x.AddErr(err)
+				x.AddError(err)
 			}
 		}
 	}
@@ -412,15 +415,15 @@ func (x *Executable) doPanic(panicValue any) {
 		//	- must contain one frame after panic
 		err = perrors.Stackn(err, doPanicFrames)
 		err = perrors.Errorf("main-thread %s%w%s", prepend, err, postpend)
-		x.AddErr(err)
+		x.AddError(err)
 	}
 }
 
-// AddErr extended with immediate printing of first error
+// AddError extended with immediate printing of first error
 //   - if err is the first error, it is immediately printed
 //   - subsequent errors are appended to x.err
 //   - err nil: ignored
-func (x *Executable) AddErr(err error) {
+func (x *Executable) AddError(err error) {
 
 	// debug printing
 	if parl.IsThisDebug() {
