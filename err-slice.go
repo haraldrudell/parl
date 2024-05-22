@@ -5,6 +5,8 @@ ISC License
 
 package parl
 
+import "github.com/haraldrudell/parl/perrors"
+
 // ErrSlice is a thread-safe unbound awaitable error container
 //   - [ErrSlice.AddError] is a function to submit errors
 //   - [ErrSlice.WaitCh] returns a closing channel to await the next error
@@ -51,4 +53,11 @@ func (e *ErrSlice) AddError(err error) { e.errs.Send(err) }
 //     act as a deferred Close function
 func (e *ErrSlice) EmptyCh(doNotInitialize ...bool) (ch AwaitableCh) {
 	return e.errs.EmptyCh(doNotInitialize...)
+}
+
+// AppendErrors collects any errors contained and appends them to errp
+func (e *ErrSlice) AppendErrors(errp *error) {
+	for _, err := range e.errs.GetAll() {
+		*errp = perrors.AppendError(*errp, err)
+	}
 }
