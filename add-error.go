@@ -5,6 +5,8 @@ ISC License
 
 package parl
 
+import "github.com/haraldrudell/parl/perrors"
+
 // DeferredErrorSink is a deferrable function that provides
 // an error to ErrorSink if
 // errp is non-nil pointer to non-nil error
@@ -16,6 +18,31 @@ func DeferredErrorSink(errorSink ErrorSink1, errp *error) {
 		return
 	}
 	errorSink.AddError(err)
+}
+
+// DeferredEmptySink is a deferrable function that appends
+// all erorrs in errorSink to errp
+func DeferredErrorSource(errorSource ErrorSource1, errp *error) {
+
+	// errorSink may be [AtomicError] that does not empty
+
+	if errs, ok := errorSource.(Errs); ok {
+		// eSource is an error source where each Error removes
+		// from the source
+		for {
+			var e, hasError = errs.Error()
+			if !hasError {
+				return
+			}
+			*errp = perrors.AppendError(*errp, e)
+		}
+	}
+
+	var e, hasError = errorSource.Error()
+	if !hasError {
+		return
+	}
+	*errp = perrors.AppendError(*errp, e)
 }
 
 // privateErrorSink allows a type with a private addError method to be used as [ErrorSink]

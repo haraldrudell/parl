@@ -49,6 +49,9 @@ const (
 //     channel make 21 ns, channel close 9 ns as well as
 //     CAS operation 8/21 ns
 //   - compared to Go channel:
+//   - — #1: has no errors, blocking or threads
+//   - — #2: many-to-many: many threads can await a single slice, a thread can await many slices or events
+//   - — #3: initialization-free
 //   - — unbound, non-blocking-send that is error and panic free
 //   - — happens-before with each received value or detection of value avaliable or close:
 //     similar to unbuffered channel guarantees while being buffered
@@ -60,9 +63,6 @@ const (
 //     All is shielded by atomic performance
 //   - — for high parallelism, AwaitableSlice sustains predominately atomic performance while
 //     channel has 100× deteriorating unshielded lock performance as of go1.22.3
-//   - AwaitableSlice deprecates:
-//   - — [NBChan] fully-featured unbound channel
-//   - — [NBRareChan] low-usage unbound channel
 //
 // Usage:
 //
