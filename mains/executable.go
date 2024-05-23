@@ -456,6 +456,8 @@ func (x *Executable) AddError(err error) {
 	x.err.Add(err)
 }
 
+func (x *Executable) EndErrors() {}
+
 // Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
 //   - Usually invoked for all app terminations
 //   - — either by defer ex.Recover(&err) at beginning fo main
