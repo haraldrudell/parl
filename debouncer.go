@@ -69,7 +69,7 @@ type debouncerIn[T any] struct {
 	// how input thread receives shutdown
 	isShutdown *Awaitable
 	// how input thread emits an unforeseen panic
-	errFn AddError
+	errorSink ErrorSink
 	// awaitable indicating input thread exit
 	inputExit Awaitable
 }
@@ -95,7 +95,7 @@ type debouncerOut[T any] struct {
 	// how output thread receives shutdown
 	isShutdown *Awaitable
 	// how output thread emits an unforeseen panic
-	errFn AddError
+	errorSink ErrorSink
 	// awaitable indicating output thread exit
 	outputExit Awaitable
 }
@@ -117,13 +117,13 @@ func NewDebouncer[T any](
 	debounceInterval, maxDelay time.Duration,
 	inputCh <-chan T,
 	sender func([]T),
-	errFn AddError,
+	errorSink ErrorSink,
 ) (debouncer *Debouncer[T]) {
 	if inputCh == nil {
 		panic(NilError("inputCh"))
 	} else if sender == nil {
 		panic(NilError("sender"))
-	} else if errFn == nil {
+	} else if errorSink == nil {
 		panic(NilError("errFn"))
 	}
 
@@ -149,7 +149,7 @@ func NewDebouncer[T any](
 		useMaxDelay:      maxDelay > 0,
 		maxDelayTimer:    *ptime.NewThreadSafeTimer(maxDelay),
 		isShutdown:       &isShutdown,
-		errFn:            errFn,
+		errorSink:        errorSink,
 	}
 	// get timer ready for reset
 	in.maxDelayTimer.Stop()
@@ -165,7 +165,7 @@ func NewDebouncer[T any](
 		isInputExit:     in.inputExit.Ch(),
 		sender:          sender,
 		isShutdown:      &isShutdown,
-		errFn:           errFn,
+		errorSink:       errorSink,
 	}
 
 	go out.outputThread()
@@ -196,7 +196,7 @@ func (d *Debouncer[T]) Wait() {
 // inputThread debounces the input channel until it closes or Shutdown
 func (d *debouncerIn[T]) inputThread() {
 	defer d.inputExit.Close()
-	defer Recover(func() DA { return A() }, nil, OnError(d.errFn))
+	defer Recover(func() DA { return A() }, NoErrp, d.errorSink)
 	defer d.maxDelayTimer.Stop()
 	defer d.debounceTimer.Stop()
 	defer d.buffer.Close() // close of buffer causes output thread to eventually exit
@@ -255,7 +255,7 @@ func (d *debouncerIn[T]) inputThread() {
 func (d *debouncerOut[T]) outputThread() {
 	defer d.isShutdown.Close() // shutdown input thread if running
 	defer d.outputExit.Close()
-	defer Recover(func() DA { return A() }, nil, OnError(d.errFn))
+	defer Recover(func() DA { return A() }, NoErrp, d.errorSink)
 
 	// while buffer is not closed and emptied, wait for:
 	//	- debounce timer expired triggering send,

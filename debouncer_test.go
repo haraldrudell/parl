@@ -37,7 +37,7 @@ func TestDebouncer(t *testing.T) {
 		noMaxDelay,
 		inputCh,
 		receiver.Send,
-		debouncerPanicErrFn,
+		newPanicOnError(),
 	)
 
 	// actValues should receive a slice of two values
@@ -61,7 +61,7 @@ func TestDebouncer(t *testing.T) {
 		noMaxDelay,
 		inputCh,
 		receiver.Send,
-		debouncerPanicErrFn,
+		newPanicOnError(),
 	)
 
 	// close of input channel should terminate the debouncer
@@ -80,7 +80,7 @@ func TestDebouncer(t *testing.T) {
 		maxDelay1ms,
 		inputCh,
 		receiver.Send,
-		debouncerPanicErrFn,
+		newPanicOnError(),
 	)
 
 	// maxDelay should release one value
@@ -97,8 +97,12 @@ func TestDebouncer(t *testing.T) {
 	//t.Fail()
 }
 
+type panicOnError struct{}
+
+func newPanicOnError() (errorSink ErrorSink) { return NewErrorSinkEndable(&panicOnError{}) }
+
 // debouncerPanicErrFn is a debouncer errFN that panics
 //   - debuncer does not have any errors
-func debouncerPanicErrFn(err error) {
+func (p *panicOnError) AddError(err error) {
 	panic(err)
 }
