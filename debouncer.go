@@ -69,7 +69,7 @@ type debouncerIn[T any] struct {
 	// how input thread receives shutdown
 	isShutdown *Awaitable
 	// how input thread emits an unforeseen panic
-	errorSink ErrorSink
+	errorSink ErrorSink1
 	// awaitable indicating input thread exit
 	inputExit Awaitable
 }
@@ -95,7 +95,7 @@ type debouncerOut[T any] struct {
 	// how output thread receives shutdown
 	isShutdown *Awaitable
 	// how output thread emits an unforeseen panic
-	errorSink ErrorSink
+	errorSink ErrorSink1
 	// awaitable indicating output thread exit
 	outputExit Awaitable
 }
@@ -117,7 +117,7 @@ func NewDebouncer[T any](
 	debounceInterval, maxDelay time.Duration,
 	inputCh <-chan T,
 	sender func([]T),
-	errorSink ErrorSink,
+	errorSink ErrorSink1,
 ) (debouncer *Debouncer[T]) {
 	if inputCh == nil {
 		panic(NilError("inputCh"))

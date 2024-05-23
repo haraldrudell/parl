@@ -366,7 +366,7 @@ func (s *SocketListener[C]) getReceiver() (cReceiver ConnectionReceiver[C], err 
 		return
 	}
 
-	if cReceiver, err = ts.Receiver(&s.connWait, s.errs.AddError); err != nil {
+	if cReceiver, err = ts.Receiver(&s.connWait, &s.errs); err != nil {
 		return // error from [ThreadSource.Receiver]
 	} else if cReceiver == nil {
 		err = perrors.NewPF("Received nil ConnectionReceiver")

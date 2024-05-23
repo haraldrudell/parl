@@ -29,5 +29,5 @@ type ThreadSource[C net.Conn] interface {
 	//	- any connection provided to [ConnectionReceiver.Handle] is
 	//		guaranteed to be closed by Handle even if
 	//		[ConnectionReceiver.Shutdown] was already invoked
-	Receiver(done parl.Done, addError parl.AddError) (connReceiver ConnectionReceiver[C], err error)
+	Receiver(done parl.Done, errorSink parl.ErrorSink1) (connReceiver ConnectionReceiver[C], err error)
 }
