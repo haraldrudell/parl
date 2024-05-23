@@ -44,10 +44,10 @@ var NoIgnores *regexp.Regexp
 //   - watchers are not recursive into subdirectories
 //   - — to detect new entires, all child-directories must be watched
 type Watcher struct {
-	eventFn func(event *WatchEvent)
-	errFn   func(err error)
-	ignores *regexp.Regexp
-	filter  Op
+	eventFn   func(event *WatchEvent)
+	errorSink parl.ErrorSink1
+	ignores   *regexp.Regexp
+	filter    Op
 
 	// addLock serializes Watch-create and Shutdown
 	addLock    sync.Mutex
@@ -70,13 +70,13 @@ type Watcher struct {
 //     must be thread-safe, protected by go, Mutex or atomic
 func NewWatcher(
 	filter Op, ignores *regexp.Regexp,
-	eventFn func(event *WatchEvent), errFn func(err error),
+	eventFn func(event *WatchEvent), errorSink parl.ErrorSink1,
 ) (watcher *Watcher) {
 	return &Watcher{
-		eventFn: eventFn,
-		errFn:   errFn,
-		filter:  filter,
-		ignores: ignores,
+		eventFn:   eventFn,
+		errorSink: errorSink,
+		filter:    filter,
+		ignores:   ignores,
 	}
 }
 
@@ -153,7 +153,7 @@ func (w *Watcher) create() (err error) {
 		return
 	}
 	// invoke Watch
-	err = NewWatcherShim(&w.WatcherShim, w.filterEvent, w.errFn).Watch()
+	err = NewWatcherShim(&w.WatcherShim, w.filterEvent, w.errorSink).Watch()
 	return
 }
 

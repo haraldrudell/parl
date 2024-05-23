@@ -58,7 +58,7 @@ func TestWatcherShim(t *testing.T) {
 	var paths []string
 
 	// Add() List() Shutdown() Watch()
-	var watcherShim *WatcherShim = NewWatcherShim(noFieldp, shimT.eventFunc, shimT.errFn)
+	var watcherShim *WatcherShim = NewWatcherShim(noFieldp, shimT.eventFunc, shimT)
 
 	// Watch should not error
 	err = watcherShim.Watch()
@@ -97,7 +97,7 @@ func newShimTester() (w *shimTester) {
 }
 
 // errFn for watcherShim
-func (w *shimTester) errFn(err error) {
+func (w *shimTester) AddError(err error) {
 	panic(err)
 }
 

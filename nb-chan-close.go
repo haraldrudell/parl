@@ -254,7 +254,7 @@ func (n *NBChan[T]) executeChClose() (didClose bool, err error) {
 	if didClose, err = n.closableChan.Close(); !didClose {
 		return // already closed return: noop
 	} else if err != nil {
-		n.AddError(err) // store possible close error
+		n.errs.AddError(err) // store possible close error
 	}
 	// update [NBChan.waitForClose]
 	n.waitForClose.Close()

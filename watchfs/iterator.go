@@ -67,7 +67,7 @@ func NewIterator(path string, filter Op, ignores *regexp.Regexp, ctx ...context.
 	if len(ctx) > 0 {
 		i.ctx = ctx[0]
 	}
-	i.watcher = *NewWatcher(filter, ignores, i.receiveEventFromWatcher, i.errFn)
+	i.watcher = *NewWatcher(filter, ignores, i.receiveEventFromWatcher, newErrorSink(&i))
 	return iters.NewFunctionIterator(i.iteratorFunction, i.asyncCancel)
 }
 
@@ -170,7 +170,7 @@ func (i *Iterator) getEvent() (event *WatchEvent) {
 // errFn receives errors from the watcher api
 //   - invoked at any time
 //   - thread-safe
-func (i *Iterator) errFn(err error) {
+func (i *Iterator) addError(err error) {
 	// append the error to i.err
 	for {
 		var errp = i.err.Load()

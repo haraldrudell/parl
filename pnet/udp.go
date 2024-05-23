@@ -21,7 +21,7 @@ type UDP struct {
 	net.UDPAddr    // struct IP Port Zone
 	ListenInvoked  atomic.Bool
 	StartingListen sync.WaitGroup
-	ErrCh          chan<- error
+	ErrCh          parl.ErrSlice
 	IsListening    atomic.Bool
 	NetUDPConn     *net.UDPConn
 	connMutex      sync.RWMutex
@@ -31,7 +31,10 @@ type UDP struct {
 
 type UDPFunc func(b []byte, oob []byte, flags int, addr *net.UDPAddr)
 
-// NewUDP network: "udp" "udp4" "udp6" address: "host:port"
+// NewUDP
+//   - network: "udp" "udp4" "udp6"
+//   - address: "host:port"
+//   - maxSize 0: default 65507
 func NewUDP(network, address string, udpFunc UDPFunc, maxSize int) (udp *UDP) {
 	if maxSize < 1 {
 		maxSize = udpDefaultMaxSize
@@ -51,7 +54,7 @@ const (
 	useOfClosed       = "use of closed network connection"
 )
 
-func (udp *UDP) Listen() (errCh <-chan error) {
+func (udp *UDP) Listen() (errCh parl.ErrorSource) {
 	udp.StartingListen.Add(1)
 	if !udp.ListenInvoked.CompareAndSwap(false, true) {
 		udp.StartingListen.Done()
@@ -61,16 +64,13 @@ func (udp *UDP) Listen() (errCh <-chan error) {
 		udp.StartingListen.Done()
 		panic(perrors.New("udp.Listen after Shutdown"))
 	}
-	errChan := make(chan error)
-	errCh = errChan
-	udp.ErrCh = errChan
+	errCh = &udp.ErrCh
 	go udp.listenThread()
 	return
 }
 
 func (udp *UDP) listenThread() {
-	errCh := udp.ErrCh
-	defer close(errCh)
+	defer udp.ErrCh.EndErrors()
 	var FInvocations sync.WaitGroup
 	defer FInvocations.Wait()
 	var startingDone bool
@@ -79,18 +79,18 @@ func (udp *UDP) listenThread() {
 			udp.StartingListen.Done()
 		}
 	}()
-	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, func(e error) { errCh <- e }) // capture panics
+	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, &udp.ErrCh) // capture panics
 
 	// listen
 	var netUDPConn *net.UDPConn // represents a network file descriptor
 	var err error
 	if netUDPConn, err = net.ListenUDP(udp.Network, &udp.UDPAddr); err != nil {
-		errCh <- perrors.Errorf("net.ListenUDP: '%w'", err)
+		udp.ErrCh.AddError(perrors.Errorf("net.ListenUDP: '%w'", err))
 		return
 	}
 	if udp.setConn(netUDPConn) { // isShutdown
 		if err = netUDPConn.Close(); err != nil {
-			errCh <- perrors.Errorf("netUDPConn.Close: '%w'", err)
+			udp.ErrCh.AddError(perrors.Errorf("netUDPConn.Close: '%w'", err))
 		}
 		return
 	}
@@ -101,7 +101,7 @@ func (udp *UDP) listenThread() {
 	defer func() {
 		if !udp.IsShutdown.Load() {
 			if err := netUDPConn.Close(); err != nil {
-				errCh <- err
+				udp.ErrCh.AddError(err)
 			}
 		}
 		udp.IsListening.Store(false)
@@ -121,7 +121,7 @@ func (udp *UDP) listenThread() {
 			if udp.IsShutdown.Load() && udp.isClosedErr(err) {
 				return // we are shutdown
 			}
-			errCh <- perrors.Errorf("ReadMsgUDP: '%w'", err)
+			udp.ErrCh.AddError(perrors.Errorf("ReadMsgUDP: '%w'", err))
 			return
 		}
 		FInvocations.Add(1)
@@ -186,5 +186,5 @@ func (udp *UDP) Shutdown() {
 	if err == nil {
 		return // conn successfully closed
 	}
-	udp.ErrCh <- err
+	udp.ErrCh.AddError(err)
 }

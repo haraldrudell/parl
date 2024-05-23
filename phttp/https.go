@@ -65,11 +65,11 @@ func NewHttps(nearSocket netip.AddrPort, network pnet.Network, certDER parl.Cert
 //   - can only be invoked once or panic
 //   - errCh closes on server shutdown
 //   - non-blocking, all errors are sent on the error channel
-func (s *Https) Listen() (errCh <-chan error) {
+func (s *Https) Listen() (errCh parl.Errs) {
 	if !s.NoListen.CompareAndSwap(false, true) {
 		panic(perrors.NewPF("multiple invocations"))
 	}
-	errCh = s.ErrCh.Ch()
+	errCh = &s.ErrCh
 	// listen is deferred so just launch the thread
 	go s.httpsListenerThread()
 	return
@@ -85,7 +85,7 @@ const (
 func (s *Https) httpsListenerThread() {
 	defer s.EndListenAwaitable.Close()
 	var err error
-	defer parl.Recover(func() parl.DA { return parl.A() }, &err, s.SendErr)
+	defer parl.Recover(func() parl.DA { return parl.A() }, &err, &s.ErrCh)
 
 	// get near tls socket listener
 	// *tls.listener — need this or it’s file certificates

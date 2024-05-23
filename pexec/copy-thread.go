@@ -24,12 +24,12 @@ import (
 //   - the thread itself never fails
 func copyThread(label string,
 	reader io.Reader, writer io.Writer,
-	addError func(err error), execCtx context.Context,
+	errorSink parl.ErrorSink, execCtx context.Context,
 	wg *sync.WaitGroup) {
 	defer wg.Done()
 	var err error
 	defer parl.CancelOnError(&err, execCtx) // cancel the command if copyThread failes
-	defer parl.RecoverAnnotation("copy command i/o "+label, &err, addError)
+	defer parl.RecoverAnnotation("copy command i/o "+label, func() parl.DA { return parl.A() }, &err, errorSink)
 
 	if _, err = io.Copy(writer, reader); perrors.Is(&err, "%s io.Copy %w", label, err) {
 

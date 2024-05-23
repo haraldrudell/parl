@@ -121,24 +121,31 @@ func TestHttp(t *testing.T) {
 	pnetHttp.Shutdown()
 
 	// wait for error reader to exit
-	goResult.ReceiveError(nil)
+	goResult.ReceiveError(parl.NoErrp)
 
-	if !pnetHttp.ErrCh.IsClosed() {
-		t.Error("ErrCh not closed")
-	}
 	if !pnetHttp.EndListenAwaitable.IsClosed() {
 		t.Error("EndListenAwaitable not closed")
 	}
 }
 
 // errChListener is goroutine consuming http error channel
-func errChListener(errCh <-chan error, g parl.GoResult) {
+func errChListener(errorSource parl.ErrorSource, g parl.GoResult) {
 	var err error
 	defer g.SendError(&err)
 
-	for err = range errCh {
-		parl.Log(perrors.Long(err))
-		panic(err)
+	var endCh = errorSource.EndCh()
+	for {
+		select {
+		case <-errorSource.WaitCh():
+			var err, hasValue = errorSource.Error()
+			if !hasValue {
+				continue
+			}
+			parl.Log(perrors.Long(err))
+			panic(err)
+		case <-endCh:
+			return
+		}
 	}
 }
 

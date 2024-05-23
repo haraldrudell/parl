@@ -256,7 +256,7 @@ type NBChan[T any] struct {
 	// behind outputLock: outputQueue sliced off from low to high indexes
 	outputQueue []T
 	// thread panics and channel close errors
-	perrors.ParlError
+	errs ErrSlice
 }
 
 // NewNBChan returns a non-blocking trillion-size buffer channel.
@@ -360,6 +360,21 @@ func (n *NBChan[T]) Ch() (ch <-chan T) { return n.closableChan.Ch() }
 
 // Count returns number of unsent values
 func (n *NBChan[T]) Count() (unsentCount int) { return int(n.unsentCount.Load()) }
+
+// GetError returns any error
+//   - compatible with deprecated [perrrors.ParlError.GetError]
+//   - appends any error sinto one
+//   - err nil: there were no errors
+func (n *NBChan[T]) GetError() (err error) {
+	for {
+		var e, hasValue = n.errs.Error()
+		if !hasValue {
+			break
+		}
+		err = perrors.AppendError(err, e)
+	}
+	return
+}
 
 // Capacity returns size of allocated queues
 func (n *NBChan[T]) Capacity() (capacity int) {

@@ -135,7 +135,7 @@ func TestSimple(t *testing.T) {
 		t.Errorf("NextNextNext value %d exp %d", value, zeroValue)
 	}
 
-	// CancelCond should return false
+	// Cancel, Cond should return false
 	reset()
 	err = iterator.Cancel()
 	_ = err

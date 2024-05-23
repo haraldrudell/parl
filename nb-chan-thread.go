@@ -20,7 +20,7 @@ func (n *NBChan[T]) sendThread(value T, hasValue bool) {
 	defer n.tcThreadExitAwaitable.Close()
 	// execute possible deferred close from Close invocation
 	defer n.sendThreadDeferredClose()
-	defer Recover(func() DA { return A() }, nil, n.sendThreadOnError)
+	defer Recover(func() DA { return A() }, nil, &n.errs)
 
 	// send value loop
 	for {
@@ -156,7 +156,7 @@ func (n *NBChan[T]) sendThreadOnError(err error) {
 	if pruntime.IsSendOnClosedChannel(err) && n.isCloseNow.IsInvoked() {
 		return // ignore if the channel was or became closed
 	}
-	n.AddError(err)
+	n.errs.AddError(err)
 }
 
 // sendThreadBlockingSend sends blocking on consumer-receive channel

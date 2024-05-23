@@ -18,7 +18,7 @@ const (
 
 // InvokeOnTimer implements a timeout action
 type InvokeOnTimer struct {
-	awaitable *cyclebreaker.Awaitable
+	awaitable cyclebreaker.Awaitable
 }
 
 // NewInvokeOnTimer panics or invokes elapsedFunc if not reset within d
@@ -37,23 +37,23 @@ type InvokeOnTimer struct {
 //   - resources are released on:
 //   - — Stop invocation
 //   - — timer firing
-func NewInvokeOnTimer(d time.Duration, errPanic error, elapsedFunc func(), errCh ...chan<- error) (timer *InvokeOnTimer) {
+func NewInvokeOnTimer(d time.Duration, errPanic error, elapsedFunc func(), errorSink ...cyclebreaker.ErrorSink1) (timer *InvokeOnTimer) {
 	if errPanic == nil && elapsedFunc == nil {
 		cyclebreaker.NilError("errPanic and elapsedFunc")
 	}
 	if d <= 0 {
 		d = defaultInvokeOnTimerDuration
 	}
-	var errCh0 chan<- error
-	if len(errCh) > 0 {
-		errCh0 = errCh[0]
+	var errorSink0 cyclebreaker.ErrorSink1
+	if len(errorSink) > 0 {
+		errorSink0 = errorSink[0]
 	}
 
-	var t = InvokeOnTimer{awaitable: cyclebreaker.NewAwaitable()}
+	var t = InvokeOnTimer{}
 	go invokeOnTimerThread(
 		time.NewTimer(d), t.awaitable.Ch(),
 		errPanic, elapsedFunc,
-		errCh0,
+		errorSink0,
 	)
 	return &t
 }
@@ -65,11 +65,11 @@ func (t *InvokeOnTimer) Stop() { t.awaitable.Close() }
 func invokeOnTimerThread(
 	timer *time.Timer, c cyclebreaker.AwaitableCh,
 	errPanic error, elapsedFunc func(),
-	errCh chan<- error,
+	errorSink cyclebreaker.ErrorSink1,
 ) {
 	var err error
-	if errCh != nil {
-		defer cyclebreaker.SendErr(errCh, &err)
+	if errorSink != nil {
+		errorSink.AddError(err)
 	} else {
 		defer infallible(&err)
 	}
@@ -96,7 +96,7 @@ func infallible(errp *error) {
 	if err == nil {
 		return
 	}
-	cyclebreaker.Infallible(err)
+	cyclebreaker.Infallible.AddError(err)
 }
 
 func processTermination(errp *error) {

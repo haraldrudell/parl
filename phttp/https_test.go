@@ -167,9 +167,6 @@ func TestHttpsListen(t *testing.T) {
 	// wait for error reader to exit
 	goResult.ReceiveError(nil)
 
-	if !https.ErrCh.IsClosed() {
-		t.Error("ErrCh not closed")
-	}
 	if !https.EndListenAwaitable.IsClosed() {
 		t.Error("EndListenAwaitable not closed")
 	}

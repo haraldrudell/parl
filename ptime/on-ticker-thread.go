@@ -33,7 +33,7 @@ func OnTickerThread(callback func(at time.Time), period time.Duration, loc *time
 	var err error
 	if g != nil {
 		defer g.Done(&err)
-		defer cyclebreaker.Recover(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, cyclebreaker.NoOnError)
+		defer cyclebreaker.Recover(func() cyclebreaker.DA { return cyclebreaker.A() }, &err)
 	} else {
 		defer cyclebreaker.Recover(func() cyclebreaker.DA { return cyclebreaker.A() }, &err, cyclebreaker.Infallible)
 	}

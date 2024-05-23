@@ -171,7 +171,7 @@ func (s *SocketListener[C]) AcceptConnections(handler func(C)) (goodClose bool) 
 	}
 	defer s.acceptWait.Done()                  // indicate accept thread exited
 	defer s.waitForConns(&cReceiver, &isPanic) // wait for connection goroutines
-	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errs.AddError)
+	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, &s.errs)
 
 	s.handler = handler
 	var err error
@@ -350,7 +350,7 @@ func (s *SocketListener[C]) waitForConns(cReceiverp *ConnectionReceiver[C], isPa
 //   - invokeHandler recovers panic in handler function
 func (s *SocketListener[C]) invokeHandler(connImpl C) {
 	defer s.connWait.Done()
-	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, s.errs.AddError)
+	defer parl.Recover2(func() parl.DA { return parl.A() }, nil, &s.errs)
 
 	s.handler(connImpl)
 }

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl/internal/cyclebreaker"
-	"github.com/haraldrudell/parl/perrors"
 )
 
 // ClosingTicker is like time.Ticker but the channel C closes on shutdown.
@@ -21,8 +20,8 @@ import (
 // MaxDuration is normally 1 s
 type ClosingTicker struct {
 	C                 <-chan time.Time
-	MaxDuration       time.Duration // atomic int64
-	perrors.ParlError               // panic in Shutdown or panic in tick thread
+	MaxDuration       time.Duration            // atomic int64
+	err               cyclebreaker.AtomicError // panic in Shutdown or panic in tick thread
 	isShutdownRequest chan struct{}
 	isTickThreadExit  chan struct{}
 	shutdownOnce      sync.Once
@@ -48,7 +47,7 @@ func NewClosingTicker(d time.Duration) (t *ClosingTicker) {
 // Shutdown causes the channel C to close and resources to be released
 func (t *ClosingTicker) Shutdown() {
 	t.shutdownOnce.Do(func() {
-		defer cyclebreaker.Recover2(func() cyclebreaker.DA { return cyclebreaker.A() }, nil, t.AddErrorProc)
+		defer cyclebreaker.Recover2(func() cyclebreaker.DA { return cyclebreaker.A() }, nil, &t.err)
 
 		close(t.isShutdownRequest)
 		<-t.isTickThreadExit
@@ -57,13 +56,13 @@ func (t *ClosingTicker) Shutdown() {
 
 func (t *ClosingTicker) GetError() (maxDuration time.Duration, err error) {
 	maxDuration = time.Duration(atomic.LoadInt64((*int64)(&t.MaxDuration)))
-	err = t.ParlError.GetError()
+	err, _ = t.err.Error()
 	return
 }
 
 func (t *ClosingTicker) tick(out chan time.Time, ticker *time.Ticker) {
 	defer close(t.isTickThreadExit)
-	defer cyclebreaker.Recover2(func() cyclebreaker.DA { return cyclebreaker.A() }, nil, t.AddErrorProc)
+	defer cyclebreaker.Recover2(func() cyclebreaker.DA { return cyclebreaker.A() }, nil, &t.err)
 	defer close(out)
 	defer ticker.Stop()
 

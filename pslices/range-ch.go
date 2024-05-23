@@ -35,7 +35,7 @@ type RangeCh[T any] struct {
 	//	- isClosed.Close is idempotent
 	//	- synchronization mechanic to exit rangeChWriteThread
 	//	- observable
-	isClosed *cyclebreaker.Awaitable
+	isClosed cyclebreaker.Awaitable
 	// isExit is synchronization mechanic that rangeChWriteThread has exit
 	//	- on isExit closing, ch is already closed
 	isExit cyclebreaker.AwaitableCh
@@ -50,9 +50,8 @@ type RangeCh[T any] struct {
 func NewRangeCh[T any](tss *ThreadSafeSlice[T]) (rangeChan *RangeCh[T]) {
 	var isExit = make(chan struct{})
 	r := RangeCh[T]{
-		ch:       make(chan T),
-		isClosed: cyclebreaker.NewAwaitable(),
-		isExit:   isExit,
+		ch:     make(chan T),
+		isExit: isExit,
 	}
 
 	// launch sending thread

@@ -67,17 +67,16 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 
 	// thread management: waitgroup and thread-safe error store
 	var wg sync.WaitGroup
-	defer parl.Debug("waitgroup complete")
-	defer wg.Wait()
-	var errs perrors.ParlError
-	defer func() {
-		err = perrors.AppendError(err, errs.GetError())
-	}()
-
+	var errs parl.ErrSlice
+	var isDebug = parl.IsThisDebug()
+	if isDebug {
+		// expensive
+		defer parl.Debug("waitgroup and closers complete")
+	}
 	// close if we are aborting
 	var closers []io.Closer
-	isStart := false
-	defer parl.Debug("closers complete")
+	var isStart = false
+	defer execStreamFullEnd(&isStart, &closers, &wg, &errs, isDebug, &err)
 	defer func() {
 		if isStart {
 			return // do nothing: if exec.Cmd.Start succeeded, exe.Cmd close the streams
@@ -108,7 +107,7 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 				return // pipe error return
 			}
 			wg.Add(1)
-			go copyThread("stdin", stdin, ioWriteCloser, errs.AddErrorProc, execCtx, &wg)
+			go copyThread("stdin", stdin, ioWriteCloser, &errs, execCtx, &wg)
 		}
 	}
 
@@ -123,7 +122,7 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 				return // pipe error return
 			}
 			wg.Add(1)
-			go copyThread("stdout", ioReadCloser, stdout, errs.AddErrorProc, execCtx, &wg)
+			go copyThread("stdout", ioReadCloser, stdout, &errs, execCtx, &wg)
 		}
 	}
 
@@ -138,7 +137,7 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 				return // pipe error return
 			}
 			wg.Add(1)
-			go copyThread("stderr", ioReadCloser, stderr, errs.AddErrorProc, execCtx, &wg)
+			go copyThread("stderr", ioReadCloser, stderr, &errs, execCtx, &wg)
 		}
 	}
 
@@ -185,6 +184,27 @@ func ExecStreamFull(stdin io.Reader, stdout io.WriteCloser, stderr io.WriteClose
 		return // Wait() error return
 	}
 	return // command completed successfully return
+}
+
+func execStreamFullEnd(isStart *bool, closers *[]io.Closer, wg *sync.WaitGroup, errs parl.ErrorsSource, isDebug bool, errp *error) {
+	if *isStart {
+		return // do nothing: if exec.Cmd.Start succeeded, exe.Cmd close the streams
+	}
+	for _, c := range *closers {
+		if e := c.Close(); e != nil {
+			*errp = perrors.AppendError(*errp, perrors.ErrorfPF("stream Close %w", e))
+		}
+	}
+	if isDebug {
+		parl.Debug("closers complete")
+	}
+	for _, e := range errs.Errors() {
+		*errp = perrors.AppendError(*errp, e)
+	}
+	wg.Wait()
+	if isDebug {
+		parl.Debug("waitgroup complete")
+	}
 }
 
 func invokeStart(startCallback StartCallback, execCmd *exec.Cmd, e error) (err error) {

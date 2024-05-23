@@ -40,7 +40,7 @@ type Http struct {
 	// real-time server error stream, unbound non-blocking
 	//	- [Http.SendErr] invocations
 	//   - shutdown error
-	ErrCh parl.NBChan[error]
+	ErrCh parl.ErrSlice
 	// near socket address, protocol is tcp
 	Near netip.AddrPort
 	// allows to wait for listen
@@ -121,11 +121,11 @@ func (s *Http) HandleFunc(pattern string, handler HandlerFunc) {
 //   - can only be invoked once or panic
 //   - errCh closes on server shutdown
 //   - non-blocking, all errors are sent on the error channel
-func (s *Http) Listen() (errCh <-chan error) {
+func (s *Http) Listen() (errCh parl.Errs) {
 	if !s.NoListen.CompareAndSwap(false, true) {
 		panic(perrors.NewPF("multiple invocations"))
 	}
-	errCh = s.ErrCh.Ch()
+	errCh = &s.ErrCh
 	// listen is deferred so just launch the thread
 	go s.httpListenerThread()
 	return
@@ -136,7 +136,7 @@ func (s *Http) Listen() (errCh <-chan error) {
 func (s *Http) httpListenerThread() {
 	defer s.EndListenAwaitable.Close()
 	var err error
-	defer parl.Recover(func() parl.DA { return parl.A() }, &err, s.SendErr)
+	defer parl.Recover(func() parl.DA { return parl.A() }, &err, &s.ErrCh)
 
 	// get near tcp socket listener
 	var listener net.Listener
@@ -162,9 +162,6 @@ func (s *Http) httpListenerThread() {
 	}
 	err = perrors.Errorf("hp.Server.Serve: ‘%w’", err)
 }
-
-// SendErr sends errors on the server’s error channel
-func (s *Http) SendErr(err error) { s.ErrCh.Send(err) }
 
 // idempotent panic-free shutdown that does not return prior to server shut down
 func (s *Http) Shutdown() {
@@ -194,11 +191,11 @@ func (s *Http) shutdown() {
 	var ctx, cancel = context.WithTimeout(context.Background(), httpShutdownTimeout)
 	defer cancel()
 	if err := s.Server.Shutdown(ctx); perrors.IsPF(&err, "hp.Server.Shutdown: '%w'", err) {
-		s.SendErr(err)
+		s.ErrCh.AddError(err)
 	}
 	if wasListen {
 		// wait for thread to exit
 		<-s.EndListenAwaitable.Ch()
 	}
-	s.ErrCh.Close()
+	s.ErrCh.EndErrors()
 }

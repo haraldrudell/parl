@@ -73,12 +73,13 @@ type NBRareChan[T any] struct {
 	// returned by StopSend await empty channel
 	isEmpty Awaitable
 	// sendThread panics, should be none
-	errs atomic.Pointer[error]
+	errs AtomicError
 	// isPanic indicates that a send thread suffered a panic
 	//	- triggers PanicCh awaitable
 	isPanic Awaitable
 	// ensures close executed once
 	closeOnce OnceCh
+	sink      nbrSink[T]
 }
 
 // Ch obtains the underlying channel for channel receive operations
@@ -162,8 +163,8 @@ func (n *NBRareChan[T]) Close(values *[]T, errp *error) {
 		// wait for all created threads to exit
 		n.threadWait.Wait()
 		if errp != nil {
-			if ep := n.errs.Load(); ep != nil {
-				*errp = perrors.AppendError(*errp, *ep)
+			if err, hasValue := n.errs.Error(); hasValue {
+				*errp = perrors.AppendError(*errp, err)
 			}
 		}
 	}
@@ -193,7 +194,8 @@ func (n *NBRareChan[T]) close() (values []T) {
 // sendThread carries out send operations on the channel
 func (n *NBRareChan[T]) sendThread(value T) {
 	defer n.threadWait.Done()
-	defer Recover(func() DA { return A() }, nil, n.sendThreadPanic)
+	n.sink.r = n
+	defer Recover(func() DA { return A() }, nil, &n.sink)
 
 	var ch = n.closableChan.Ch()
 	for {
@@ -230,18 +232,7 @@ func (n *NBRareChan[T]) sendThreadNextValue() (value T, hasValue bool) {
 
 // sendThreadPanic aggregates thread panics
 func (n *NBRareChan[T]) sendThreadPanic(err error) {
-
-	// provide panic error to errs
-	for {
-		var errp0 = n.errs.Load()
-		if errp0 == nil && n.errs.CompareAndSwap(nil, &err) {
-			break // wrote new error
-		}
-		var err2 = perrors.AppendError(*errp0, err)
-		if n.errs.CompareAndSwap(errp0, &err2) {
-			break // appended error
-		}
-	}
+	n.errs.AddError(err)
 
 	// notify awaitable that a panic occured
 	n.isPanic.Close()
@@ -250,3 +241,7 @@ func (n *NBRareChan[T]) sendThreadPanic(err error) {
 
 	n.threadReadingValues.Close()
 }
+
+type nbrSink[T any] struct{ r *NBRareChan[T] }
+
+func (n *nbrSink[T]) AddError(err error) { n.r.sendThreadPanic(err) }

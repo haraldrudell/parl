@@ -7,6 +7,7 @@ package cyclebreaker
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/haraldrudell/parl/perrors"
@@ -19,13 +20,22 @@ import (
 //   - if onError non-nil, the function is invoked zero or one time with the aggregate error
 //   - if onError nil, the error is logged to standard error
 //   - if errp is non-nil, it is updated with any aggregate error
+//   - parl recover options:
+//   - — [RecoverErr]: aggregates to error pointer with enclosing function location, optional panic flag
+//   - — [Recover]: aggregates to error pointer with enclosing function location, optional single-invocation [parl.ErrorSink]
+//   - — [Recover2]: aggregates to error pointer with enclosing function location, optional multiple-invocation [parl.ErrorSink]
+//   - — [RecoverAnnotation]: aggregates to error pointer with fixed-string annotation, optional single-invocation [parl.ErrorSink]
+//   - — [PanicToErr]: aggregates to error pointer with generic annotation, optional panic flag
+//   - — preferrably: RecoverErr, Recover or Recover2 should be used to provide the package and function name
+//     of the enclosing function for the defer-statement that invoked recover
+//   - — PanicToErr and RecoverAnnotation cannot provide where in the stack trace recover was invoked
 //
 // Usage:
 //
 //	func someFunc() (err error) {
 //	  defer parl.Recover(func() parl.DA { return parl.A() }, &err, parl.NoOnError)
-func Recover(deferredLocation func() DA, errp *error, onError OnError) {
-	doRecovery(noAnnotation, deferredLocation, errp, onError, recoverOnErrrorOnce, noIsPanic, recover())
+func Recover(deferredLocation func() DA, errp *error, errorSink ...ErrorSink1) {
+	doRecovery(noAnnotation, deferredLocation, errp, recoverOnErrrorOnce, noIsPanic, recover(), errorSink...)
 }
 
 // Recover2 recovers panic using deferred annotation
@@ -34,25 +44,56 @@ func Recover(deferredLocation func() DA, errp *error, onError OnError) {
 //   - if errp is non-nil:
 //   - — if *errp was nil, it is updated with any panic
 //   - — if *errp was non-nil, it is updated with any panic as an aggregate error
+//   - parl recover options:
+//   - — [RecoverErr]: aggregates to error pointer with enclosing function location, optional panic flag
+//   - — [Recover]: aggregates to error pointer with enclosing function location, optional single-invocation [parl.ErrorSink]
+//   - — [Recover2]: aggregates to error pointer with enclosing function location, optional multiple-invocation [parl.ErrorSink]
+//   - — [RecoverAnnotation]: aggregates to error pointer with fixed-string annotation, optional single-invocation [parl.ErrorSink]
+//   - — [PanicToErr]: aggregates to error pointer with generic annotation, optional panic flag
+//   - — preferrably: RecoverErr, Recover or Recover2 should be used to provide the package and function name
+//     of the enclosing function for the defer-statement that invoked recover
+//   - — PanicToErr and RecoverAnnotation cannot provide where in the stack trace recover was invoked
 //
 // Usage:
 //
 //	func someFunc() (err error) {
 //	  defer parl.Recover2(func() parl.DA { return parl.A() }, &err, parl.NoOnError)
-func Recover2(deferredLocation func() DA, errp *error, onError OnError) {
-	doRecovery(noAnnotation, deferredLocation, errp, onError, recoverOnErrrorMultiple, noIsPanic, recover())
+func Recover2(deferredLocation func() DA, errp *error, errorSink ...ErrorSink1) {
+	doRecovery(noAnnotation, deferredLocation, errp, recoverOnErrrorMultiple, noIsPanic, recover(), errorSink...)
 }
 
 // RecoverAnnotation is like Recover but with fixed-string annotation
-func RecoverAnnotation(annotation string, errp *error, onError OnError) {
-	doRecovery(annotation, noDeferredAnnotation, errp, onError, recoverOnErrrorOnce, noIsPanic, recover())
+//   - default annotation: “recover from panic:”
+//   - parl recover options:
+//   - — [RecoverErr]: aggregates to error pointer with enclosing function location, optional panic flag
+//   - — [Recover]: aggregates to error pointer with enclosing function location, optional single-invocation [parl.ErrorSink]
+//   - — [Recover2]: aggregates to error pointer with enclosing function location, optional multiple-invocation [parl.ErrorSink]
+//   - — [RecoverAnnotation]: aggregates to error pointer with fixed-string annotation, optional single-invocation [parl.ErrorSink]
+//   - — [PanicToErr]: aggregates to error pointer with generic annotation, optional panic flag
+//   - — preferrably: RecoverErr, Recover or Recover2 should be used to provide the package and function name
+//     of the enclosing function for the defer-statement that invoked recover
+//   - — PanicToErr and RecoverAnnotation cannot provide where in the stack trace recover was invoked
+//
+// Usage:
+//
+//	func someFunc() (err error) {
+//	  defer parl.RecoverAnnotation("property " + property, func() parl.DA { return parl.A() }, &err, parl.NoOnError)
+func RecoverAnnotation(annotation string, deferredLocation func() DA, errp *error, errorSink ...ErrorSink1) {
+	doRecovery(annotation, deferredLocation, errp, recoverOnErrrorOnce, noIsPanic, recover(), errorSink...)
 }
+
+// argument to Recover: no error aggregation
+var NoErrp *error
 
 // nil OnError function
 //   - public for RecoverAnnotation
+//
+// deprecated: use [ErrorSink]
 var NoOnError OnError
 
 // OnError is a function that receives error values from an errp error pointer or a panic
+//
+// deprecated: use [ErrorSink]
 type OnError func(err error)
 
 const (
@@ -96,13 +137,25 @@ func A() DA { return pruntime.NewCodeLocation(parlAFrames) }
 var noIsPanic *bool
 
 // doRecovery implements recovery for Recovery andd Recovery2
-func doRecovery(annotation string, deferredAnnotation annotationLiteral, errp *error, onError OnError, onErrorStrategy OnErrorStrategy, isPanic *bool, recoverValue interface{}) {
+//   - annotation: typically empty, can be string of some distinguishing property
+//   - — “copy command i/o stderr”
+//   - deferredAnnotation if a function-literal thunk present in the defer statement
+//   - — provides in which enclosing function the defer-statement invoking recovery is located
+//   - errp: optional error aggregation, default none
+//   - errorSink: optional errorSink, default errors are printed to standard error
+//   - isPanic: optional panic-flag
+//   - recoverValue: the value recover() returned
+func doRecovery(annotation string, deferredAnnotation annotationLiteral, errp *error, onErrorStrategy OnErrorStrategy, isPanic *bool, recoverValue interface{}, errorSink ...ErrorSink1) {
 	if onErrorStrategy == recoverOnErrrorNone {
 		if errp == nil {
 			panic(NilError("errp"))
 		}
-	} else if errp == nil && onError == nil {
+	} else if errp == nil && errorSink == nil {
 		panic(NilError("both errp and onError"))
+	}
+	var eSink ErrorSink1
+	if len(errorSink) > 0 {
+		eSink = errorSink[0]
 	}
 
 	// build aggregate error in err
@@ -113,22 +166,21 @@ func doRecovery(annotation string, deferredAnnotation annotationLiteral, errp *e
 		// and *errp contains an error,
 		// invoke onError or Log to standard error
 		if err != nil && onErrorStrategy == recoverOnErrrorMultiple {
-			invokeOnError(onError, err) // invoke onError or parl.Log
+			sendError(eSink, err) // invoke onError or parl.Log
 		}
 	}
 
 	// consume recover()
 	if recoverValue != nil {
+		// update optional panic flag
 		if isPanic != nil {
 			*isPanic = true
 		}
-		if annotation == noAnnotation {
-			annotation = getDeferredAnnotation(deferredAnnotation)
-		}
+		annotation = getDeferredAnnotation(annotation, deferredAnnotation)
 		var panicError = processRecoverValue(annotation, recoverValue, doRecoveryFrames)
 		err = perrors.AppendError(err, panicError)
 		if onErrorStrategy == recoverOnErrrorMultiple {
-			invokeOnError(onError, panicError)
+			sendError(eSink, panicError)
 		}
 	}
 
@@ -143,47 +195,72 @@ func doRecovery(annotation string, deferredAnnotation annotationLiteral, errp *e
 		}
 		// if OnError is once, invoke onError or Log with the aggregate error
 		if onErrorStrategy == recoverOnErrrorOnce {
-			invokeOnError(onError, err)
+			sendError(eSink, err)
 		}
 	}
 }
 
-// getDeferredAnnotation obtains annotation from a deferred annotation function literal
-func getDeferredAnnotation(deferredAnnotation annotationLiteral) (annotation string) {
+// getDeferredAnnotation returns an annotation string from a deferred annotation function literal
+//   - annotation0: typically empty, can be string of some distinguishing property
+//   - — “copy command i/o stderr” → “copy…: panic detected in…”
+//   - deferredAnnotation: a thunk returning a pruntime.CodeLocation for where it is declared
+//     on invocation providing package and function name enclosing the defer-statement invoking recover
+//   - annotation:
+//   - —“panic detected in os.Write:”
+//   - — “recover from panic:”
+//   - — “copy command i/o stderr: panic detected in os.Write:”
+//   - — “copy command i/o stderr panic:”
+func getDeferredAnnotation(annotation0 string, deferredAnnotation annotationLiteral) (annotation string) {
 	if deferredAnnotation != nil {
+		// execute the thunk returning the code location of the function literal declaration
 		if da := deferredAnnotation(); da != nil {
 			var cL = (*pruntime.CodeLocation)(da)
 			// single word package name
 			var packageName = cL.Package()
 			// recoverDaPanic.func1: hosting function name and a derived name for the function literal
 			var funcName = cL.FuncIdentifier()
-			// removed “.func1” suffix
+			// function literals are anonymous functions with “.func1” suffix
+			//	- remove the suffix
 			if index := strings.LastIndex(funcName, "."); index != -1 {
 				funcName = funcName[:index]
 			}
-			annotation = fmt.Sprintf("panic detected in %s.%s:",
+
+			// annotation with code location
+			if annotation0 != "" {
+				annotation0 += "\x20: "
+			}
+			annotation = fmt.Sprintf("%spanic detected in %s.%s:",
+				annotation0,
 				packageName,
 				funcName,
 			)
+			return
 		}
 	}
-	if annotation == "" {
-		// default annotation cannot be obtained
-		//	- the deferred Recover function is invoked directly from rutine, eg. runtime.gopanic
-		//	- therefore, use fixed string
-		annotation = "recover from panic:"
+
+	// fixed annotation without code location
+	if annotation0 != "" {
+		annotation = annotation0 + " panic:"
+		return
 	}
+
+	// annotation without code location
+	// default annotation cannot be obtained
+	//	- the deferred Recover function is invoked directly from rutine, eg. runtime.gopanic
+	//	- therefore, use fixed string
+	annotation = "recover from panic:"
 
 	return
 }
 
-// invokeOnError invokes an onError function or logs to standard error if onError is nil
-func invokeOnError(onError OnError, err error) {
-	if onError != nil {
-		onError(err)
+// sendError invokes an onError function or logs to standard error if onError is nil
+func sendError(errorSink ErrorSink1, err error) {
+	if errorSink != nil {
+		errorSink.AddError(err)
 		return
 	}
 	Log("Recover: %+v\n", err)
+	Log("invokeOnError parl.recover %s", debug.Stack())
 }
 
 // processRecoverValue returns an error value with stack from annotation and panicValue

@@ -35,20 +35,17 @@ type ConverterFunction[K any, V any] func(key K, isCancel bool) (value V, err er
 type SimpleConverter[K any, V any] func(key K) (value V)
 
 // IteratorAction is a delegated request from [iters.BaseIterator]
-//   - isCancel true requests cancel of iteration.
-//     No further invocations will occur.
+//   - isCancel true: consumer requests cancel of iterator.
+//     No further IteratorAction invocations will occur.
 //     The iterator should release resources.
 //     The iterator may return an error
 //   - otherwise, the iterator can:
-//   - — return the next value
-//   - — return an error. No further invocations will occur
-//   - — return err == parl.ErrEndCallbacks requesting an end to iterations.
-//     No further invocations will occur
+//   - — return the next value, with err nil, continuing iteration
+//   - — return an error. No further invocations will occur, value is not used
+//   - — return err == parl.ErrEndCallbacks requesting an end to iterations without error.
+//     No further invocations will occur.
 //     ErrEndCallbacks error is not returned to the consumer
-//   - the returned value is used if:
-//   - — returned err is nil and
-//   - — provided isCancel was false and
-//   - — returned didCancel is false
-//   - isPanic indicates that err is the result of a panic.
-//     isPanic is only used if err is non-nil
+//   - value is used if:
+//   - — returned err is nil and not ErrEndCallbacks and
+//   - — provided isCancel was false
 type IteratorAction[T any] func(isCancel bool) (value T, err error)

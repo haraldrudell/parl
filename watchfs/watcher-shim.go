@@ -48,7 +48,7 @@ type WatcherShim struct {
 	//	- portable types
 	eventFunc func(name string, op Op, t time.Time) (err error)
 	// error sink
-	errFn func(err error)
+	errorSink parl.ErrorSink1
 	// ensures Watch only invoked once
 	isWatchInvoked atomic.Bool
 	// awaitable for running threads
@@ -74,11 +74,11 @@ type WatcherShim struct {
 func NewWatcherShim(
 	fieldp *WatcherShim,
 	eventFunc func(name string, op Op, t time.Time) (err error),
-	errFn func(err error),
+	errorSink parl.ErrorSink1,
 ) (watcherShim *WatcherShim) {
 	if eventFunc == nil {
 		panic(parl.NilError("eventFunc"))
-	} else if errFn == nil {
+	} else if errorSink == nil {
 		panic(parl.NilError("errFn"))
 	}
 	if fieldp != nil {
@@ -89,7 +89,7 @@ func NewWatcherShim(
 	}
 	watcherShim.ID = watchNo.Add(1)
 	watcherShim.eventFunc = eventFunc
-	watcherShim.errFn = errFn
+	watcherShim.errorSink = errorSink
 	return
 }
 
@@ -214,7 +214,7 @@ func (w *WatcherShim) errorThread(errCh <-chan error) {
 	defer parl.Recover(func() parl.DA { return parl.A() }, nil, parl.Infallible)
 
 	for err := range errCh {
-		w.errFn(err)
+		w.errorSink.AddError(err)
 	}
 }
 
@@ -222,7 +222,7 @@ func (w *WatcherShim) errorThread(errCh <-chan error) {
 //   - provides timestamped values
 func (w *WatcherShim) eventThread(eventCh <-chan fsnotify.Event) {
 	defer w.endingThread()
-	defer parl.Recover(func() parl.DA { return parl.A() }, nil, w.errFn)
+	defer parl.Recover(func() parl.DA { return parl.A() }, nil, w.errorSink)
 
 	// wait for event
 	//	- received as value, a string and an int
@@ -234,7 +234,7 @@ func (w *WatcherShim) eventThread(eventCh <-chan fsnotify.Event) {
 
 		// send event
 		if err := w.eventFunc(fsnotifyEvent.Name, Op(fsnotifyEvent.Op), now); err != nil {
-			w.errFn(perrors.ErrorfPF("eventFunc %w", err))
+			w.errorSink.AddError(perrors.ErrorfPF("eventFunc %w", err))
 			return
 		}
 	}
@@ -268,6 +268,6 @@ func (w *WatcherShim) ensureWatcherClose() {
 	// close the watcher
 	var err = watcher.Close()
 	if err != nil {
-		w.errFn(err)
+		w.errorSink.AddError(err)
 	}
 }

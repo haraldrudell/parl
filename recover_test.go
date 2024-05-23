@@ -74,7 +74,11 @@ func TestRecoverDA(t *testing.T) {
 
 var tStatic *testing.T
 
-func diagnosingNoOnerror(err error) {
+type dn struct{}
+
+var diagnosingNoOnerror = dn{}
+
+func (d *dn) AddError(err error) {
 	tStatic.Logf("OnError function at %s: Recovered err: %s", pruntime.NewCodeLocation(0).Short(), perrors.Short(err))
 }
 
@@ -84,7 +88,7 @@ func diagnosingNoOnerror(err error) {
 //   - err is the resultfrom [Recover]
 func recoverDaPanic() (deferLocation, panicLocation *pruntime.CodeLocation, err error) {
 	deferLocation = pruntime.NewCodeLocation(0)
-	defer Recover(func() DA { return A() }, &err, diagnosingNoOnerror)
+	defer Recover(func() DA { return A() }, &err, &diagnosingNoOnerror)
 
 	panickingFunction(&panicLocation)
 	return

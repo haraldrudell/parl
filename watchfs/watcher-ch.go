@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"sync"
 	"sync/atomic"
+
+	"github.com/haraldrudell/parl"
 )
 
 // WatcherCh provides a channel api for a file-system watcher
@@ -47,10 +49,10 @@ type WatcherCh struct {
 //	  event, events := watchfs.UnpackEvents(any)
 func NewWatcherCh(
 	filter Op, ignores *regexp.Regexp,
-	errFn func(err error),
+	errorSink parl.ErrorSink1,
 ) (watcherCh *WatcherCh) {
 	w := WatcherCh{ch: make(chan any, 1)}
-	w.watcher = NewWatcher(filter, ignores, w.eventFunc, errFn)
+	w.watcher = NewWatcher(filter, ignores, w.eventFunc, errorSink)
 	return &w
 }
 

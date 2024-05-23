@@ -47,19 +47,27 @@ func TestNewUdp(t *testing.T) {
 	}
 
 	// error listening thread
-	errCh := udp.Listen()
+	var errCh = udp.Listen()
 	var errChWg sync.WaitGroup
 	errChWg.Add(1)
 	go func() {
 		defer errChWg.Done()
 		t.Log("reading errCh")
-		err, ok := <-errCh
-		if !ok {
-			t.Log("errCh closed")
-			return
+		var endCh = errCh.EndCh()
+		for {
+			select {
+			case <-errCh.WaitCh():
+				var err, hasValue = errCh.Error()
+				if !hasValue {
+					continue
+				}
+				t.Error("errCh has error")
+				panic(err)
+			case <-endCh:
+				t.Log("errCh closed")
+				return
+			}
 		}
-		t.Error("errCh has error")
-		panic(err)
 	}()
 	isUp, addr := udp.WaitForUp()
 	if !isUp {

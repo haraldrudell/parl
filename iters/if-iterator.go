@@ -58,7 +58,7 @@ type Iterator[T any] interface {
 	//	- otherwise, no more items exist and value is the data type zero-value
 	Next() (value T, hasValue bool)
 	// Cancel stops an iteration
-	//	- after Cancel invocation, Cond, Next and Same indicate no value available
+	//	- after Cancel invocation, Cond and Next indicate no value available
 	//	- Cancel returns the first error that occurred during iteration, if any
 	//	- an iterator implementation may require Cancel invocation
 	//		to release resources

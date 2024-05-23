@@ -105,7 +105,7 @@ func TestWatcherDirectory(t *testing.T) {
 	var ignores *regexp.Regexp
 
 	// create watcher watching the temporary directory
-	watcher = NewWatcher(filter, ignores, store.eventFunc, store.errFn)
+	watcher = NewWatcher(filter, ignores, store.eventFunc, store)
 	err = watcher.Watch(directory1)
 	if err != nil {
 		t.Errorf("Watch err: %s", perrors.Short(err))
@@ -305,7 +305,7 @@ func TestWatcherDirScan(t *testing.T) {
 	if err = os.Mkdir(dir2, dir2Perm); err != nil {
 		panic(err)
 	}
-	watcher = NewWatcher(filter, ignores, store.eventFunc, store.errFn)
+	watcher = NewWatcher(filter, ignores, store.eventFunc, store)
 	err = watcher.Watch(directory1)
 	if err != nil {
 		t.Errorf("Watch err: %s", perrors.Short(err))
@@ -370,7 +370,7 @@ func TestWatcherFile(t *testing.T) {
 	if err = os.WriteFile(file1, noData, file1Perm); err != nil {
 		panic(err)
 	}
-	watcher = NewWatcher(filter, ignores, store.eventFunc, store.errFn)
+	watcher = NewWatcher(filter, ignores, store.eventFunc, &store)
 	err = watcher.Watch(file1)
 	if err != nil {
 		t.Errorf("Watch err: %s", perrors.Short(err))
@@ -459,7 +459,7 @@ func (e *eventStore) eventFunc(watchEvent *WatchEvent) {
 }
 
 // errFn is the error receiver
-func (e *eventStore) errFn(err error) {
+func (e *eventStore) AddError(err error) {
 	e.t.Fatalf("FAIL Watcher err: " + perrors.Long(err))
 }
 
