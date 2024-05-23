@@ -43,17 +43,18 @@ func (e *ErrSlice) Errors() (errs []error) { return e.errs.GetAll() }
 //   - the next invocation may return a different channel object
 func (e *ErrSlice) WaitCh() (ch AwaitableCh) { return e.errs.DataWaitCh() }
 
+// EndCh awaits the error source closing:
+//   - the error source must be read to empty
+//   - the error source must be closed by the error-source providing entity
+func (e *ErrSlice) EndCh() (ch AwaitableCh) { return e.errs.EmptyCh(CloseAwaiter) }
+
 // AddError is a function to submit non-fatal errors
 func (e *ErrSlice) AddError(err error) { e.errs.Send(err) }
 
-// EmptyCh returns an awaitable channel that closes on queue being or
-// becoming empty
-//   - doNotInitialize CloseAwaiter: obtain the channel but do not enable it closing.
-//     A subsequent invocation with doNotInitialize missing will enable its closing thus
-//     act as a deferred Close function
-func (e *ErrSlice) EmptyCh(doNotInitialize ...bool) (ch AwaitableCh) {
-	return e.errs.EmptyCh(doNotInitialize...)
-}
+// EndCh awaits the error source closing:
+//   - the error source must be read to empty
+//   - the error source must be closed by the error-source providing entity
+func (e *ErrSlice) EndErrors() { e.errs.EmptyCh() }
 
 // AppendErrors collects any errors contained and appends them to errp
 func (e *ErrSlice) AppendErrors(errp *error) {
