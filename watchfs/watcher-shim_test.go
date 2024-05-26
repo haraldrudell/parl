@@ -103,5 +103,5 @@ func (w *shimTester) AddError(err error) {
 
 // eventFunc for watcherShim
 func (w *shimTester) eventFunc(name string, op Op, t time.Time) (err error) {
-	panic(err)
+	panic(perrors.NewPF("eventFunc"))
 }

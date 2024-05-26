@@ -120,6 +120,8 @@ type Executable struct {
 	IsErrorLocation bool
 	// optionsWereParsed signals that parsing completed without panic
 	optionsWereParsed atomic.Bool
+	// a specific status code to use on exit
+	statusCode parl.Atomic64[int]
 }
 
 // Executable is an error sink
@@ -284,70 +286,49 @@ func (x *Executable) ConfigureLog() (ex1 *Executable) {
 	return x
 }
 
-// Recover function to be used in main.main:
-//
-//	func main() {
-//	  defer Recover()
-//	  …
-//
-// On panic, the function prints to stderr: "Unhandled panic invoked exe.Recover: stack:"
-// followed by a stack trace. It then adds an error to mains.Executable and terminates
-// the process with status code 1
-func (x *Executable) Recover(errp ...*error) {
-
-	// get error from *errp and store in ex.err
-	if len(errp) > 0 {
-		if errp0 := errp[0]; errp0 != nil {
-			if err := *errp0; err != nil && err != errEarlyPanicError {
-				x.AddError(err)
-			}
-		}
-	}
-
-	x.doPanic(recover())
-
-	// ex.err now contains program result
-
-	// print completed successfully
-	if x.err.Count() == 0 && x.OKtext != NoOK {
-		var program string
-		var completedSuccessfully string
-		now := "at " + parl.ShortSpace() // time now second precision
-		if x.OKtext != "" {
-			completedSuccessfully = x.OKtext // custom "Completed successfully"
-		} else {
-			program = x.Program
-			completedSuccessfully = defaultOK // "<executable> completed successfully
-		}
-		sList := []string{program, completedSuccessfully, now}
-		parl.Log(pstrings.FilteredJoin(sList)) // to stderr
-	}
-
-	// will print any errors
-	x.Exit()
-}
-
+// errEarlyPanicError is a non-nil error value between EarlyPanic and Recover
 var errEarlyPanicError = errors.New("mains stored a panic")
 
-func (x *Executable) EarlyPanic(errp *error) {
+// EarlyPanic is a deferred function that recovers panic prior to all other deferred functions
+//   - EarlyPanic ensures that a panic is displayed immediately and
+//     that the panic is stored as the first occurring error
+//   - the first deferred function should be [Executable.Recover]
+//   - the last deferred function should be [Executable.EarlyPanic]
+//   - EarlyPanic avoids confusion from other deferred functions quietly hanging
+//     or storing a first error that is actually subsequent to the panic
+func (x *Executable) EarlyPanic(errp ...*error) {
 
-	// store the panic
-	x.doPanic(recover())
+	// print and store any panic returned by recover()
+	if !x.processPanicValue(recover()) {
+		return // there was no panic
+	}
+	// a panic was recovered, printed and stored
 
 	// since the panic was stored and printed:
 	//	- an error must be returned to maintain the error condition
-	//	- panic cannot be invoked again because it would cancel other deferred functions
-	//	- if the stored error is used, this may be modified and lead to error duplication
+	//	- — panic cannot be invoked again because it would cancel other deferred functions
+	//	- — if the just stored error value is used, this may be modified and lead to error duplication
 	//	- therefore, a new simple error is returned
-	//	- if a stack trace is added to the simple error, it will appear as a panic
-	if *errp == nil {
-		*errp = errEarlyPanicError
+	//	- — once at [Executable.Recover] the simple error can be discarded
+	//	- — since EarlyPanic just recovered a panic, EarlyPanic itself would produce a a panic stack,
+	//		why a stack trace added to the simple error now would make the error appear as a panic
+	//	- — therefore, the simple error has no stack
+
+	// ensure any non-nil errp points to a non-nil error
+	if len(errp) > 0 {
+		if errp0 := errp[0]; errp0 != nil && *errp0 == nil {
+			*errp0 = errEarlyPanicError
+		}
 	}
 }
 
-func (x *Executable) doPanic(panicValue any) {
+// processPanicValue prints and stores any non-nil recover() values
+//   - the value with its type
+//   - stack trace for any error that has stack
+//   - recovery stack trace
+func (x *Executable) processPanicValue(panicValue any) (wasPanic bool) {
 
-	// ensure -debug honored if panic before options parsing
+	// ensure -debug honored if panic or error before options parsing
 	if !x.optionsWereParsed.Load() {
 		for _, option := range os.Args {
 			if option == pflags.DebugOption { // -debug
@@ -356,67 +337,83 @@ func (x *Executable) doPanic(panicValue any) {
 		}
 	}
 
-	// check for panic
-	if panicValue != nil {
-
-		// determine if v is error
-		err, recoverValueIsError := panicValue.(error)
-		var error0 error
-
-		// debug print
-		isDebug := parl.IsThisDebug()
-		if isDebug {
-			hasStack := false
-			var valueString string
-			var error0type string
-			if !recoverValueIsError {
-				valueString = parl.Sprintf(" '%+v'", panicValue)
-			} else {
-				error0 = perrors.Error0(err)
-				error0type = parl.Sprintf(" panic error type: %T", error0)
-				hasStack = perrors.HasStack(err)
-				error0value := fmt.Sprintf("error0: %+v", error0)
-				if hasStack {
-					valueString = parl.Sprintf(" error-value:\n\n%s\n\n%s\n\n", perrors.Long(err), error0value)
-				} else {
-					valueString = err.Error() + "\n" + error0value
-				}
-			}
-			parl.Debug("%s: panic with -debug: recover-value type: %T%s hasStack: %t%s",
-				pruntime.NewCodeLocation(0).PackFunc(),
-				panicValue, error0type, hasStack, valueString)
-		}
-
-		// print panic message and invocation stack
-		var stackString string
-		if isDebug {
-			stackString = " recovery stack trace:\n\n" + pruntime.DebugStack(0) + "\n\n"
-		}
-		var programString string
-		if x.Program != "" {
-			programString = "\x20" + x.Program
-		}
-		parl.Log("\n\nProgram%s Recovered a Main-Thread panic:%s", programString, stackString)
-
-		// store recovery value as error
-		var prepend string
-		var postpend string
-		if !recoverValueIsError {
-			err = perrors.Errorf("panic: non-error value: %T %[1]v", panicValue)
-		} else {
-			prepend = "panic: “"
-			postpend = "”"
-			if isDebug {
-				// put error0 type name in error message
-				postpend += parl.Sprintf(" type: %T", error0)
-			}
-		}
-		// always add a stack trace after panic
-		//	- must contain one frame after panic
-		err = perrors.Stackn(err, doPanicFrames)
-		err = perrors.Errorf("main-thread %s%w%s", prepend, err, postpend)
-		x.AddError(err)
+	// no ongoing panic is noop
+	if wasPanic = panicValue != nil; !wasPanic {
+		return
 	}
+	// a panic was recovered in panicValue
+
+	// determine if panicValue implements error
+	var err, recoverValueIsError = panicValue.(error)
+	// the innermost error if panicValue is error
+	var error0 error
+
+	// debug print panicValue
+	isDebug := parl.IsThisDebug()
+	if isDebug {
+		hasStack := false
+		var valueString string
+		var error0type string
+		if !recoverValueIsError {
+			valueString = parl.Sprintf(" “%+v”", panicValue)
+		} else {
+			error0 = perrors.Error0(err)
+			error0type = parl.Sprintf(" panic error type: %T", error0)
+			hasStack = perrors.HasStack(err)
+			error0value := fmt.Sprintf("error0: %+v", error0)
+			if hasStack {
+				valueString = parl.Sprintf(" error-value:\n\n%s\n\n%s\n\n", perrors.Long(err), error0value)
+			} else {
+				valueString = err.Error() + "\n" + error0value
+			}
+		}
+		// panic printout:
+		//	- the packFunc for this function
+		//	- the type returned by recover()
+		//	- innermost error type if panicValue implements error
+		//	- true if panicValue was an error with a stack trace
+		//	- the value returned by recover():
+		//	- — if recover() did not return an error: printed using “%+v”
+		//	- — if recover() returned an error with stack: the error with stack and
+		//		the innermost error printed using “%+v”
+		//	- — if recover() returned an error without stack: the message and
+		//		the innermost error printed using “%+v”
+		parl.Debug("%s: panic with -debug: recover-value type: %T%s hasStack: %t%s",
+			pruntime.NewCodeLocation(0).PackFunc(),
+			panicValue, error0type, hasStack, valueString)
+	}
+
+	// print recovery stack trace
+	var stackString string
+	if isDebug {
+		stackString = " recovery stack trace:\n\n" + pruntime.DebugStack(0) + "\n\n"
+	}
+	var programString string
+	if x.Program != "" {
+		programString = "\x20" + x.Program
+	}
+	parl.Log("\n\nProgram%s Recovered a main-thread panic:%s", programString, stackString)
+
+	// store recovery value as error
+	var prepend string
+	var postpend string
+	if !recoverValueIsError {
+		err = perrors.Errorf("panic: non-error value: %T %[1]v", panicValue)
+	} else {
+		prepend = "panic: “"
+		postpend = "”"
+		if isDebug {
+			// put error0 type name in error message
+			postpend += parl.Sprintf(" type: %T", error0)
+		}
+	}
+	// always add a stack trace after panic
+	//	- must contain one frame after panic
+	err = perrors.Stackn(err, doPanicFrames)
+	err = perrors.Errorf("main-thread %s%w%s", prepend, err, postpend)
+	x.AddError(err)
+
+	return
 }
 
 // AddError extended with immediate printing of first error
@@ -456,26 +453,65 @@ func (x *Executable) AddError(err error) {
 	x.err.Add(err)
 }
 
+// a subt making [Executable] implement [parl.ErrorSink]
 func (x *Executable) EndErrors() {}
 
-// Exit terminate from mains.err: exit 0 or echo to stderr and status code 1
-//   - Usually invoked for all app terminations
-//   - — either by defer ex.Recover(&err) at beginning fo main
-//   - — or rarely by direct invocation in program code
-//   - when invoked, errors are expected to be in ex.err from:
-//   - — ex.AddErr or
-//   - — ex.Recover
-//   - Exit does not return from invoking os.Exit
-func (x *Executable) Exit(stausCode ...int) {
+// SetStatusCode allos to set the status code to use on exit
+//   - deferrable, thread-safe
+func (x *Executable) SetStatusCode(statusCode *int) { x.statusCode.Store(*statusCode) }
 
-	// get requested status code
-	var statusCode0 int
-	if len(stausCode) > 0 {
-		statusCode0 = stausCode[0]
+// Recover terminates the process, typically invoked as the first deferred function in main.main
+//   - errp: optional pointer that may point to a non-nil error
+//   - Recover does not return, instead it invokes [os.Exit]
+//   - Recover recovers any ongoing panic using recover()
+//   - successful exit is:
+//   - — no ongoing panic
+//   - — no non-nil errors pointed to by errp
+//   - — no errors previously stored by [Executable.AddError] or [Executable.EarlyPanic]
+//   - — no non-zero status code previously stored by [Executable.SetStatusCode]
+//   - on successful exit, a timestamped success message is printed followed by exit status zero:
+//   - — “gtee completed successfully at 240524 17:26:50-07”
+//   - on failure exit:
+//   - — non-panic errors are printed as one-liners with code location
+//   - — panics are printed with stack trace and error chain
+//   - — the last printed line is a timestamped exit message:
+//   - — “240524 21:32:08-07 gtee: exit status 1”
+//   - — exit status code is any non-zero status code provided to [Executable.SetStatusCode] or 1
+//
+// Usage:
+//
+//	func main() {
+//	  var err error
+//	  defer Recover(&err)
+//	  …
+func (x *Executable) Recover(errp ...*error) {
+
+	// process remaining error data
+	//	— get error from *errp and store in x.err
+	if len(errp) > 0 {
+		if errp0 := errp[0]; errp0 != nil {
+			if err := *errp0; err != nil && err != errEarlyPanicError {
+				x.AddError(err)
+			}
+		}
+	}
+	// recover any ongoing panic
+	x.processPanicValue(recover())
+
+	// exit status code, zero on success:
+	//	- errCount zero and
+	//	- no non-zero status code set by [Executable.SetStatusCode]
+	var statusCode = x.statusCode.Load()
+	// the number of errors and panics
+	var errCount = x.err.Count()
+	// if not success, ensure non-zero status code
+	//	- status code 1 is default
+	if statusCode == 0 && errCount > 0 {
+		statusCode = pos.StatusCodeErr
 	}
 
 	// printouts when IsDebug
-	if x.err.Count() == 0 {
+	if errCount == 0 {
 		parl.Debug("\nexe.Exit: no error")
 	} else {
 		parl.Debug("\nexe.Exit: err: %T '%[1]v'", x.err.GetN())
@@ -485,18 +521,32 @@ func (x *Executable) Exit(stausCode ...int) {
 		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}
 
-	// terminate when there are no errors
-	var errCount = x.err.Count()
-	if errCount == 0 {
-		if statusCode0 != 0 {
-			pos.OsExit(statusCode0)
+	// successfull exit
+	if statusCode == 0 {
+		// print timestamped success message if not suppressed
+		//	- “gtee completed successfully at 240524 17:26:50-07”
+		if x.OKtext != NoOK {
+			var program string
+			var completedSuccessfully string
+			now := "at " + parl.ShortSpace() // time now second precision
+			if x.OKtext != "" {
+				completedSuccessfully = x.OKtext // custom "Completed successfully"
+			} else {
+				program = x.Program
+				completedSuccessfully = defaultOK // "<executable> completed successfully
+			}
+			sList := []string{program, completedSuccessfully, now}
+			parl.Log(pstrings.FilteredJoin(sList)) // to stderr
 		}
-		pos.Exit0()
+		// exit status zero
+		pos.OsExit(statusCode)
 	}
+
+	// err0 is the first occuring error if any
 	var err0 error
 
 	// print all errors except the very first
-	//	- if first error value was printed long, it doesnot have to be printed
+	//	- if first error value was printed long, it does not have to be printed
 	//	- otherwise, print its associated errors
 	//	- subsequent errors printed in full
 	for i, err := range x.err.Get() {
@@ -522,14 +572,15 @@ func (x *Executable) Exit(stausCode ...int) {
 		fmt.Fprintln(os.Stderr, err0)
 	}
 
-	// exit 1
-	if statusCode0 == 0 {
-		statusCode0 = pos.StatusCodeErr
-	}
-	parl.Log(parl.ShortSpace() + "\x20" + x.Program + ": exit status " + strconv.Itoa(statusCode0)) // outputs "060102 15:04:05Z07 " without newline to stderr
-	pos.Exit(statusCode0, nil)                                                                      // os.Exit(1) outputs "exit status 1" to stderr
+	// timestamped staus-code message
+	//	- “240524 21:32:08-07 gtee: exit status 1”
+	parl.Log(parl.ShortSpace() + "\x20" + x.Program + ": exit status " + strconv.Itoa(statusCode)) // outputs "060102 15:04:05Z07 " without newline to stderr
+
+	// exit with non-zero status code
+	pos.Exit(statusCode, nil)
 }
 
+// printAssociated recursively prints associated error values
 func (x *Executable) printAssociated(i string, err error) {
 	var associatedErrors = errorglue.ErrorList(err)
 	// 1 means no associated errors

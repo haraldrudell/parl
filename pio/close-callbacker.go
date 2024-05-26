@@ -12,9 +12,14 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// Go does not allow promotion of a type parameter
-// https://github.com/golang/go/issues/49030
-// interfaces:
+// it is desirable to modify the Close method for any interface or type
+// having a Close method
+//   - Go does not allow promotion of a type parameter
+//     https://github.com/golang/go/issues/49030
+//   - this limitation means a generic Close wrapper can not be defined
+//     that would promote whatever methods the generic type provides
+//     in addition to Close
+//   - the types providing a Close method that it would be desirable to promote:
 var _ io.ReadCloser
 var _ io.ReadSeekCloser
 var _ io.ReadWriteCloser

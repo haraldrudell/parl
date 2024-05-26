@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	// the status code of a process terminated by signal
 	TerminatedBySignal = -1
 )
 

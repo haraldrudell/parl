@@ -21,3 +21,9 @@ package parl
 //	    hasHappened = false
 //	}
 type AwaitableCh <-chan struct{}
+
+// Await is a deferrable funciton awaiting close of ch
+func Await(ch AwaitableCh) {
+	NilPanic("awaitable channel", ch)
+	<-ch
+}

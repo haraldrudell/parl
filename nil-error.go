@@ -12,6 +12,14 @@ import (
 	"github.com/haraldrudell/parl/pruntime"
 )
 
+// NilPanic panics with NilError label if value is nil
+func NilPanic[T any](label string, value T) {
+	if !IsNil(value) {
+		return
+	}
+	panic(NilError(label))
+}
+
 const (
 	// count frame of [parl.NilError]
 	nilErrorFrames = 1

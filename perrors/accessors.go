@@ -244,6 +244,8 @@ func IsType(err error, pointerToErrorValue interface{}) (hadErrpType bool) {
 	return // no match exit
 }
 
+// Error0 returns the last error in err’s error chain
+// or nil if err is nil
 func Error0(err error) (e error) {
 	for ; err != nil; err = errors.Unwrap(err) {
 		e = err

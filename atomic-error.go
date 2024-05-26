@@ -34,6 +34,32 @@ func (a *AtomicError) AddError(err error) {
 	}
 }
 
+// AddErrorSwap attempts to write newErr if empty or matching oldErr
+//   - oldErr: nil or an error returned by [AtomicError.AddErrorSwap] or otherErr
+//   - newErr: the error to store
+//   - didSwap true: newErr was stored either because of empty or matching oldErr
+//   - didSwap false: an error differerent fro oldErr is returned in otherErr
+func (a *AtomicError) AddErrorSwap(oldErr, newErr error) (didSwap bool, otherErr error) {
+
+	// if empty, write new value
+	var ep = a.err.Load()
+	if ep == nil {
+		if didSwap = a.err.CompareAndSwap(nil, &newErr); didSwap {
+			return // wrote new error return
+		}
+	}
+
+	// if oldErr, try to write newErr
+	if *ep == oldErr {
+		if didSwap = a.err.CompareAndSwap(ep, &newErr); didSwap {
+			return // updated error return
+		}
+	}
+	otherErr = *ep
+
+	return // didSwap false return: an error exists, and it is not oldErr
+}
+
 func (a *AtomicError) Error() (err error, hasValue bool) {
 	if ep := a.err.Load(); ep != nil {
 		err = *ep

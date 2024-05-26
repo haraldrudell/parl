@@ -15,21 +15,21 @@ import (
 )
 
 const (
-	NoStdout   Stdouts = false
-	WantStdout Stdouts = true
+	NoExecBlockingStdout Stdouts = false
+	WantStdout           Stdouts = true
 )
 
 type Stdouts bool
 
 const (
-	NoStderr Stderrs = iota + 1
+	NoExecBlockingStderr Stderrs = iota + 1
 	WantStderr
 	StderrIsError
 )
 
 type Stderrs uint8
 
-var NoStdin []byte
+var NoExecBlockingStdin []byte
 
 // ExecBlocking executes a system command with independent control over stdin stdout stderr
 //   - if stdin is nil, no stdin is provided to command

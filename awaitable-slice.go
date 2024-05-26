@@ -102,7 +102,7 @@ type AwaitableSlice[T any] struct {
 	queueLock sync.Mutex
 	// queue is a locally made slice for individual values
 	//	- behind queueLock
-	//	- not a slice-away slie
+	//	- not a slice-away slice
 	queue []T
 	// slices contains slices of values transferred by SendSlice and
 	// possible subsequent locally made slices of values
