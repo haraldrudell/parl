@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	// “ThreadLogger” preceeds all thread-logger output
 	threadLoggerLabel = "ThreadLogger"
 )
 
@@ -30,35 +31,55 @@ const (
 //     not exit prematurely. The WaitGroup ends when the GoGroup ends and ThreadLogger
 //     ceases output
 type ThreadLogger struct {
-	log      parl.PrintfFunc
 	endCh    chan struct{}
 	isCancel atomic.Bool
+	// the log output is printed to
+	log parl.PrintfFunc
 
-	goGroup            *g0.GoGroup
-	isEnd              func() bool
+	// goGroup is thread-group being monitored
+	goGroup *g0.GoGroup
+	// isEnd is the thread-group’s private method returning end status
+	isEnd func() bool
+	// isAggregateThreads is the thread-group’s private flag for whether to collect thread data
 	isAggregateThreads *atomic.Bool
-	setCancelListener  func(f func())
-	gEndCh             <-chan struct{}
+	// setCancelListener is the thread-group’s private method for installing a listener to context cancel
+	setCancelListener func(f func())
+	// gEndCh is the thread-group’s private end channel for SubGo that does not have an error stream
+	gEndCh <-chan struct{}
 }
 
 var _ = parl.AggregateThread
 
-// NewThreadLogger wraps a GoGen thread-group in a debug listener
-//   - parl.AggregateThread is enabled for the thread-group
-//   - ThreadLogger listens for thread-group Cancel
-//   - Wait method ensures process does not exit prior to ThreadLogger complete
-//   - logFn is an optional logging function, default parl.Log to stderr
+// NewThreadLogger provides debug logging for a thread-group
+//   - GoGen: an thread-group object managing threads implemented by [g0.GoGroup]:
+//   - — [parl.GoGroup]
+//   - — [parl.Subgo]
+//   - — [parl.SubGroup]
+//   - logFn: an optional logging function, default [parl.Log] to stderr
+//   - the new function does not take any action or prepare logging,
+//     actions begin by invoking the Log method
+//   - [ThreadLogger.Log] begins monitoring and should be invoked prior to launching any threads
+//   - — ThreadLogger enables [parl.AggregateThread] for the thread-group.
+//     This causes the thread-group to collect thread information for debug purposes
+//   - — ThreadLogger then listens for thread-group Cancel allowing logging to start automatically
+//   - [ThreadLogger.Wait] awaits the end of the thread-group and the thread logger
+//   - — Wait should not be invoked prior to ensuring that the thread-group is shutting down
+//   - — a thread-group is typically shut down via its Cancel method,
+//     but a thread-group also shuts down on its last thread exiting,
+//     a fatal thread error or for other reasons
+//   - — invoking the Wait method ensures the process does not exit prior to ThreadLogger complete
+//   - ThreadLogger uses a thread for logging that exits upon the thread-group ending
 //
 // Usage:
 //
 //	main() {
 //	  var threadGroup = g0.NewGoGroup(context.Background())
 //	  defer threadGroup.Wait()
-//	  defer g0.NewThreadLogger(threadGroup).Log().Wait()
+//	  defer g0debug.NewThreadLogger(threadGroup).Log().Wait()
 //	  defer threadGroup.Cancel()
 //	  …
 //	 threadGroup.Cancel()
-func NewThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interface{})) (threadLogger *ThreadLogger) {
+func NewThreadLogger(goGen parl.GoGen, logFn ...parl.PrintfFunc) (threadLogger *ThreadLogger) {
 	t := ThreadLogger{endCh: make(chan struct{})}
 
 	// obtain logging function
@@ -69,17 +90,22 @@ func NewThreadLogger(goGen parl.GoGen, logFn ...func(format string, a ...interfa
 		t.log = parl.Log
 	}
 
-	// obtain GoGroup
+	// obtain implementing GoGroup
 	var ok bool
 	if t.goGroup, ok = goGen.(*g0.GoGroup); !ok {
 		panic(perrors.ErrorfPF("type assertion failed, need GoGroup SubGo or SubGroup, received: %T", goGen))
 	}
+
+	// retrieve internals from the goGroup
 	t.isEnd, t.isAggregateThreads, t.setCancelListener, t.gEndCh = t.goGroup.Internals()
 
 	return &t
 }
 
-// Log preares the threadgroup for logging on Cancel
+// Log prepares the threadgroup for logging on Cancel
+//   - Log activates a Cancel listener on the thread-group
+//     allowing thread-logging to start automatically
+//   - supports functional chaining
 func (t *ThreadLogger) Log() (t2 *ThreadLogger) {
 	t2 = t
 
@@ -103,9 +129,8 @@ func (t *ThreadLogger) Log() (t2 *ThreadLogger) {
 	return
 }
 
-func (t *ThreadLogger) Wait() {
-	<-t.endCh
-}
+// Wait awaits the monitored thread-group end which ends the thread-logger, too
+func (t *ThreadLogger) Wait() { <-t.endCh }
 
 // cancelListener is invoked on every threadGroup.Cancel()
 func (t *ThreadLogger) cancelListener() {
@@ -117,9 +142,7 @@ func (t *ThreadLogger) cancelListener() {
 }
 
 // launchThread prepares the waitgroup and lunches the logging thread
-func (t *ThreadLogger) launchThread() {
-	go t.printThread()
-}
+func (t *ThreadLogger) launchThread() { go t.printThread() }
 
 // printThread prints goroutines that have yet to exit every second
 func (t *ThreadLogger) printThread() {

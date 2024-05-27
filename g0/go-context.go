@@ -23,7 +23,7 @@ const (
 //   - goContext is based on parl.NewCancelContext
 type goContext struct {
 	goEntityID // EntityID()
-	wg         parl.WaitGroup
+	wg         parl.WaitGroupCh
 	//	- updatable, therefore must be atomic access
 	ctxp atomic.Pointer[context.Context]
 	// cancelListener is function invoked immediately prior to

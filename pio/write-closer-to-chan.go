@@ -13,9 +13,7 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-type WriteCloserToChan struct {
-	ch parl.NBChan[[]byte]
-}
+type WriteCloserToChan struct{ ch parl.AwaitableSlice[[]byte] }
 
 func NewWriteCloserToChan() (writeCloser io.WriteCloser) {
 	return &WriteCloserToChan{}
@@ -24,7 +22,7 @@ func NewWriteCloserToChan() (writeCloser io.WriteCloser) {
 func InitWriteCloserToChan(wcp *WriteCloserToChan) {}
 
 func (wc *WriteCloserToChan) Write(p []byte) (n int, err error) {
-	if wc.ch.DidClose() {
+	if parl.IsClosed[string](&wc.ch) {
 		err = perrors.ErrorfPF(fs.ErrClosed.Error())
 		return
 	}
@@ -33,10 +31,8 @@ func (wc *WriteCloserToChan) Write(p []byte) (n int, err error) {
 	return
 }
 func (wc *WriteCloserToChan) Close() (err error) {
-	wc.ch.Close()
+	wc.ch.EmptyCh()
 	return
 }
 
-func (wc *WriteCloserToChan) Ch() (readCh <-chan []byte) {
-	return wc.ch.Ch()
-}
+func (wc *WriteCloserToChan) Ch() (readCh parl.ClosableAllSource[[]byte]) { return &wc.ch }

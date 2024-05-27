@@ -23,7 +23,7 @@ const (
 // HaltDetector sends detected Go runtime execution halts on channel ch.
 type HaltDetector struct {
 	reportingThreshold time.Duration
-	ch                 parl.NBChan[*HaltReport]
+	ch                 parl.AwaitableSlice[*HaltReport]
 }
 
 // HaltReport is a value object representing a detected Go runtime execution halt
@@ -81,8 +81,6 @@ func (h *HaltDetector) Thread(g0 parl.Go) {
 	}
 }
 
-// Ch returns a receive channel for reports of Go rutnime execution halts
+// Ch returns a receive channel for reports of Go runtime execution halts
 //   - Ch never closes
-func (h *HaltDetector) Ch() (ch <-chan *HaltReport) {
-	return h.ch.Ch()
-}
+func (h *HaltDetector) Ch() (ch parl.Source1[*HaltReport]) { return &h.ch }

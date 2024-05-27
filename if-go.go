@@ -23,13 +23,12 @@ import (
 //   - — to submit non-fatal errors via [Go.AddError]
 //   - — to detect and initiate cancel via [Go.Context] [Go.Cancel]
 //   - [Go.Cancel] cancels:
-//   - — this Go thread’s context
 //   - — this Go’s parent thread-group’s context and
 //   - — this Go’s parent thread-group’s subordinate thread-groups’ contexts
 //   - The Go Context is canceled when
 //   - — the parent GoGroup thread-group’s context is Canceled or
 //   - —a thread in the parent GoGroup thread-group initiates Cancel
-//   - Cancel by threads in sub ordinate thread-groups do not Cancel this Go thread
+//   - Cancel by threads in subordinate thread-groups do not Cancel this Go thread
 //
 // Usage:
 //
@@ -52,7 +51,7 @@ type Go interface {
 	//	in a function call invocation launching a new gorotuine thread.
 	//	- the new thread belongs to the same GoGroup thread-group as the Go
 	//		object whose Go method was invoked.
-	Go() (g0 Go)
+	Go() (g Go)
 	// SubGo returns a GoGroup thread-group whose fatal and non-fatel errors go to
 	//	the Go object’s parent thread-group.
 	//	- a SubGo is used to ensure sub-threads exiting prior to their parent thread
@@ -79,8 +78,9 @@ type Go interface {
 	//	- non-nil err indicates fatal error
 	// 	- deferrable
 	Done(errp *error)
-	// Wait awaits exit of this Go thread.
+	// Wait awaits exit of this Go thread
 	Wait()
+	// ch closes upon exit of this Go thread
 	WaitCh() (ch AwaitableCh)
 	// Cancel signals for the threads in this Go thread’s parent GoGroup thread-group
 	// and any subordinate thread-groups to exit.
@@ -194,7 +194,7 @@ type GoGen interface {
 type GoGroup interface {
 	// Go returns a Go object to be provided as a go statement function argument.
 	Go() (g0 Go)
-	// SubGo returns athread-group whose fatal errors go to Go’s parent.
+	// SubGo returns a thread-group whose fatal errors go to Go’s parent.
 	//   - both non-fatal and fatal errors in SubGo threads are sent to Go’s parent
 	// 		like Go.AddError and Go.Done.
 	//		- therefore, when a SubGo thread fails, the application will typically exit.
@@ -208,11 +208,27 @@ type GoGroup interface {
 	//	- SubGroup only awaits SubGroup threads
 	//	- parent await also awaits SubGroup threads
 	SubGroup(onFirstFatal ...GoFatalCallback) (subGroup SubGroup)
-	// Ch returns a channel sending the all fatal termination errors when
-	// the FailChannel option is present, or only the first when both
-	// FailChannel and StoreSubsequentFail options are present.
-	Ch() (ch <-chan GoError)
-	// Wait waits for this thread-group to terminate.
+	// GoError returns a channel returning fatal and not-fatal errors and thread exits.
+	//	- see GoError for exact error categories
+	//
+	// Usage:
+	//
+	//	var goErrors = goGroup.GoError()
+	//	for goError := goErrors.Init(); goErrors.Condition(&goError); {
+	//	  …
+	//	var goEndCh = goErrors.EmptyCh(parl.CloseAwaiter)
+	//	for {
+	//	  select {
+	//	  case <-goEndCh:
+	//	    goEndCh = nil
+	//	    …
+	//	  case <-goErrors.DataWaitCh():
+	//	    var goError, hasValue = goErrors.Get()
+	//	    if !hasValue {
+	//	      continue
+	//	    …
+	GoError() (goErrors IterableSource[GoError])
+	// Wait waits for this thread-group to end
 	Wait()
 	// EnableTermination controls temporarily preventing the GoGroup from
 	// terminating.
@@ -290,8 +306,26 @@ type SubGo interface {
 
 type SubGroup interface {
 	SubGo
-	// Ch returns a receive channel for fatal errors if this SubGo has LocalChannel option.
-	Ch() (ch <-chan GoError)
+	// GoError returns a channel returning fatal and not-fatal errors and thread exits.
+	//	- see GoError for exact error categories
+	//
+	// Usage:
+	//
+	//	var goErrors = goGroup.GoError()
+	//	for goError := goErrors.Init(); goErrors.Condition(&goError); {
+	//	  …
+	//	var goEndCh = goErrors.EmptyCh(parl.CloseAwaiter)
+	//	for {
+	//	  select {
+	//	  case <-goEndCh:
+	//	    goEndCh = nil
+	//	    …
+	//	  case <-goErrors.DataWaitCh():
+	//	    var goError, hasValue = goErrors.Get()
+	//	    if !hasValue {
+	//	      continue
+	//	    …
+	GoError() (goErrors IterableSource[GoError])
 	// FirstFatal allows to await or inspect the first thread terminating with error.
 	// it is valid if this SubGo has LocalSubGo or LocalChannel options.
 	// To wait for first fatal error using multiple-semaphore mechanic:

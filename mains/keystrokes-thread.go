@@ -15,32 +15,46 @@ import (
 
 // keystrokesThread reads blocking from [os.Stdin] therefore cannot be canceled
 //   - therefore, keystrokesThread is a top-level function not waited upon
-//   - on [Keystrokes.CloseNow], keystrokesThread exits on the following return keypress
-//   - on [os.Stdin] closing, keystrokesThread closes the Keystrokes channel
+//   - silent true: nothing is printed on os.Stdin closing
+//   - silent false: “mains.keystrokesThread standard input closed” may be printed to
+//     standard error on os.Stdin closing
+//   - errorSink receives any errors returned by or panic in [os.Stdin.Read]
+//   - stdin receives text lines from standard input with line terminator removed
+//   - on [Keystrokes.CloseNow], keystrokesThread exits on the following keypress
+//   - on [os.Stdin] closing, keystrokesThread closes the stdin line-input channel
 //   - [StdinReader] converts any error to [io.EOF]
 //   - [parl.Infallible] prints any errors to standard error, should not be any
 //   - —
 //   - -verbose=mains.keystrokesThread
-func keystrokesThread(silent bool, errorSink parl.ErrorSink, stdin *parl.NBChan[string]) {
+func keystrokesThread(silent bool, errorSink parl.ErrorSink1, stdin parl.ClosableSink[string]) {
 	var err error
-	defer parl.Debug("keystrokes.scannerThread exiting: err: %s", perrors.Short(err))
+	var isDebug = parl.IsThisDebug()
+	if isDebug {
+		defer parl.Debug("keystrokes.scannerThread exiting: err: %s", perrors.Short(err))
+	}
+	if errorSink == nil {
+		errorSink = parl.Infallible
+	}
 	// if a panic is recovered, or err holds an error, both are printed to standard error
-	defer parl.Recover(func() parl.DA { return parl.A() }, &err, parl.Infallible)
+	defer parl.Recover(func() parl.DA { return parl.A() }, &err, errorSink)
 	// ensure string-channel closes on exit without discarding any input
-	defer stdin.Close()
+	defer stdin.EmptyCh()
 
-	var isError atomic.Bool
-	var scanner = bufio.NewScanner(NewStdinReader(errorSink.AddError, &isError))
-	parl.Debug("keystrokes.scannerThread scanning: stdin.Ch: 0x%x", stdin.Ch())
+	var isStdinReaderError atomic.Bool
+	// scanner splits input into lines
+	var scanner = bufio.NewScanner(NewStdinReader(errorSink, &isStdinReaderError))
+	var stdinClosedCh = stdin.EmptyCh(parl.CloseAwaiter)
 
 	// blocks here
 	for scanner.Scan() {
-		// DidClose is true if close was invoked
-		//	- stdin.Ch may not be closed yet
-		if stdin.DidClose() {
+
+		// check if consumer closed stdin output
+		select {
+		case <-stdinClosedCh:
 			return // terminated by Keystrokes.CloseNow
+		default:
 		}
-		if parl.IsThisDebug() {
+		if isDebug {
 			parl.Log("keystrokes.Send %q", scanner.Text())
 		}
 		stdin.Send(scanner.Text())
@@ -54,7 +68,7 @@ func keystrokesThread(silent bool, errorSink parl.ErrorSink, stdin *parl.NBChan[
 	// do not print:
 	if silent || //	- if silent is configured or
 		err != nil || //	- the scanner had error or
-		isError.Load() { //	- close is caused by an error handled by StdinReader
+		isStdinReaderError.Load() { //	- close is caused by an error handled by StdinReader
 		return
 	}
 	// echoed to standard error

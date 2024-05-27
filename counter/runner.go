@@ -31,6 +31,7 @@ func (r *runner) Add(task RateRunnerTask) {
 
 // Do is invoked by a timer with an intended at time
 func (r *runner) Do(at time.Time) {
+	_ = at
 	at = time.Now() // obtain accurate time-stamp
 	for i := 0; ; i++ {
 		task := r.task(i)

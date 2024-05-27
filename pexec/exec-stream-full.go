@@ -8,6 +8,7 @@ package pexec
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -18,32 +19,6 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 	"golang.org/x/sys/unix"
 )
-
-var (
-	// [ExecStreamFull] env: use the environment of the parent process
-	DefaulEnv []string
-	// [ExecStreamFull] startCallback: no startCallback
-	NoStartCallback StartCallback
-	// [ExecStreamFull] stdin: no stdin
-	NoStdin io.Reader
-	// [ExecStreamFull] stdout: no stdout
-	NoStdout io.Writer
-	// [ExecStreamFull] stderr: no stderr
-	NoStderr io.Writer
-	// [ExecStreamFull] extraFiles: no extraFiles
-	NoExtraFiles []*os.File
-)
-
-// [ExecStreamFull] startCallback: the signature of startCallback
-type StartCallback interface {
-	// StartResult is invoked by [ExecStreamFull] unless it fails
-	// prior to Start
-	//	- StartResult receives the command-description and
-	//		process data along with any error occurring during Start
-	//	- if err is nil, the command sub-process did start
-	//	- StartResult must be thread-safe
-	StartResult(execCmd *exec.Cmd, err error)
-}
 
 // ExecStreamFull executes a system command using the exec.Cmd type and flexible streaming
 //   - ExecStreamFull makes streaming [exec.Cmd] easy to use
@@ -104,7 +79,7 @@ type StartCallback interface {
 //   - — [pio.NewWriteCloserToChan]
 //   - — [pio.NewWriteCloserToChanLine]
 //   - — [pio.NewReadWriteCloserSlice]
-//   - [parl.EchoModerator] can be use with ExecStreamFull:
+//   - [parl.EchoModerator] can be used with ExecStreamFull:
 //   - — if system commands slow down or lock-up, too many (dozens) invoking goroutines
 //     may cause increased memory consumption, thrashing or exhaust of file handles, ie.
 //     an uncontrollable host state
@@ -307,4 +282,32 @@ func invokeStart(startCallback StartCallback, execCmd *exec.Cmd, e error) (err e
 	startCallback.StartResult(execCmd, e)
 
 	return
+}
+
+// ErrArgsListEmpty is returned when args doe not contain a command
+var ErrArgsListEmpty = errors.New("args list empty")
+var (
+	// [ExecStreamFull] env: use the environment of the parent process
+	DefaulEnv []string
+	// [ExecStreamFull] startCallback: no startCallback
+	NoStartCallback StartCallback
+	// [ExecStreamFull] stdin: no stdin
+	NoStdin io.Reader
+	// [ExecStreamFull] stdout: no stdout
+	NoStdout io.Writer
+	// [ExecStreamFull] stderr: no stderr
+	NoStderr io.Writer
+	// [ExecStreamFull] extraFiles: no extraFiles
+	NoExtraFiles []*os.File
+)
+
+// [ExecStreamFull] startCallback: the signature of startCallback
+type StartCallback interface {
+	// StartResult is invoked by [ExecStreamFull] unless it fails
+	// prior to Start
+	//	- StartResult receives the command-description and
+	//		process data along with any error occurring during Start
+	//	- if err is nil, the command sub-process did start
+	//	- StartResult must be thread-safe
+	StartResult(execCmd *exec.Cmd, err error)
 }

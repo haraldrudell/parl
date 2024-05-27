@@ -18,7 +18,7 @@ import (
 type WriteCloserToChanLine struct {
 	lock        sync.Mutex
 	s           string
-	ch          parl.NBChan[string]
+	ch          parl.AwaitableSlice[string]
 	withNewline bool
 }
 
@@ -33,7 +33,7 @@ func NewWriteCloserToChanLine(withNewline ...bool) (writeCloser io.WriteCloser) 
 func (wc *WriteCloserToChanLine) Write(p []byte) (n int, err error) {
 
 	// check for closed write stream
-	if wc.ch.DidClose() {
+	if parl.IsClosed[string](&wc.ch) {
 		err = perrors.ErrorfPF(fs.ErrClosed.Error())
 		return
 	}
@@ -73,10 +73,8 @@ func (wc *WriteCloserToChanLine) Close() (err error) {
 		wc.ch.Send(wc.s)
 	}
 
-	wc.ch.Close()
+	wc.ch.EmptyCh()
 	return
 }
 
-func (wc *WriteCloserToChanLine) Ch() (readCh <-chan string) {
-	return wc.ch.Ch()
-}
+func (wc *WriteCloserToChanLine) Ch() (readCh parl.ClosableAllSource[string]) { return &wc.ch }

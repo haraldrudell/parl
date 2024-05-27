@@ -30,7 +30,7 @@ func TestDebouncer(t *testing.T) {
 	var inputCh = make(chan int, 2)
 	inputCh <- value1
 	inputCh <- value2
-	var receiver NBChan[[]int]
+	var receiver AwaitableSlice[[]int]
 	t0 = time.Now()
 	var debouncer = NewDebouncer(
 		debouncePeriod,
@@ -42,7 +42,8 @@ func TestDebouncer(t *testing.T) {
 
 	// actValues should receive a slice of two values
 	//	- received because of debounce timer 1 ms
-	actValues = <-receiver.Ch()
+	<-receiver.DataWaitCh()
+	actValues, _ = receiver.Get()
 	t1 = time.Now()
 	t.Logf("elapsed debounce: %s", ptime.Duration(t1.Sub(t0)))
 	if !slices.Equal(actValues, expValues) {
@@ -84,7 +85,8 @@ func TestDebouncer(t *testing.T) {
 	)
 
 	// maxDelay should release one value
-	actValues = <-receiver.Ch()
+	<-receiver.DataWaitCh()
+	actValues, _ = receiver.Get()
 	t1 = time.Now()
 	t.Logf("elapsed maxDelay: %s", ptime.Duration(t1.Sub(t0)))
 	if !slices.Equal(actValues, expValues1) {

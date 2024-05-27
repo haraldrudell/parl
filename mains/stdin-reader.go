@@ -15,37 +15,41 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// StdinReader is a reader wrapping the unclosable os.Stdin.Read
+// StdinReader is a reader wrapping the unclosable [os.Stdin.Read]
 //   - on error, the error is sent to addError and EOF is returned
 type StdinReader struct {
-	// optionl error submitting function
-	addError parl.AddError
+	// option error submitting function
+	errorSink parl.ErrorSink1
 	// whether error has occured in [StdinReader.Read]
 	isClosed atomic.Bool
 	// optional value set to true on error
 	isError *atomic.Bool
 }
 
-var _ io.Reader = &StdinReader{}
-
-// NewStdinReader returns a reader that closes on error
-//   - addError is an optional function receiving errors occurring in [os.Stdin.Read].
-//     if missing, errors are printed to stderr
+// NewStdinReader returns a error-free reader of standard input that closes on error
+//   - errorSink receives any errors returned by [os.Stdin.Read] or runtime panic in this method.
+//     If missing, errors are printed to stderr
 //   - isError is an optional atomic set to true on first error
-func NewStdinReader(addError func(err error), isError *atomic.Bool) (reader *StdinReader) {
+//   - [StdinReader.Read] returns bytes read from standard input until it closes.
+//     The only error returned is io.EOF
+func NewStdinReader(errorSink parl.ErrorSink1, isError *atomic.Bool) (stdinReader io.Reader) {
 	return &StdinReader{
-		addError: addError,
-		isError:  isError,
+		errorSink: errorSink,
+		isError:   isError,
 	}
 }
 
 // Read reads from standard input
-//   - on error, the reader closes
-//   - errors are submitted separately or printed to stderr and not returned
-//   - the only error returned is [io.EOF]
-//   - [os.Stdin] cannot be closed so a blocking read cannot be canceled
-//   - if another process closes stdin, on the next keypress an error will result
-//   - on process exit, Read may hang until enter is pressed
+//   - on [os.Stdin.Read] error or panic, the reader closes
+//   - n: the number of bytes read
+//   - err: Read never returns any other error than [io.EOF]
+//   - — on any error or panic, Read returns io.EOF
+//   - errors and runtime panics are sent to the errorSink or printed to stderr
+//   - [os.Stdin] cannot be closed so a blocking [StdinReader.Read] cannot be canceled
+//   - if the stdin pipe is closed by another process,
+//     Read keeps blocking but returns on the next keypress.
+//     Then, an error os.ErrClosed is sent to the errorsink and io.EOF is returned
+//   - on process exit, Read is unblocked as stdin is closed
 func (r *StdinReader) Read(p []byte) (n int, err error) {
 
 	// already closed case
@@ -83,11 +87,11 @@ func (r *StdinReader) Read(p []byte) (n int, err error) {
 	// isPanic: false
 
 	// if addError present, submit error to it
-	if r.addError != nil {
+	if r.errorSink != nil {
 		err = perrors.ErrorfPF("os.Stdin.Read error: “%w” isPanic: %t",
 			err, isPanic,
 		)
-		r.addError(err)
+		r.errorSink.AddError(err)
 		err = io.EOF
 		return
 	}

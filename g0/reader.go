@@ -65,7 +65,7 @@ func Reader(shouldTerminate *atomic.Bool, addError parl.AddError, log parl.Print
 	if log == nil {
 		log = parl.Log
 	}
-	for goError := range goGroup.Ch() {
+	for goError := goGroup.GoError().Init(); goGroup.GoError().Condition(&goError); {
 
 		// if not thread-exit, it is a warning
 		//	- if panic: full stack trace

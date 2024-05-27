@@ -20,7 +20,8 @@ const (
 	// [ExitErrorData.ExitErrorString] should include standard error output
 	ExitErrorIncludeStderr = true
 	// status code 1, which in POSIX means a general error
-	StatusCode1    = 1
+	StatusCode1 = 1
+	// counts [AddStderr] stack frame
 	addStderrStack = 1
 )
 

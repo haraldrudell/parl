@@ -22,11 +22,11 @@ import (
 // A WaitGroup must not be copied after first use.
 // In the terminology of the Go memory model, decrementing
 // “synchronizes before” the return of any Wait call or Ch read that it unblocks.
-//   - counter is increased by [WaitGroupCh.Add] or [WaitGroupCh.Count]
+//   - counter is increased by [WaitGroupCh.Add] or [WaitGroupCh.Counts]
 //   - counter is decreased by [WaitGroupCh.Done] [WaitGroupCh.Add]
-//     [WaitGroupCh.DoneBool] or [WaitGroupCh.Count]
+//     [WaitGroupCh.DoneBool] or [WaitGroupCh.Counts]
 //   - counter zero is awaited by [WaitGroupCh.Ch] or [WaitGroupCh.Wait]
-//   - observability if provided by [WaitGroupCh.Count] [WaitGroupCh.DoneBool] and
+//   - observability if provided by [WaitGroupCh.Counts] [WaitGroupCh.DoneBool] and
 //     [WaitGroupCh.IsZero]
 //   - panic: negative counter from invoking decreasing methods is panic
 //   - panic: adjusting away from zero after invocation of [WaitGroupCh.Ch] or
@@ -77,15 +77,21 @@ type addsDones struct {
 
 // Done decrements the WaitGroup counter by one.
 func (w *WaitGroupCh) DoneBool() (isExit bool) {
-	var count, _ = w.Count(-1)
+	var count, _ = w.Counts(-1)
 	return count == 0
 }
 
-// Count returns the current state optionally adjusting the counter
+// Counts returns the current number of threads
+func (w *WaitGroupCh) Count() (currentCount int) {
+	currentCount, _ = w.Counts()
+	return
+}
+
+// Counts returns the current state optionally adjusting the counter
 //   - delta is optional counter adjustment
 //   - currentCount is current remaining count
 //   - totalAdds is cumulative positive adds over WaitGroup lifetime
-func (w *WaitGroupCh) Count(delta ...int) (currentCount, totalAdds int) {
+func (w *WaitGroupCh) Counts(delta ...int) (currentCount, totalAdds int) {
 	var newAddsDones addsDones
 	var channelShouldClose bool
 	for {
@@ -150,10 +156,10 @@ func (w *WaitGroupCh) IsZero() (isZero bool) {
 // Add adds delta, which may be negative, to the WaitGroup counter
 //   - If the counter becomes zero, all goroutines blocked on Wait are released
 //   - If the counter goes negative, Add panics
-func (w *WaitGroupCh) Add(delta int) { w.Count(delta) }
+func (w *WaitGroupCh) Add(delta int) { w.Counts(delta) }
 
 // Done decrements the WaitGroup counter by one.
-func (w *WaitGroupCh) Done() { w.Count(-1) }
+func (w *WaitGroupCh) Done() { w.Counts(-1) }
 
 // Ch returns a channel that closes once the counter reaches zero
 func (w *WaitGroupCh) Ch() (awaitableCh AwaitableCh) { return w.getCh() }

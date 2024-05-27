@@ -35,7 +35,7 @@ var didLaunch atomic.Bool
 //     on process exit or next keypress
 type Keystrokes struct {
 	// unbound locked combined channel and slice type
-	stdin parl.NBChan[string]
+	stdin parl.AwaitableSlice[string]
 }
 
 // NewKeystrokes returns an object reading lines from standard input
@@ -58,7 +58,7 @@ func NewKeystrokes() (keystrokes *Keystrokes) { return &Keystrokes{} }
 //   - supports functional chaining
 //   - silent [SilentClose] does not echo anything on [os.Stdin] closing
 //   - addError if present receives errors from [os.Stdin.Read]
-func (k *Keystrokes) Launch(errorSink parl.ErrorSink, silent ...bool) (keystrokes *Keystrokes) {
+func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...bool) (keystrokes *Keystrokes) {
 	keystrokes = k
 
 	// ensure only launched once
@@ -84,7 +84,7 @@ func (k *Keystrokes) Launch(errorSink parl.ErrorSink, silent ...bool) (keystroke
 //   - — [Keystrokes.CloseNow] or
 //   - — [os.Stdin] closing or
 //   - — thread runtime error
-func (k *Keystrokes) Ch() (ch <-chan string) { return k.stdin.Ch() }
+func (k *Keystrokes) StringSource() (stringSource parl.ClosableSource1[string]) { return &k.stdin }
 
 // CloseNow closes the string-sending channel discarding any pending characters
-func (k *Keystrokes) CloseNow(errp *error) { k.stdin.CloseNow(errp) }
+func (k *Keystrokes) CloseNow(errp *error) { k.stdin.EmptyCh() }

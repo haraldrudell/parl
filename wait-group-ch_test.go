@@ -61,7 +61,7 @@ func TestWaitGroupCh(t *testing.T) {
 
 	// Count returns zeroes
 	reset()
-	currentCount, totalAdds = w.Count()
+	currentCount, totalAdds = w.Counts()
 	if currentCount != 0 {
 		t.Errorf("Count currentCount %d exp 0", currentCount)
 	}
@@ -75,7 +75,7 @@ func TestWaitGroupCh(t *testing.T) {
 	reset()
 	w.Add(adds0)
 	w.Done()
-	currentCount, totalAdds = w.Count()
+	currentCount, totalAdds = w.Counts()
 	if currentCount != currentCountExp0 {
 		t.Errorf("Count currentCount %d exp %d", currentCount, currentCountExp0)
 	}

@@ -13,38 +13,52 @@ import (
 	"github.com/haraldrudell/parl/g0"
 )
 
-func ExitingGoroutine(g parl.Go) {
-	g.Done(nil)
-}
-
-func ReadErrorChannelToEnd(ch <-chan parl.GoError, t *testing.T) {
-}
-
 func TestThreadLogger(t *testing.T) {
 
-	// goGroup being logged
-	var goGroup parl.GoGroup = g0.NewGoGroup(context.Background())
+	var (
+		// goGroup being logged
+		goGroup  parl.GoGroup = g0.NewGoGroup(context.Background())
+		goErrors parl.IterableSource[parl.GoError]
+		hasValue bool
+		goError  parl.GoError
+		endCh    parl.AwaitableCh
+	)
 
-	// waitgroup for threadLogger end
-	var wg = NewThreadLogger(goGroup).Log()
+	// Log Wait
+	var threadLogger *ThreadLogger = NewThreadLogger(goGroup)
+
+	// arm logging for the thread-group
+	threadLogger.Log()
 
 	// launch a quickly terminating goroutine
 	//	- this will cause goGroup to terminate
-	go ExitingGoroutine(goGroup.Go())
+	//	- logging will then start
+	go exitingGoroutine(goGroup.Go())
 
 	// read error channel to end
+	//	- this will cause the thread-group to end
+	goErrors = goGroup.GoError()
+	endCh = goErrors.EmptyCh(parl.CloseAwaiter)
 	for {
-		e, ok := <-goGroup.Ch()
-		if !ok {
-			break // error channel closed
+		select {
+		case <-goErrors.DataWaitCh():
+			if goError, hasValue = goErrors.Get(); !hasValue {
+				continue
+			} else if goError == nil {
+				continue
+			} else if goError.Err() != nil {
+				t.Errorf("goGroup err: %s", goError)
+			}
+		case <-endCh:
 		}
-		var err = e.Err()
-		if err != nil {
-			t.Errorf("goGroup err: %s", e)
-		}
+		break
 	}
 
+	// await thread logger exit
 	t.Log("wg.Wait…")
-	wg.Wait()
+	threadLogger.Wait()
 	t.Log("wg.Wait complete")
 }
+
+// exitingGoroutine is a goroutine immediately exiting successfully
+func exitingGoroutine(g parl.Go) { g.Done(nil) }

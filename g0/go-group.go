@@ -55,7 +55,7 @@ type GoGroup struct {
 	// gos is a map from goEntityId to subordinate SubGo SunGroup Go
 	gos parli.ThreadSafeMap[parl.GoEntityID, *ThreadData]
 	// unbound error channel used when instance is GoGroup or SubGroup
-	errCh parl.NBChan[parl.GoError]
+	goErrorStream parl.AwaitableSlice[parl.GoError]
 	// channel that closes when this threadGroup ends
 	endCh parl.Awaitable
 	// provides Go entity ID, sub-object waitgroup, cancel-context
@@ -338,7 +338,7 @@ func (g *GoGroup) GoDone(thread parl.Go, err error) {
 		} else {
 			goErrorContext = parl.GePreDoneExit
 		}
-		g.errCh.Send(NewGoError(err, goErrorContext, thread))
+		g.goErrorStream.Send(NewGoError(err, goErrorContext, thread))
 	} else {
 
 		// SubGo: forward error to parent
@@ -365,7 +365,7 @@ func (g *GoGroup) GoDone(thread parl.Go, err error) {
 // ConsumeError receives non-fatal errors from a Go thread.
 //   - Go.AddError delegates to this method
 func (g *GoGroup) ConsumeError(goError parl.GoError) {
-	if g.errCh.DidClose() {
+	if parl.IsClosed[parl.GoError](&g.goErrorStream) {
 		panic(perrors.ErrorfPF(g.panicString("", nil, nil, true, goError)))
 	}
 	if goError == nil {
@@ -388,13 +388,13 @@ func (g *GoGroup) ConsumeError(goError parl.GoError) {
 	}
 
 	// send the error to the channel of this stand-alone G1Group
-	g.errCh.Send(goError)
+	g.goErrorStream.Send(goError)
 }
 
-// Ch returns a channel sending the all fatal termination errors when
+// GoError returns a channel sending the all fatal termination errors when
 // the FailChannel option is present, or only the first when both
 // FailChannel and StoreSubsequentFail options are present.
-func (g *GoGroup) Ch() (ch <-chan parl.GoError) { return g.errCh.Ch() }
+func (g *GoGroup) GoError() (goErrors parl.IterableSource[parl.GoError]) { return &g.goErrorStream }
 
 // FirstFatal allows to await or inspect the first thread terminating with error.
 // it is valid if this SubGo has LocalSubGo or LocalChannel options.
@@ -517,7 +517,7 @@ func (g *GoGroup) Internals() (
 	endCh <-chan struct{},
 ) {
 	if g.hasErrorChannel {
-		endCh = g.errCh.WaitForCloseCh()
+		endCh = g.goErrorStream.EmptyCh(parl.CloseAwaiter)
 	} else {
 		endCh = g.endCh.Ch()
 	}
@@ -670,7 +670,7 @@ func (g *GoGroup) panicString(
 //   - cancels context
 func (g *GoGroup) endGoGroup() {
 	if g.hasErrorChannel {
-		g.errCh.Close() // close local error channel
+		g.goErrorStream.EmptyCh() // close local error channel
 	}
 	// mark GoGroup terminated
 	g.endCh.Close()
@@ -711,7 +711,7 @@ func (g *GoGroup) isEnd() (isEnd bool) {
 		return g.endCh.IsClosed()
 	} else {
 		// others is when error channel closes
-		return g.errCh.IsClosed()
+		return parl.IsClosed[parl.GoError](&g.goErrorStream)
 	}
 }
 

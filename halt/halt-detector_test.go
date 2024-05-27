@@ -15,16 +15,20 @@ import (
 )
 
 func TestHaltDetector(t *testing.T) {
-	var start = time.Now()
-	var minD = 500 * time.Microsecond
+	var (
+		start = time.Now()
+		minD  = 500 * time.Microsecond
+	)
 
-	var haltDetector *HaltDetector
-	var ch <-chan *HaltReport
-	var goGroup parl.GoGroup
-	var haltReport *HaltReport
-	var end time.Time
-	var goError parl.GoError
-	var ok bool
+	var (
+		haltDetector *HaltDetector
+		ch           parl.Source1[*HaltReport]
+		goGroup      parl.GoGroup
+		haltReport   *HaltReport
+		end          time.Time
+		goError      parl.GoError
+		ok, hasValue bool
+	)
 
 	// create
 	haltDetector = NewHaltDetector()
@@ -35,7 +39,9 @@ func TestHaltDetector(t *testing.T) {
 	go haltDetector.Thread(goGroup.Go())
 
 	// check report
-	haltReport = <-ch
+	<-ch.DataWaitCh()
+	haltReport, hasValue = ch.Get()
+	_ = hasValue
 	end = time.Now()
 	if haltReport.N != 1 {
 		t.Errorf("haltReport.N not 1: %d", haltReport.N)
@@ -52,13 +58,13 @@ func TestHaltDetector(t *testing.T) {
 	// shutdown
 	goGroup.Cancel()
 	// receive thread exit
-	if goError, ok = <-goGroup.Ch(); !ok {
+	if goError, ok = parl.AwaitValue(goGroup.GoError()); !ok {
 		t.Error("goGroup.Ch closed")
 	}
 	if goError.Err() != nil || goError.ErrContext() != parl.GeExit {
 		t.Errorf("goGroup bad goError: %s", goError.String())
 	}
-	if goError, ok = <-goGroup.Ch(); ok {
+	if goError, ok = parl.AwaitValue(goGroup.GoError()); ok {
 		t.Errorf("goGroup.Ch did not close: %s", goError.String())
 	}
 }

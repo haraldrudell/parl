@@ -8,6 +8,8 @@ package pio
 import (
 	"io"
 	"testing"
+
+	"github.com/haraldrudell/parl"
 )
 
 func TestNewWriteCloserToChanLine(t *testing.T) {
@@ -31,14 +33,14 @@ func TestNewWriteCloserToChanLine(t *testing.T) {
 
 	writeCloser.Close()
 
-	ch := impl.Ch()
+	var ch = impl.Ch()
 	for i := 0; i < len(exp); i++ {
-		s, ok := <-ch
-		if !ok {
+		var value, isOpen = parl.AwaitValue(ch)
+		if !isOpen {
 			break
 		}
-		if s != exp[i] {
-			t.Errorf("line %d: %q exp %q", i, s, exp[i])
+		if value != exp[i] {
+			t.Errorf("line %d: %q exp %q", i, value, exp[i])
 		}
 	}
 }

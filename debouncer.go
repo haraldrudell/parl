@@ -50,7 +50,7 @@ type debouncerIn[T any] struct {
 	// from where incoming values for debouncing are read
 	inputCh <-chan T
 	// non-blocking unbound buffer to output thread
-	buffer NBChan[T]
+	buffer AwaitableSlice[T]
 	// how long time must pass between two consecutive
 	// incoming values in order to submit to output channel
 	debounceInterval time.Duration
@@ -77,7 +77,7 @@ type debouncerIn[T any] struct {
 // debouncerIn implements the debouncer input-thread
 type debouncerOut[T any] struct {
 	// non-blocking unbound buffer from input thread
-	buffer *NBChan[T]
+	buffer *AwaitableSlice[T]
 	// send trigger based on debounce time expired
 	debounceC <-chan time.Time
 	// is maxDelay timer is used
@@ -199,7 +199,7 @@ func (d *debouncerIn[T]) inputThread() {
 	defer Recover(func() DA { return A() }, NoErrp, d.errorSink)
 	defer d.maxDelayTimer.Stop()
 	defer d.debounceTimer.Stop()
-	defer d.buffer.Close() // close of buffer causes output thread to eventually exit
+	defer d.buffer.EmptyCh() // close of buffer causes output thread to eventually exit
 
 	// debounce timer was started
 	var debounceTimerRunning bool
@@ -262,7 +262,7 @@ func (d *debouncerOut[T]) outputThread() {
 	//	- maxDelay timer expired triggering send,
 	//	- input thread exiting or
 	//	- shutdown causing exit
-	for !d.buffer.IsClosed() {
+	for !IsClosed[T](d.buffer) {
 		select {
 		// input thread starts and extends the debounce timer as
 		// values are received
@@ -285,7 +285,7 @@ func (d *debouncerOut[T]) outputThread() {
 		}
 
 		// send any values
-		if values := d.buffer.Get(); len(values) > 0 {
+		if values := d.buffer.GetAll(); len(values) > 0 {
 			d.sender(values)
 		}
 	}

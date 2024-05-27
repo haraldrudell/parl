@@ -16,7 +16,7 @@ import (
 
 // RateRunner is a container managing threads executing rate-counter tasks by their period
 type RateRunner struct {
-	g0 parl.GoGen
+	g parl.GoGen
 
 	lock  sync.Mutex
 	subGo parl.SubGo
@@ -24,10 +24,10 @@ type RateRunner struct {
 }
 
 // NewRateRunner returns a thread-container for running rate-counter averaging
-func NewRateRunner(g0 parl.GoGen) (rr *RateRunner) {
+func NewRateRunner(g parl.GoGen) (rr *RateRunner) {
 	return &RateRunner{
-		g0: g0,
-		m:  map[time.Duration]*runner{},
+		g: g,
+		m: map[time.Duration]*runner{},
 	}
 }
 
@@ -46,13 +46,13 @@ func (rr *RateRunner) AddTask(period time.Duration, task RateRunnerTask) {
 		return
 	}
 
-	if rr.g0 == nil {
+	if rr.g == nil {
 		panic(perrors.NewPF("RateCounters instantiated with parl.Go nil"))
 	} else if rr.subGo == nil {
-		rr.subGo = rr.g0.SubGo()
+		rr.subGo = rr.g.SubGo()
 	}
 
-	runner := NewRunner()
+	var runner = NewRunner()
 	runner.Add(task)
 	go ptime.OnTickerThread(runner.Do, period, time.Local, rr.subGo.Go())
 	rr.m[period] = runner

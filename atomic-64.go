@@ -14,6 +14,7 @@ import (
 // Atomic64 is a generic 64-bit integer with atomic access
 //   - generic for named types of any underlying integer or any built-in integer type
 //   - generic version of [atomic.Uint64]
+//   - Atomic64[int] is atomic int for all platforms
 //   - —
 //   - go1.21.5 due to alignment using atomic.align64, Atomic64 must be based on [atomic.Uint64]
 type Atomic64[T constraints.Integer] struct{ atomic.Uint64 }

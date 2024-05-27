@@ -65,16 +65,16 @@ func TestGo(t *testing.T) {
 		t.Error("Go.SubGo bad")
 	}
 	g0.AddError(err)
-	if goError = <-goGroup.Ch(); !errors.Is(goError.Err(), err) ||
+	if goError, _ = parl.AwaitValue(goGroup.GoError()); !errors.Is(goError.Err(), err) ||
 		goError.ErrContext() != parl.GeNonFatal {
 		t.Error("g0.AddError bad")
 	}
 	g0.Done(&err)
-	if goError = <-goGroup.Ch(); !errors.Is(goError.Err(), err) ||
+	if goError, _ = parl.AwaitValue(goGroup.GoError()); !errors.Is(goError.Err(), err) ||
 		goError.ErrContext() != parl.GeExit {
 		t.Error("g0.Done bad")
 	}
-	if _, ok = <-goGroup.Ch(); ok {
+	if _, ok = parl.AwaitValue(goGroup.GoError()); ok {
 		t.Error("g0.Done goGroup errch did not close")
 	}
 	g0.Wait()

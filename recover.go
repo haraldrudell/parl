@@ -121,9 +121,6 @@ const (
 // how OnError is handled: recoverOnErrrorOnce recoverOnErrrorMultiple recoverOnErrrorNone
 type OnErrorStrategy uint8
 
-// indicates deferred annotation is not present
-var noDeferredAnnotation func() DA
-
 // DA is the value returned by a deferred code location function
 type DA *pruntime.CodeLocation
 

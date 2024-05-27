@@ -297,6 +297,66 @@ func TestAwaitableSliceSend(t *testing.T) {
 	slice.Send(value)
 }
 
+// edge cases for Get
+func TestAwaitableSliceGet(t *testing.T) {
+	var (
+		value1, value2 = 1, 2
+	)
+
+	var (
+		value    int
+		hasValue bool
+		endCh    AwaitableCh
+	)
+
+	var slice *AwaitableSlice[int]
+	var reset = func() {
+		slice = &AwaitableSlice[int]{}
+	}
+
+	// test Get of last item in output in deferred close
+	reset()
+	slice.Send(value1)
+	slice.Send(value2)
+	// close stream entering deferred close
+	endCh = slice.EmptyCh()
+	// Get transfers both items to outputLock
+	// Get should return first item
+	value, hasValue = slice.Get()
+	if !hasValue {
+		t.Error("hasValue false")
+	}
+	if value != value1 {
+		t.Errorf("Get %d exp %d", value, value1)
+	}
+	// stream should not be closed
+	select {
+	case <-endCh:
+		t.Errorf("stream closed")
+	default:
+	}
+	// Get should return last item and close the stream
+	value, hasValue = slice.Get()
+	if !hasValue {
+		t.Error("hasValue false")
+	}
+	if value != value2 {
+		t.Errorf("Get %d exp %d", value, value2)
+	}
+	// stream should be closed
+	select {
+	case <-endCh:
+	default:
+		t.Errorf("stream not closed")
+	}
+	// Get should retrieve no items
+	value, hasValue = slice.Get()
+	_ = value
+	if hasValue {
+		t.Error("hasValue true")
+	}
+}
+
 // 100% coverage GetSlice
 func TestAwaitableSliceGetSlice(t *testing.T) {
 	//t.Error("loggin on")
