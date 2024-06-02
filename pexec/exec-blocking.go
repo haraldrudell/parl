@@ -17,7 +17,7 @@ import (
 // ExecBlocking provides a simple way to quietly execute a system command
 //   - blocking, control over standard i/o, ability to cancel
 //   - stdin: a byte sequence used as input to the system command
-//   - stdin nil: the command receives a closed standard input
+//   - stdin ExecBlockingClosedStdin nil: the command receives a closed standard input
 //   - stdin ExecBlockingEmptyStdin: the system command receives an open but empty standard input
 //   - wantStdout WantStdout: the command’s standard poutput is returned in stdout
 //   - wantStdout NoExecBlockingStdout: the command’s standard output is discarded
@@ -94,3 +94,6 @@ var NoExecBlockingStdin []byte
 
 // [ExecBlocking] the system command receives an open but empty standard input
 var ExecBlockingEmptyStdin = []byte{}
+
+// [ExecBlocking] the system command receives a closed standard input
+var ExecBlockingClosedStdin = []byte{}

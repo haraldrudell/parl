@@ -288,3 +288,14 @@ func processRecoverValue(annotation string, panicValue interface{}, frames int) 
 
 	return
 }
+
+// for [RecoverAnnotation] when no error sink is present and
+// no standard error output should be output
+//   - for [Recover] and [Recover2], instead use [RevocerErr]
+var NoopErrorSink = &noopErrorSink{}
+
+type noopErrorSink struct{}
+
+func (n *noopErrorSink) AddError(err error) {}
+
+var _ ErrorSink1 = NoopErrorSink

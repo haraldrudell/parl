@@ -38,12 +38,13 @@ func TestSocket(t *testing.T) {
 	}
 
 	// NewTCPListener()
-	socket = NewTCPListener()
+	socket = NewTCPListener(&err)
+	if err != nil {
+		t.Fatalf("NewTCPListener err %s", perrors.Short(err))
+	}
 	if socket == nil {
 		t.Fatalf("NewTCPListener nil")
-	} else if socket.TCPListener == nil {
-		t.Fatalf("socket.TCPListener nil")
-	} else if socket.SocketListener.netListener != socket.TCPListener {
+	} else if socket.SocketListener.netListener != &socket.TCPListener {
 		t.Fatalf("socket.TCPListener and socket.SocketListener.netListener different")
 	}
 
@@ -121,7 +122,10 @@ func TestAcceptThread(t *testing.T) {
 	var threadWait sync.WaitGroup
 
 	// set-up socket
-	socket = NewTCPListener()
+	socket = NewTCPListener(&err)
+	if err != nil {
+		t.Fatalf("NewTCPListener err %s", perrors.Short(err))
+	}
 	if err = socket.Listen(socketString); err != nil {
 		t.Fatalf("ListenTCP4 error: %+v", err)
 	}

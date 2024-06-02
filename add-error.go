@@ -8,8 +8,8 @@ package parl
 import "github.com/haraldrudell/parl/perrors"
 
 // DeferredErrorSink is a deferrable function that provides
-// an error to ErrorSink if
-// errp is non-nil pointer to non-nil error
+// any error at *errp to errorSink
+//   - errp may be nil
 func DeferredErrorSink(errorSink ErrorSink1, errp *error) {
 	var err error
 	if errp == nil {
@@ -20,8 +20,8 @@ func DeferredErrorSink(errorSink ErrorSink1, errp *error) {
 	errorSink.AddError(err)
 }
 
-// DeferredEmptySink is a deferrable function that appends
-// all erorrs in errorSink to errp
+// DeferredErrorSource is a deferrable function that appends
+// all errors in errorSink to errp
 func DeferredErrorSource(errorSource ErrorSource1, errp *error) {
 
 	// errorSink may be [AtomicError] that does not empty
@@ -38,6 +38,7 @@ func DeferredErrorSource(errorSource ErrorSource1, errp *error) {
 		}
 	}
 
+	// single-error source like [parl.AtomicError]
 	var e, hasError = errorSource.Error()
 	if !hasError {
 		return

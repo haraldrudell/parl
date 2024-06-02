@@ -22,6 +22,7 @@ type Sink[T any] interface {
 // EmptyCh
 type Closable[T any] interface {
 	EmptyCh(doNotInitialize ...bool) (ch AwaitableCh)
+	IsClosed() (isClosed bool)
 }
 
 type ClosableSink[T any] interface {
@@ -35,6 +36,7 @@ type ClosableSink[T any] interface {
 type Source1[T any] interface {
 	Get() (value T, hasValue bool)
 	DataWaitCh() (ch AwaitableCh)
+	AwaitValue() (value T, hasValue bool)
 }
 
 // Get GetSlice DataWaitCh

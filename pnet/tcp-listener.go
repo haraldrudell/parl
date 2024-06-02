@@ -7,6 +7,8 @@ package pnet
 
 import (
 	"net"
+
+	"github.com/haraldrudell/parl/perrors"
 )
 
 // TCPListener wraps [net.TCPListener]
@@ -21,7 +23,8 @@ import (
 //   - — awaitable Close and handler completion
 type TCPListener struct {
 	// the TCP IPv4 or IPv6 listening socket promoting TCP-specific methods
-	*net.TCPListener
+	//	- initialized by new-function, therefore thread-safe access
+	net.TCPListener
 	// connection-handler argument is *net.TCPConn
 	SocketListener[*net.TCPConn]
 }
@@ -45,19 +48,22 @@ type TCPListener struct {
 //	}
 //	defer parl.Close(&r.socket, &err)
 //	println(socket.AddrPort().String()) // “127.0.0.1:1122”
-func NewTCPListener(network ...Network) (socket *TCPListener) {
+func NewTCPListener(errp *error, network ...Network) (socket *TCPListener) {
+	// single allocation here
+	t := TCPListener{}
+	var err error
 	var addressType Network
 	if len(network) > 0 {
 		addressType = network[0]
 	} else {
 		addressType = NetworkTCP4
 	}
-
-	var listener net.TCPListener
-	return &TCPListener{
-		TCPListener:    &listener,
-		SocketListener: *NewSocketListener[*net.TCPConn](&listener, addressType, TransportTCP),
+	NewSocketListener[*net.TCPConn](&t.TCPListener, addressType, TransportTCP, &t.SocketListener, &err)
+	if err != nil {
+		*errp = perrors.AppendError(*errp, err)
+		return
 	}
+	return &t
 }
 
 // - idempotent panic-free awaitable Close

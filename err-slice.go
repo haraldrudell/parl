@@ -19,6 +19,26 @@ import "github.com/haraldrudell/parl/perrors"
 //   - — collect errors at end and
 //   - — close then read-to-end function
 //   - implements [parl.Errs] [parl.ErrorSink]
+//
+// Usage:
+//
+//	var errs ErrSlice
+//	go fn(&errs)
+//	for err := errs.Init(); errs.Condition(&err); {
+//	  // process real-time error stream
+//	…
+//	func fn(errs parl.ErrorSink) {
+//	  defer errs.EndErrors()
+//	  …
+//	  errs.AddError(err)
+//
+//	var errs ErrSlice
+//	fn2(&errs)
+//	for _, err := range errs.Errors() {
+//	  // process post-invocation errors
+//	  …
+//	func fn2(errs parl.ErrorSink1) {
+//	  errs.AddError(err)
 type ErrSlice struct {
 	// errs is a thread-safe, unbound awaitable slice of errors
 	errs AwaitableSlice[error]
@@ -62,3 +82,6 @@ func (e *ErrSlice) AppendErrors(errp *error) {
 		*errp = perrors.AppendError(*errp, err)
 	}
 }
+
+func (e *ErrSlice) Init() (err error)                     { return }
+func (e *ErrSlice) Condition(errp *error) (hasValue bool) { return e.errs.Condition(errp) }

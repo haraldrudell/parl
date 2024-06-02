@@ -80,20 +80,32 @@ func NewSocketListener[C net.Conn](
 	listener net.Listener,
 	network Network,
 	transport SocketTransport,
+	fieldp *SocketListener[C],
+	errp *error,
 ) (socket *SocketListener[C]) {
+	var err error
 	if listener == nil {
-		panic(perrors.NewPF("listener cannot be nil"))
+		err = perrors.NewPF("listener cannot be nil")
 	} else if !network.IsValid() {
-		panic(perrors.ErrorfPF("invalid network: %s", network))
+		err = perrors.ErrorfPF("invalid network: %s", network)
 	} else if !transport.IsValid() {
-		panic(perrors.ErrorfPF("invalid transport: %s", transport))
+		err = perrors.ErrorfPF("invalid transport: %s", transport)
 	}
-	return &SocketListener[C]{
-		netListener: listener,
-		network:     network,
-		transport:   transport,
-		closeWait:   make(chan struct{}),
+	if err != nil {
+		*errp = perrors.AppendError(*errp, err)
+		return
 	}
+	if fieldp == nil {
+		// allocation here
+		socket = &SocketListener[C]{}
+	} else {
+		socket = fieldp
+	}
+	socket.netListener = listener
+	socket.network = network
+	socket.transport = transport
+	socket.closeWait = make(chan struct{})
+	return
 }
 
 // Listen binds listening to a near socket
