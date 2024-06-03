@@ -21,7 +21,7 @@ func DeferredErrorSink(errorSink ErrorSink1, errp *error) {
 }
 
 // DeferredErrorSource is a deferrable function that appends
-// all errors in errorSink to errp
+// all errors in errorSource to errp
 func DeferredErrorSource(errorSource ErrorSource1, errp *error) {
 
 	// errorSink may be [AtomicError] that does not empty

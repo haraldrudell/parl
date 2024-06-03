@@ -55,10 +55,11 @@ func NewTCPListener(errp *error, network ...Network) (socket *TCPListener) {
 	var addressType Network
 	if len(network) > 0 {
 		addressType = network[0]
-	} else {
+	}
+	if addressType == NetworkDefault {
 		addressType = NetworkTCP4
 	}
-	NewSocketListener[*net.TCPConn](&t.TCPListener, addressType, TransportTCP, &t.SocketListener, &err)
+	NewSocketListener(&t.TCPListener, addressType, TransportTCP, &t.SocketListener, &err)
 	if err != nil {
 		*errp = perrors.AppendError(*errp, err)
 		return

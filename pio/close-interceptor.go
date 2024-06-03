@@ -11,9 +11,19 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-// CloseInterceptor is an interceptor for io types implementing Close:
-//   - [io.Closer] [io.ReadCloser] [io.WriteCloser] [io.ReadWriteCloser]
-//   - [io.ReadSeekCloser]
+// CloseInterceptor is a type executing a Close strategy for certain stream types
+//   - new functions that adds a wrapper to an io value:
+//   - — [NewReaderCloseInterceptor] wraps an [io.Reader] or [io.ReadCloser]
+//   - — [NewWriterCloseInterceptor] wraps an [io.Writer] or [io.WriteCloser]
+//   - — [NewReadWriterCloseInterceptor] wraps an [io.ReadWriter] or [io.ReadWriteCloser]
+//   - — [pio.NewCloseWait] wraps an [io.Closer] with a close strategy
+//   - predefined strategies:
+//   - — [pio.CloseStackTraces] prints a stack trace for each close invocation
+//   - — [pio.CloseIdempotent] makes close idempotent
+//   - — [pio.NoClose] prevents any Close invocation
+//   - stream types:
+//   - — [io.Closer] [io.ReadCloser] [io.WriteCloser] [io.ReadWriteCloser]
+//   - — [io.ReadSeekCloser]
 type CloseInterceptor interface {
 	// CloseIntercept decides if Close should be invoked on the wrapped type
 	//	- closer: the wrapped value as [io.Closer]: nil if Close is not available
@@ -39,16 +49,20 @@ var (
 	// CloseIdempotent makes close Idempotent
 	//   - only the first Close invocation may receive any error
 	CloseIdempotent CloseInterceptor = &idempotentClose{}
+
+	// NoClose prevents any Close invocation
+	NoClose CloseInterceptor = &noClose{}
 )
 
 type (
 	stackTraceClose struct{}
 	idempotentClose struct{}
+	noClose         struct{}
 )
 
 // print stack trace to standard error for each invocation
 //   - Close is idempotent
-func (c stackTraceClose) CloseIntercept(closer io.Closer, label string, closeNo int) (err error) {
+func (c *stackTraceClose) CloseIntercept(closer io.Closer, label string, closeNo int) (err error) {
 	parl.Log("CloseIntercept %s no%d", label, closeNo)
 	if closeNo > 1 || closer == nil {
 		return
@@ -58,10 +72,13 @@ func (c stackTraceClose) CloseIntercept(closer io.Closer, label string, closeNo 
 }
 
 // make Close idempotent
-func (c idempotentClose) CloseIntercept(closer io.Closer, label string, closeNo int) (err error) {
+func (c *idempotentClose) CloseIntercept(closer io.Closer, label string, closeNo int) (err error) {
 	if closeNo > 1 || closer == nil {
 		return
 	}
 	parl.Close(closer, &err)
 	return
 }
+
+// prevent Close
+func (c *noClose) CloseIntercept(closer io.Closer, label string, closeNo int) (err error) { return }
