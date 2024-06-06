@@ -99,21 +99,29 @@ func CloseRm(filename string, osFile *os.File, errp *error) {
 		return
 	}
 
+	// delete outfile
+	if err := RemoveFile(filename); err != nil {
+		*errp = perrors.AppendError(*errp, err)
+	}
+}
+
+// RemoveFile deletes a file after changing its permissions to ensure uw
+func RemoveFile(filename string) (err error) {
+
 	// ensure write permission for filename
 	var fileInfo fs.FileInfo
-	var err error
 	if fileInfo, err = pfs.Stat(filename); err != nil {
-		*errp = perrors.AppendError(*errp, err)
 		return
 	} else if fileInfo.Mode()&FilePermUw == 0 {
 		if err = os.Chmod(filename, fileInfo.Mode()|FilePermUw); perrors.IsPF(&err, "Chmod %w", err) {
-			*errp = perrors.AppendError(*errp, err)
 			return
 		}
 	}
 
 	// remove file
 	if err = os.Remove(filename); err != nil {
-		*errp = perrors.AppendError(*errp, perrors.ErrorfPF("os.Remove %w", err))
+		err = perrors.ErrorfPF("os.Remove %w", err)
 	}
+
+	return
 }

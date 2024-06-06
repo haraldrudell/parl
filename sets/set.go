@@ -23,23 +23,26 @@ type Set0[T comparable, E any] struct {
 }
 
 // NewSet returns an enumeration of printable semantic elements
-//   - elements implement the sets.Element[E] interface:
-//   - — Value method returns the comparable
-//   - — String method returns string representation
-//   - a common concrete type is [sets.SetElement]:
-//   - — ValueV field is comparable
-//   - — Name field is the string value
-//     Typically single word
+//   - T is a comparable type for indexing the set, ie.
+//     the type of the constants used as set values [SetElement.ValueV]
+//   - E is type of declarative elements assigning additional properties to T.
+//     Typically: [sets.SetElement].
+//     E is typically inferred and does not have to pbe provided.
+//   - elements: a slice whose elements implement the sets.Element[E] interface:
+//   - — [SetElement.Value] method returns the T comparable
+//   - — [SetElement.String] method returns string representation
+//   - elements: a simple concrete type is [sets.SetElement]:
+//   - — ValueV field is T comparable
+//   - — Name field is the string value: typically single word
 //   - another concerete type is sets.ElementFull[E]: Value, String, Description
-//   - — Description method returns a sentece-length description
+//   - — Description method returns a sentence-length description
 //
 // usage:
 //
-//	sets.NewSet(sets.NewElements[int](
-//		[]sets.SetElement[int]{
-//			{ValueV: unix.AF_INET, Name: "IPv4"},
-//			{ValueV: unix.AF_INET6, Name: "IPv6"},
-//		}))
+//	sets.NewSet([]sets.SetElement[int]{
+//		{ValueV: unix.AF_INET, Name: "IPv4"},
+//		{ValueV: unix.AF_INET6, Name: "IPv6"},
+//	})
 func NewSet[T comparable, E any](elements []E) (set Set[T]) {
 	return NewSetFieldp[T](elements, nil, nil, nil)
 }
