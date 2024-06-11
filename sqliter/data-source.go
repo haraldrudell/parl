@@ -17,7 +17,24 @@ import (
 
 const (
 	// SQLite3 special filename for in-memory databases
-	SQLiteMemoryDataSourceName = ":memory:"
+	//	- default [In-Memory Databases] name is “:memory:”
+	//	- if two threads or a query while another query is read,
+	//		a second database connection is opened which uses a different database
+	//	- from SQLite3 [version] 3.7.13+, multiple connections may
+	//		share in-memory database
+	//	- use URI filename: “file::memory:?cache=shared”
+	//	- Go package modernc.org/sqlite 1.30.1 240606
+	//		is pure Go code-compatible with SQLite 3.46.0
+	//	- the in-memory filename provided here does not support
+	//		partitioning.
+	//		It is used for testing
+	//	- because Go may open parallel database connections
+	//		at any time, use of legacy filename “:memory:”
+	//		produces unpredictable results
+	//
+	// [In-Memory Databases]: https://sqlite.org/inmemorydb.html
+	// [version]: https://stackoverflow.com/questions/36447766/multiple-sqlite-connections-to-a-database-in-memory#comment60508526_36447766
+	SQLiteMemoryDataSourceName = "file::memory:?cache=shared"
 	// name of the SQLite3 database driver
 	//	- “modernc.org/sqlite”
 	SQLiteDriverName = "sqlite"
@@ -39,6 +56,9 @@ type DataSource struct {
 
 // OpenDataSource creates a database-file in the file-system and
 // returns its database implementation
+//   - dataSourceName: a filename specifying a SQLite3 database file
+//   - — for an in-memory database, SQLiteMemoryDataSourceName or ":memory:" is used
+//   - dataSource: wraps a [sql.DB] value
 func OpenDataSource(dataSourceName parl.DataSourceName) (dataSource parl.DataSource, err error) {
 
 	d := DataSource{

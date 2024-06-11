@@ -31,10 +31,10 @@ var _ parl.CounterSet = &Counters{}     // Counters is a parl.CounterSet
 var _ parl.CounterSetData = &Counters{} // Counters is a parl.CounterSet
 var _ parl.CounterStore = &Counters{}   // Counters is a parl.CounterStore
 
-func newCounters(g0 parl.GoGen) (counters parl.Counters) {
+func newCounters(g parl.GoGen) (counters parl.Counters) {
 	return &Counters{
 		m:          map[parl.CounterID]any{},
-		RateRunner: *NewRateRunner(g0),
+		RateRunner: *NewRateRunner(g),
 	}
 }
 

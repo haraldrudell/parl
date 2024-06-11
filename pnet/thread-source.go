@@ -11,23 +11,30 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-// ThreadSource provides a thread-allocation strategy
-//   - when Receiver is invoked, threads can be pre-launched for
-//     a pending connection
-//   - default allocation strategy when ThreadSource is not used is
-//     one thread per connection
-//   - ThreadSource allows for any thread-allocation strategy to be used
-//     when handling multiple connections
-//   - when connReceiver.Handle is invoked, threads launched by Receiver
-//     may already be waiting at a a lock for maximum performance
+// ThreadSource allows for a thread-allocation strategy
+//   - for example a listener receives incoming connections for processing.
+//     ThreadSource allows for those connections to be handed to a function
+//     obtained ahead of time, thus permitting for a
+//     thread-allocation strategy to be implemented
+//   - when ThreadSource is not used, the default allocation strategy is
+//     one new thread for each connection
+//   - when Receiver is invoked, threads can created ahead of time for
+//     future connections and a connection-queue can be implemented
+//   - once an incoming connection occurs, connReceiver.Handle is invoked,
+//     and that function may use threads already created by the ThreadSource
+//     held waiting at a lock
+//   - the ThreadSource does not have shutdown. Once the listeners have concluded
+//     the ThreadSource can be shut down
+//   - ConnectionReceiver has Shutdown and a strict protocol to prevent
+//     resource leaks
 type ThreadSource[C net.Conn] interface {
 	// Receiver prepares the ThreadSource for a possible upcoming connection
-	//	- done will be invoked exactly once by all connReceiver objects
-	//	- to ensure done invocation, [ConnectionReceiver.Handle] or
-	//		[ConnectionReceiver.Shutdown] or both must be invoked
-	//	- Receiver and connReceiver.Handle do not block
-	//	- any connection provided to [ConnectionReceiver.Handle] is
-	//		guaranteed to be closed by Handle even if
-	//		[ConnectionReceiver.Shutdown] was already invoked
+	//	- done.Done must be invoked exactly once for all connReceiver objects
+	//	- — to ensure done invocation:
+	//	- — [ConnectionReceiver.Handle] or
+	//	- — [ConnectionReceiver.Shutdown] or both may be invoked
+	//	- Receiver and connReceiver.Handle must not block
+	//	- any connection provided to [ConnectionReceiver.Handle] must be
+	//		closed by Handle even if [ConnectionReceiver.Shutdown] was already invoked
 	Receiver(done parl.Done, errorSink parl.ErrorSink1) (connReceiver ConnectionReceiver[C], err error)
 }

@@ -6,8 +6,8 @@ ISC License
 package pfs
 
 import (
+	"errors"
 	"io/fs"
-	"os"
 
 	"github.com/haraldrudell/parl/perrors"
 )
@@ -37,7 +37,7 @@ type IsDirectoryArg uint8
 func IsDirectory(path string, flags IsDirectoryArg) (isDirectory bool, err error) {
 	var fileInfo fs.FileInfo
 	if fileInfo, err = Stat(path); err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			if flags&IsDirectoryNonExistentIsError == 0 {
 				err = nil
 			}

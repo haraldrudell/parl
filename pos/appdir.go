@@ -54,7 +54,7 @@ type AppDirectory struct {
 //	var knownToExistAbsCleanNoSymlinksNeverErrors = appDir.Directory()
 func NewAppDir(appName string) (appd *AppDirectory) { return &AppDirectory{App: appName} }
 
-// best-effort single-value absolute clean possibly symlink-free directory
+// best-effort single-value absolute and clean path possibly symlink-free to directory
 //   - returns an absolute path whether the directory exists or not
 //   - if directory exists, absolute clean symlink-free, otherwise absolute clean
 //   - Directory may panic from errors that are returned by [AppDirectory.EnsureDir] or

@@ -106,7 +106,7 @@ func (r *FastReader) Length() (length int) {
 	return
 }
 
-// Buffer retyurns a copy of currently buffered data
+// Buffer returns a copy of currently buffered data
 //   - thread-safe
 func (r *FastReader) Buffer() (buffer []byte) {
 	r.bufferLock.Lock()

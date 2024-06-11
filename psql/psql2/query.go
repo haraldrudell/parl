@@ -13,9 +13,9 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// QueryString issues a query by preparing a statement for dataSource
-func QueryString(label string, ctx context.Context, dataSource parl.DataSource,
-	query string, args ...any) (value string, err error) {
+// Query issues a query by preparing a statement for dataSource
+func Query(label string, ctx context.Context, dataSource parl.DataSource,
+	query string, args ...any) (sqlRows *sql.Rows, err error) {
 
 	// prepare the sql statement
 	var sqlStmt *sql.Stmt
@@ -26,9 +26,17 @@ func QueryString(label string, ctx context.Context, dataSource parl.DataSource,
 	defer closeStmt(sqlStmt, label, &err)
 
 	// execute
-	if value, err = ScanToString(sqlStmt.QueryRowContext(ctx, args...), nil); err != nil {
+	if sqlRows, err = sqlStmt.QueryContext(ctx, args...); err != nil {
 		err = perrors.Errorf("exec %s: %w", label, err)
 	}
 
 	return
+}
+
+func closeStmt(sqlStmt *sql.Stmt, label string, errp *error) {
+	var err = sqlStmt.Close()
+	if err == nil {
+		return
+	}
+	*errp = perrors.AppendError(*errp, perrors.Errorf("close %s: %w", label, err))
 }

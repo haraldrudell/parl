@@ -14,21 +14,35 @@ import (
 	"github.com/haraldrudell/parl/iters"
 )
 
+// DirEntry is the value-type the iterator returns
 type DirEntry struct {
+	// DirEntry is the directory entry as returned by
+	// [os.File.ReadDir]
 	fs.DirEntry
+	// ProvidedPath is the initial path to the directory
+	// as provided with [DirEntry.Name] appended
 	ProvidedPath string
 }
 
+// DirEntryIterator is a one-level directory iterator
 type DirEntryIterator struct {
+	// path is the directory being listed
 	path string
+	// base iterator provides Cancel() Cond() Next()
 	iters.BaseIterator[DirEntry]
+	// sliceOnce ensures the directory is only listed once
 	sliceOnce sync.Once
-	err       error
-
+	// err is the iterator’s error state
+	err error
+	// entriesLock makes entires thread-safe
 	entriesLock sync.Mutex
-	entries     []fs.DirEntry
+	// entires are the [fs.DireEntry] interface-values
+	// representing directory entries
+	entries []fs.DirEntry
 }
 
+// NewDirEntryIterator returns a one-level directory iterator
+//   - path: directory whose entries should be traversed
 func NewDirEntryIterator(path string) (iterator iters.Iterator[DirEntry]) {
 	i := DirEntryIterator{path: path}
 	i.BaseIterator = *iters.NewBaseIterator(i.iteratorAction)
@@ -63,6 +77,7 @@ func (t *DirEntryIterator) iteratorAction(isCancel bool) (result DirEntry, err e
 	return
 }
 
+// entry returns the next directory entry if any
 func (t *DirEntryIterator) entry() (entry fs.DirEntry) {
 	t.entriesLock.Lock()
 	defer t.entriesLock.Unlock()
@@ -76,4 +91,6 @@ func (t *DirEntryIterator) entry() (entry fs.DirEntry) {
 
 	return
 }
+
+// loadSlice is the once function listing the directory
 func (t *DirEntryIterator) loadSlice() { t.entries, t.err = ReadDir(t.path) }

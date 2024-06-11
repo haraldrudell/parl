@@ -17,89 +17,130 @@ import (
 )
 
 func TestPragmaDB(t *testing.T) {
-	var pragmas map[string]string
-	var ctx = context.Background()
-	var err error
-	var schema = func(dataSource parl.DataSource, ctx context.Context) (err error) { return }
-	var dbs = psql.DBFactory.NewDB(newMemDataSourceNamer(), schema)
-	pragmas, err = PragmaDB(dbs, parl.NoPartition, ctx)
+	//t.Error("Logging on")
+	var (
+		// empty schema function
+		schema = func(dataSource parl.DataSource, ctx context.Context) (err error) { return }
+		exp    = map[string]string{
+			"foreignKeys": "0",
+			"journalMode": "memory",
+			"busyTimeout": "0",
+		}
+	)
+
+	var (
+		pragmas   parl.Pragmas
+		ctx       = context.Background()
+		err       error
+		dbMap     = psql.DBFactory.NewDB(newMemDataSourceNamer(), schema)
+		pragmaMap map[string]string
+	)
+
+	// PragmaDB should match
+	pragmas, err = PragmaDB(dbMap, parl.NoPartition, ctx)
 	if err != nil {
-		panic(err)
+		t.Fatalf("PragmaDB err %s", perrors.Short(err))
 	}
-	t.Logf("pragmas: %v", pragmas)
-	err = dbs.Close()
+	// pragmas: “busyTimeout: 0 foreignKeys: 0 journalMode: memory”
+	t.Logf("pragmas: “%s”", pragmas)
+	pragmaMap = pragmas.Map()
+	if !maps.Equal(pragmaMap, exp) {
+		t.Errorf("pragmas: %v exp %v", pragmaMap, exp)
+	}
+
+	// Close should succeed
+	err = dbMap.Close()
 	if err != nil {
-		panic(err)
+		t.Fatalf("Close err %s", perrors.Short(err))
 	}
 }
 
 func TestPragma(t *testing.T) {
-	//t.Fail()
-	var exp = map[string]string{
-		"foreignKeys": "0",
-		"journalMode": "memory",
-		"busyTimeout": "0",
-	}
+	//t.Error("Logging on")
+	var (
+		exp = map[string]string{
+			"foreignKeys": "0",
+			"journalMode": "memory",
+			"busyTimeout": "0",
+		}
+	)
 
-	var pragmas map[string]string
-	var ctx = context.Background()
-	var err error
-	var dataSource parl.DataSource
+	var (
+		pragmas    parl.Pragmas
+		pragmaMap  map[string]string
+		ctx        = context.Background()
+		err        error
+		dataSource parl.DataSource
+	)
 
+	// create in-memory data source
 	dataSource, err = OpenDataSource(SQLiteMemoryDataSourceName)
 	if err != nil {
 		panic(err)
 	}
 
+	// pragmas should match
 	pragmas, err = Pragma(dataSource, ctx)
 	if err != nil {
 		t.Fatalf("Open err: %s", perrors.Short(err))
 	}
-
 	// pragmas: map[foreignKeys:0 journal:memory timeout:0]
 	t.Logf("pragmas: %v", pragmas)
-
-	if !maps.Equal(pragmas, exp) {
-		t.Errorf("pragmas: %v exp %v", pragmas, exp)
+	pragmaMap = pragmas.Map()
+	if !maps.Equal(pragmaMap, exp) {
+		t.Errorf("pragmas: %v exp %v", pragmaMap, exp)
 	}
+
+	// Close should succeed
 	err = dataSource.Close()
 	if err != nil {
 		panic(err)
 	}
 }
 
+// TestPragmaSQL tests SQLite pragma using native [sql.DB] and [sql.Open] functions
 func TestPragmaSQL(t *testing.T) {
-	//t.Fail()
-	var exp = map[string]string{
-		"foreignKeys": "0",
-		"journalMode": "memory",
-		"busyTimeout": "0",
-	}
+	//t.Error("Logging on")
+	var (
+		exp = map[string]string{
+			"foreignKeys": "0",
+			"journalMode": "memory",
+			"busyTimeout": "0",
+		}
+	)
 
-	var pragmas map[string]string
-	var ctx = context.Background()
-	var err error
+	var (
+		pragmas   parl.Pragmas
+		pragmaMap map[string]string
+		ctx       = context.Background()
+		err       error
+	)
 
-	// retrieve in-memory default pragmas
+	// create in-memory data source
+
+	// native [sql.DB] object: lots of methods and fields
 	var sqlDB *sql.DB
-	if sqlDB, err = sql.Open(SQLiteDriverName, SQLiteMemoryDataSourceName); perrors.IsPF(&err, "Open %w", err) {
-		return
+	sqlDB, err = sql.Open(SQLiteDriverName, SQLiteMemoryDataSourceName)
+	if err != nil {
+		t.Fatalf("sql.Open err %s", perrors.Short(err))
 	}
 
+	// pragmas should match
 	pragmas, err = PragmaSQL(sqlDB, ctx)
 	if err != nil {
-		t.Fatalf("Open err: %s", perrors.Short(err))
+		t.Fatalf("PragmaSQL err: %s", perrors.Short(err))
+	}
+	// pragmas: “busyTimeout: 0 foreignKeys: 0 journalMode: memory”
+	t.Logf("pragmas: “%s”", pragmas)
+	pragmaMap = pragmas.Map()
+	if !maps.Equal(pragmaMap, exp) {
+		t.Errorf("pragmas: %v exp %v", pragmaMap, exp)
 	}
 
-	// pragmas: map[foreignKeys:0 journal:memory timeout:0]
-	t.Logf("pragmas: %v", pragmas)
-
-	if !maps.Equal(pragmas, exp) {
-		t.Errorf("pragmas: %v exp %v", pragmas, exp)
-	}
+	// Close should succeed
 	err = sqlDB.Close()
 	if err != nil {
-		panic(err)
+		t.Errorf("Close err %s", err)
 	}
 }
 

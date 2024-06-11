@@ -15,6 +15,11 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
+var (
+	// [NewContextCopier] and [CopyContext]: no buffer provided
+	NoBuffer []byte
+)
+
 const (
 	// buffer size if no buffer provided is 1 MiB
 	copyContextBufferSize = 1024 * 1024 // 1 MiB
@@ -44,12 +49,13 @@ type ContextCopier struct {
 }
 
 // NewContextCopier copies src to dst aborting if context is canceled
-//   - buf is buffer that can be used
-//   - if reader implements WriteTo or writer implements ReadFrom,
+//   - buf: a buffer that can be used
+//   - buf [pio.NoBuffer]: no buffer is available
+//   - — if reader implements WriteTo or writer implements ReadFrom,
 //     no buffer is required
-//   - if a buffer is reqiired ans missing, 1 MiB is allocated
-//   - Copy methods does copying
-//   - Shutdown method or context cancel aborts Copy in progress
+//   - — if a buffer is required and missing, 1 MiB is allocated
+//   - [ContextCopier.Copy] does copying
+//   - [ContextCopier.Shutdown] or context cancel aborts Copy in progress
 //   - if the runtime type of reader or writer is [io.Closable],
 //     a thread is active during copying
 func NewContextCopier(buf ...[]byte) (copier *ContextCopier) {

@@ -6,6 +6,8 @@ ISC License
 package pfs
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -99,7 +101,7 @@ func TestAbsEvalBadSymLink(t *testing.T) {
 	// no such file or directory at pfs.AbsEval()-abs-eval.go:30’
 	t.Logf("err: ‘%s’ ‘%s’", errorglue.DumpChain(err), perrors.Short(err))
 	// is not exist: false
-	t.Logf("is not exist: %t", os.IsNotExist(err))
+	t.Logf("is not exist: %t", errors.Is(err, fs.ErrNotExist))
 	// errno: ENOENT 2 0x2
 	t.Logf("errno: %s", punix.ErrnoString("", err))
 
@@ -127,7 +129,7 @@ func TestAbsEvalBadPath(t *testing.T) {
 	// no such file or directory at pfs.AbsEval()-abs-eval.go:30’
 	t.Logf("err: ‘%s’ ‘%s’", errorglue.DumpChain(err), perrors.Short(err))
 	// is not exist: false
-	t.Logf("is not exist: %t", os.IsNotExist(err))
+	t.Logf("is not exist: %t", errors.Is(err, fs.ErrNotExist))
 	// errno: ENOENT 2 0x2
 	t.Logf("errno: %s", punix.ErrnoString("", err))
 

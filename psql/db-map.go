@@ -25,6 +25,8 @@ package psql
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -37,16 +39,18 @@ import (
 //   - caching of SQL-implementation-specific database objects
 //   - a cache for prepared statements via methods
 //     Exec Query QueryRow QueryString QueryInt
+//   - [psql.DBMap] implements [parl.DB]
 type DBMap struct {
 	// dsnr is a SQL implementation-specific data source provider implementing:
 	//	- possible partitioning
 	//	- creation and query of databases
 	dsnr parl.DataSourceNamer
 	// schema executes application-specific SQL initialization for a new datasource
-	//	- executes CREATE of tables and indexes
+	//	- executes CREATE TABLE for tables and indexes
 	//	- configures database-specific referential integrity and journaling
 	schema func(dataSource parl.DataSource, ctx context.Context) (err error)
-
+	// stateLock makes m thread-safe
+	//	- makes Close and getOrCreateDBCache critical section
 	stateLock sync.Mutex
 	m         map[parl.DataSourceName]*psql2.StatementCache // behind stateLock
 	closeErr  atomic.Pointer[error]                         // written behind stateLock
@@ -108,7 +112,8 @@ func (d *DBMap) Query(
 	return
 }
 
-// Query executes a query known to return exactly one row
+// QueryRow executes a query returning only its first row
+//   - zero rows returns error: sql: no rows in result set: use [DB.Query]
 func (d *DBMap) QueryRow(
 	partition parl.DBPartition, query string, ctx context.Context,
 	args ...any) (sqlRow *sql.Row, err error) {
@@ -125,34 +130,56 @@ func (d *DBMap) QueryRow(
 	return
 }
 
-// Query executes a query known to return exactly one row and returns its string value
+// QueryString executes a query known to return zero or one row and first column a string value
+//   - implemented by [sql.DB.QueryRowContext]
 func (d *DBMap) QueryString(
-	partition parl.DBPartition, query string, ctx context.Context,
-	args ...any) (value string, err error) {
+	partition parl.DBPartition, query string, noRowsOk parl.NoRowsAction,
+	ctx context.Context,
+	args ...any,
+) (value string, hasValue bool, err error) {
+
+	// retrieve a possibly cached prepared statement
 	var stmt psql2.Stmt
 	if stmt, err = d.getStmt(partition, query, ctx); err != nil {
 		return
 	}
+
 	if err = stmt.QueryRowContext(ctx, args...).Scan(&value); err != nil {
+		if noRowsOk == parl.NoRowsOK && errors.Is(err, sql.ErrNoRows) {
+			err = nil
+			return
+		}
 		err = perrors.Errorf("QueryString.Scan: %w", err)
 		return
 	}
+	hasValue = true
 
 	return
 }
 
-// Query executes a query known to return exactly one row and returns its int value
+// QueryInt executes a query known to return zero or one row and first column an int value
+//   - implemented by [sql.DB.QueryRowContext]
 func (d *DBMap) QueryInt(
-	partition parl.DBPartition, query string, ctx context.Context,
-	args ...any) (value int, err error) {
+	partition parl.DBPartition, query string, noRowsOk parl.NoRowsAction,
+	ctx context.Context,
+	args ...any,
+) (value int, hasValue bool, err error) {
+
+	// retrieve a possibly cached prepared statement
 	var stmt psql2.Stmt
 	if stmt, err = d.getStmt(partition, query, ctx); err != nil {
 		return
 	}
+
 	if err = stmt.QueryRowContext(ctx, args...).Scan(&value); err != nil {
+		if noRowsOk == parl.NoRowsOK && errors.Is(err, sql.ErrNoRows) {
+			err = nil
+			return
+		}
 		err = perrors.Errorf("QueryInt.Scan: %w", err)
 		return
 	}
+	hasValue = true
 
 	return
 }
@@ -188,7 +215,55 @@ func (d *DBMap) Close() (err error) {
 	return
 }
 
-// getStmt obtains a cached statemrnt or prepares the statement and caches it
+// “psql.DBMap-parl.DB-0x14000316f60-#0-unclosed”
+//   - uniquely identifies the [psql.DBMap] value
+//   - how many mapped partitions
+//   - close and error state
+func (d *DBMap) String() (s string) {
+
+	// “parlDB.String: psql.DBMap-parl.DB-0x14000062e28”
+	//	- uniquely identifies the type
+	//	- uniquely identifies the value
+	s = fmt.Sprintf("%s-parl.DB-0x%x",
+		dbMapTypeName,
+		parl.Uintptr(d),
+	)
+
+	// if nil value
+	if d == nil {
+		return
+	}
+
+	var length, isInitialized = d.length()
+	if !isInitialized {
+		s += "-uninitialized"
+		return
+	}
+
+	// “-#4-unclosed”
+	var status string
+	if errp := d.closeErr.Load(); errp == nil {
+		status = "unclosed"
+	} else if err := *errp; err == nil {
+		status = "closed"
+	} else {
+		status = fmt.Sprintf("close-err:“%s”", perrors.Short(err))
+	}
+	s += fmt.Sprintf("-#%d-%s", length, status)
+
+	return
+}
+
+func (d *DBMap) length() (length int, isInitialized bool) {
+	d.stateLock.Lock()
+	defer d.stateLock.Unlock()
+
+	isInitialized = d.m != nil
+	length = len(d.m)
+	return
+}
+
+// getStmt obtains a cached statemnt or prepares the statement and caches it
 func (d *DBMap) getStmt(
 	partition parl.DBPartition, query string, ctx context.Context,
 ) (stmt psql2.Stmt, err error) {
@@ -271,3 +346,6 @@ func (d *DBMap) getEnd(
 		*errp = perrors.AppendError(*errp, e)
 	}
 }
+
+// type name of [parl.DB] implementation: “psql.DBMap”
+var dbMapTypeName = fmt.Sprintf("%T", DBMap{})

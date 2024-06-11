@@ -17,15 +17,27 @@ import (
 //     against which queries can be prepared and executed
 //   - DataSourceNamer applies to any database implementation
 //   - sqliter provides implementations for SQLite3
+//   - the data source namer can map an application name and
+//     partition indentifier to the data source to be used
 type DataSourceNamer interface {
 	// DSN returns the data source name based on a partition selector
+	//	- upon creation, the data source namer was provided with
+	//		information on data source naming for a particular application program
 	DSN(partition ...DBPartition) (dataSourceName DataSourceName)
 	// DataSource returns a usable data source based on a data source name
+	//	- with parl, all statements are prepared statements.
+	//		The function provided by a data source is to create prepared statements.
+	//		Those prepared statements are later executed efficiently
 	DataSource(dsn DataSourceName) (dataSource DataSource, err error)
 }
 
 // DataSource is a value referring to a set of SQL tables,
 // possibly a partition
+//   - a datasource is typically implemented by [sql.DB]
+//     delegating to the SQL driver in use
+//   - a data source name is SQL driver dependent
+//   - for SQLite3, a data source name is a filename like
+//     “~/.local/share/myapp/myapp-2024.db”
 type DataSourceName string
 
 // DataSource represents a set of SQL tables,

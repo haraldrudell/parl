@@ -16,20 +16,39 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
+// ParsePEM reads the content in a pem-format byte sequence
+//   - pemData: text pem-format data byte-sequence
+//   - certificate: non-nil if the first pem-block successfully parsed as a “CERTIFICATE”
+//   - privateKey: non-nil if the first pem contained a pkcs8 “PRIVATE KEY”
+//   - publicKey: non-nil if the first pem contained a pkix encoded “PUBLIC KEY”
+//   - can do rsa, ecdsa, ed25519 keys and x.509 certificates
+//   - reads the first pem-block present
+//   - errors:
+//   - — no pem-block found
+//   - — pem parsing failed
+//   - — a different pem block type was encountered
 func ParsePEM(pemData []byte) (certificate parl.Certificate, privateKey parl.PrivateKey, publicKey parl.PublicKey, err error) {
-	block, _ := pem.Decode(pemData)
+
+	// decode the pem block to obtain its type
+	var block, _ = pem.Decode(pemData)
 	if block == nil {
 		err = perrors.NewPF("PEM block not found in input")
 		return
 	}
 	switch block.Type {
 	case pemPublicKeyType:
+
+		// “PUBLIC KEY”
 		publicKey, err = ParsePkix(block.Bytes)
 		return
 	case pemPrivateKeyType:
+
+		// “PRIVATE KEY”
 		privateKey, err = ParsePkcs8(block.Bytes)
 		return
 	case pemCertificateType:
+
+		// “CERTIFICATE”
 		if _, err = x509.ParseCertificate(block.Bytes); perrors.IsPF(&err, "x509.ParseCertificate %w", err) {
 			return
 		}
@@ -41,6 +60,7 @@ func ParsePEM(pemData []byte) (certificate parl.Certificate, privateKey parl.Pri
 	}
 }
 
+// ParsePkcs8 parses an unencrypted private key in PKCS #8, ASN.1 binary DER form
 func ParsePkcs8(privateKeyDer parl.PrivateKeyDer) (privateKey parl.PrivateKey, err error) {
 	var pub any
 	if pub, err = x509.ParsePKCS8PrivateKey(privateKeyDer); perrors.IsPF(&err, "x509.ParsePKCS8PrivateKey %w", err) {
@@ -58,6 +78,7 @@ func ParsePkcs8(privateKeyDer parl.PrivateKeyDer) (privateKey parl.PrivateKey, e
 	return
 }
 
+// ParsePkix parses a public key in PKIX, ASN.1 binary DER form
 func ParsePkix(publicKeyDer parl.PublicKeyDer) (publicKey parl.PublicKey, err error) {
 	var pub any
 	if pub, err = x509.ParsePKIXPublicKey(publicKeyDer); perrors.IsPF(&err, "x509.ParsePKIXPublicKey %w", err) {
