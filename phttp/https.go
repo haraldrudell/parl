@@ -196,7 +196,7 @@ func (s *Https) TLS(socketAddress pnet.SocketAddress) (tlsListener net.Listener,
 
 	// underlying tcp listener from pnet
 	var listener net.Listener
-	if listener, err = pnet.Listen(socketAddress, pnet.NoCancel); err != nil {
+	if listener, err = pnet.Listen(socketAddress); err != nil {
 		return
 	}
 	var _ = net.Listen

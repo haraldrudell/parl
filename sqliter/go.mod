@@ -10,7 +10,7 @@ replace github.com/haraldrudell/parl/psql => ../psql
 
 require (
 	github.com/google/uuid v1.4.0
-	github.com/haraldrudell/parl v0.4.184
+	github.com/haraldrudell/parl v0.4.185
 	github.com/haraldrudell/parl/psql v0.0.0-00010101000000-000000000000
 	modernc.org/sqlite v1.27.0
 )
@@ -20,7 +20,7 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8 // indirect
+	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8 // indirect
 	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect

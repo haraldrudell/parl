@@ -13,36 +13,45 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-var NoCancel *atomic.Pointer[context.CancelFunc]
-
-// Listen obtains a tcp or other listener
+// Listen obtains a tcp or stream-oriented domain-socket listener
+//   - for connection-oriented and their derived protocols like https
 //   - socketAddress: contains:
-//   - — [Network] and either
+//   - — [Network] tcp/tcp4/tcp6 and either
 //   - — an IPv4/IPv6 [netip.AddrPort] literal or
 //   - — domain name resolving to a local interface: “example.com:1234”
 //   - — domain-socket address “/socket” “@socket”
-//   - — zero port number selects an ephemeral port
-//   - — if IPv6 is allowed, default host typically becomes “::” not “::1”
-//   - — cancel is an optional pointer that is set to a cancel function
-//     during listen invocation.
-//     May have value [NoCancel]
+//   - — for tcp, zero port number selects an ephemeral port
+//   - — if IPv6 is supported, “localhost” typically becomes “::” not “::1”
+//   - cancel: optional pointer that is set to a cancel function
+//     during listen invocation
+//   - invokes [net.ListenConfig.Listen]
+//   - network value is not used by the kernel, it is a standard-library scoped
+//     helper
+//   - TODO 240616 possibly refactor cancel argument
 func Listen(
 	socketAddress SocketAddress,
-	cancel *atomic.Pointer[context.CancelFunc],
+	cancel ...*atomic.Pointer[context.CancelFunc],
 ) (listener net.Listener, err error) {
-	var ctx, cancelFunc = context.WithCancel(context.Background())
-	defer cancelFunc()
-	if cancel != nil {
-		cancel.Store(&cancelFunc)
-		defer cancel.Store(nil)
+
+	// [net.ListenConfig.Listen] requires a context
+	var ctx = context.Background()
+
+	// handle cancel argument
+	if len(cancel) > 0 {
+		if cancel0 := cancel[0]; cancel0 != nil {
+			var cancelFunc context.CancelFunc
+			ctx, cancelFunc = context.WithCancel(ctx)
+			defer cancelFunc()
+			cancel0.Store(&cancelFunc)
+			defer cancel0.Store(nil)
+		}
 	}
 
 	var listenConfig = net.ListenConfig{}
 	var network = socketAddress.Network().String()
 	var addr = socketAddress.String()
-	listener, err = listenConfig.Listen(ctx, network, addr)
-	if err != nil {
-		err = perrors.ErrorfPF("net.Listen %s %s: '%w'", network, addr, err)
+	if listener, err = listenConfig.Listen(ctx, network, addr); err != nil {
+		err = perrors.ErrorfPF("net.Listen %s %s: “%w”", network, addr, err)
 	}
 
 	return
