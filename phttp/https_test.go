@@ -6,17 +6,15 @@ ISC License
 package phttp
 
 import (
+	"context"
 	"crypto"
 	"crypto/x509"
 	"fmt"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/netip"
-	"os"
-	"path/filepath"
-	"strconv"
 	"testing"
+	"time"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/parlca"
@@ -24,158 +22,181 @@ import (
 	"github.com/haraldrudell/parl/pnet"
 )
 
-func TestNewHttps(t *testing.T) {
-	var ip = "127.0.0.1"
-	var nearSocket = netip.MustParseAddrPort(ip + ":0")
-	var network = pnet.NetworkTCP
-	var addrExp = ip + ":" + strconv.Itoa(int(HttpsPort))
+func TestHttps(t *testing.T) {
+	//t.Error("Logging on")
+	const (
+		// GET request protocol: “https://”
+		protocol = "https://"
+		// server URI: “/” matches everything
+		URIPattern = "/"
+		// ca common name, will default to {host}ca
+		canonicalName       = ""
+		httpShutdownTimeout = 5 * time.Second
+		expRequestCount     = 1
+	)
+	var (
+		// listening socket is IPv4 localhost ephemeral port
+		socketAddress = pnet.NewSocketAddressLiteral(
+			pnet.NetworkTCP4,
+			netip.MustParseAddrPort("127.0.0.1:0"),
+		)
+		// IP address for certificate
+		IPv4loopback = net.IPv4(127, 0, 0, 1)
+	)
 
-	var certDER parl.CertificateDer
-	var signer crypto.Signer
-	var https = NewHttps(nearSocket, network, certDER, signer)
-	if https.Network != pnet.NetworkTCP {
-		t.Errorf("New bad network %s exp %s", https.Network, network)
-	}
-	if https.Server.Addr != addrExp {
-		t.Errorf("bad Addr %q exp %q", https.Server.Addr, addrExp)
-	}
-}
+	var (
+		err error
+		// caCert is binary private key and binary DER ASN.1 certificate
+		caCert parl.CertificateAuthority
+		// ca certificate in usable [x509.Certificate] format
+		caX509 *x509.Certificate
+		// serverSigner is binary and [crypto.Signer] used to run the server
+		serverSigner parl.PrivateKey
+		// public key for creating server certificate
+		serverPublic   crypto.PublicKey
+		template       x509.Certificate
+		certDER        parl.CertificateDer
+		requestCounter *sHandler
+		respS          string
+		resp           *http.Response
+		statusCode     int
+		getURI         string
+		ctx            = context.Background()
+		shutdownCh     parl.AwaitableCh
+		errIterator    parl.ErrsIter
+		errList        []error
+	)
 
-func TestHttpsListen(t *testing.T) {
-	var IPv4loopback = net.IPv4(127, 0, 0, 1)
-	var ipS = IPv4loopback.String()
-	var dir = t.TempDir()
-	var nearSocket = netip.MustParseAddrPort(ipS + ":0")
-	var network = pnet.NetworkDefault
-	// https://
-	var protocol = "https://"
-	// "/" matches everything
-	var URIPattern = "/"
-	// ca common name, will default to {host}ca
-	var canonicalName = ""
-	// /usr/local/opt/openssl/bin/openssl x509 -in ca.der -inform der -noout -text
-	var caCertFilename = filepath.Join(dir, "ca.der")
-	var ownerRW = fs.FileMode(0o600)
-	// /usr/local/opt/openssl/bin/openssl pkey -in key.der -inform der -text -noout
-	var keyFilename = filepath.Join(dir, "key.der")
-	// /usr/local/opt/openssl/bin/openssl x509 -in cert.der -inform der -noout -text
-	var certFilename = filepath.Join(dir, "cert.der")
-	// var commonName = "" // server certificate, will default to {host}
-	// var subject = "subject"
+	// methods to test:
+	//	- HandleFunc() Listen() TLS() Serve()
+	//	- Errs() ShutdownCh()
+	//	- Shutdown() Shutdown2()
+	var httpsServer *Https
 
-	var err error
-	var caCert parl.CertificateAuthority
-	var caX509 *x509.Certificate
-	var serverKey parl.PrivateKey
-	// private key for running the server
-	var serverSigner parl.PrivateKey
-	// public key for creating server certificate
-	var serverPublic crypto.PublicKey
-	var keyDER parl.PrivateKeyDer
-	var template x509.Certificate
-	var certDER parl.CertificateDer
-	var handler *sHandler
-	var goResult = parl.NewGoResult()
-	var near, respS string
-	var resp *http.Response
-	var statusCode int
-
+	// create http Server
+	// ensure credentials
 	t.Log("Creating self-signed certificate authority")
+	// caCert is binary private key and binary DER ASN.1 certificate
 	if caCert, err = parlca.NewSelfSigned(canonicalName, x509.RSA); err != nil {
-		t.Fatalf("parlca.NewSelfSigned %s %s", x509.RSA, perrors.Short(err))
+		// x509.RSA: “RSA”
+		t.Fatalf("FAIL parlca.NewSelfSigned %s “%s”", x509.RSA, perrors.Short(err))
 	}
-	writeFile(caCertFilename, caCert.DER(), ownerRW, t.Logf)
-	caX509, err = caCert.Check()
-	if err != nil {
-		t.Fatalf("caCert,Check: %s", perrors.Short(err))
+	// expand certificate to [x509.Certificate[]
+	if caX509, err = caCert.Check(); err != nil {
+		t.Fatalf("FAIL: caCert.Check: %s", perrors.Short(err))
 	}
-
 	t.Log("Creating server private key")
-	serverKey, err = parlca.NewEd25519()
-	if err != nil {
-		t.Fatal(perrors.Errorf("server parlca.NewEd25519: '%w'", err))
+	// serverSigner is binary and [crypto.Signer] used to run the server
+	if serverSigner, err = parlca.NewEd25519(); err != nil {
+		t.Fatalf("FAIL server parlca.NewEd25519: “%q”", err)
 	}
-	serverSigner = serverKey             // private key for running the server
-	serverPublic = serverSigner.Public() // public key for creating server certificate
-	if keyDER, err = serverKey.DER(); err != nil {
-		t.Fatal(err)
-	}
-	writeFile(keyFilename, keyDER, ownerRW, t.Logf)
-
 	t.Log("Creating server certificate")
+	// public key for creating server certificate
+	serverPublic = serverSigner.Public()
 	template = x509.Certificate{
 		IPAddresses: []net.IP{IPv4loopback, net.IPv6loopback},
 	}
+	// certificate use is server authentication
 	parlca.EnsureServer(&template)
+	// have ca sign the certificate into binary DER ASN.1 form
 	if certDER, err = caCert.Sign(&template, serverPublic); err != nil {
-		t.Errorf("signing server certificate: %+v", err)
-		return
+		t.Fatalf("FAIL signing server certificate: “%s”", err)
 	}
-	writeFile(certFilename, certDER, ownerRW, t.Logf)
+	httpsServer = NewHttps(certDER, serverSigner)
 
-	// Listen() TLS()
-	var https *Https = NewHttps(nearSocket, network, certDER, serverSigner)
+	// add handler shared by all listeners counting requests
+	requestCounter = newShandler()
+	httpsServer.HandleFunc(URIPattern, requestCounter.Handle)
 
-	handler = newShandler()
-	https.HandleFunc(URIPattern, handler.Handle)
-	defer https.Shutdown()
-
-	t.Log("invoking Listen")
-	go errChListener(https.Listen(), goResult)
-
-	t.Log("waiting for ListenAwaitable")
-	<-https.ListenAwaitable.Ch()
-	if !https.Near.IsValid() {
-		t.Fatalf("FATAL: https.Near invalid")
+	// listen should trigger event
+	t.Log("invoking Listen…")
+	if nearAddrPort, listener, e := httpsServer.Listen(socketAddress); e == nil {
+		go httpsServer.Serve(listener)
+		t.Logf("near addr-port: %s", nearAddrPort)
+		getURI = protocol + nearAddrPort.String()
+	} else {
+		t.Fatalf("Listen err “%s”", e)
 	}
-	near = https.Near.String()
-	t.Logf("Near: %s", near)
 
-	t.Log("issuing http.GET")
-	resp, err = pnet.Get(protocol+near, pnet.NewTLSConfig(caX509), nil)
+	// GET should succeed with status code 204
+	t.Log("issuing http.GET…")
+	resp, err = pnet.Get(getURI, pnet.NewTLSConfig(caX509), ctx)
 	// macOS does accept self-signed certificate
 	//resp, err = http.Get(protocol + near)
+	respS = ""
 	if resp != nil {
 		statusCode = resp.StatusCode
 		respS = fmt.Sprintf("status code: %d", statusCode)
-	} else {
-		respS = "resp nil"
 	}
-
-	t.Logf("%s err: %s", respS, perrors.Short(err))
 	if err != nil {
-		t.Errorf("http.Get err %s", perrors.Short(err))
+		respS += fmt.Sprintf("Get err “%s”", err)
 	}
-	// status code should be 204
-	if resp != nil {
-		if resp.StatusCode != http.StatusNoContent {
-			t.Errorf("http.Get status code %d exp %d", resp.StatusCode, http.StatusNoContent)
-		}
-		if e := resp.Body.Close(); e != nil {
-			panic(e)
-		}
+	t.Logf(respS)
+	if err != nil {
+		t.Errorf("FAIL http.Get err %s", perrors.Short(err))
+	} else if resp == nil {
+		t.Fatal("resp nil")
+	}
+	// GET should return status code 204
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("FAIL http.Get status code %d exp %d", resp.StatusCode, http.StatusNoContent)
+	} else if e := resp.Body.Close(); e != nil {
+		t.Fatalf("FAIL resp.Body.Close err %s", e)
 	}
 
 	// handle count should be 1
-	if c := int(handler.Rqs.Load()); c != 1 {
-		t.Errorf("bad handle count: %d exp 1", c)
+	if c := int(requestCounter.RequestCount.Load()); c != expRequestCount {
+		t.Errorf("FAIL bad handle count: %d exp %d", c, expRequestCount)
 	}
 
-	t.Logf("Shutting down server")
-	https.Shutdown()
+	// ShutdownCh should be non-nil untriggered
+	shutdownCh = httpsServer.ShutdownCh()
+	if shutdownCh == nil {
+		t.Error("ShutdownCh nil")
+	}
+	select {
+	case <-shutdownCh:
+		t.Errorf("ShutdownCh triggered")
+	default:
+	}
 
-	// wait for error reader to exit
-	goResult.ReceiveError(nil)
+	// on shutdown, endListen should trigger
+	t.Logf("Shutting down server…")
+	err = httpsServer.Shutdown()
+	if err != nil {
+		t.Errorf("Shutdown err “%s”", err)
+	}
 
-	if !https.EndListenAwaitable.IsClosed() {
-		t.Error("EndListenAwaitable not closed")
+	// ShutdownCh should be triggered
+	select {
+	case <-shutdownCh:
+	default:
+		t.Errorf("ShutdownCh untriggered")
+	}
+
+	// Errs should be empty
+	errIterator = httpsServer.Errs()
+	errList = errIterator.Errors()
+	if len(errList) > 0 {
+		t.Errorf("Server had errors: %v", errList)
+	}
+
+	httpsServer.Shutdown2(&err)
+	if err != nil {
+		t.Errorf("Shutdown2 err “%s”", err)
 	}
 }
 
-// writeFile writes byts to file panic on error
-func writeFile(filename string, byts []byte, mode fs.FileMode, logf parl.PrintfFunc) {
-	logf("Writing: %s", filename)
-	if err := os.WriteFile(filename, byts, mode); err != nil {
-		panic(perrors.Errorf("os.WriteFile: '%w'", err))
-	}
+// sHandler counts incoming requests
+type sHandler struct{ RequestCount parl.Atomic64[int] }
+
+// newShandler returns a request counter
+func newShandler() (s *sHandler) { return &sHandler{} }
+
+// Handle is the http-server handler function
+//   - return body-less status Code 204: no content
+//   - counts requests
+func (s *sHandler) Handle(w http.ResponseWriter, r *http.Request) {
+	s.RequestCount.Add(1)
+	w.WriteHeader(http.StatusNoContent)
 }

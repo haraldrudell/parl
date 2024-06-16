@@ -6,7 +6,6 @@ ISC License
 package pfs
 
 import (
-	"errors"
 	"io/fs"
 	"os"
 
@@ -23,7 +22,7 @@ func Exists(path string) (fileInfo fs.FileInfo /* interface */) {
 	if err == nil {
 		return // does exist: fileInfo
 	}
-	if errors.Is(err, fs.ErrNotExist) {
+	if os.IsNotExist(err) {
 		return // does not exist: nil
 	}
 	panic(perrors.Errorf("os.Stat: '%w'", err))
@@ -37,7 +36,7 @@ func Exists2(path string) (fileInfo fs.FileInfo, isNotExist bool, err error) {
 	if fileInfo, err = os.Stat(path); err == nil {
 		return // does exist return : fileInfo non-nil, error nil
 	}
-	isNotExist = errors.Is(err, fs.ErrNotExist)
+	isNotExist = os.IsNotExist(err)
 	err = perrors.ErrorfPF("os.Stat %w", err)
 
 	return

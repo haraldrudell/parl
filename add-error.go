@@ -122,6 +122,17 @@ type Errs interface {
 	ErrorsSource
 }
 
+// Errs provides an error source that:
+//   - is iterable, awaitable and closable
+//   - can return errors one-at-a-time, in iteration or all-at-once
+//   - implemented by [parl.ErrSlice]
+type ErrsIter interface {
+	// Error() WaitCh() EndCh() Errors()
+	Errs
+	Init() (err error)
+	Condition(errp *error) (hasValue bool)
+}
+
 // ErrorsSource provides receiving multiple
 // errors at once
 type ErrorsSource interface {
