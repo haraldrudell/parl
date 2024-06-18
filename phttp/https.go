@@ -50,7 +50,7 @@ type Https struct {
 	wg parl.WaitGroupCh
 	// shutdownOnce indicates that [Https.Shutdown] has been invoked
 	shutdownOnce parl.OnceCh
-	// errs collect errors from exing [Https.Serve] threads
+	// errs collect errors from exiting [Https.Serve] threads
 	errs parl.ErrSlice
 }
 
@@ -220,12 +220,20 @@ func (s *Https) TLS(socketAddress pnet.SocketAddress) (tlsListener net.Listener,
 	return
 }
 
+func (s *Https) GetServeGoFunction() (serve func(listener net.Listener)) {
+	s.wg.Add(1)
+	serve = s.serve
+	return
+}
+
 // Serve is a thread invoking [http.Server.Serve] providing:
 //   - await via wg
 //   - error collection
-func (s *Https) Serve(listener net.Listener) {
+func (s *Https) serve(listener net.Listener) {
 	var err error
+	// invoked without recover
 	defer s.closeErrsOn1()
+	defer s.wg.Done()
 	defer parl.Recover2(func() parl.DA { return parl.A() }, &err, &s.errs)
 
 	// Serve is blocking invocations of [net.ListenerAccept]
@@ -295,25 +303,38 @@ func (s *Https) maybeClose(listenerp *net.Listener, errp *error) {
 }
 
 // closeErrsOn1 ensures that shutdown is invoked
-//   - invoked on Serve-thread exit and Shutdown completion
+//   - invoked on:
+//   - — all Serve-thread exits and
+//   - — completion of winner Shutdown
+//     -
 //   - closes [Https.Errs]
 func (s *Https) closeErrsOn1() {
 
-	// if shutdown has not been invoked,
-	// this is the first exiting Serve thread
-	//	- Shutdown should complete
+	// if shutdown has not been invoked so:
+	//	- this is the first exiting Serve thread
+	//	- must invoke Shutdown to cause other Serve threads to exit
+	//	- upon return from Shutdown, it is certain that the server is shut down
+	//	- the error slice can be closed
 	if !s.shutdownOnce.IsInvoked() {
 		if err := s.Shutdown(); err != nil {
 			s.errs.AddError(err)
 		}
 		// after shutdown completion,
 		// it is likely that allServe threads have exited
+		//	- close error slice
 		s.errs.EndErrors()
 		return
 	}
 
-	// if there are no serve threads, shutdown should invoke EndErrors
-	if _, totalAdds := s.wg.Counts(); totalAdds == 0 {
+	// Shutdown has been invoked so this is:
+	//	- an effective shutdown invocation prior to any Serve thread exit
+	//	- — one currentCount is held by Shutdown
+	//	- a Serve thread exiting upon Shutdown invocation
+	//	- — Serve thread has already invoked wg.Done
+	//	- error slice should be closed when:
+	//	- — there are no Serve threads: totalAdds == 1
+	//	- — this is the last exiting Serve thread: currentCount == 1
+	if currentCount, totalAdds := s.wg.Counts(); totalAdds == 1 || currentCount == 1 {
 		s.errs.EndErrors()
 	}
 }

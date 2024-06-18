@@ -33,6 +33,13 @@ var DefaultRouteIPv6 = netip.MustParsePrefix("::/0")
 // VPNRouteIPv6 is overriding VPN route “::/3” for IPv6
 var VPNRouteIPv6 = netip.MustParsePrefix("::/3")
 
+// IPv4loopback is [net.IP] for localhost
+//   - similar to [net.IPv6loopback] 16-byte “::1”
+//   - outdated net.IP is used with [x509.Certificate]
+var IPv4loopback = net.IPv4(127, 0, 0, 1)
+
+var LocalHost = "localhost"
+
 // IsNetwork determines if IP is the network address (all zeros) for this Mask
 // for 1.2.3.4/24 the network address 1.2.3.0 returns true
 func IsNetwork(IP net.IP, IPMask net.IPMask) (isNetwork bool) {

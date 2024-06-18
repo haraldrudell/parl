@@ -18,8 +18,10 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/parlca"
+	"github.com/haraldrudell/parl/parlca/parlca2"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pnet"
+	"github.com/haraldrudell/parl/ptime"
 )
 
 func TestHttps(t *testing.T) {
@@ -40,31 +42,22 @@ func TestHttps(t *testing.T) {
 			pnet.NetworkTCP4,
 			netip.MustParseAddrPort("127.0.0.1:0"),
 		)
-		// IP address for certificate
-		IPv4loopback = net.IPv4(127, 0, 0, 1)
 	)
 
 	var (
-		err error
-		// caCert is binary private key and binary DER ASN.1 certificate
-		caCert parl.CertificateAuthority
-		// ca certificate in usable [x509.Certificate] format
-		caX509 *x509.Certificate
-		// serverSigner is binary and [crypto.Signer] used to run the server
-		serverSigner parl.PrivateKey
-		// public key for creating server certificate
-		serverPublic   crypto.PublicKey
-		template       x509.Certificate
-		certDER        parl.CertificateDer
-		requestCounter *sHandler
-		respS          string
-		resp           *http.Response
-		statusCode     int
-		getURI         string
-		ctx            = context.Background()
-		shutdownCh     parl.AwaitableCh
-		errIterator    parl.ErrsIter
-		errList        []error
+		err             error
+		requestCounter  *sHandler
+		respS           string
+		resp            *http.Response
+		statusCode      int
+		getURI          string
+		ctx             = context.Background()
+		shutdownCh      parl.AwaitableCh
+		errIterator     parl.ErrsIter
+		errList         []error
+		x509Certificate *x509.Certificate
+		privateKey      crypto.Signer
+		t0, t1          time.Time
 	)
 
 	// methods to test:
@@ -73,36 +66,12 @@ func TestHttps(t *testing.T) {
 	//	- Shutdown() Shutdown2()
 	var httpsServer *Https
 
-	// create http Server
-	// ensure credentials
-	t.Log("Creating self-signed certificate authority")
-	// caCert is binary private key and binary DER ASN.1 certificate
-	if caCert, err = parlca.NewSelfSigned(canonicalName, x509.RSA); err != nil {
-		// x509.RSA: “RSA”
-		t.Fatalf("FAIL parlca.NewSelfSigned %s “%s”", x509.RSA, perrors.Short(err))
-	}
-	// expand certificate to [x509.Certificate[]
-	if caX509, err = caCert.Check(); err != nil {
-		t.Fatalf("FAIL: caCert.Check: %s", perrors.Short(err))
-	}
-	t.Log("Creating server private key")
-	// serverSigner is binary and [crypto.Signer] used to run the server
-	if serverSigner, err = parlca.NewEd25519(); err != nil {
-		t.Fatalf("FAIL server parlca.NewEd25519: “%q”", err)
-	}
-	t.Log("Creating server certificate")
-	// public key for creating server certificate
-	serverPublic = serverSigner.Public()
-	template = x509.Certificate{
-		IPAddresses: []net.IP{IPv4loopback, net.IPv6loopback},
-	}
-	// certificate use is server authentication
-	parlca.EnsureServer(&template)
-	// have ca sign the certificate into binary DER ASN.1 form
-	if certDER, err = caCert.Sign(&template, serverPublic); err != nil {
-		t.Fatalf("FAIL signing server certificate: “%s”", err)
-	}
-	httpsServer = NewHttps(certDER, serverSigner)
+	t0 = time.Now()
+
+	x509Certificate, privateKey, err = parlca2.Credentials()
+
+	// httpsServer = NewHttps(certDER, serverSigner)
+	httpsServer = NewHttps(x509Certificate.Raw, privateKey)
 
 	// add handler shared by all listeners counting requests
 	requestCounter = newShandler()
@@ -111,22 +80,29 @@ func TestHttps(t *testing.T) {
 	// listen should trigger event
 	t.Log("invoking Listen…")
 	if nearAddrPort, listener, e := httpsServer.Listen(socketAddress); e == nil {
-		go httpsServer.Serve(listener)
+		go httpsServer.GetServeGoFunction()(listener)
 		t.Logf("near addr-port: %s", nearAddrPort)
 		getURI = protocol + nearAddrPort.String()
 	} else {
 		t.Fatalf("Listen err “%s”", e)
 	}
+	t1 = time.Now()
+	// pre-Get latency: 2.911ms
+	t.Logf("pre-Get latency: %s", ptime.Duration(t1.Sub(t0)))
 
 	// GET should succeed with status code 204
 	t.Log("issuing http.GET…")
-	resp, err = pnet.Get(getURI, pnet.NewTLSConfig(caX509), ctx)
+	t0 = time.Now()
+	resp, err = Get(getURI, pnet.NewTLSConfig(x509Certificate), ctx)
+	t1 = time.Now()
 	// macOS does accept self-signed certificate
 	//resp, err = http.Get(protocol + near)
 	respS = ""
 	if resp != nil {
 		statusCode = resp.StatusCode
 		respS = fmt.Sprintf("status code: %d", statusCode)
+		// Get latency: 2.21ms
+		t.Logf("Get latency: %s", ptime.Duration(t1.Sub(t0)))
 	}
 	if err != nil {
 		respS += fmt.Sprintf("Get err “%s”", err)
@@ -162,7 +138,19 @@ func TestHttps(t *testing.T) {
 
 	// on shutdown, endListen should trigger
 	t.Logf("Shutting down server…")
-	err = httpsServer.Shutdown()
+	if true {
+		t0 = time.Now()
+		err = httpsServer.Shutdown()
+		t1 = time.Now()
+		// Shutdown latency: 1.1s
+		t.Logf("Shutdown latency: %s", ptime.Duration(t1.Sub(t0)))
+	} else {
+		t0 = time.Now()
+		err = httpsServer.Close()
+		t1 = time.Now()
+		// Close latency: 52µs
+		t.Logf("Close latency: %s", ptime.Duration(t1.Sub(t0)))
+	}
 	if err != nil {
 		t.Errorf("Shutdown err “%s”", err)
 	}
@@ -199,4 +187,58 @@ func newShandler() (s *sHandler) { return &sHandler{} }
 func (s *sHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	s.RequestCount.Add(1)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// has self-signed ca authority
+func LegacyRealCode(t *testing.T) (err error) {
+	const (
+		// ca common name, will default to {host}ca
+		canonicalName = ""
+	)
+	var (
+		// serverSigner is binary and [crypto.Signer] used to run the server
+		serverSigner parl.PrivateKey
+		// public key for creating server certificate
+		serverPublic crypto.PublicKey
+		template     x509.Certificate
+		// caCert is binary private key and binary DER ASN.1 certificate
+		caCert parl.CertificateAuthority
+		// ca certificate in usable [x509.Certificate] format
+		caX509  *x509.Certificate
+		certDER parl.CertificateDer
+	)
+
+	// create http Server
+	// ensure credentials
+	t.Log("Creating self-signed certificate authority")
+	// caCert is binary private key and binary DER ASN.1 certificate
+	if caCert, err = parlca.NewSelfSigned(canonicalName, x509.RSA); err != nil {
+		// x509.RSA: “RSA”
+		t.Fatalf("FAIL parlca.NewSelfSigned %s “%s”", x509.RSA, perrors.Short(err))
+	}
+	// expand certificate to [x509.Certificate[]
+	if caX509, err = caCert.Check(); err != nil {
+		t.Fatalf("FAIL: caCert.Check: %s", perrors.Short(err))
+	}
+	t.Log("Creating server private key")
+	// serverSigner is binary and [crypto.Signer] used to run the server
+	if serverSigner, err = parlca.NewEd25519(); err != nil {
+		t.Fatalf("FAIL server parlca.NewEd25519: “%q”", err)
+	}
+	t.Log("Creating server certificate")
+	// public key for creating server certificate
+	serverPublic = serverSigner.Public()
+	template = x509.Certificate{
+		IPAddresses: []net.IP{pnet.IPv4loopback, net.IPv6loopback},
+	}
+	// certificate use is server authentication
+	parlca.EnsureServer(&template)
+	// have ca sign the certificate into binary DER ASN.1 form
+	if certDER, err = caCert.Sign(&template, serverPublic); err != nil {
+		t.Fatalf("FAIL signing server certificate: “%s”", err)
+	}
+	_ = certDER
+	_ = caX509
+
+	return
 }

@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// [ThreadSafeTimer.Reset] for default duration
+const DefaultDuration = 0
+
 const (
 	// if new-function is invoked with zero default duration,
 	// default default-duration is 1 second
@@ -37,10 +40,15 @@ type ThreadSafeTimer struct {
 }
 
 // NewThreadSafeTimer returns a running timer with thread-safe Reset
-//   - default defaultDuration is 1 second for defaultDuration missing, zero or negative
-//   - defaultDuration is the default for Reset when Reset argument is zero or negative
-//   - Reset can be invoked at any time without any precautions.
-//   - — [time.Timer.Reset] has many conditions to avoid memory leaks
+//   - defaultDuration: the duration used for [ThreadSafeTimer.Reset]
+//     when invoked with [DefaultDuration], zero or negative value
+//   - — missing: 1 second
+//   - — [DefaultDuration] or 0: the timer is a dummy that never triggers
+//   - — negative: the absolute value is used as duration.
+//     The timer is created but stopped, ie. ready for [ThreadSafeTimer.Reset]
+//   - [ThreadSafeTimer.Reset] can be invoked at any time without any precautions.
+//   - — the standard lirary’s [time.Timer.Reset] has many conditions to avoid memory leaks,
+//     and Reset cannot be used by multiple threads
 //   - Stop and Reset methods are thread-safe
 //   - a timer must either expire or have Stop invoked to release resources
 //   - if timer was created in same thread or obtained via synchronize before,
@@ -52,13 +60,24 @@ func NewThreadSafeTimer(defaultDuration ...time.Duration) (timer *ThreadSafeTime
 	if len(defaultDuration) > 0 {
 		d = defaultDuration[0]
 	}
-	if d <= 0 {
-		d = defaultDefaultDuration // 1 second
+	if d == 0 {
+		// 1 second
+		d = defaultDefaultDuration
+	}
+
+	// isStopTimer means start and immediately stop timer
+	var isStopTimer = d <= 0
+	if isStopTimer {
+		d = -d
+	}
+	var t = time.NewTimer(d)
+	if isStopTimer {
+		t.Stop()
 	}
 
 	return &ThreadSafeTimer{
 		defaultDuration: d,
-		Timer:           time.NewTimer(d),
+		Timer:           t,
 		resetLock:       &sync.Mutex{},
 	}
 }
@@ -71,6 +90,12 @@ func NewThreadSafeTimer(defaultDuration ...time.Duration) (timer *ThreadSafeTime
 //   - thread-safety is obtained by making the Stop-drain-Reset sequence atomic
 //   - unsynchronized Reset will cause memory leaks
 func (t *ThreadSafeTimer) Reset(duration time.Duration) {
+
+	// when invoked with zero and default is also zero: noop
+	if duration == 0 && t.defaultDuration == 0 {
+		return
+	}
+
 	if duration <= 0 {
 		duration = t.defaultDuration
 	}
