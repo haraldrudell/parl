@@ -32,6 +32,14 @@ type SelfSigned struct {
 	PrivateKey       parl.PrivateKey
 }
 
+// NewSelfSigned creates a self-ssigned certificate authority
+//   - ca: a certificate with embedded private key
+//   - — implementation is parlca.Certificate, ie. binary der format
+//   - canonicalName: 240623 not used
+//   - algo:
+//   - — [x509.Ed25519] smallest key size but as of 2024 not supported by browsers
+//   - — [x509.RSA] the most commonly used algorithm for browsers
+//   - — [x509.ECDSA]
 func NewSelfSigned(canonicalName string, algo x509.PublicKeyAlgorithm) (ca parl.CertificateAuthority, err error) {
 	c := SelfSigned{}
 
@@ -42,7 +50,7 @@ func NewSelfSigned(canonicalName string, algo x509.PublicKeyAlgorithm) (ca parl.
 
 	// create certificate of certificate authority
 	var certificateDer parl.CertificateDer
-	cert := &x509.Certificate{}
+	var cert = &x509.Certificate{}
 	EnsureSelfSigned(cert)
 	if certificateDer, err = x509.CreateCertificate(rand.Reader,
 		cert,                  // template
@@ -81,17 +89,13 @@ func (ca *SelfSigned) Sign(template *x509.Certificate, publicKey crypto.PublicKe
 func (ca *SelfSigned) Check() (cert *x509.Certificate, err error) {
 	if err = ca.PrivateKey.Validate(); err != nil {
 		return
-	}
-	if cert, err = ca.ParseCertificate(); perrors.IsPF(&err, "x509.ParseCertificate: '%w'", err) {
+	} else if cert, err = ca.ParseCertificate(); perrors.IsPF(&err, "x509.ParseCertificate: '%w'", err) {
 		return
-	}
-	if cert.PublicKey == nil {
-		err = perrors.NewPF("public key uninitialied")
+	} else if cert.PublicKey == nil {
+		err = perrors.NewPF("public key uninitialized")
 		return
 	}
 	return
 }
 
-func (ca *SelfSigned) Private() (privateKey parl.PrivateKey) {
-	return ca.PrivateKey
-}
+func (ca *SelfSigned) Private() (privateKey parl.PrivateKey) { return ca.PrivateKey }

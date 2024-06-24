@@ -6,9 +6,6 @@ ISC License
 package parlca
 
 import (
-	"crypto/ecdsa"
-	"crypto/ed25519"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 
@@ -58,40 +55,4 @@ func ParsePEM(pemData []byte) (certificate parl.Certificate, privateKey parl.Pri
 		err = perrors.ErrorfPF("Unknown pem block type: %q", block.Type)
 		return
 	}
-}
-
-// ParsePkcs8 parses an unencrypted private key in PKCS #8, ASN.1 binary DER form
-func ParsePkcs8(privateKeyDer parl.PrivateKeyDer) (privateKey parl.PrivateKey, err error) {
-	var pub any
-	if pub, err = x509.ParsePKCS8PrivateKey(privateKeyDer); perrors.IsPF(&err, "x509.ParsePKCS8PrivateKey %w", err) {
-		return
-	}
-	if pk, ok := pub.(*rsa.PrivateKey); ok {
-		privateKey = &RsaPrivateKey{PrivateKey: *pk}
-	} else if pk, ok := pub.(*ecdsa.PrivateKey); ok {
-		privateKey = &EcdsaPrivateKey{PrivateKey: *pk}
-	} else if pk, ok := pub.(ed25519.PrivateKey); ok {
-		privateKey = &Ed25519PrivateKey{PrivateKey: pk}
-	} else {
-		err = perrors.ErrorfPF("Unknown private key type: %T", pub)
-	}
-	return
-}
-
-// ParsePkix parses a public key in PKIX, ASN.1 binary DER form
-func ParsePkix(publicKeyDer parl.PublicKeyDer) (publicKey parl.PublicKey, err error) {
-	var pub any
-	if pub, err = x509.ParsePKIXPublicKey(publicKeyDer); perrors.IsPF(&err, "x509.ParsePKIXPublicKey %w", err) {
-		return
-	}
-	if pk, ok := pub.(*rsa.PublicKey); ok {
-		publicKey = &RsaPublicKey{PublicKey: *pk}
-	} else if pk, ok := pub.(*ecdsa.PublicKey); ok {
-		publicKey = &EcdsaPublicKey{PublicKey: *pk}
-	} else if pk, ok := pub.(ed25519.PublicKey); ok {
-		publicKey = &Ed25519PublicKey{PublicKey: pk}
-	} else {
-		err = perrors.ErrorfPF("Unknown public key type: %T", pub)
-	}
-	return
 }

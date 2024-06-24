@@ -22,15 +22,19 @@ const (
 	pemNewline   = "\n"
 )
 
+// PemText returns lead-in text for pem format block
+// - data is 1 or 2 copies of binary der data
+// - — 1: only sh256 fingerprint
+// - — 2: sha256 and sha1 fingerprints
 func PemText(data ...[]byte) (pemText string) {
 	pemText = parl.Sprintf(copyright, time.Now().Format(parl.Rfc3339s))
 
 	// calculate sha256 fingerprint
 	if len(data) > 0 {
-		hashBytes := sha256.Sum256(data[0]) // [32]byte
+		var hashBytes = sha256.Sum256(data[0]) // [32]byte
 		pemText += fingerPrint + hex.EncodeToString(hashBytes[:4]) + pemNewline
 		if len(data) > 1 {
-			hashBytes1 := sha1.Sum(data[1])
+			var hashBytes1 = sha1.Sum(data[1])
 			pemText += fingerPrint1 + hex.EncodeToString(hashBytes1[:4]) + pemNewline
 		}
 	}

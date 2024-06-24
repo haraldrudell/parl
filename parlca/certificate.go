@@ -14,8 +14,8 @@ import (
 )
 
 // Certificate wraps a der format x509 certificate.
-// A der-format certificate is produced by x509.CreateCertificate.
-// An x509.Certificate can be obtained by using x509.ParseCertificate.
+//   - der-format certificate is produced by [x509.CreateCertificate]
+//   - An [x509.Certificate] can be obtained from [x509.ParseCertificate]
 type Certificate struct {
 	/*
 		// x509.Certificate
@@ -33,6 +33,13 @@ type Certificate struct {
 	der parl.CertificateDer
 }
 
+// NewCertificate returns an object that can produce:
+//   - textual pem format and
+//   - expanded [x509.Certificate] format
+//   - storage is maximum efficient binary der asn.1 format
+//   - [Certificate.DER] binary data
+//   - [Certificate.PEM] textual block
+//   - [Certificate.ParseCertificate] [x509.Certificate] data structure
 func NewCertificate(certificateDer parl.CertificateDer) (certificate parl.Certificate) {
 	return &Certificate{der: certificateDer}
 }
@@ -86,24 +93,33 @@ func LoadCertificate(filename string) {}
 		return
 	}
 */
-func (ca *Certificate) DER() (certificateDer parl.CertificateDer) {
-	return ca.der
+
+// DER returns the binary der asn.1 format of the certificate
+func (c *Certificate) DER() (certificateDer parl.CertificateDer) { return c.der }
+
+// PEM returns a file-writable and human-readable pem block
+//   - “==… CERTIFICATE…”
+func (c *Certificate) PEM() (pemBytes parl.PemBytes) {
+	return append(
+		// lead-in text for pem block sha256 and sha1 fingerprint
+		[]byte(PemText(c.der, c.der)),
+		// ==… CERTIFICATE…
+		pem.EncodeToMemory(&pem.Block{
+			Type:  pemCertificateType,
+			Bytes: c.DER(),
+		})...)
 }
 
-func (ca *Certificate) PEM() (pemBytes parl.PemBytes) {
-	return append([]byte(PemText(ca.der, ca.der)), pem.EncodeToMemory(&pem.Block{
-		Type:  pemCertificateType,
-		Bytes: ca.DER(),
-	})...)
-}
-
-func (ca *Certificate) ParseCertificate() (certificate *x509.Certificate, err error) {
-	certificateDer := ca.der
-	if len(certificateDer) == 0 {
+// ParseCertificate returns expanded [x509.Certificate] format
+//   - allows certificate to be used as parent argument to [x509.CreateCertificate]
+//   - provides access to certificate datapoints
+func (c *Certificate) ParseCertificate() (certificate *x509.Certificate, err error) {
+	if certificateDer := c.der; len(certificateDer) == 0 {
 		err = perrors.New("certificate der uninitialized")
 		return
+	} else if certificate, err = x509.ParseCertificate(certificateDer); err != nil {
+		err = perrors.ErrorfPF("x509.ParseCertificate: %w", err)
 	}
-	certificate, err = x509.ParseCertificate(certificateDer)
-	perrors.IsPF(&err, "x509.ParseCertificate: '%w'", err)
+
 	return
 }
