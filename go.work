@@ -1,6 +1,8 @@
 // © 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 // ISC License
-go 1.21
+go 1.22.0
+
+toolchain go1.23.1
 
 // go work use -r .
 use (

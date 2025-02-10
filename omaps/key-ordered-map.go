@@ -28,21 +28,41 @@ type KeyOrderedMap[K constraints.Ordered, V any] struct {
 }
 
 // NewKeyOrderedMap returns a mapping whose keys are provided in order.
-func NewKeyOrderedMap[K btree.Ordered, V any]() (orderedMap *KeyOrderedMap[K, V]) {
-	return &KeyOrderedMap[K, V]{
-		map2: *newMap[K, V](),
-		tree: btree.NewOrderedG[K](BtreeDegree),
+func NewKeyOrderedMap[K btree.Ordered, V any](fieldp ...*KeyOrderedMap[K, V]) (orderedMap *KeyOrderedMap[K, V]) {
+
+	// set orderedMap
+	if len(fieldp) > 0 {
+		orderedMap = fieldp[0]
 	}
+	if orderedMap == nil {
+		orderedMap = &KeyOrderedMap[K, V]{}
+	}
+
+	// initialize all fields
+	newMap(&orderedMap.map2)
+	orderedMap.tree = btree.NewOrderedG[K](BtreeDegree)
+
+	return
 }
 
 // NewKeyOrderedMap returns a mapping whose keys are provided in order
 //   - [constraints.Ordered] is [btree.Ordered] plus uintptr
 //   - if K type does not have uintptr, use [NewKeyOrderedMap]
-func NewKeyOrderedMapOrdered[K constraints.Ordered, V any]() (orderedMap *KeyOrderedMap[K, V]) {
-	return &KeyOrderedMap[K, V]{
-		map2: *newMap[K, V](),
-		tree: btree.NewG[K](BtreeDegree, LessOrdered),
+func NewKeyOrderedMapOrdered[K constraints.Ordered, V any](fieldp ...*KeyOrderedMap[K, V]) (orderedMap *KeyOrderedMap[K, V]) {
+
+	// set orderedMap
+	if len(fieldp) > 0 {
+		orderedMap = fieldp[0]
 	}
+	if orderedMap == nil {
+		orderedMap = &KeyOrderedMap[K, V]{}
+	}
+
+	// initialize all fields
+	newMap(&orderedMap.map2)
+	orderedMap.tree = btree.NewG[K](BtreeDegree, LessOrdered)
+
+	return
 }
 
 func (m *KeyOrderedMap[K, V]) Put(key K, value V) {
@@ -83,11 +103,23 @@ func (m *KeyOrderedMap[K, V]) Clear() {
 }
 
 // Clone returns a shallow clone of the map
-func (m *KeyOrderedMap[K, V]) Clone() (clone *KeyOrderedMap[K, V]) {
-	return &KeyOrderedMap[K, V]{
-		map2: *m.map2.clone(),
+func (m *KeyOrderedMap[K, V]) Clone(goMap ...*map[K]V) (clone *KeyOrderedMap[K, V]) {
+
+	// clone to Go map case
+	if len(goMap) > 0 {
+		if gm := goMap[0]; gm != nil {
+			m.map2.m2.Clone(gm)
+			return
+		}
+	}
+
+	// regular clone case
+	clone = &KeyOrderedMap[K, V]{
 		tree: m.tree.Clone(),
 	}
+	m.map2.cloneToField(&clone.map2)
+
+	return
 }
 
 // List provides mapped values in order

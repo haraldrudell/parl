@@ -37,7 +37,16 @@ func Close(closable io.Closer, errp *error) {
 	var err error
 	defer RecoverErr(func() DA { return A() }, errp)
 
-	if err = closable.Close(); perrors.IsPF(&err, "%w", err) {
-		*errp = perrors.AppendError(*errp, err)
+	if err = closable.Close(); err == nil {
+		return // successful close
 	}
+	// Close returned error
+
+	// ensure err has stack trace
+	if !perrors.HasStack(err) {
+		// the stack should begin with caller of parl.Close:
+		err = perrors.Stackn(err, 1)
+	}
+
+	*errp = perrors.AppendError(*errp, err)
 }

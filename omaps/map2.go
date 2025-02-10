@@ -5,22 +5,39 @@ ISC License
 
 package omaps
 
-import "github.com/haraldrudell/parl/pmaps/pmaps2"
+import (
+	"github.com/haraldrudell/parl/pmaps/pmaps2"
+	"golang.org/x/exp/maps"
+)
 
 // map2 is a private promotable field only promoting
 // explicit public identifiers Get Length Range
+//   - non-thread-safe map implementation for omaps package
 //   - hiding methods: Clear Clone Delete Put
-//   - providing private clone method
-//   - innermost map-implementation type for non-thread-safe maps in omaps package
+//   - providing private clone methods
 //   - type aliasing does not work for generic types
-//   - implementation is [pmaps.Map] wrapping Go map
+//   - implementation is [pmaps2.Map] wrapping Go map
 type map2[K comparable, V any] struct {
-	// m2 protects public identifiers from being promoted
+	// m2 identifier protects public identifiers from being promoted
 	m2 pmaps2.Map[K, V]
+	// goMap is allocation-saving helper for cloning
+	goMap *map[K]V
 }
 
 // map2 is a private promotable field without public identifiers
-func newMap[K comparable, V any]() (m *map2[K, V]) { return &map2[K, V]{m2: *pmaps2.NewMap[K, V]()} }
+func newMap[K comparable, V any](fieldp *map2[K, V]) (m *map2[K, V]) {
+
+	// set m
+	if m = fieldp; m == nil {
+		m = &map2[K, V]{}
+	}
+
+	// initialize all fields
+	var noGoMap map[K]V
+	pmaps2.NewMap2[K, V](&m.m2, noGoMap, &m.goMap)
+
+	return
+}
 
 // Get returns the value mapped by key or the V zero-value otherwise
 //   - ok: true if a mapping was found
@@ -38,4 +55,14 @@ func (m *map2[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bool)) (ran
 	return m.m2.Range(rangeFunc)
 }
 
-func (m *map2[K, V]) clone() (clone *map2[K, V]) { return &map2[K, V]{m2: *m.m2.Clone()} }
+// cloneToField is package-private method providing access to encapsulated Clone
+// - clone into existing field without unnecessary alocations
+func (m *map2[K, V]) cloneToField(clone *map2[K, V]) {
+	// create clone of Go map implementation used by m
+	var goMap = maps.Clone(*m.goMap)
+	// initialize clone m2 nd goMap fields
+	pmaps2.NewMap2(&clone.m2, goMap, &clone.goMap)
+}
+
+// cloneToGoMap is package-private method providing access to encapsulated Clone
+func (m *map2[K, V]) cloneToGoMap(goMap *map[K]V) { m.m2.Clone(goMap) }

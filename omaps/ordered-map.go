@@ -23,13 +23,37 @@ type OrderedMap[K comparable, V constraints.Ordered] struct {
 }
 
 // NewOrderedMap returns a map for btree.Ordered, ie. not ~uintptr
-func NewOrderedMap[K comparable, V btree.Ordered]() (orderedMap *OrderedMap[K, V]) {
-	return &OrderedMap[K, V]{orderedMapFunc: *newOrderedMapFunc[K, V]()}
+func NewOrderedMap[K comparable, V btree.Ordered](fieldp ...*OrderedMap[K, V]) (orderedMap *OrderedMap[K, V]) {
+
+	// set orderedMap
+	if len(fieldp) > 0 {
+		orderedMap = fieldp[0]
+	}
+	if orderedMap == nil {
+		orderedMap = &OrderedMap[K, V]{}
+	}
+
+	// initialize all fields
+	newOrderedMapFunc[K, V](&orderedMap.orderedMapFunc)
+
+	return
 }
 
 // NewOrderedMapUintptr returns a map for ~uintptr
-func NewOrderedMapUintptr[K comparable, V ~uintptr]() (orderedMap *OrderedMap[K, V]) {
-	return &OrderedMap[K, V]{orderedMapFunc: *newOrderedMapFuncUintptr[K, V](LessOrdered[V])}
+func NewOrderedMapUintptr[K comparable, V ~uintptr](fieldp ...*OrderedMap[K, V]) (orderedMap *OrderedMap[K, V]) {
+
+	// set orderedMap
+	if len(fieldp) > 0 {
+		orderedMap = fieldp[0]
+	}
+	if orderedMap == nil {
+		orderedMap = &OrderedMap[K, V]{}
+	}
+
+	// initialize all fields
+	newOrderedMapFuncUintptr[K, V](LessOrdered[V], &orderedMap.orderedMapFunc)
+
+	return
 }
 
 // Put creates or replaces a mapping

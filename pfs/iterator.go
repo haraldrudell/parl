@@ -20,12 +20,20 @@ type Iterator struct {
 	iters.BaseIterator[ResultEntry]
 }
 
-// NewIterator returns an iterator for a file-system entry and any child entries if directory
-//   - path is the initial path for the file-system walk.
-//     it may be relative or absolute, contain symlinks and
+// NewIterator returns a directory-tree iterator for all file-system entries following symbolic links
+//   - path: initial path for file-system traversal.
+//     path may be relative or absolute, contain symlinks and
 //     point to a file, directory or special file
-//   - if symlinks and directories are not skipped, they are followed
-//   - all errors during traversal are provided as is
+//   - entries that are error-free non-directory non-symbolic-link are returned as [REntry]
+//   - symbolic links and directories that are not actively skipped are followed
+//   - — returned as [RSkippable]
+//   - “.” and “..” are not returned
+//   - directories that cannot be opened or listed are returned again as [RDirBad]
+//   - broken symbolic links are returned as [RSymlinkBad]
+//   - entries that unexpectedly produce error are returned as [RError]
+//   - —
+//   - [NewDirEntryIterator] single-level directory iterator
+//   - delegates to [pfs.NewTraverser]
 func NewIterator(path string) (iterator iters.Iterator[ResultEntry]) {
 	i := Iterator{traverser: *NewTraverser(path)}
 	i.BaseIterator = *iters.NewBaseIterator(i.iteratorAction)

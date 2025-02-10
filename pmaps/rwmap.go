@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pmaps provides an unordered, thread-safe, RWMutex-mechanic map pmaps.RWMap.
 package pmaps
 
 import (
@@ -37,14 +36,26 @@ type RWMap[K comparable, V any] struct {
 	threadSafeMap[K, V]
 }
 
-// NewRWMap returns a thread-safe map implementation
+// NewRWMap returns a thread-safe map implementation as interface
 func NewRWMap[K comparable, V any]() (rwMap parli.ThreadSafeMap[K, V]) {
 	return NewRWMap2[K, V]()
 }
 
-// NewRWMap2 returns a thread-safe map implementation
-func NewRWMap2[K comparable, V any]() (rwMap *RWMap[K, V]) {
-	return &RWMap[K, V]{threadSafeMap: *newThreadSafeMap[K, V]()}
+// NewRWMap2 returns a thread-safe map implementation as pointer to type
+func NewRWMap2[K comparable, V any](fieldp ...*RWMap[K, V]) (rwMap *RWMap[K, V]) {
+
+	// set rwMap
+	if len(fieldp) > 0 {
+		rwMap = fieldp[0]
+	}
+	if rwMap == nil {
+		rwMap = &RWMap[K, V]{}
+	}
+
+	// initialize all fields
+	newThreadSafeMap[K, V](&rwMap.threadSafeMap)
+
+	return
 }
 
 // Putif is conditional Put depending on the return value from the putIf function
@@ -54,7 +65,7 @@ func NewRWMap2[K comparable, V any]() (rwMap *RWMap[K, V]) {
 //   - during PutIf, the map cannot be accessed and the map’s write-lock is held
 //   - PutIf is an atomic, thread-safe operation
 func (m *RWMap[K, V]) PutIf(key K, value V, putIf func(value V) (doPut bool)) (wasNewKey bool) {
-	defer m.tsm.Lock()()
+	defer m.tsm.Lock().Unlock()
 
 	existing, keyExists := m.tsm.Get(key)
 	wasNewKey = !keyExists
@@ -66,16 +77,32 @@ func (m *RWMap[K, V]) PutIf(key K, value V, putIf func(value V) (doPut bool)) (w
 	return
 }
 
-// Clone returns a shallow clone of the map
-func (m *RWMap[K, V]) Clone() (clone parli.ThreadSafeMap[K, V]) {
-	return m.Clone2()
+// Clone returns a shallow clone of the map as interface type
+func (m *RWMap[K, V]) Clone(goMap ...*map[K]V) (clone parli.ThreadSafeMap[K, V]) {
+	return m.Clone2(goMap...)
 }
 
-// Clone returns a shallow clone of the map
-func (m *RWMap[K, V]) Clone2() (clone *RWMap[K, V]) {
-	defer m.tsm.RLock()()
+// Clone returns a shallow clone of the map as implementation pointer type
+func (m *RWMap[K, V]) Clone2(goMap ...*map[K]V) (clone *RWMap[K, V]) {
+	var gm *map[K]V
+	if len(goMap) > 0 {
+		gm = goMap[0]
+	}
+	if gm == nil {
+		clone = &RWMap[K, V]{}
+	}
+	defer m.tsm.RLock().RUnlock()
 
-	return &RWMap[K, V]{threadSafeMap: *m.threadSafeMap.clone()}
+	// clone to Go-map case
+	if gm != nil {
+		m.threadSafeMap.cloneToGomap(gm)
+		return
+	}
+
+	// clone RWMap case
+	m.threadSafeMap.clone(&clone.threadSafeMap)
+
+	return
 }
 
 // Keys provides the mapping keys, undefined ordering
@@ -87,7 +114,7 @@ func (m *RWMap[K, V]) Keys(n ...int) (keys []K) {
 	if len(n) > 0 {
 		n0 = n[0]
 	}
-	defer m.tsm.RLock()()
+	defer m.tsm.RLock().RUnlock()
 
 	// n0 is actual length to use
 	var length = m.tsm.Length()

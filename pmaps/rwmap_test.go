@@ -21,41 +21,49 @@ import (
 )
 
 func TestRWMap(t *testing.T) {
-	var key1, key2 = "key1", "key2"
-	var value1, value2 = 1, 2
-	// expected map length 1
-	var lengthExp = 1
-	var mapExp1 = map[string]int{key1: value1}
-	var lengthExpRange2 = 1
-	var mapExp2 = map[string]int{key1: value1, key2: value2}
-	var mapExpValue2 = map[string]int{key1: value2}
-	var mapExpKey2 = map[string]int{key2: value2}
-	var lengthExp0 = 0
-	var keysExp = []string{key1}
-	var keysLength, listLength = 1, 1
-	var newV = func() (valuep *int) { return &value2 }
-	var makeV = func() (value int) { return value2 }
+	const (
+		key1, key2     = "key1", "key2"
+		value1, value2 = 1, 2
+		// expected map length 1
+		lengthExp              = 1
+		lengthExpRange2        = 1
+		lengthExp0             = 0
+		keysLength, listLength = 1, 1
+	)
+	var (
+		mapExp1      = map[string]int{key1: value1}
+		mapExp2      = map[string]int{key1: value1, key2: value2}
+		mapExpValue2 = map[string]int{key1: value2}
+		mapExpKey2   = map[string]int{key2: value2}
+		keysExp      = []string{key1}
+		value2x      = value2
+		newV         = func() (valuep *int) { return &value2x }
+		makeV        = func() (value int) { return value2 }
+		putIfTrue    = func(value int) (doPut bool) {
+			if value != value1 {
+				panic(perrors.NewPF("putif bad value"))
+			}
+			return true
+		}
+		putIfFalse = func(value int) (doPut bool) {
+			if value != value1 {
+				panic(perrors.NewPF("putif bad value"))
+			}
+			return
+		}
+	)
 
-	var lengthAct, value, zeroValue int
-	var hasValue, rangedAll, wasNewKey bool
-	var ranger *mapRanger[string, int]
-	var mapAct map[string]int
-	var keys []string
-	var values []int
-	var clone parli.ThreadSafeMap[string, int]
-	var rwmap2 *RWMap[string, int]
-	var putIfTrue = func(value int) (doPut bool) {
-		if value != value1 {
-			panic(perrors.NewPF("putif bad value"))
-		}
-		return true
-	}
-	var putIfFalse = func(value int) (doPut bool) {
-		if value != value1 {
-			panic(perrors.NewPF("putif bad value"))
-		}
-		return
-	}
+	var (
+		lengthAct, value, zeroValue    int
+		hasValue, rangedAll, wasNewKey bool
+		ranger                         *mapRanger[string, int]
+		mapAct                         map[string]int
+		keys                           []string
+		values                         []int
+		clone                          parli.ThreadSafeMap[string, int]
+		rwmap2                         *RWMap[string, int]
+		goMap                          map[string]int
+	)
 
 	// Get() Put() Delete() Length() Range()
 	// GetOrCreate() PutIf()
@@ -205,6 +213,13 @@ func TestRWMap(t *testing.T) {
 	rwmap2.Range(ranger.rangeFunc)
 	if !maps.Equal(ranger.M, mapExp1) {
 		t.Errorf("Clone2 %v exp %v", ranger.M, mapExp1)
+	}
+
+	// Clone to Go map
+	reset()
+	rwmap.Clone(&goMap)
+	if !maps.Equal(goMap, mapExp1) {
+		t.Errorf("Clone2 %v exp %v", goMap, mapExp1)
 	}
 
 	// GetOrCreate unknown key should return nil

@@ -3,11 +3,11 @@
 ISC License
 */
 
-// Package omaps provides ordered Go hash-maps with order provided by B-Tree m-ary self-balancing ordered trees
 package omaps
 
 import (
 	"github.com/google/btree"
+	"github.com/haraldrudell/parl"
 	"golang.org/x/exp/constraints"
 )
 
@@ -37,24 +37,56 @@ type BTreeMap[K comparable, V any] struct {
 	tree *btree.BTreeG[V]
 }
 
-// NewBTreeMap returns a mapping whose values are provided in custom order
+// NewBTreeMap returns a mapping whose values are provided in order
 //   - btree.Ordered does not include ~uintptr. For other ordered V, use [NewBTreeMapAny]
-func NewBTreeMap[K comparable, V btree.Ordered]() (orderedMap *BTreeMap[K, V]) {
-	return newBTreeMap[K, V](btree.NewOrderedG[V](BtreeDegree))
+func NewBTreeMap[K comparable, V btree.Ordered](fieldp ...*BTreeMap[K, V]) (orderedMap *BTreeMap[K, V]) {
+	return newBTreeMap[K, V](btree.NewOrderedG[V](BtreeDegree), fieldp...)
 }
 
 // NewBTreeMapAny returns a mapping whose values are provided in custom order
-//   - supports uintptr. If the ordered V is not uintptr, use [NewBTreeMap]
-func NewBTreeMapAny[K comparable, V any](less btree.LessFunc[V]) (orderedMap *BTreeMap[K, V]) {
-	return newBTreeMap[K, V](btree.NewG[V](BtreeDegree, less))
+//   - supports uintptr. If using default ordered V not uintptr, use [NewBTreeMap]
+func NewBTreeMapAny[K comparable, V any](less btree.LessFunc[V], fieldp ...*BTreeMap[K, V]) (orderedMap *BTreeMap[K, V]) {
+	parl.NilPanic("less", less)
+	return newBTreeMap[K, V](btree.NewG[V](BtreeDegree, less), fieldp...)
+}
+
+// NewBTreeMapAny returns a mapping whose values are provided in custom order
+//   - fieldp is optional
+//   - used for clone to field
+//   - less is embedded into tree
+func NewBTreeMapClone[K comparable, V any](fieldp *BTreeMap[K, V], cloneFrom *BTreeMap[K, V]) (orderedMap *BTreeMap[K, V]) {
+	parl.NilPanic("cloneFrom", cloneFrom)
+
+	// set orderedMap
+	if fieldp != nil {
+		orderedMap = fieldp
+	} else {
+		orderedMap = &BTreeMap[K, V]{}
+	}
+
+	// handle cloneFrom to all fields
+	cloneFrom.map2.cloneToField(&orderedMap.map2)
+	orderedMap.tree = cloneFrom.tree.Clone()
+
+	return
 }
 
 // newBTreeMap creates using existing B-tree
-func newBTreeMap[K comparable, V any](tree *btree.BTreeG[V]) (orderedMap *BTreeMap[K, V]) {
-	return &BTreeMap[K, V]{
-		map2: *newMap[K, V](),
-		tree: tree,
+func newBTreeMap[K comparable, V any](tree *btree.BTreeG[V], fieldp ...*BTreeMap[K, V]) (orderedMap *BTreeMap[K, V]) {
+
+	// set orderedMap
+	if len(fieldp) > 0 {
+		orderedMap = fieldp[0]
 	}
+	if orderedMap == nil {
+		orderedMap = &BTreeMap[K, V]{}
+	}
+
+	// initialize all fields
+	newMap[K, V](&orderedMap.map2)
+	orderedMap.tree = tree
+
+	return
 }
 
 // constraints.Ordered includes ~uintptr
@@ -108,11 +140,23 @@ func (m *BTreeMap[K, V]) Clear() {
 
 // Clone returns a shallow clone of the map
 //   - clone is done by ranging all keys
-func (m *BTreeMap[K, V]) Clone() (clone *BTreeMap[K, V]) {
-	return &BTreeMap[K, V]{
-		map2: *m.map2.clone(),
+func (m *BTreeMap[K, V]) Clone(goMap ...*map[K]V) (clone *BTreeMap[K, V]) {
+
+	// Go map clone case
+	if len(goMap) > 0 {
+		if gm := goMap[0]; gm != nil {
+			m.map2.cloneToGoMap(gm)
+			return
+		}
+	}
+
+	// regular clone case
+	clone = &BTreeMap[K, V]{
 		tree: m.tree.Clone(),
 	}
+	m.map2.cloneToField(&clone.map2)
+
+	return
 }
 
 // List provides mapped values in order

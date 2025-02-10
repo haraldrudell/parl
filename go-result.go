@@ -6,10 +6,11 @@ ISC License
 package parl
 
 // GoResult makes any number of goroutines awaitable
-//   - number of goroutines must be known at time of new
-//   - [NewGoResult] is the simplest, goroutines are awaited by [GoResult.ReceiveError]
-//   - [NewGoResult2] also has [IsError] method indicating if any goroutine
+//   - requires new-function invocation:
+//   - — [NewGoResult] is the simplest, goroutines are awaited by [GoResult.ReceiveError]
+//   - — [NewGoResult2] also has [IsError] method indicating if any goroutine
 //     exited with fatal error
+//   - — number of goroutines must be known at time of new
 //   - [GoResult.IsValid] true if the GoResult is initialized
 //   - [GoResult.SendError](errp *error) deferrable, how goroutine sends results
 //   - [GoResult.ReceiveError](errp *error, n ...int) (err error)
@@ -24,8 +25,31 @@ package parl
 //   - receiver is value struct with pointer in the form of an interface
 type GoResult struct{ goResult }
 
+// true if the GoResult is initialized by new-function
 func (g GoResult) IsValid() (isValid bool) { return g.goResult != nil }
 
+// String method always works
+//   - “GoResult_nil”:
+//     uninitialized, invalid GoResult nil or no new-function
+//   - “goResult_len:0”: from NewGoResult
+//   - — has channel capacity 1
+//   - — len is whether any result is pending in the channel
+//   - “goResult_remain:1_ch:0(1)_isError:false” from NewGoResult2
+//   - — Has buffered channel of certain capacity
+//   - — remain is how many results remain to be read from channel
+//   - — ch is how many items are pending in channel
+//   - — isError is true if an error was read from a goroutine
+//     or SetIsError was invoked
+func (g GoResult) String() (s string) {
+	if g.goResult == nil {
+		return "GoResult_nil"
+	}
+	return g.goResult.String()
+}
+
+// goResult is internally interface pointer
+//   - allows copy of value
+//   - points to a channel type wih method-set
 type goResult interface {
 	// SendError sends error as the final action of a goroutine
 	//   - SendError makes a goroutine:
@@ -62,6 +86,8 @@ type goResult interface {
 	// Remaining returns the number of goroutines that have yet to exit
 	//	- only for [NewGoResult2]
 	Remaining() (remaining int)
+	// pritable representation
+	String() (s string)
 }
 
 // NewGoResult returns the minimum mechanic to make a goroutine awaitable

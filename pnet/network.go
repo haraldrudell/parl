@@ -8,6 +8,7 @@ package pnet
 import (
 	"net"
 
+	"github.com/haraldrudell/parl/iters"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/sets"
 )
@@ -63,3 +64,5 @@ var networkSet = sets.NewSet[Network]([]sets.SetElementFull[Network]{
 func (t Network) String() (s string) { return networkSet.StringT(t) }
 
 func (t Network) IsValid() (isValid bool) { return networkSet.IsValid(t) }
+
+func (t Network) Iterator() (iterator iters.Iterator[Network]) { return networkSet.Iterator() }

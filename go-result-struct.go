@@ -6,6 +6,7 @@ ISC License
 package parl
 
 import (
+	"fmt"
 	"math"
 	"sync/atomic"
 
@@ -88,3 +89,11 @@ func (g *goResultStruct) IsError() (isError bool) { return g.isError.Load() }
 
 // Remaining returns the number of goroutines that have yet to exit
 func (g *goResultStruct) Remaining() (remaining int) { return int(g.remaining.Load()) }
+
+func (g *goResultStruct) String() (s string) {
+	return fmt.Sprintf("goResult_remain:%d_ch:%d(%d)_isError:%t",
+		g.remaining.Load(),
+		len(g.goResultChan), cap(g.goResultChan),
+		g.IsError(),
+	)
+}

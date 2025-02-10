@@ -125,7 +125,7 @@ func ErrpString(errp *error) (s string) {
 
 // LongShort picks output format
 //   - no error: “OK”
-//   - no panic: error-message at runtime.gopanic:26
+//   - no panic: “error-message at runtime.gopanic:26”
 //   - panic: long format with all stack traces and values
 //   - associated errors are always printed
 func LongShort(err error) (message string) {

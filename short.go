@@ -57,11 +57,18 @@ func timeAndFormat(tim []time.Time, hour, minute string) (s string) {
 
 	// pick layout using Zone.offset
 	var format string
-	if _, offsetS := t.Zone(); offsetS%offsetHourDivisor != 0 {
+	if !IsEvenHourTimeZone(t) {
 		format = minute
 	} else {
 		format = hour
 	}
 
 	return t.Format(format)
+}
+
+// IsEvenHourTimeZone returns true if at time t with t’s assigned timezone,
+// that time zone is even hours off UTC
+func IsEvenHourTimeZone(t time.Time) (isEven bool) {
+	var _ /*name*/, offsetS = t.Zone()
+	return offsetS%offsetHourDivisor == 0
 }

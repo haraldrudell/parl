@@ -68,19 +68,19 @@ The second part is a numeric port number.
 The empty string "" represents "localhost:5037".
 If the port part is missing, such as "localhost" it implies port 5037.
 If the host part is missing, it implies "localhost".
-Note that locahost is valid both for IPv4 and IPv6.
+Note that localhost is valid both for IPv4 and IPv6.
 */
 type AdbSocketAddress string
 
 // AndroidSerial uniquely identities an Android device.
 //   - has .String and .IsValid, is Ordered
-//   - typically a string of a dozen or so 8-bit chanacters consisting of
+//   - typically a string of a dozen or so 8-bit characters consisting of
 //     lower and upper case a-zA-Z0-9
 type AndroidSerial string
 
 // Adbetter is a factory instance for connections featuring Adbette
-// context is used for terminating a connection attempt.
-// context is not retained in the connection.
+//   - context is used for terminating a connection attempt.
+//   - context is not retained in the connection.
 type Adbetter interface {
 	NewConnection(address AdbSocketAddress, ctx context.Context) (conn Adbette, err error)
 }

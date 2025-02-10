@@ -2,12 +2,15 @@
 // ISC License
 module github.com/haraldrudell/parl
 
-go 1.21
-
-toolchain go1.21.3
+// minimum version of Go required to
+// compile packages in this module
+//	- go1.22.0 supported 240206–2025-02
+//	- oldest supported Go release since 240813
+go 1.22.0
 
 require (
-	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
-	golang.org/x/sys v0.21.0
-	golang.org/x/text v0.16.0
+	github.com/google/uuid v1.6.0
+	golang.org/x/exp v0.0.0-20250207012021-f9890c6ad9f3
+	golang.org/x/sys v0.30.0
+	golang.org/x/text v0.22.0
 )

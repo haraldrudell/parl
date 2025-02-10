@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pmaps2 contains resusable map types for other parl packages.
 package pmaps2
 
 import "golang.org/x/exp/maps"
@@ -18,10 +17,43 @@ import "golang.org/x/exp/maps"
 //   - — zero-value delete can be implemented by consumer
 //   - — range-Clear with zero-value write can be implemented by consumer
 //   - — order methods List and Keys can be implemented by consumer
+//   - all public methods intended to be public to final consumer
 type Map[K comparable, V any] struct{ goMap map[K]V }
 
 // NewMap returns a reusable Go Map object
 func NewMap[K comparable, V any]() (mapping *Map[K, V]) { return &Map[K, V]{goMap: make(map[K]V)} }
+
+// NewMap2 is field initializer with optional Go map pointer
+//   - fieldp: saves one allocation on field initialization
+//   - m: saves one allocation on clone: is the Go map to use
+//   - goMap saves allocation on clone to field: is pointer to internal Go map
+func NewMap2[K comparable, V any](fieldp *Map[K, V], m map[K]V, goMap ...**map[K]V) (mapping *Map[K, V]) {
+
+	// mapping points to result
+	if fieldp != nil {
+		mapping = fieldp
+	} else {
+		mapping = &Map[K, V]{}
+	}
+
+	// initialize Go map field
+	if m != nil {
+		mapping.goMap = m
+	} else {
+		mapping.goMap = make(map[K]V)
+	}
+
+	// check for Go map pointer requested
+	var gm **map[K]V
+	if len(goMap) == 0 {
+		return
+	} else if gm = goMap[0]; gm == nil {
+		return
+	}
+	*gm = &mapping.goMap
+
+	return
+}
 
 // Get returns the value mapped by key or the V zero-value otherwise
 //   - ok: true if a mapping was found
@@ -65,16 +97,18 @@ func (m *Map[K, V]) Clear() { m.goMap = make(map[K]V) }
 //   - mp is an optional pointer to an already allocated map instance
 //     to be used and appended to
 //   - delegates to [maps.Clone] ranging all keys
-func (m *Map[K, V]) Clone(mp ...*Map[K, V]) (clone *Map[K, V]) {
+func (m *Map[K, V]) Clone(goMap ...*map[K]V) (clone *Map[K, V]) {
 
-	// clone should point to a destination instance
-	if len(mp) > 0 {
-		clone = mp[0]
-	}
-	if clone == nil {
-		clone = &Map[K, V]{}
+	// clone to Go map case
+	if len(goMap) > 0 {
+		if gm := goMap[0]; gm != nil {
+			*gm = maps.Clone(m.goMap)
+			return
+		}
 	}
 
+	// regular clone case
+	clone = &Map[K, V]{}
 	clone.goMap = maps.Clone(m.goMap)
 
 	return

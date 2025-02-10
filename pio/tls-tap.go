@@ -26,13 +26,13 @@ type TLSTap struct {
 //   - if any of readWriter, reads or writes implements io.Close, they are closed on socketTap.Close
 //   - the consumer may invoke socketTap.Close to ensure reads and writes are closed
 //   - errors in reads or writes do not affect the socketTap consumer
-func NewTLSTap(conn *tls.Conn, readsWriter, writesWriter io.Writer, addError parl.AddError) (socketTap io.ReadWriter) {
+func NewTLSTap(conn *tls.Conn, readsWriter, writesWriter io.Writer, errorSink parl.ErrorSink1) (socketTap io.ReadWriter) {
 	if conn == nil {
 		panic(parl.NilError("conn"))
 	}
 	socketTap = &TLSTap{
 		Conn: conn,
-		tap:  NewTap(readsWriter, writesWriter, addError),
+		tap:  NewTap(readsWriter, writesWriter, errorSink),
 	}
 	return
 }

@@ -20,7 +20,7 @@ type DirIterator struct {
 	iters.BaseIterator[ResultEntry]
 }
 
-// NewIterator returns an iterator for a file-system entry and any child entries if directory
+// NewDirIterator returns an iterator for directories
 //   - path is the initial path for the file-system walk.
 //     it may be relative or absolute, contain symlinks and
 //     point to a file, directory or special file

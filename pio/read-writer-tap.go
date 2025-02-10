@@ -26,13 +26,13 @@ type ReadWriterTap struct {
 //   - if any of readWriter, reads or writes implements io.Close, they are closed on socketTap.Close
 //   - the consumer may invoke socketTap.Close to ensure reads and writes are closed
 //   - errors in reads or writes do not affect the socketTap consumer
-func NewReadWriterTap(readWriter io.ReadWriter, reads, writes io.Writer, errs func(err error)) (socketTap io.ReadWriter) {
+func NewReadWriterTap(readWriter io.ReadWriter, reads, writes io.Writer, errorSink parl.ErrorSink1) (socketTap io.ReadWriter) {
 	if readWriter == nil {
 		panic(parl.NilError("readWriter"))
 	}
 	socketTap = &ReadWriterTap{
 		ReadWriter: readWriter,
-		t:          NewTap(reads, writes, errs),
+		t:          NewTap(reads, writes, errorSink),
 	}
 	return
 }

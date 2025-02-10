@@ -42,9 +42,11 @@ type ExitErrorData struct {
 // ExitErrorData implements error
 var _ error = &ExitErrorData{}
 
-// NewExitErrorData returns parse-once data on a possible ExitError
-//   - if ExitErr field is nil or IsExitError method returns false, err does not contain an ExitError
-//   - the returned value is an error implementation
+// NewExitErrorData returns once-parsed data on a possible ExitError
+//   - err: an error chain possibly containing an ExitError from an exec.Cmd process
+//   - stderr: optional byte stream captured from process’ standard error
+//   - exitErrorData: always non-nil and an error implementation
+//   - if exitErrorData.ExitErr field is nil or exitErrorData.IsExitError() method returns false, err does not contain an ExitError
 func NewExitErrorData(err error, stderr ...[]byte) (exitErrorData *ExitErrorData) {
 	var e = ExitErrorData{Err: err}
 	if errors.As(err, &e.ExitErr); e.ExitErr != nil {

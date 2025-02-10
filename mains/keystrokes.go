@@ -40,7 +40,7 @@ type Keystrokes struct {
 
 // NewKeystrokes returns an object reading lines from standard input
 //   - [Keystrokes.Launch] launches a thread reading from [os.Stdin]
-//   - [Keystrokes.Ch] provides a channel sending strings on each return key-press
+//   - [Keystrokes.StringSource] provides a channel sending strings on each return key-press
 //   - [Keystrokes.CloseNow] closes the channel discarding buffered characters
 //   - Ch also closes on Stdin closing or thread runtime error
 //
@@ -51,7 +51,17 @@ type Keystrokes struct {
 //	var keystrokes = NewKeystrokes()
 //	defer keystrokes.Launch().CloseNow(&err)
 //	for line := range keystrokes.Ch() {
-func NewKeystrokes() (keystrokes *Keystrokes) { return &Keystrokes{} }
+func NewKeystrokes(fieldp ...*Keystrokes) (keystrokes *Keystrokes) {
+	if len(fieldp) > 0 {
+		keystrokes = fieldp[0]
+	}
+	if keystrokes != nil {
+		*keystrokes = Keystrokes{}
+	} else {
+		keystrokes = &Keystrokes{}
+	}
+	return
+}
 
 // Launch starts reading stdin for keystrokes
 //   - can only be invoked once per process or panic

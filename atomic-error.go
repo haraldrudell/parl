@@ -12,7 +12,7 @@ import (
 )
 
 // AtomicError is a thread-safe container for a single error value
-//   - [AtomicError.AddError] updates the errorvalue
+//   - [AtomicError.AddError] sets or appends to the error value
 //   - [AtomicError.AddErrorSwap] conditionally updates the error value
 //   - [AtomicError.Error] returns the current error value
 //   - AtomicError is not closable and holds only one updatable value

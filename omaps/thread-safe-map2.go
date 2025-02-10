@@ -6,6 +6,7 @@ ISC License
 package omaps
 
 import (
+	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pmaps/pmaps2"
 )
@@ -15,13 +16,27 @@ import (
 //   - native Go map functions: Get Put Delete Length Range
 //   - convenience methods: clone Clear
 //   - order methods: List
+//   - need new-function with fieldp to save one allocation for enclosing map
+//   - need clone with fieldp for enclosing clone
 type threadSafeMap[K comparable, V any] struct {
 	m2 pmaps2.ThreadSafeMap[K, V]
 }
 
 // newThreadSafeMap returns a thread-safe Go map
-func newThreadSafeMap[K comparable, V any]() (m *threadSafeMap[K, V]) {
-	return &threadSafeMap[K, V]{m2: *pmaps2.NewThreadSafeMap[K, V]()}
+func newThreadSafeMap[K comparable, V any](fieldp ...*threadSafeMap[K, V]) (m *threadSafeMap[K, V]) {
+
+	// set m
+	if len(fieldp) > 0 {
+		m = fieldp[0]
+	}
+	if m == nil {
+		m = &threadSafeMap[K, V]{}
+	}
+
+	// initialize all fields
+	pmaps2.NewThreadSafeMap[K, V](&m.m2)
+
+	return
 }
 
 // GetOrCreate returns an item from the map if it exists otherwise creates it.
@@ -42,7 +57,7 @@ func (m *threadSafeMap[K, V]) GetOrCreate(
 	newV func() (value *V),
 	makeV func() (value V),
 ) (value V, ok bool) {
-	defer m.m2.Lock()()
+	defer m.m2.Lock().Unlock()
 
 	// try existing mapping
 	if value, ok = m.m2.Get(key); ok {
@@ -72,42 +87,48 @@ func (m *threadSafeMap[K, V]) GetOrCreate(
 	return // no key, no newV or makeV: nil return
 }
 
-func (m *threadSafeMap[K, V]) clone() (clone *threadSafeMap[K, V]) {
-	return &threadSafeMap[K, V]{m2: *m.m2.Clone()}
-}
+// clone is package-private helper method providing access to encapsulated Clone method
+//   - tsm fieldp saves one allocation
+func (m *threadSafeMap[K, V]) clone(tsm *threadSafeMap[K, V]) { m.m2.Clone(&tsm.m2) }
+
+// cloneToGomap is package-private helper providing access to
+// encapsulated thread-safe map
+//   - goMap fieldp saves one allocation
+func (m *threadSafeMap[K, V]) cloneToGomap(goMap *map[K]V) { m.m2.CloneToGoMap(goMap) }
+
 func (m *threadSafeMap[K, V]) Get(key K) (value V, ok bool) {
-	defer m.m2.RLock()()
+	defer m.m2.RLock().RUnlock()
 
 	return m.m2.Get(key)
 }
 
 func (m *threadSafeMap[K, V]) Put(key K, value V) {
-	defer m.m2.Lock()()
+	defer m.m2.Lock().Unlock()
 
 	m.m2.Put(key, value)
 }
 
-func (m *threadSafeMap[K, V]) Delete(key K, useZeroValue ...bool) {
-	defer m.m2.Lock()()
+func (m *threadSafeMap[K, V]) Delete(key K, useZeroValue ...parli.DeleteMethod) {
+	defer m.m2.Lock().Unlock()
 
 	m.m2.Delete(key, useZeroValue...)
 }
 
 func (m *threadSafeMap[K, V]) Length() (length int) {
-	defer m.m2.RLock()()
+	defer m.m2.RLock().RUnlock()
 
 	return m.m2.Length()
 }
 
 func (m *threadSafeMap[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bool)) {
-	defer m.m2.RLock()()
+	defer m.m2.RLock().RUnlock()
 
 	m.m2.Range(rangeFunc)
 }
 
 // Clear empties the map
-func (m *threadSafeMap[K, V]) Clear(useRange ...bool) {
-	defer m.m2.Lock()()
+func (m *threadSafeMap[K, V]) Clear(useRange ...parli.ClearMethod) {
+	defer m.m2.Lock().Unlock()
 
 	m.m2.Clear(useRange...)
 }
@@ -121,7 +142,7 @@ func (m *threadSafeMap[K, V]) List(n ...int) (list []V) {
 	if len(n) > 0 {
 		n0 = n[0]
 	}
-	defer m.m2.RLock()()
+	defer m.m2.RLock().RUnlock()
 
 	return m.m2.List(n0)
 }

@@ -6,6 +6,8 @@ ISC License
 package ptime
 
 import (
+	"fmt"
+	"math"
 	"strconv"
 	"time"
 )
@@ -37,12 +39,56 @@ func Duration(d time.Duration) (printableDuration string) {
 	} else if absValue < 10*time.Hour {
 		return d.Truncate(time.Second).String() // min 5m14s
 	} else if absValue < 24*time.Hour {
-		d = d.Truncate(time.Minute) // h 17h27m
-		return strconv.Itoa(int(d.Hours())) + "h" + strconv.Itoa(int(d.Minutes())%60) + "m"
+		// hours and minutes, -24 < d < +24 hours
+		var hours = int(d.Hours())
+		// minutes 0–59 positive when d negative
+		var mins = int(math.Abs(d.Minutes())) % 60
+		return strconv.Itoa(hours) + "h" + strconv.Itoa(mins) + "m"
 	} else if absValue < 240*time.Hour {
-		d = d.Truncate(time.Hour) // days 3d15h
-		return strconv.Itoa(int(d.Hours())/24) + "d" + strconv.Itoa(int(d.Hours())%24) + "h"
+		// -240 < hours < 240
+		var hours0 = int(d.Hours())
+		// -10 < days < 10
+		var days = hours0 / 24
+		var hours = hours0 % 24
+		if hours < 0 {
+			hours = -hours
+		}
+		return strconv.Itoa(days) + "d" + strconv.Itoa(hours) + "h"
 	}
 	d = d.Truncate(24 * time.Hour)               // 10+ days
 	return strconv.Itoa(int(d.Hours())/24) + "d" // months 36d years 3636d
+}
+
+func DurationHMS(d time.Duration) (printableHMS string) {
+
+	// sign
+	var sign string
+	var dPos time.Duration
+	if d < 0 {
+		sign = "-"
+		dPos = -d
+	} else {
+		dPos = d
+	}
+
+	// hours digits
+	var hoursS string
+	var hours = uint64(dPos / time.Hour)
+	if hours < 10 {
+		hoursS = fmt.Sprintf("%02d", hours)
+	} else {
+		hoursS = fmt.Sprintf("%d", hours)
+	}
+
+	var mins = int(dPos / time.Minute % 60)
+	var seconds = int(dPos / time.Second % 60)
+
+	printableHMS = fmt.Sprintf("%s%s:%02d:%02d",
+		sign,
+		hoursS,
+		mins,
+		seconds,
+	)
+
+	return
 }

@@ -39,17 +39,19 @@ const (
 type YamlOption bool
 
 // BaseOptionsType is the type that holds mains’ effective option values
+//   - -yamlFile -yamlKey -verbose -debug -silent -version -no-yaml
 type BaseOptionsType = struct {
 	YamlFile, YamlKey, Verbosity   string
 	Debug, Silent, Version, DoYaml bool
 }
 
 // BaseOptions is the value that holds mains’ effective option values
+//   - -yamlFile -yamlKey -verbose -debug -silent -version -no-yaml
 var BaseOptions BaseOptionsType
 
 // BaseOptionData returns basic options for mains
-//   - verbose debug silent version
-//   - if yaml == YamlYes: yamlFile yamlKey
+//   - -verbose -debug -silent -version
+//   - if yaml == YamlYes: -yamlFile -yamlKey
 func BaseOptionData(program string, yaml YamlOption) (optionData []pflags.OptionData) {
 
 	var nonYamlOptions = []pflags.OptionData{

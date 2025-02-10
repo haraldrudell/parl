@@ -32,7 +32,8 @@ const (
 	openFlagsLog = os.O_CREATE | os.O_APPEND | os.O_WRONLY |
 		// each write commits data to the underlying hardware prior to return
 		os.O_SYNC
-	FilePermUw os.FileMode = 0o200 // -w- --- ---
+	openFlagsExist             = os.O_APPEND | os.O_WRONLY
+	FilePermUw     os.FileMode = 0o200 // -w- --- ---
 )
 
 // AppendToFile is [os.Open] for a write-only file that is created or appended to
@@ -44,8 +45,63 @@ const (
 //   - — [os.Create]: opens or creates a file for reading and writing that is truncated if it exists
 //   - — [pos.NewFile]: write-only file that must not exist
 //   - — [pos.LogFile]: a created or appended to write-only file committing on every write
-func AppendToFile(filename string) (osFile *os.File, err error) {
-	if osFile, err = os.OpenFile(filename, openFlagsCreateOrAppend, FilePermUrw); err != nil {
+func AppendToFile(filename string, perms ...fs.FileMode) (osFile *os.File, err error) {
+	var perm fs.FileMode
+	if len(perms) > 0 {
+		perm = perms[0]
+	} else {
+		perm = FilePermUrw
+	}
+
+	if osFile, err = os.OpenFile(filename, openFlagsCreateOrAppend, perm); err != nil {
+		err = perrors.ErrorfPF("OpenFile: %w", err)
+	}
+
+	return
+}
+
+// AppenFile appends data to write-only file
+//   - thread-safe if not on nfs
+//   - default perms on create: urw
+//   - similar to func os.WriteFile(name string, data []byte, perm os.FileMode) error
+func AppendFile(filename string, data []byte, perms ...fs.FileMode) (err error) {
+	var osFile *os.File
+	if osFile, err = AppendToFile(filename, perms...); err != nil {
+		return
+	} else if _ /*n*/, err = osFile.Write(data); perrors.IsPF(&err, "File.Write %w", err) {
+		return
+	}
+	parl.Close(osFile, &err)
+
+	return
+}
+
+// AppenFile appends data to write-only file
+//   - s: typically ending with newline
+//   - thread-safe if not on nfs
+//   - default perms on create: urw
+//   - similar to func os.WriteFile(name string, data []byte, perm os.FileMode) error
+func AppendFileString(filename, s string, perms ...fs.FileMode) (err error) {
+	var osFile *os.File
+	if osFile, err = AppendToFile(filename, perms...); err != nil {
+		return
+	} else if _ /*n*/, err = osFile.WriteString(s); perrors.IsPF(&err, "File.Write %w", err) {
+		return
+	}
+	parl.Close(osFile, &err)
+
+	return
+}
+
+// NewFile is [os.Open] for a write-only file that must exist
+//   - if file is not on NFS, append is thread-safe
+//   - other functions:
+//   - — [os.Open]: opens an existing file for reading only
+//   - — [os.Create]: opens or creates a file for reading and writing that is truncated if it exists
+//   - — [pos.AppendToFile]: write-only file that is created or appended to
+//   - — [pos.LogFile]: a created or appended to write-only file committing on every write
+func AppendExisting(filename string) (osFile *os.File, err error) {
+	if osFile, err = os.OpenFile(filename, openFlagsExist, FilePermUrw); err != nil {
 		err = perrors.ErrorfPF("OpenFile: %w", err)
 	}
 

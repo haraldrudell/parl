@@ -17,3 +17,6 @@ package parl
 //
 // and compatible functions
 type PrintfFunc func(format string, a ...any)
+
+// Logger is a generic PrintfFunc value
+type Logger interface{ Log(format string, a ...any) }

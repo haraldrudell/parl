@@ -19,28 +19,41 @@ const (
 )
 
 // NextHop describes a route target
+//   - NextHop describes how a packet is to be routed from this host
+//     towards its final destination
+//   - NextHop is typically obtained by looking up an IP address in
+//     a routing table, ie. a collection of routing prefixes like “127/8” “::1”
+//   - NexHop is either:
+//   - — a local address for the host itself assigned to a local network interface
+//   - — a subnet address for a host directly reachable via a local network interface
+//   - — a gateway address on a subnet directly reachable via a local network interface
 type NextHop struct {
-	/*
-		if NextHop is an address on the local host or on a local subnet,
-		Gateway is nil
-		LinkAddr describes the local interface
-		Src is the address on that local interface
-
-		If Nexthop is remote, beyond any local subnet,
-		Gateway is an IP on a local subnet
-		LinkAddr describes the local interface for that subnet
-		Src is the address on that local interface
-	*/
-	Gateway  netip.Addr
-	LinkAddr            // LinkAddr is the hosts’s network interface where to send packets
-	Src      netip.Addr // the source ip to use for originating packets on LinkAddr
-	nIPv6    int        // number of assigned IPv6 addresses, 0 if unknown
-	nIPv4    int        // number of assigned IPv6 addresses, 0 if unknown
+	// Gateway is set if a gateway is used to route beyond local subnets
+	//	- if NextHop is an address on the local host or on a local subnet:
+	//	- — Gateway is nil
+	//	- — LinkAddr describes the local interface
+	//	- — Src is the address on that local interface
+	//	- If Nexthop is remote, beyond any local subnet:
+	//	- — Gateway is an IP on a local subnet
+	//	- — LinkAddr describes the local interface for that subnet
+	//	- — Src is the address on that local interface
+	Gateway netip.Addr
+	// LinkAddr is the hosts’s network interface where to send packets
+	LinkAddr
+	// Src is the source ip to use for originating packets on LinkAddr
+	Src netip.Addr
+	// nIPv6 is the number of assigned IPv6 addresses, 0 if unknown
+	nIPv6 int
+	// nIPv4 is the number of assigned IPv6 addresses, 0 if unknown
+	nIPv4 int
 }
 
 // NewNextHop assembles a route destination
+//   - gateway: optional gateway IP
+//   - linkAddr: optional local network interface
+//   - src: optional source IP to use on linkAddr
 func NewNextHop(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr) (nextHop *NextHop) {
-	next0 := NextHop{}
+	var next0 = NextHop{}
 	if gateway.IsValid() {
 		next0.Gateway = gateway
 	}
@@ -55,54 +68,60 @@ func NewNextHop(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr) (nextHop
 }
 
 // NewNextHopCounts returns NextHop with current IP address counts
+//   - gateway: optional gateway IP
+//   - linkAddr: optional local network interface
+//   - src: optional source IP to use on linkAddr
+//   - useNameCache missing: name cache is not used
+//   - useNameCache [pnet.Update]: name cache is used and first updated
+//   - useNameCache [pnet.NoUpdate]: name cache is used without update
+//     -
+//   - the name cache contains local network interface names for interfaces that are no longer up
 //   - if input LinkAddr does not have interface name, interface name is added to output nextHop
 //   - 6in4 are converted to IPv4
-func NewNextHopCounts(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr,
+func NewNextHopCounts(
+	gateway netip.Addr,
+	linkAddr *LinkAddr,
+	src netip.Addr,
 	useNameCache ...NameCacher,
 ) (nextHop *NextHop, err error) {
-	var doCache = NoCache
+
+	// default: no cache used
+	var cacheParameter = NoCache
 	if len(useNameCache) > 0 {
-		doCache = useNameCache[0]
+		cacheParameter = useNameCache[0]
 	}
 
 	// tentative NextHop value based on input arguments
-	var nh = NewNextHop(gateway, linkAddr, src)
+	var nextHop0 = NewNextHop(gateway, linkAddr, src)
 
-	// interface from LinkAddr is required to get IP addresses assigned to the network interface
+	// obtain network interface from provided LinkAddr
+	//	- searched using LinkAddr index, name then mac
+	//	- result contains interface index, name and IP address assignments
 	var netInterface *net.Interface
+	// network interface name obtained via LinkAddr index and cache
 	var interfaceName string
-	var unknownInterface bool
-	// obtain interface using index, name or mac
-	if netInterface, unknownInterface, err = nh.LinkAddr.Interface(); err != nil {
-		// for netlink packets of deleted interface, the index is already invalid
-		//	- use the cache to obtain the interface name
-		if unknownInterface && doCache != NoCache && linkAddr.IfIndex.IsValid() {
-			if interfaceName, err = networkInterfaceNameCache.CachedName(linkAddr.IfIndex, doCache); err == nil {
-				if nh.LinkAddr.Name == "" && interfaceName != "" {
-					nh.LinkAddr.Name = interfaceName // update interface name if not already set
-				}
-			}
+	if netInterface, interfaceName, err = getInterface(&nextHop0.LinkAddr, cacheParameter); err != nil {
+		return // error in LinkAddr.Interface or CachedName
+	} else if netInterface == nil {
+		if nextHop0.LinkAddr.Name == "" && interfaceName != "" {
+			nextHop0.LinkAddr.Name = interfaceName // update interface name if not already set
 		}
-		if err != nil {
-			return // error in LinkAddr.Interface or CachedName
-		}
-	}
-	if netInterface == nil {
-		nextHop = nh
+		nextHop = nextHop0
 		return // Linkaddr interface did not exist
 	}
+	// netInterface is present
 
 	// update nh.Linkaddr from netInterface
-	if !nh.LinkAddr.IfIndex.IsValid() {
-		if nh.LinkAddr.IfIndex, err = NewIfIndexInt(netInterface.Index); err != nil {
+	if !nextHop0.LinkAddr.IfIndex.IsValid() {
+		if nextHop0.LinkAddr.IfIndex, err = NewIfIndexInt(netInterface.Index); err != nil {
 			return
 		}
 	}
-	if nh.LinkAddr.Name == "" {
-		nh.LinkAddr.Name = netInterface.Name // update interface name if not already set
+	if nextHop0.LinkAddr.Name == "" {
+		nextHop0.LinkAddr.Name = netInterface.Name // update interface name if not already set
 	}
-	if len(nh.LinkAddr.HardwareAddr) == 0 {
-		nh.LinkAddr.HardwareAddr = netInterface.HardwareAddr
+	if len(nextHop0.LinkAddr.HardwareAddr) == 0 {
+		nextHop0.LinkAddr.HardwareAddr = netInterface.HardwareAddr
 	}
 
 	// get IP address counts from interface
@@ -110,8 +129,8 @@ func NewNextHopCounts(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr,
 	if i4, i6, err = InterfaceAddrs(netInterface); err != nil {
 		return
 	}
-	nh.nIPv4 = len(i4)
-	nh.nIPv6 = len(i6)
+	nextHop0.nIPv4 = len(i4)
+	nextHop0.nIPv6 = len(i6)
 	// macOS lo0 has address:
 	// for i := 0; i < len(i6); {
 	// 	addr := i6[i].Addr()
@@ -123,7 +142,36 @@ func NewNextHopCounts(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr,
 	// 	}
 	// 	i++
 	// }
-	nextHop = nh
+	nextHop = nextHop0
+	return
+}
+
+// getInterface gets netInterface or interfaceName for linkAddr
+//   - searched using LinkAddr index, name then mac
+//   - if interface not found but index valid and cacheParameter not NoCache:
+//   - find interface name using cache
+func getInterface(linkAddr *LinkAddr, cacheParameter NameCacher) (netInterface *net.Interface, interfaceName string, err error) {
+
+	// obtain interface using index, name or mac
+	var unknownInterface bool
+	if netInterface, unknownInterface, err = linkAddr.Interface(); err == nil {
+		return // interface obtained
+	} else if !unknownInterface || cacheParameter == NoCache || !linkAddr.IfIndex.IsValid() {
+		return // unfixable error return
+	}
+	// unknown interface but ifindex is valid and use cache
+
+	// check the cache of interfaces that were once up
+	// for netlink packets of deleted interface, the index is already invalid
+	//	- use the cache mapping LinkAddr index to obtain the interface name
+	switch cacheParameter {
+	case Update:
+		interfaceName, err = networkInterfaceNameCache.CachedName(linkAddr.IfIndex)
+	case NoUpdate:
+		interfaceName = networkInterfaceNameCache.CachedNameNoUpdate(linkAddr.IfIndex)
+		err = nil
+	}
+
 	return
 }
 
@@ -170,10 +218,6 @@ func (n *NextHop) IsZeroValue() (isZeroValue bool) {
 //   - name can be returned empty
 //   - name of Linkaddr, then interface from index, name, mac
 func (n *NextHop) Name(useNameCache ...NameCacher) (name string, err error) {
-	var doCache = NoCache
-	if len(useNameCache) > 0 {
-		doCache = useNameCache[0]
-	}
 
 	// is name already present?
 	if name = n.LinkAddr.Name; name != "" {
@@ -216,6 +260,12 @@ func (n *NextHop) Name(useNameCache ...NameCacher) (name string, err error) {
 		return // interface name from zone
 	}
 
+	// cache parameter default NoCache
+	var doCache = NoCache
+	if len(useNameCache) > 0 {
+		doCache = useNameCache[0]
+	}
+
 	// should cache be used?
 	if doCache == NoCache {
 		return
@@ -238,9 +288,15 @@ func (n *NextHop) Name(useNameCache ...NameCacher) (name string, err error) {
 
 	// search cache
 	for _, ifi := range ixs {
-		if name, err = networkInterfaceNameCache.CachedName(ifi, doCache); err != nil {
-			return
-		} else if name != "" {
+		switch doCache {
+		case NoUpdate:
+			name = networkInterfaceNameCache.CachedNameNoUpdate(ifi)
+		case Update:
+			if name, err = networkInterfaceNameCache.CachedName(ifi); err != nil {
+				return
+			}
+		}
+		if name != "" {
 			return
 		}
 	}
@@ -353,6 +409,7 @@ func (n *NextHop) ifCidr(srcIP netip.Addr, is4 bool) (cidr netip.Prefix, err err
 	return
 }
 
+// Dump displays all fields of NextHop for troubleshooting
 func (n *NextHop) Dump() (s string) {
 	return parl.Sprintf("nextHop_gwIP_%s_%s_src_%s_4:%d_6:%d",
 		n.Gateway.String(),

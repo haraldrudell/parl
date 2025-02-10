@@ -124,6 +124,12 @@ func (s *Https) ShutdownCh() (ch parl.AwaitableCh) { return s.wg.Ch() }
 type HandlerFunc func(http.ResponseWriter, *http.Request)
 
 // HandleFunc registers a URL-handler for the server
+//   - pattern described by [http.ServeMux]: [METHOD ][HOST]/[PATH]
+//   - — pattern empty string or invalid is panic
+//   - — subsequent identical pattern is panic
+//   - handler is func(http.ResponseWriter, *http.Request)
+//   - — handler nil is panic
+//   - — panic in handler is logged by http package
 func (s *Https) HandleFunc(pattern string, handler HandlerFunc) {
 	s.serveMux.HandleFunc(pattern, handler)
 }
@@ -254,6 +260,8 @@ func (s *Https) serve(listener net.Listener) {
 //   - — default: 3 s
 //   - err: only the fiurst invocation receive errors
 func (s *Https) Shutdown(ctx ...context.Context) (err error) {
+
+	// first thread closes server, subsequent threads wait for close
 	if isWinner, done := s.shutdownOnce.IsWinner(); !isWinner {
 		return
 	} else {
@@ -261,6 +269,8 @@ func (s *Https) Shutdown(ctx ...context.Context) (err error) {
 		defer s.closeErrsOn1()
 		defer done.Done()
 	}
+
+	// context with max wait time for request completion
 	var shutdownCtx context.Context
 	if len(ctx) > 0 {
 		shutdownCtx = ctx[0]
@@ -271,12 +281,16 @@ func (s *Https) Shutdown(ctx ...context.Context) (err error) {
 		shutdownCtx, cancelFunc = context.WithTimeout(context.Background(), httpShutdownTimeout)
 		defer cancelFunc()
 	}
+
+	// attempt to shut down server gracefully
 	if err = s.Server.Shutdown(shutdownCtx); err == nil {
 		return // good graceful shutdown return
 	} else if err != context.DeadlineExceeded && err != context.Canceled {
 		err = perrors.ErrorfPF("http.Shutdown %w", err)
 		return // bad graceful shutdown return
 	}
+
+	// forced shut down
 	if err = s.Close(); err != nil {
 		err = perrors.ErrorfPF("http.Close %w", err)
 	}

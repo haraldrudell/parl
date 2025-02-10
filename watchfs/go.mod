@@ -2,18 +2,20 @@
 // ISC License
 module github.com/haraldrudell/parl/watchfs
 
-go 1.21
+go 1.22.0
+
+toolchain go1.23.2
 
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/fsnotify/fsnotify v1.7.0
-	github.com/google/uuid v1.4.0
-	github.com/haraldrudell/parl v0.4.187
+	github.com/fsnotify/fsnotify v1.8.0
+	github.com/google/uuid v1.6.0
+	github.com/haraldrudell/parl v0.4.188
 )
 
 require (
-	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8 // indirect
-	golang.org/x/sys v0.21.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/exp v0.0.0-20250207012021-f9890c6ad9f3 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 )

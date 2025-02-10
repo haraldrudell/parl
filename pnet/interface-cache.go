@@ -7,80 +7,37 @@ package pnet
 
 import (
 	"net"
-	"sync"
-	"sync/atomic"
 
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 )
 
-const (
-	NoCache  NameCacher = iota // name cache should not be used in the api call
-	Update                     // use name cache and update the cache first
-	NoUpdate                   // use name cache without update. Mechanic for ongoing name cache update is required
-)
-
-// NameCacher contaisn instructions for interface-name cache read: [NoCache] [Update] [NoUpdate]
-type NameCacher uint8
-
 // InterfaceCache is a cache mapping per-boot stable network interface index #1 to name "lo0". Thread-Safe
 type InterfaceCache struct {
-	updateLock sync.Mutex
-	m          atomic.Pointer[map[IfIndex]string] // write behind lock
+	// makes m thread-safe
+	updateLock parl.Mutex
+	// map behind lock
+	m map[IfIndex]string
 }
 
-// NewInterfaceCache returns a cache mapiing network-interfac eindex to name. Thread-Safe
-func NewInterfaceCache() (interfaceCache *InterfaceCache) {
-	return &InterfaceCache{}
-}
+// NewInterfaceCache returns a cache mapping network-interface index to name
+func NewInterfaceCache() (interfaceCache *InterfaceCache) { return &InterfaceCache{} }
 
-// Init loads the cache, an opeation that may fail. Funtional chaining. Thread-Safe
+// Init loads the cache, an operation that may fail. Funtional chaining. Thread-Safe
+//   - used for initializing a static-variable cache
 func (i *InterfaceCache) Init() (i0 *InterfaceCache) {
-	if _, err := i.Update(); err != nil {
+	if _, err := i.CachedName(); err != nil {
 		panic(err)
 	}
 	return i
 }
 
-// CachedName retrieves a name by index with optional cache update. Thread-Safe
-//   - default is to update
+// CachedName retrieves a name by index after cache update
+//   - ifIndex: optional query to return in name after cache update
 //   - unknown index returns empty string
-func (i *InterfaceCache) CachedName(ifIndex IfIndex, noUpdate ...NameCacher) (name string, err error) {
-	var cacher = Update
-	if len(noUpdate) > 0 {
-		cacher = noUpdate[0]
-	}
-
-	if cacher != Update {
-		name = i.CachedNameNoUpdate(ifIndex)
-		return
-	}
-
-	var m map[IfIndex]string
-	if m, err = i.Update(); err != nil {
-		return
-	}
-	name = m[ifIndex]
-
-	return
-}
-
-// CachedNameNoUpdate retrieves a name by index with no cache update. Thread-Safe
-func (i *InterfaceCache) CachedNameNoUpdate(ifIndex IfIndex) (name string) {
-	var m map[IfIndex]string
-	if mp := i.m.Load(); mp != nil {
-		m = *mp
-	} else {
-		panic(perrors.NewPF("map never updated"))
-	}
-
-	name = m[ifIndex]
-	return
-}
-
-// Update updates the cache by reading all system interfaces. Thread-Safe
-func (i *InterfaceCache) Update() (m map[IfIndex]string, err error) {
-	i.updateLock.Lock()
-	defer i.updateLock.Unlock()
+//   - Thread-Safe
+func (i *InterfaceCache) CachedName(ifIndex ...IfIndex) (name string, err error) {
+	defer i.updateLock.Lock().Unlock()
 
 	// get interfaces
 	var interfaces []net.Interface
@@ -88,54 +45,55 @@ func (i *InterfaceCache) Update() (m map[IfIndex]string, err error) {
 		return
 	}
 
-	// get map
-	if mp := i.m.Load(); mp != nil {
-		m = *mp
-	} else {
-		m = make(map[IfIndex]string)
+	// get map to use
+	if i.m == nil {
+		i.m = make(map[IfIndex]string, len(interfaces))
 	}
 
 	// populate map
 	for ix := 0; ix < len(interfaces); ix++ {
-		ifp := &interfaces[ix]
-		if ifp.Name == "" {
-			continue
+		var interface1 = &interfaces[ix]
+		var name1 = interface1.Name
+		var ifIndex1 IfIndex
+		if name == "" {
+			continue // nameless interface ignore
+		} else if ifIndex1, err = NewIfIndexInt(interface1.Index); err != nil {
+			return // interface without index error
+		} else if i.m[ifIndex1] != name1 {
+			// write only updated values
+			i.m[ifIndex1] = name1
 		}
-		var ifIndex IfIndex
-		if ifIndex, err = NewIfIndexInt(ifp.Index); err != nil {
-			return
-		}
-		m[ifIndex] = ifp.Name
 	}
 
-	// store atomically
-	i.m.Store(&m)
+	// carry out any provided query
+	if len(ifIndex) == 0 {
+		return // no provided query
+	}
+	name = i.m[ifIndex[0]]
 
 	return
 }
 
-// Map returns a copy of the current cache. Thread-Safe
-func (i *InterfaceCache) Map() (m map[IfIndex]string) {
-	i.updateLock.Lock()
-	defer i.updateLock.Unlock()
+// CachedNameNoUpdate retrieves a name by index with no cache update. Thread-Safe
+func (i *InterfaceCache) CachedNameNoUpdate(ifIndex IfIndex) (name string) {
+	defer i.updateLock.Lock().Unlock()
 
-	if mp := i.m.Load(); mp != nil {
-		m = make(map[IfIndex]string, len(*mp))
-		for k, v := range *mp {
-			m[k] = v
-		}
+	if i.m == nil {
+		panic(perrors.NewPF("map never updated"))
 	}
+	name = i.m[ifIndex]
+
 	return
 }
 
 // Map replaces the cache. Thread-Safe
 //   - do not read from or write to newMap after SetMap
+//   - used for testing
 func (i *InterfaceCache) SetMap(newMap map[IfIndex]string) (oldMap map[IfIndex]string) {
-	i.updateLock.Lock()
-	defer i.updateLock.Unlock()
+	defer i.updateLock.Lock().Unlock()
 
-	if mp := i.m.Swap(&newMap); mp != nil {
-		oldMap = *mp
-	}
+	oldMap = i.m
+	i.m = newMap
+
 	return
 }

@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 
 	"github.com/google/btree"
+	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"golang.org/x/exp/maps"
 )
 
 // InsOrderedMap is a mapping whose values are provided in insertion order
@@ -50,11 +50,46 @@ type mapValue[V any] struct {
 	insertionIndex uint64            // insertion order when mapping was created
 }
 
+func (v *mapValue[V]) Clone() (clone *mapValue[V]) {
+	clone = &mapValue[V]{
+		insertionIndex: v.insertionIndex,
+	}
+	clone.valuep.Store(v.valuep.Load())
+	return
+}
+
 // NewInsOrderedMap is a mapping whose keys are provided in insertion order.
-func NewInsOrderedMap[K comparable, V any]() (orderedMap *InsOrderedMap[K, V]) {
-	m := InsOrderedMap[K, V]{m: make(map[K]*mapValue[V])}
-	m.tree = btree.NewG(BtreeDegree, m.insOrderLess)
-	return &m
+func NewInsOrderedMap[K comparable, V any](fieldp ...*InsOrderedMap[K, V]) (orderedMap *InsOrderedMap[K, V]) {
+
+	// set orderedMap
+	if len(fieldp) > 0 {
+		orderedMap = fieldp[0]
+	}
+	if orderedMap == nil {
+		orderedMap = &InsOrderedMap[K, V]{}
+	}
+
+	// initialize all fields
+	orderedMap.m = make(map[K]*mapValue[V])
+	orderedMap.tree = btree.NewG(BtreeDegree, orderedMap.insOrderLess)
+	orderedMap.insertionIndex.Store(0)
+
+	return
+}
+
+func NewInsOrderedMapClone[K comparable, V any](fieldp *InsOrderedMap[K, V], cloneFrom *InsOrderedMap[K, V]) (m *InsOrderedMap[K, V]) {
+	parl.NilPanic("fieldp", fieldp)
+	parl.NilPanic("cloneFrom", cloneFrom)
+	m = fieldp
+
+	m.m = make(map[K]*mapValue[V], len(cloneFrom.m))
+	for k, v := range cloneFrom.m {
+		m.m[k] = v.Clone()
+	}
+	m.tree = cloneFrom.tree.Clone()
+	m.insertionIndex.Store(cloneFrom.insertionIndex.Load())
+
+	return
 }
 
 // Get returns the value mapped by key or the V zero-value otherwise
@@ -140,13 +175,27 @@ func (m *InsOrderedMap[K, V]) Clear() {
 }
 
 // Clone returns a shallow clone of the map
-func (m *InsOrderedMap[K, V]) Clone() (clone *InsOrderedMap[K, V]) {
-	c := InsOrderedMap[K, V]{
-		m:    maps.Clone(m.m),
-		tree: m.tree.Clone(),
+func (m *InsOrderedMap[K, V]) Clone(goMap ...*map[K]V) (clone *InsOrderedMap[K, V]) {
+
+	// clone to Go map case
+	if len(goMap) > 0 {
+		if gm := goMap[0]; gm != nil {
+			var g = make(map[K]V, len(m.m))
+			for k, v := range m.m {
+				g[k] = *v.valuep.Load()
+			}
+			*gm = g
+			return
+		}
 	}
-	clone.insertionIndex.Store(m.insertionIndex.Load())
-	return &c
+
+	// regular clone case
+	clone = &InsOrderedMap[K, V]{}
+	var fieldp = clone
+	var cloneFrom = m
+	NewInsOrderedMapClone(fieldp, cloneFrom)
+
+	return
 }
 
 // List provides the mapped values in order

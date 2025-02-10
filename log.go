@@ -31,7 +31,7 @@ func Out(format string, a ...interface{}) {
 
 // Outw always prints to standard out without ensuring terminating newline
 func Outw(format string, a ...interface{}) {
-	stderrLogger.Logw(format, a...)
+	stdoutLogger.Logw(format, a...)
 }
 
 // Log always prints to standard error

@@ -12,15 +12,22 @@ import (
 type testMapValue struct{ value int }
 
 func TestMap(t *testing.T) {
-	var v1 = testMapValue{1}
-	var v2 = testMapValue{2}
-	var v3 = testMapValue{3}
-	var expLength = 2
-	var zeroValue *testMapValue
+	const (
+		expLength = 2
+	)
+	var (
+		v1        = testMapValue{1}
+		v2        = testMapValue{2}
+		v3        = testMapValue{3}
+		zeroValue *testMapValue
+	)
 
-	var m, m2 Map[int, *testMapValue]
-	var value *testMapValue
-	var ok bool
+	var (
+		m     Map[int, *testMapValue]
+		m2    *Map[int, *testMapValue]
+		value *testMapValue
+		ok    bool
+	)
 
 	m = *NewMap[int, *testMapValue]()
 	m.Put(v1.value, &v1)
@@ -51,7 +58,7 @@ func TestMap(t *testing.T) {
 	}
 
 	// Clone should return duplicate
-	m.Clone(&m2)
+	m2 = m.Clone()
 	if m2.Length() != expLength {
 		t.Errorf("Length m2 %d exp %d", m2.Length(), expLength)
 	}

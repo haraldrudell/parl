@@ -6,6 +6,8 @@ ISC License
 package parl
 
 import (
+	"fmt"
+
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -119,4 +121,9 @@ func (g goResultChan) IsError() (isError bool) {
 
 func (g goResultChan) Remaining() (remaining int) {
 	panic(perrors.NewPF("NewGoResult does not provide Remaining: use NewGoResult2"))
+}
+
+// “goResultChan0(1)”
+func (g goResultChan) String() (s string) {
+	return fmt.Sprintf("goResult_len:%d", len(g))
 }

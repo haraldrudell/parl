@@ -42,7 +42,26 @@ type DirEntryIterator struct {
 }
 
 // NewDirEntryIterator returns a one-level directory iterator
-//   - path: directory whose entries should be traversed
+//   - path: directory whose entries should be traversed.
+//     Relative or absolute, cannot be empty.
+//     May be “.” to scan current working directory.
+//
+// Usage:
+//
+//	var iterator = pfs.NewDirEntryIterator(someDir)
+//	defer iterator.Cancel(&err)
+//	for dirEntry, _ := iterator.Init(); iterator.Cond(&dirEntry); {
+//	  parl.Log(dirEntry.Name()) // “file.txt”
+//	  parl.Log(dirEntry.providedPath) // “someDir/file.txt”
+//	  var abs string
+//	  if abs, err = pfs.AbsEval(dirEntry.ProvidedPath); err != nil {
+//	    return
+//	  }
+//	  parl.Log(abs) // “/file-system/someDir/file.txt”
+//	  parl.Log("%t", dirEntry.IsDir()) // “false”
+//	  parl.Log("%t", dirEntry.Type().IsRegular()) // “true”
+//	  var fileInfo fs.FileInfo
+//	  if fileInfo, err = dirEntry.Info(); err != nil {
 func NewDirEntryIterator(path string) (iterator iters.Iterator[DirEntry]) {
 	i := DirEntryIterator{path: path}
 	i.BaseIterator = *iters.NewBaseIterator(i.iteratorAction)

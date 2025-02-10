@@ -6,8 +6,9 @@ ISC License
 package pmaps2
 
 import (
-	"sync"
-
+	"github.com/haraldrudell/parl/internal/cyclebreaker"
+	"github.com/haraldrudell/parl/parli"
+	"github.com/haraldrudell/parl/psync"
 	"golang.org/x/exp/maps"
 )
 
@@ -33,36 +34,47 @@ const (
 //   - — List unordered values
 //   - ThreadSafeMap uses reader/writer mutual exclusion lock for thread-safety
 //   - map mechnic is Go map
+//   - intended to be unpromoted field, ie. public methods not ultimately exported
+//   - TODO 250129 lock-pointer allows pass-by-value like Go map at
+//     cost of one allocation. Should pointer be removed or have a non-pointer version?
 type ThreadSafeMap[K comparable, V any] struct {
-	lock            *sync.RWMutex
-	goMap           map[K]V
-	unlock, runlock func()
+	// lock-pointer allows pass-by-value at cost of allocation
+	lock *cyclebreaker.RWMutex
+	// Go map implementation
+	goMap map[K]V
 }
 
 // NewThreadSafeMap returns a thread-safe Go map
 //   - stores self-refencing pointers
-func NewThreadSafeMap[K comparable, V any]() (m *ThreadSafeMap[K, V]) {
-	var rwm sync.RWMutex
-	return &ThreadSafeMap[K, V]{
-		lock:    &rwm,
-		goMap:   make(map[K]V),
-		unlock:  rwm.Unlock,
-		runlock: rwm.RUnlock,
+func NewThreadSafeMap[K comparable, V any](fieldp ...*ThreadSafeMap[K, V]) (m *ThreadSafeMap[K, V]) {
+
+	// set m
+	if len(fieldp) > 0 {
+		m = fieldp[0]
 	}
+	if m == nil {
+		m = &ThreadSafeMap[K, V]{}
+	}
+
+	// initialize all fields
+	m.lock = &cyclebreaker.RWMutex{}
+	m.goMap = make(map[K]V)
+
+	return
 }
 
 // allows consumers to obtain the write lock
 //   - returns a function releasing the lock
-func (m *ThreadSafeMap[K, V]) Lock() (unlock func()) {
+func (m *ThreadSafeMap[K, V]) Lock() (unlocker psync.Unlocker) {
 	m.lock.Lock()
-	return m.unlock
+	return m.lock
 }
 
 // allows consumers to obtain the read lock
 //   - returns a function releasing the lock
-func (m *ThreadSafeMap[K, V]) RLock() (runlock func()) {
+func (m *ThreadSafeMap[K, V]) RLock() (runlocker psync.RUnlocker) {
 	m.lock.RLock()
-	return m.runlock
+	return m.lock
 }
 
 // Get returns the value mapped by key or the V zero-value otherwise.
@@ -85,10 +97,10 @@ func (m *ThreadSafeMap[K, V]) Put(key K, value V) { m.goMap[key] = value }
 //     when V contains pointers to large objects
 //   - O(log n)
 //   - invoked while holding Lock
-func (m *ThreadSafeMap[K, V]) Delete(key K, useZeroValue ...bool) {
+func (m *ThreadSafeMap[K, V]) Delete(key K, useZeroValue ...parli.DeleteMethod) {
 
 	// if doZero is not present and true, regular map delete
-	if len(useZeroValue) == 0 || !useZeroValue[0] {
+	if len(useZeroValue) == 0 || useZeroValue[0] != parli.SetZeroValue {
 		delete(m.goMap, key)
 		return // non-zero-value delete
 	}
@@ -127,10 +139,10 @@ func (m *ThreadSafeMap[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bo
 //   - if useRange is RangeDelete, the map is cleared by
 //     iterating and deleteing all keys
 //   - invoked while holding Lock
-func (m *ThreadSafeMap[K, V]) Clear(useRange ...bool) {
+func (m *ThreadSafeMap[K, V]) Clear(useRange ...parli.ClearMethod) {
 
 	// if useRange is not present and true, clear by re-initialize
-	if len(useRange) == 0 || !useRange[0] {
+	if len(useRange) == 0 || useRange[0] != parli.MapClearUsingRange {
 		m.goMap = make(map[K]V)
 		return // re-create clear return
 	}
@@ -144,19 +156,18 @@ func (m *ThreadSafeMap[K, V]) Clear(useRange ...bool) {
 }
 
 // Clone returns a shallow clone of the map
-//   - clone is done by ranging all keys
+//   - if goMap present, it receives a Go-map clone
+//   - otherwise, tsm receives clone
+//   - clone implementation is [maps.Clone]
 //   - invoked while holding RLock or Lock
-func (m *ThreadSafeMap[K, V]) Clone() (clone *ThreadSafeMap[K, V]) {
-	var rwm sync.RWMutex
-	clone = &ThreadSafeMap[K, V]{
-		lock:    &rwm,
-		goMap:   maps.Clone(m.goMap),
-		unlock:  rwm.Unlock,
-		runlock: rwm.RUnlock,
-	}
+func (m *ThreadSafeMap[K, V]) Clone(clone *ThreadSafeMap[K, V]) {
 
-	return
+	clone.lock = &cyclebreaker.RWMutex{}
+	clone.goMap = maps.Clone(m.goMap)
 }
+
+// - invoked while holding RLock or Lock
+func (m *ThreadSafeMap[K, V]) CloneToGoMap(goMap *map[K]V) { *goMap = maps.Clone(m.goMap) }
 
 // List provides the mapped values, undefined ordering
 //   - O(n)

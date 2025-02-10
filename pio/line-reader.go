@@ -34,7 +34,7 @@ type LineReader struct {
 	nextNewlineIndex int
 }
 
-// NewLineReader reads a [io.Reader] stream returing one line per Read invocation
+// NewLineReader reads a [io.Reader] stream returning one line per Read invocation
 //   - operates on efficient byte
 //   - does not implement [io.WriteTo] or [io.Closer]
 //   - alternative to using [bufio.Scanner]

@@ -7,6 +7,7 @@ package omaps
 
 import (
 	"github.com/google/btree"
+	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -31,12 +32,23 @@ type ThreadSafeOrderedMapFunc[K comparable, V any] struct {
 // values are provided in custom order. Thread-safe.
 func NewThreadSafeOrderedMapFunc[K comparable, V any](
 	less func(a, b V) (aBeforeB bool),
+	fieldp ...*ThreadSafeOrderedMapFunc[K, V],
 ) (orderedMap *ThreadSafeOrderedMapFunc[K, V]) {
-	return &ThreadSafeOrderedMapFunc[K, V]{
-		threadSafeMap: *newThreadSafeMap[K, V](),
-		tree:          btree.NewG(BtreeDegree, less),
-		less:          less,
+
+	// set orderedMap
+	if len(fieldp) > 0 {
+		orderedMap = fieldp[0]
 	}
+	if orderedMap == nil {
+		orderedMap = &ThreadSafeOrderedMapFunc[K, V]{}
+	}
+
+	// initialize all fields
+	newThreadSafeMap[K, V](&orderedMap.threadSafeMap)
+	orderedMap.tree = btree.NewG(BtreeDegree, less)
+	orderedMap.less = less
+
+	return
 }
 
 // GetOrCreate returns an item from the map if it exists otherwise creates it.
@@ -57,7 +69,7 @@ func (m *ThreadSafeOrderedMapFunc[K, V]) GetOrCreate(
 	newV func() (value *V),
 	makeV func() (value V),
 ) (value V, hasValue bool) {
-	defer m.m2.Lock()()
+	defer m.m2.Lock().Unlock()
 
 	// try existing mapping
 	//	- value is not comparable, so if mapping exists, the only
@@ -90,7 +102,7 @@ func (m *ThreadSafeOrderedMapFunc[K, V]) GetOrCreate(
 }
 
 func (m *ThreadSafeOrderedMapFunc[K, V]) Put(key K, value V) {
-	defer m.m2.Lock()()
+	defer m.m2.Lock().Unlock()
 
 	// whether the mapping exists
 	//	- value is not comparable, so if mapping exists, the only
@@ -108,8 +120,8 @@ func (m *ThreadSafeOrderedMapFunc[K, V]) Put(key K, value V) {
 	m.tree.ReplaceOrInsert(value)
 }
 
-func (m *ThreadSafeOrderedMapFunc[K, V]) Delete(key K, useZeroValue ...bool) {
-	defer m.m2.Lock()()
+func (m *ThreadSafeOrderedMapFunc[K, V]) Delete(key K, useZeroValue ...parli.DeleteMethod) {
+	defer m.m2.Lock().Unlock()
 
 	// no-op: delete non-existent mapping
 	var existing, hasExisting = m.m2.Get(key)
@@ -121,17 +133,31 @@ func (m *ThreadSafeOrderedMapFunc[K, V]) Delete(key K, useZeroValue ...bool) {
 	m.m2.Delete(key, useZeroValue...)
 	m.tree.Delete(existing) // delete from sort order
 }
-func (m *ThreadSafeOrderedMapFunc[K, V]) Clone() (clone *ThreadSafeOrderedMapFunc[K, V]) {
-	defer m.m2.RLock()()
-
-	return &ThreadSafeOrderedMapFunc[K, V]{
-		threadSafeMap: *m.threadSafeMap.clone(),
-		tree:          m.tree.Clone(),
-		less:          m.less,
+func (m *ThreadSafeOrderedMapFunc[K, V]) Clone(goMap ...*map[K]V) (clone *ThreadSafeOrderedMapFunc[K, V]) {
+	var gm *map[K]V
+	if len(goMap) > 0 {
+		gm = goMap[0]
 	}
+	if gm == nil {
+		clone = &ThreadSafeOrderedMapFunc[K, V]{}
+	}
+	defer m.m2.RLock().RUnlock()
+
+	// clone to Go-map case
+	if gm != nil {
+		m.threadSafeMap.cloneToGomap(gm)
+		return
+	}
+
+	// clone RWMap case
+	m.threadSafeMap.clone(&clone.threadSafeMap)
+	clone.tree = m.tree.Clone()
+	clone.less = m.less
+
+	return
 }
-func (m *ThreadSafeOrderedMapFunc[K, V]) Clear(useRange ...bool) {
-	defer m.m2.Lock()()
+func (m *ThreadSafeOrderedMapFunc[K, V]) Clear(useRange ...parli.ClearMethod) {
+	defer m.m2.Lock().Unlock()
 
 	m.m2.Clear(useRange...)
 	m.tree.Clear(false)
@@ -141,7 +167,7 @@ func (m *ThreadSafeOrderedMapFunc[K, V]) Clear(useRange ...bool) {
 //   - n zero or missing means all items
 //   - n non-zero means this many items capped by length
 func (m *ThreadSafeOrderedMapFunc[K, V]) List(n ...int) (list []V) {
-	defer m.m2.RLock()()
+	defer m.m2.RLock().RUnlock()
 
 	// empty map case
 	var length = m.m2.Length()

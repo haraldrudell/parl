@@ -35,11 +35,22 @@ type OrderedMapFunc[K comparable, V any] struct {
 //   - btree.Ordered does not include ~uintptr
 func NewOrderedMapFunc[K comparable, V any](
 	less func(a, b V) (aBeforeB bool),
+	fieldp ...*OrderedMapFunc[K, V],
 ) (orderedMap *OrderedMapFunc[K, V]) {
-	return &OrderedMapFunc[K, V]{
-		btreeMap: *newBTreeMap2Any[K, V](less),
-		less:     less,
+
+	// set orderedMap
+	if len(fieldp) > 0 {
+		orderedMap = fieldp[0]
 	}
+	if orderedMap == nil {
+		orderedMap = &OrderedMapFunc[K, V]{}
+	}
+
+	// initialize all fields
+	newBTreeMap2Any[K, V](&orderedMap.btreeMap, less)
+	orderedMap.less = less
+
+	return
 }
 
 // Put creates or replaces a mapping
@@ -49,9 +60,22 @@ func (m *OrderedMapFunc[K, V]) Put(key K, value V) {
 
 // Clone returns a shallow clone of the map
 //   - clone is done by ranging all keys
-func (m *OrderedMapFunc[K, V]) Clone() (clone *OrderedMapFunc[K, V]) {
-	return &OrderedMapFunc[K, V]{
-		btreeMap: *m.btreeMap.Clone(),
-		less:     m.less,
+func (m *OrderedMapFunc[K, V]) Clone(goMap ...*map[K]V) (clone *OrderedMapFunc[K, V]) {
+
+	// clone to Go map case
+	if len(goMap) > 0 {
+		if gm := goMap[0]; gm != nil {
+			m.btreeMap.cloneToGoMap(gm)
+			return
+		}
 	}
+
+	// regular clone case
+	clone = &OrderedMapFunc[K, V]{
+		less: m.less,
+	}
+	//btreeMap: *m.btreeMap.Clone(),
+	m.btreeMap.cloneToField(&clone.btreeMap)
+
+	return
 }

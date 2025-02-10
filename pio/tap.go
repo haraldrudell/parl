@@ -18,14 +18,14 @@ type Tap struct {
 	closeWinner               atomic.Bool
 	IsClosed                  parl.Awaitable
 	readsWriter, writesWriter io.Writer
-	addError                  func(err error)
+	errorSink                 parl.ErrorSink1
 }
 
-func NewTap(readsWriter, writesWriter io.Writer, addError parl.AddError) (tap *Tap) {
+func NewTap(readsWriter, writesWriter io.Writer, errorSink parl.ErrorSink1) (tap *Tap) {
 	return &Tap{
 		readsWriter:  readsWriter,
 		writesWriter: writesWriter,
-		addError:     addError,
+		errorSink:    errorSink,
 	}
 }
 
@@ -47,8 +47,8 @@ func (t *Tap) Read(reader io.Reader, p []byte) (n int, err error) {
 	}
 
 	// propagate reader error
-	if err != nil && t.addError != nil {
-		t.addError(NewPioError(PeRead, err))
+	if err != nil && t.errorSink != nil {
+		t.errorSink.AddError(NewPioError(PeRead, err))
 	}
 
 	return
@@ -72,8 +72,8 @@ func (t *Tap) Write(writer io.Writer, p []byte) (n int, err error) {
 	n, err = writer.Write(p)
 
 	// propagate reader error to addError as well
-	if err != nil && t.addError != nil {
-		t.addError(NewPioError(PeWrite, err))
+	if err != nil && t.errorSink != nil {
+		t.errorSink.AddError(NewPioError(PeWrite, err))
 	}
 
 	return
@@ -90,8 +90,8 @@ func (t *Tap) Close(closer any) (err error) {
 
 	// close delegate if it implements io.Close
 	if closer, ok := closer.(io.Closer); ok {
-		if parl.Close(closer, &err); err != nil && t.addError != nil {
-			t.addError(NewPioError(PeClose, err))
+		if parl.Close(closer, &err); err != nil && t.errorSink != nil {
+			t.errorSink.AddError(NewPioError(PeClose, err))
 		}
 	}
 
@@ -117,8 +117,8 @@ func (t *Tap) Close(closer any) (err error) {
 }
 
 func (t *Tap) handleError(err error) {
-	if t.addError != nil {
-		t.addError(err)
+	if t.errorSink != nil {
+		t.errorSink.AddError(err)
 	} else {
 		panic(err)
 	}

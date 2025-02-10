@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package parltime provides on-time timers, 64-bit epoch, formaatting and other time functions.
 package ptime
 
 import (
@@ -19,12 +18,21 @@ const (
 	RFC3339NanoSpace string = "2006-01-02 15:04:05.999999999Z07:00"
 )
 
-// Rfc3339 converts local time to string with second precision and time offset: 2006-01-02 15:04:05-07:00
-func Rfc3339(t time.Time) string {
-	return t.Format(rfc3339)
-}
+// Rfc3339 converts time to string with second precision and time offset
+//   - “2006-01-02 15:04:05-07:00”
+//   - “2025-12-31 01:02:03+00:00”
+//   - t: second-precision
+//   - local time zone or UTC by t.Location, it’s built-in time zone information
+//   - typically, time.Time is in t.Local
+//   - [S] is same in UTC
+func Rfc3339(t time.Time) string { return t.Format(rfc3339) }
 
-// ParseTime parses output from Rfc3339
+// ParseTime parses output from [Rfc3339], second precision and time offset
+//   - layout: “2006-01-02 15:04:05-07:00”
+//   - tm Location depends on dateString time offset
+//   - — time offset matching time.Local uses this location
+//   - — other time offset returns custom time zone
+//   - ‘Z’ for time zone or missing time zone is error
 func ParseTime(dateString string) (tm time.Time, err error) {
 	if tm, err = time.Parse(rfc3339, dateString); err != nil {
 		err = perrors.Errorf("time.Parse: '%w'", err)
@@ -32,17 +40,16 @@ func ParseTime(dateString string) (tm time.Time, err error) {
 	return
 }
 
-// Ms gets duration in milliseconds
-func Ms(d time.Duration) string {
-	return d.Truncate(time.Millisecond).String()
-}
-
-// Ns converts time to string with nanosecond accuracy and UTC location
+// Ns converts time to string with nanosecond accuracy and UTC time zone
+//   - “2025-12-31 01:02:03.123456789+00:00”
+//   - parsed by [ParseNs]
 func Ns(t time.Time) string {
 	return t.UTC().Truncate(time.Nanosecond).Format(time.RFC3339Nano)
 }
 
 // ParseNs parses an RFC3339 time string with nanosecond accuracy
+//   - “2025-12-31 01:02:03.123456789+00:00”
+//   - output by [Ns]
 func ParseNs(timeString string) (t time.Time, err error) {
 	t, err = time.Parse(time.RFC3339Nano, timeString)
 	if err != nil {
@@ -52,31 +59,26 @@ func ParseNs(timeString string) (t time.Time, err error) {
 }
 
 // S converts time to string with second accuracy and UTC location
+//   - “2025-12-31 01:02:03.123456789+00:00”
+//   - similar to [Rfc3339] [NsLocal]
 func S(t time.Time) string {
 	return t.UTC().Truncate(time.Nanosecond).Format(time.RFC3339)
 }
 
-// ParseS parses an RFC3339 time string with nanosecond accuracy
-func ParseS(timeString string) (t time.Time, err error) {
-	t, err = time.Parse(time.RFC3339, timeString)
-	return
-}
-
 // NsLocal converts time to string with nanosecond accuracy and local time zone
+//   - “2025-12-31 01:02:03.123456789-08:00”
+//   - similar to [Rfc3339] [S]
 func NsLocal(t time.Time) string {
 	return t.Local().Truncate(time.Nanosecond).Format(time.RFC3339Nano)
 }
 
-// SGreater compares two times first rouding to second
-func SGreater(t1 time.Time, t2 time.Time) bool {
-	return t1.Truncate(time.Second).After(t2.Truncate(time.Second))
-}
-
-// GetTimeString rfc 3339: email time format 2020-12-04 20:20:17-08:00
-func GetTimeString(wallTime *time.Time) (s string) {
+// GetTimeString rfc 3339: email time format
+//   - default: time.Now() with local time offset
+//   - s: “2020-12-04 20:20:17-08:00”
+func GetTimeString(wallTime time.Time) (s string) {
 	var when time.Time
-	if wallTime != nil {
-		when = *wallTime
+	if !wallTime.IsZero() {
+		when = wallTime
 	} else {
 		when = time.Now()
 	}
