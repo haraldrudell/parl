@@ -35,7 +35,8 @@ func TestAnyCount(t *testing.T) {
 
 	// iteration single value
 	total = 0
-	for i, v := a.Init(); a.Cond(&i, &v); {
+	for v := range a.Seq {
+		_ = v
 		total++
 	}
 	if total != expOne {
@@ -50,7 +51,8 @@ func TestAnyCount(t *testing.T) {
 
 	// iteration multiple values
 	total = 0
-	for i, v := a.Init(); a.Cond(&i, &v); {
+	for v := range a.Seq {
+		_ = v
 		total++
 	}
 	if total != expThree {
@@ -86,7 +88,8 @@ func BenchmarkAnyCount(b *testing.B) {
 		a.Count()
 
 		// iteration single value
-		for i, v := a.Init(); a.Cond(&i, &v); {
+		for v := range a.Seq {
+			_ = v
 		}
 
 		// Count multiple values
@@ -94,7 +97,8 @@ func BenchmarkAnyCount(b *testing.B) {
 		a.Count()
 
 		// iteration multiple values
-		for i, v := a.Init(); a.Cond(&i, &v); {
+		for v := range a.Seq {
+			_ = v
 		}
 	}
 }

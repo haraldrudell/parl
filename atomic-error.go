@@ -59,8 +59,8 @@ func (a *AtomicError) AddError(err error) {
 //   - didSwap false: the error held by the container that is differerent from oldErr and
 //     is returned in otherErr
 //   - AddErrorSwap writes newErr if:
-//   - — oldErr is nil and the errror container is empty or
-//   - — oldErr matches the errror held by the error container
+//   - — oldErr is nil and the error container is empty or
+//   - — oldErr matches the error held by the error container
 func (a *AtomicError) AddErrorSwap(oldErr, newErr error) (didSwap bool, otherErr error) {
 
 	// if empty, write new value

@@ -2,15 +2,13 @@
 // ISC License
 module github.com/haraldrudell/parl/omaps
 
-go 1.22.0
-
-toolchain go1.23.1
+go 1.23
 
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/btree v1.1.3
-	github.com/haraldrudell/parl v0.4.188
+	github.com/haraldrudell/parl v0.4.189
 	golang.org/x/exp v0.0.0-20250210185358-939b2ce775ac
 )
 

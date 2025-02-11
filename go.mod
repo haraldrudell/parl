@@ -4,9 +4,10 @@ module github.com/haraldrudell/parl
 
 // minimum version of Go required to
 // compile packages in this module
-//	- go1.22.0 supported 240206–2025-02
-//	- oldest supported Go release since 240813
-go 1.22.0
+//	- use of [iter.Seq] requires go1.23
+//	- go1.23 supported 240813–2025-08 upon go1.25 released
+//	- go1.23 will be oldest supported Go release 2025-02
+go 1.23
 
 require (
 	github.com/google/uuid v1.6.0

@@ -5,6 +5,8 @@ ISC License
 
 package parl
 
+import "iter"
+
 // AnyCount is a value type that may contain
 // zero, one or many values
 //   - allows a single value to represent any number of values
@@ -16,6 +18,7 @@ package parl
 //   - Count, iteration, or update are not thread-safe
 //   - if the contained value includes non-pointer locks or atomics, T must be pointer to value
 //   - has no new function
+//   - a similar type with pointer receiver is [Values] and [NewValues]
 //
 // Iteration, allocation-free:
 //
@@ -23,13 +26,16 @@ package parl
 //	for i, v := a.Init(); a.Cond(&i, &v); {
 //		v…
 type AnyCount[T any] struct {
-	// value is present when hasValue is true
+	// value recognized when hasValue is true
+	//	- precedes Values during iteration
 	Value T
 	// Values are present regardless of HasValue
 	Values []T
 	// true: Value is present
 	HasValue bool
 }
+
+var _ iter.Seq[int] = (&AnyCount[int]{}).Seq
 
 // Count returns number of values
 func (a AnyCount[T]) Count() (count int) {
@@ -40,34 +46,27 @@ func (a AnyCount[T]) Count() (count int) {
 	return
 }
 
-// Init implements the right-hand side of a short variable declaration in
-// the init statement of a Go “for” clause
-//   - iteration is not thread-safe
-func (a AnyCount[T]) Init() (firstIndex int, value T) {
-	if a.HasValue {
-		firstIndex = -1
+// Seq allows for-range iteration over container values
+//   - for v := range values.Seq {
+func (a AnyCount[T]) Seq(yield func(value T) (keepGoing bool)) {
+	var i int
+	for {
+		if i == 0 && a.HasValue {
+			i++
+			if !yield(a.Value) {
+				return
+			}
+		}
+		var sliceIndex = i
+		if a.HasValue {
+			sliceIndex--
+		}
+		if sliceIndex >= len(a.Values) {
+			break
+		}
+		i++
+		if !yield(a.Values[sliceIndex]) {
+			return
+		}
 	}
-	return
-}
-
-// Cond is the condition statement of a Go “for” clause
-//   - iteration is not thread-safe
-func (a AnyCount[T]) Cond(indexp *int, valuep *T) (condition bool) {
-	var i = *indexp
-
-	// iterate Value
-	if condition = i == -1; condition {
-		*valuep = a.Value
-		*indexp = 0
-		return
-	}
-
-	// iterate Values
-	if condition = i < len(a.Values); !condition {
-		return // end of values
-	}
-	*valuep = a.Values[i]
-	*indexp++
-
-	return
 }

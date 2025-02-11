@@ -2,16 +2,16 @@
 // ISC License
 module github.com/haraldrudell/parl/watchfs
 
-go 1.22.0
+go 1.23
 
-toolchain go1.23.2
+toolchain go1.23.5
 
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/google/uuid v1.6.0
-	github.com/haraldrudell/parl v0.4.188
+	github.com/haraldrudell/parl v0.4.189
 )
 
 require (
