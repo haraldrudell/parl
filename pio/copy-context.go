@@ -3,8 +3,6 @@
 ISC License
 */
 
-// Package pio provides a context-cancelable stream copier, a closable buffer, line-based reader
-// and other io functions
 package pio
 
 import (

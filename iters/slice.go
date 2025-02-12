@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package iters provides thread-safe iterators usable with Go’s for statement
 package iters
 
 import (

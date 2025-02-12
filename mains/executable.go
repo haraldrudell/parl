@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package mains contains functions for implementing a service or command-line utility
 package mains
 
 import (
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/mains/malib"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/perrors/errorglue"
 	"github.com/haraldrudell/parl/pflags"
@@ -108,7 +108,7 @@ type Executable struct {
 	//	- because an error added may have associated errors,
 	//		err must be a slice, to distinguish indivdual error adds
 	//	- that slice must be thread-safe
-	err      errStore
+	err      malib.ErrStore
 	ArgCount int      // number of post-options strings during parse
 	Arg      string   // if one post-options string and that is allowed, this is the string
 	Args     []string // any post-options strings if allowed
@@ -143,7 +143,7 @@ var _ parl.ErrorSink = &Executable{}
 //	…
 func (x *Executable) Init() (ex2 *Executable) {
 	ex2 = x
-	var now = ProcessStartTime()
+	var now = malib.ProcessStartTime()
 	x.Launch = now
 	x.LaunchString = now.Format(rfcTimeFormat)
 	x.Host = pos.ShortHostname()
@@ -424,7 +424,7 @@ func (x *Executable) AddError(err error) {
 
 	// debug printing
 	if parl.IsThisDebug() {
-		packFunc := perrors.PackFunc()
+		packFunc := pruntime.PackFunc()
 		var errS string
 		if err != nil {
 			errS = "\x27" + err.Error() + "\x27"
@@ -444,7 +444,7 @@ func (x *Executable) AddError(err error) {
 	if x.err.Count() == 0 {
 
 		// print and store the first error
-		if x.printErr(err, checkForPanic(err)) {
+		if x.printErr(err, malib.CheckForPanic(err)) {
 			x.err.IsFirstLong.Store(true)
 		}
 	}
@@ -558,7 +558,7 @@ func (x *Executable) Recover(errp ...*error) {
 			}
 		} else {
 			// print a subsequent error
-			if x.printErr(err, checkForPanic(err)) {
+			if x.printErr(err, malib.CheckForPanic(err)) {
 				continue // printed long means it’s complete
 			}
 		}
@@ -590,7 +590,7 @@ func (x *Executable) printAssociated(i string, err error) {
 	for j, e := range associatedErrors[1:] {
 		var label = parl.Sprintf("error#%s-associated#%d", i, j+1)
 		parl.Log(label)
-		if x.printErr(err, checkForPanic(err)) {
+		if x.printErr(err, malib.CheckForPanic(err)) {
 			continue // printed long means it’s complete
 		}
 		x.printAssociated(label, e)

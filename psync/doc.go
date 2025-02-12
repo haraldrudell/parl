@@ -3,5 +3,5 @@
 ISC License
 */
 
-// Package psync extens on the sync package
+// Package psync extens on the sync package.
 package psync

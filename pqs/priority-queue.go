@@ -3,8 +3,6 @@
 ISC License
 */
 
-// Ranking is a pointer-identity-to-value map of updatable values traversable by rank.
-// Ranking implements [parl.Ranking][V comparable, R constraints.Ordered].
 package pqs
 
 import (

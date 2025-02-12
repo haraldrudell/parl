@@ -10,6 +10,7 @@ import (
 
 	"github.com/haraldrudell/parl/ints"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 	"golang.org/x/exp/constraints"
 )
 
@@ -27,7 +28,7 @@ func NewPort[T constraints.Integer](integer T) (port Port, err error) {
 
 	// convert to uint16
 	var u16 uint16
-	if u16, err = ints.Unsigned[uint16](integer, perrors.PackFunc()); err != nil {
+	if u16, err = ints.Unsigned[uint16](integer, pruntime.PackFunc()); err != nil {
 		return
 	}
 

@@ -140,6 +140,8 @@ func invokePanicDefer(one int, stackp *pruntime.Stack, stackLoc **pruntime.CodeL
 	*stackLoc = loc
 }
 
+var p *int
+
 // panicFunction recovers a panic using [parl.RecoverErr]
 //   - panicLine is the exact code line of the panic
 //   - err is the error value produced by [parl.RecoverErr]
@@ -151,7 +153,7 @@ func nilPointerDereference() (stack pruntime.Stack, panicLoc, stackLoc *pruntime
 	defer nilPointerDereferenceDefer(message, &stack, &stackLoc)
 
 	// nil pointer dereference panic
-	for panicLoc = pruntime.NewCodeLocation(0); ; _ = *(*int)(nil) {
+	for panicLoc = pruntime.NewCodeLocation(0); ; _ = *p {
 	}
 }
 

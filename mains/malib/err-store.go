@@ -3,7 +3,7 @@
 ISC License
 */
 
-package mains
+package malib
 
 import (
 	"slices"
@@ -13,19 +13,19 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-// errStore is a slice to distinguish multiple invocations of AddErr
+// ErrStore is a slice to distinguish multiple invocations of AddErr
 //   - must be initialization free
 //   - must be thread-safe
-type errStore struct {
+type ErrStore struct {
 	errsLock    sync.Mutex
 	errs        []error
 	count       parl.Atomic64[int]
 	IsFirstLong atomic.Bool
 }
 
-func (e *errStore) Count() (count int) { return e.count.Load() }
+func (e *ErrStore) Count() (count int) { return e.count.Load() }
 
-func (e *errStore) Add(err error) {
+func (e *ErrStore) Add(err error) {
 	e.errsLock.Lock()
 	defer e.errsLock.Unlock()
 
@@ -33,7 +33,7 @@ func (e *errStore) Add(err error) {
 	e.count.Add(1)
 }
 
-func (e *errStore) GetN(index ...int) (err error) {
+func (e *ErrStore) GetN(index ...int) (err error) {
 	e.errsLock.Lock()
 	defer e.errsLock.Unlock()
 
@@ -47,7 +47,7 @@ func (e *errStore) GetN(index ...int) (err error) {
 	return
 }
 
-func (e *errStore) Get() (errs []error) {
+func (e *ErrStore) Get() (errs []error) {
 	e.errsLock.Lock()
 	defer e.errsLock.Unlock()
 

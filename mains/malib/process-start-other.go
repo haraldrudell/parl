@@ -5,7 +5,7 @@
 ISC License
 */
 
-package mains
+package malib
 
 import (
 	"bytes"

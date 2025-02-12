@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package enum provides concrete types to create enumerated collections
 package enum
 
 import (

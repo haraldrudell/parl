@@ -3,16 +3,16 @@
 ISC License
 */
 
-package mains
+package malib
 
 import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// checkForPanic returns a non-empty string when err contains a panic
+// CheckForPanic returns a non-empty string when err contains a panic
 //   - the string contains code location for the panic and the recovery
-func checkForPanic(err error) (panicString string) {
+func CheckForPanic(err error) (panicString string) {
 	if isPanic, stack, recoveryIndex, panicIndex := perrors.IsPanic(err); isPanic {
 		var frames = stack.Frames()
 		panicString = parl.Sprintf(

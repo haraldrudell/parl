@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package counter provides simple and rate counters and tracked datapoints
 package counter
 
 import (

@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package g0 provides Go threads and thread-groups
 package g0
 
 import (
@@ -94,11 +93,15 @@ func (g *Go) AddError(err error) {
 }
 
 // Done handles thread exit. Deferrable
-//   - *errp contains possible fatalk thread error
+//   - *errp contains possible fatal thread error
 //   - errp can be nil
 func (g *Go) Done(errp *error) {
 	if !g.ensureThreadData().endCh.Close() {
-		panic(perrors.ErrorfPF("Go received multiple Done: “%s”", perrors.ErrpString(errp)))
+		var err error
+		if errp != nil {
+			err = *errp
+		}
+		panic(perrors.ErrorfPF("Go received multiple Done: “%s”", perrors.Short(err)))
 	}
 
 	// obtain fatal error and ensure it has stack

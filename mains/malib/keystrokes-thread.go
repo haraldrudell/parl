@@ -3,7 +3,7 @@
 ISC License
 */
 
-package mains
+package malib
 
 import (
 	"bufio"
@@ -11,22 +11,29 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 // keystrokesThread reads blocking from [os.Stdin] therefore cannot be canceled
-//   - therefore, keystrokesThread is a top-level function not waited upon
 //   - silent true: nothing is printed on os.Stdin closing
 //   - silent false: “mains.keystrokesThread standard input closed” may be printed to
 //     standard error on os.Stdin closing
-//   - errorSink receives any errors returned by or panic in [os.Stdin.Read]
+//   - errorSink present: receives any errors returned by or panic in [os.Stdin.Read]
+//   - errorSink nil: errors are printed to standard error
 //   - stdin receives text lines from standard input with line terminator removed
-//   - on [Keystrokes.CloseNow], keystrokesThread exits on the following keypress
 //   - on [os.Stdin] closing, keystrokesThread closes the stdin line-input channel
+//   - — the close may be deferred until a key is pressed or the process exits
+//     -
+//   - Because [os.Stdin] cannot be closed and [os.Stdin.Read] is blocking:
+//   - — the thread may blockindfinitiely until process exit
+//   - — therefore, keystrokesThread is a top-level function not waited upon
+//   - — purpose is to minimize objects kept in memory until the thread exits
+//   - on [Keystrokes.CloseNow], keystrokesThread exits on the following keypress
 //   - [StdinReader] converts any error to [io.EOF]
 //   - [parl.Infallible] prints any errors to standard error, should not be any
 //   - —
 //   - -verbose=mains.keystrokesThread
-func keystrokesThread(silent bool, errorSink parl.ErrorSink1, stdin parl.ClosableSink[string]) {
+func KeystrokesThread(silent bool, errorSink parl.ErrorSink1, stdin parl.ClosableSink[string]) {
 	var err error
 	var isDebug = parl.IsThisDebug()
 	if isDebug {
@@ -75,5 +82,5 @@ func keystrokesThread(silent bool, errorSink parl.ErrorSink1, stdin parl.Closabl
 	//	- echoed if:
 	//	- stdin closed without error, eg. from user pressing ^D
 	//	- silent is false
-	parl.Log("%s standard input closed", perrors.PackFunc())
+	parl.Log("%s standard input closed", pruntime.PackFunc())
 }

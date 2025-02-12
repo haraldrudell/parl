@@ -25,7 +25,7 @@ func TestLogCapturer_Write(t *testing.T) {
 	var logCapturer *log.Logger = NewLogCapturer(printfer.log)
 
 	// Printf should log transparently
-	logCapturer.Printf(value)
+	logCapturer.Printf("%s", value)
 	if len(printfer.output) != expLength {
 		t.Fatalf("FAIL printfer.output len %d exp %d", len(printfer.output), expLength)
 	}

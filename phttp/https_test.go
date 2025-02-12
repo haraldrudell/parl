@@ -107,7 +107,7 @@ func TestHttps(t *testing.T) {
 	if err != nil {
 		respS += fmt.Sprintf("Get err “%s”", err)
 	}
-	t.Logf(respS)
+	t.Logf("%s", respS)
 	if err != nil {
 		t.Errorf("FAIL http.Get err %s", perrors.Short(err))
 	} else if resp == nil {

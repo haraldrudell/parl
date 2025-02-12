@@ -4,16 +4,3 @@ ISC License
 */
 
 package perrors
-
-// error116.Errp returns a function that updates an an error pointer value
-// with additional associated errors on subsequent invocations.
-// It is intended to be used with parl.Recover().
-// for a thread-safe version, use error116.ParlError
-func Errp(errp *error) func(e error) {
-	if errp == nil {
-		panic("Errp with nil argument")
-	}
-	return func(e error) {
-		*errp = AppendError(*errp, e)
-	}
-}

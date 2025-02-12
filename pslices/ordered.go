@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pslices provides somehat outdated slice functions such as ordered slices
 package pslices
 
 import (

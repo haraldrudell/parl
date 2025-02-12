@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	"github.com/haraldrudell/parl/ints"
-	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 	"golang.org/x/exp/constraints"
 )
 
@@ -35,7 +35,7 @@ func NewPid1[T constraints.Integer](pid T) (typedPid Pid) {
 // ConvertToPid returns a typed value process identifier from any Integer type
 func ConvertToPid[T constraints.Integer](pid T) (typedPid Pid, err error) {
 	var u32 uint32
-	if u32, err = ints.Unsigned[uint32](pid, perrors.PackFunc()); err != nil {
+	if u32, err = ints.Unsigned[uint32](pid, pruntime.PackFunc()); err != nil {
 		return
 	}
 	typedPid = Pid(u32)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/haraldrudell/parl/ints"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 	"github.com/haraldrudell/parl/sets"
 	"golang.org/x/exp/constraints"
 )
@@ -84,7 +85,7 @@ func NewAddressFamily[T constraints.Integer](integer T) (addressFamily AddressFa
 
 	// convert to uint16
 	var u16 uint16
-	if u16, err = ints.Unsigned[uint16](integer, perrors.PackFunc()); err != nil {
+	if u16, err = ints.Unsigned[uint16](integer, pruntime.PackFunc()); err != nil {
 		return
 	}
 

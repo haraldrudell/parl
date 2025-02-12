@@ -15,8 +15,6 @@ import (
 const (
 	// as second argument to [BaseOptionData], indicates that yaml options -yamlFile -yamlKey should not be present
 	YamlNo YamlOption = false
-	// as second argument to [BaseOptionData], indicates that yaml options -yamlFile -yamlKey should be present
-	YamlYes YamlOption = true
 	// indicates silent: no banner. Must be first option on command-line ‘-silent’
 	SilentString = "-" + silentOption
 	// name of version option
@@ -26,7 +24,7 @@ const (
 const (
 	// name of silent option
 	silentOption = "silent"
-	// help text for =-verbose
+	// help text for -verbose
 	verboseOptionHelp = "Regular expression for selective debug matched against CodeLocation FuncName" +
 		"\nmain.main: -verbose=main.main" +
 		"\ngithub.com/haraldrudell/parl/mains.(*Executable).Init: -verbose=mains...Executable" +
@@ -34,8 +32,7 @@ const (
 		"\nper https://github.com/google/re2/wiki/Syntax"
 )
 
-// type for second argument to [BaseOptionData]
-//   - mains.YamlNo mains.YamlYes
+// type for second argument to [BaseOptionData] [YamlNo]
 type YamlOption bool
 
 // BaseOptionsType is the type that holds mains’ effective option values
@@ -50,9 +47,11 @@ type BaseOptionsType = struct {
 var BaseOptions BaseOptionsType
 
 // BaseOptionData returns basic options for mains
+//   - program: used to generate help text
+//   - yaml: [YamlNo] means no yaml options
 //   - -verbose -debug -silent -version
 //   - if yaml == YamlYes: -yamlFile -yamlKey
-func BaseOptionData(program string, yaml YamlOption) (optionData []pflags.OptionData) {
+func BaseOptionData(program string, yaml ...YamlOption) (optionData []pflags.OptionData) {
 
 	var nonYamlOptions = []pflags.OptionData{
 		{P: &BaseOptions.Version, Name: Version, Value: false, Usage: "displays version"},
@@ -62,7 +61,7 @@ func BaseOptionData(program string, yaml YamlOption) (optionData []pflags.Option
 	}
 	optionData = nonYamlOptions
 
-	if yaml == YamlYes {
+	if len(yaml) == 0 || yaml[0] != YamlNo {
 		var yamlOptions = []pflags.OptionData{
 			{P: &BaseOptions.YamlFile, Name: "yamlFile", Value: "", Usage: fmt.Sprintf("Use specific file other than %s.yaml %[1]s-%s.yaml in ~/apps .. /etc", program, pos.ShortHostname())},
 			{P: &BaseOptions.YamlKey, Name: "yamlKey", Value: "", Usage: "Other dictionary key than ‘options:’"},

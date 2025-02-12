@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package errorglue contains non-essential error declarations
 package errorglue
 
 import "github.com/haraldrudell/parl/pruntime"

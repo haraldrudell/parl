@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package parlca provides a self-signed certificate authority
 package parlca
 
 const (

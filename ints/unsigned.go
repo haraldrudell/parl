@@ -9,6 +9,7 @@ import (
 	"errors"
 
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 	"golang.org/x/exp/constraints"
 )
 
@@ -32,7 +33,7 @@ func Unsigned[U constraints.Unsigned, T constraints.Integer](integer T, label st
 		// whatever it is, it will fit into int64
 		if i64 := int64(integer); i64 < 0 {
 			if label == "" {
-				label = perrors.PackFunc()
+				label = pruntime.PackFunc()
 			}
 			err = perrors.Errorf("%s %w: %d -0x%x", label, ErrNegative, i64, -i64)
 			return
@@ -45,7 +46,7 @@ func Unsigned[U constraints.Unsigned, T constraints.Integer](integer T, label st
 	_, max, _, _ := IntProperties[U]()
 	if u64 > max {
 		if label == "" {
-			label = perrors.PackFunc()
+			label = pruntime.PackFunc()
 		}
 		err = perrors.Errorf("%s %w: %d 0x%[1]x max: %d 0x%[2]x", label, ErrTooLarge, u64, max)
 		return

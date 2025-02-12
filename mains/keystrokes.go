@@ -9,14 +9,18 @@ import (
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/mains/malib"
 	"github.com/haraldrudell/parl/perrors"
 )
 
 const (
 	// do not echo to standard error on [os.Stdin] closing
 	// optional argument to [Keystrokes.Launch]
-	SilentClose = true
+	SilentClose SilentType = true
 )
+
+// optional flag for no stdin-cose echo [SilentClose]
+type SilentType bool
 
 // didLaunch ensures multiple keystrokesThread are not running
 var didLaunch atomic.Bool
@@ -34,7 +38,7 @@ var didLaunch atomic.Bool
 //   - those items along with [KeyStrokesThread] and [StdinReader] are released
 //     on process exit or next keypress
 type Keystrokes struct {
-	// unbound locked combined channel and slice type
+	// unbound locked thread-safe slice with closing-channel wait mechanic
 	stdin parl.AwaitableSlice[string]
 }
 
@@ -68,7 +72,7 @@ func NewKeystrokes(fieldp ...*Keystrokes) (keystrokes *Keystrokes) {
 //   - supports functional chaining
 //   - silent [SilentClose] does not echo anything on [os.Stdin] closing
 //   - addError if present receives errors from [os.Stdin.Read]
-func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...bool) (keystrokes *Keystrokes) {
+func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...SilentType) (keystrokes *Keystrokes) {
 	keystrokes = k
 
 	// ensure only launched once
@@ -80,15 +84,17 @@ func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...bool) (keystrok
 
 	var isSilent bool
 	if len(silent) > 0 {
-		isSilent = silent[0]
+		isSilent = silent[0] == SilentClose
 	}
 
-	go keystrokesThread(isSilent, errorSink, &k.stdin)
+	go malib.KeystrokesThread(isSilent, errorSink, &k.stdin)
 
 	return
 }
 
-// Ch returns a possibly closing receive-only channel sending lines from the keyboard on each return press
+// StringSource returns a possibly closing unbound slice
+// sending lines from the keyboard on each return press
+//   - closing-channel wait mechanic
 //   - Ch sends strings with return character removed
 //   - the channel closes upon:
 //   - — [Keystrokes.CloseNow] or

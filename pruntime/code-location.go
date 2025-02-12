@@ -95,7 +95,7 @@ func (cl *CodeLocation) Package() (packageName string) {
 // PackFunc return base package name and function
 // “mains.AddErr”
 func (cl *CodeLocation) PackFunc() (packageDotFunction string) {
-	_, packageName, _, funcName := pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
+	var _, packageName, _, funcName = pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
 	return packageName + "." + funcName
 }
 

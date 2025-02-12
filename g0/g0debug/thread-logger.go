@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package g0debug provides troubleshooting types for Go threads and thread-groups
 package g0debug
 
 import (

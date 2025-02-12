@@ -3,7 +3,6 @@
 ISC License
 */
 
-// plog provides thread-safe log instances for any writer
 package plog
 
 import (

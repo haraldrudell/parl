@@ -10,7 +10,8 @@ import "iter"
 // Values is a container for one or more values of type T
 //   - used as the value for a map: map[int]parl.Values[string]
 //   - implementation may be thread-safe by using atomics, lock or being read-only
-//   - a similar value-type is AnyCount
+//   - an implementation is [NewValues]
+//   - a similar value-type is [AnyCount]
 //
 // iteration:
 //
@@ -36,5 +37,5 @@ type Values[T any] interface {
 	Seq(yield func(value T) (keepGoing bool))
 }
 
-// Values.Seq is iter.Seq
+// Values.Seq is [iter.Seq]
 var _ = func(v Values[int]) (seq iter.Seq[int]) { return v.Seq }

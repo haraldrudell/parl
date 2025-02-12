@@ -3,13 +3,12 @@
 ISC License
 */
 
-// Package iana provides iana-standardized Internet protocols, port numbers, address families and
-// an Internet-socket identifier
 package iana
 
 import (
 	"github.com/haraldrudell/parl/ints"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/pruntime"
 	"github.com/haraldrudell/parl/sets"
 	"golang.org/x/exp/constraints"
 )
@@ -183,7 +182,7 @@ func NewProtocol[T constraints.Integer](integer T) (protocol Protocol, err error
 
 	// convert to uint8
 	var u8 uint8
-	if u8, err = ints.Unsigned[uint8](integer, perrors.PackFunc()); err != nil {
+	if u8, err = ints.Unsigned[uint8](integer, pruntime.PackFunc()); err != nil {
 		return
 	}
 

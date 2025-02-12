@@ -9,45 +9,64 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/haraldrudell/parl/perrors/errorglue"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
 const (
 	e116StacknFramesToSkip = 1
-	e116StackFrames        = 1
-	perrNewFrames          = 1
+	// stack frames to skip in [New] [Errorf]
+	e116StackFrames = 1
+	// stack frames to skip in [NewPF]
+	perrNewFrames = 1
 )
 
-// error116.New is similar to errors.New but ensures that the returned error
+// New is similar to [errors.New] but ensures that the returned error
 // has at least one stack trace associated
-func New(s string) error {
-	if s == "" { // ensure there is an error message
+//   - if s is empty “StackNew from …”
+func New(s string) (err error) {
+
+	// ensure there is an error message
+	if s == "" {
 		s = "StackNew from " + pruntime.NewCodeLocation(perrNewFrames).Short()
 	}
-	return Stackn(errors.New(s), e116StackFrames)
+
+	// add stack
+	err = Stackn(errors.New(s), e116StackFrames)
+
+	return
 }
 
-func NewPF(s string) error {
-	packFunc := pruntime.NewCodeLocation(perrNewFrames).PackFunc()
+// NewPF is similar to [errors.New] but ensures that the returned error
+// has at least one stack trace associated
+//   - if s is empty “StackNew from …”
+//   - prepends error message with package name and function identifiers
+//   - “perrors NewPF s cannot be empty”
+func NewPF(s string) (err error) {
+	var packFunc = pruntime.NewCodeLocation(perrNewFrames).PackFunc()
 	if s == "" {
 		s = packFunc
 	} else {
 		s = packFunc + "\x20" + s
 	}
-	return Stackn(errors.New(s), e116StackFrames)
+	err = Stackn(errors.New(s), e116StackFrames)
+	return
 }
 
-// error116.Errorf is similar to fmt.Errorf but ensures that the returned err
+// Errorf is similar to [fmt.Errorf] but ensures that the returned err
 // has at least one stack trace associated
 func Errorf(format string, a ...interface{}) (err error) {
 	err = fmt.Errorf(format, a...)
 	if HasStack(err) {
 		return
 	}
-	return Stackn(err, e116StackFrames)
+	err = Stackn(err, e116StackFrames)
+	return
 }
 
+// Errorf is similar to [fmt.Errorf] but ensures that the returned err
+// has at least one stack trace associated
+//   - prepends error message with package name and function identifiers
+//   - “perrors NewPF s cannot be empty”
 func ErrorfPF(format string, a ...interface{}) (err error) {
 	// format may include %w directives, meaning fmt.Errorf must be used
 	// format may include numeric indices like %[1]s, meaning values cannot be prepended to a
@@ -56,29 +75,6 @@ func ErrorfPF(format string, a ...interface{}) (err error) {
 	if HasStack(err) {
 		return
 	}
-	return Stackn(err, e116StackFrames)
-}
-
-// error116.Stack ensures the err has a stack trace
-// associated.
-// err can be nil in which nil is returned
-func Stack(err error) (err2 error) {
-	if HasStack(err) {
-		return err
-	}
-	return Stackn(err, e116StackFrames)
-}
-
-// error116.Stackn always attaches a new stack trace to err and
-// allows for skipping stack frames using framesToSkip.
-// if err is nil, no action is taken
-func Stackn(err error, framesToSkip int) (err2 error) {
-	if err == nil {
-		return
-	}
-	if framesToSkip < 0 {
-		framesToSkip = 0
-	}
-	err2 = errorglue.NewErrorStack(err, pruntime.NewStack(e116StacknFramesToSkip+framesToSkip))
+	err = Stackn(err, e116StackFrames)
 	return
 }

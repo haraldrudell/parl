@@ -5,12 +5,19 @@ ISC License
 
 package perrors
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/haraldrudell/parl/pruntime"
+)
 
 const (
+	// stack frames to skip [Is] [IsPF] [Is2] [Is2PF]
 	isStackFrames = 1
 )
 
+// Is2 is similar to [Is] but receives it error in e
+//   - if errp and e both non-nil, e is appended to *errp
 func Is2(errp *error, e error, format string, a ...interface{}) (isBad bool) {
 	if e == nil {
 		return // no error exit
@@ -24,13 +31,15 @@ func Is2(errp *error, e error, format string, a ...interface{}) (isBad bool) {
 	return true
 }
 
+// Is2PF is similar to [IsPF] but receives it error in e
+//   - if errp and e both non-nil, e is appended to *errp
 func Is2PF(errp *error, e error, format string, a ...interface{}) (isBad bool) {
 	if e == nil {
 		return // no error exit
 	} else if !HasStack(e) {
 		e = Stackn(e, isStackFrames)
 	}
-	PF := PackFuncN(isStackFrames)
+	var PF = pruntime.PackFunc(isStackFrames)
 	if format == "" {
 		e = fmt.Errorf("%s %w", PF, e)
 	} else {
@@ -66,6 +75,13 @@ func Is(errp *error, format string, a ...interface{}) (isBad bool) {
 	return true
 }
 
+// IsPF returns true if *errp contains a non-nil error
+//   - package and function identifiers are prepended
+//   - if return value is true and format is not empty string, *errp is updated with
+//     fmt.Errorf using format and a, typically including “%w” and an error
+//   - if *errp is non-nil and does not have a stack, a stack is inserted into
+//     its error chain
+//   - errp cannot be nil or panic
 func IsPF(errp *error, format string, a ...interface{}) (isBad bool) {
 	if errp == nil {
 		panic(NewPF("errp nil"))
@@ -74,7 +90,7 @@ func IsPF(errp *error, format string, a ...interface{}) (isBad bool) {
 	if err == nil {
 		return false // no error exit
 	}
-	PF := PackFuncN(isStackFrames)
+	var PF = pruntime.PackFunc(isStackFrames)
 	if format == "" {
 		err = fmt.Errorf("%s %w", PF, err)
 	} else {

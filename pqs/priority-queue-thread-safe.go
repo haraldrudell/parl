@@ -3,8 +3,6 @@
 ISC License
 */
 
-// RankingThreadSafe is a thread-safe pointer-identity-to-value map of updatable values traversable by rank.
-// RankingThreadSafe implements [parl.Ranking][V comparable, R constraints.Ordered].
 package pqs
 
 import (

@@ -63,10 +63,3 @@ perrors used to be called error116 becaue Rob Pike was going to put it into go1.
 © 2020–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)
 */
 package perrors
-
-// SupportsIs is used for type assertions determining if an error value
-// implements the Is() method, therefore supports errors.Is()
-type SupportsIs interface {
-	error
-	Is(target error) (isThisType bool)
-}

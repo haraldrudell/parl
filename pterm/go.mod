@@ -9,7 +9,7 @@ toolchain go1.23.5
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.189
+	github.com/haraldrudell/parl v0.4.190
 	golang.org/x/term v0.29.0
 )
 

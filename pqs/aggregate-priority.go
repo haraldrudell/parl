@@ -3,7 +3,6 @@
 ISC License
 */
 
-// pqs provides legacy priority-queue implementation likely to be deprecated
 package pqs
 
 import (
