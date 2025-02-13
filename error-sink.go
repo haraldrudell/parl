@@ -7,6 +7,11 @@ package parl
 
 import "github.com/haraldrudell/parl/perrors"
 
+var (
+	// NoErrorSink1 is value to use when no [ErrorSink1] is provided
+	NoErrorSink1 ErrorSink1
+)
+
 // ErrorSink receives non-fatal errors
 //   - closable version of [ErrorSink1]
 //   - addresses threads’ need to submit non-fatal errors

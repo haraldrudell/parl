@@ -18,7 +18,12 @@ import (
 )
 
 func TestGoGroup(t *testing.T) {
+	// isDebug is true if test is being debugged and may
+	// be stopped long time at a breakpoint
 	var isDebug bool //= true
+	// timeout is timeout to wait for data
+	//	- isDebug true: timeout zero: wait indefinitely while stopped in debugger
+	//	- isDebug false: timeout 1ms so test does not hang indefinitely
 	var timeout time.Duration
 	if isDebug {
 		t.Errorf("isDebug: timeouts are disabled")
@@ -26,11 +31,14 @@ func TestGoGroup(t *testing.T) {
 		timeout = time.Millisecond
 	}
 	const (
+		// shortTime waits slightly to avoid race-condition errors
 		shortTime = time.Millisecond
+		// messageBad is error message fixture
+		messageBad = "bad"
 	)
 	var (
-		messageBad = "bad"
-		errBad     = errors.New(messageBad)
+		// errBad is error fixture
+		errBad = errors.New(messageBad)
 	)
 
 	var (
@@ -46,7 +54,7 @@ func TestGoGroup(t *testing.T) {
 		isReady, isDone            parl.WaitGroupCh
 		timer                      *time.Timer
 		goGroupImpl                *GoGroup
-		isTimeout                  int
+		isTimeout                  timeoutFlag
 		hasValue                   bool
 	)
 
@@ -191,7 +199,7 @@ func TestGoGroup(t *testing.T) {
 	// GoError should send errors
 	reset()
 	goGroup.Go().AddError(errBad)
-	goError, hasValue, isTimeout = awaitGoError(goGroup.GoError(), timeout)
+	goError, hasValue, isTimeout = awaitGoError(&goGroupImpl.goErrorStream, timeout)
 	_ = hasValue
 	if isTimeout == timeoutYES {
 		t.Fatal("GoGroup error channel timeout")
@@ -203,11 +211,14 @@ func TestGoGroup(t *testing.T) {
 		t.Error("GoError sending bad errors")
 	}
 
-	// Ch should close on termination
+	// goErrorStream should close on termination
+	//	- goErrorStream is not exposed by GoGroup
+	//	- access the package-private goErrorStream using goGroupImpl
 	reset()
+	// AllowTermination for unused GoGroup causes it to terminate
 	goGroup.EnableTermination(parl.AllowTermination)
 	select {
-	case <-goGroup.GoError().EmptyCh(parl.CloseAwaiter):
+	case <-goGroupImpl.goErrorStream.EmptyCh(parl.CloseAwaiter):
 	default:
 		t.Error("Ch did not close on termination")
 	}
@@ -295,7 +306,7 @@ func TestSubGo(t *testing.T) {
 		goError, goError2      parl.GoError
 		g                      parl.Go
 		hasValue               bool
-		isTimeout              int
+		isTimeout              timeoutFlag
 	)
 
 	// Go Subgo SubGroup Wait WaitCh EnableTermination
@@ -313,7 +324,7 @@ func TestSubGo(t *testing.T) {
 	// a non-fatal subGo error should be recevied on GoGroup error channel
 	goError = NewGoError(err, parl.GeNonFatal, subGo.Go())
 	subGoImpl.ConsumeError(goError)
-	goError2, hasValue, isTimeout = awaitGoError(goGroup.GoError(), timeout)
+	goError2, hasValue, isTimeout = awaitGoError(&goGroupImpl.goErrorStream, timeout)
 	_ = hasValue
 	if isTimeout == timeoutYES {
 		t.Fatal("GoGroup error channel timeout")
@@ -327,7 +338,7 @@ func TestSubGo(t *testing.T) {
 	// a SubGo fatal error should be recevied on GoGroup error channel
 	g = subGo.Go()
 	g.Done(&err)
-	goError2, hasValue, isTimeout = awaitGoError(goGroup.GoError(), timeout)
+	goError2, hasValue, isTimeout = awaitGoError(&goGroupImpl.goErrorStream, timeout)
 	_ = hasValue
 	if isTimeout == timeoutYES {
 		t.Fatal("GoGroup error channel timeout")
@@ -345,7 +356,7 @@ func TestSubGo(t *testing.T) {
 	// gogroup should end and closed its error channel
 	//	- its only thread did exit
 	select {
-	case <-goGroup.GoError().EmptyCh(parl.CloseAwaiter):
+	case <-goGroupImpl.goErrorStream.EmptyCh(parl.CloseAwaiter):
 	default:
 		t.Errorf("goGroup channel did not close: %s", goError2)
 	}
@@ -368,12 +379,12 @@ func TestSubGroup(t *testing.T) {
 
 	var (
 		goGroup                       parl.GoGroup
-		subGroupImpl                  *GoGroup
+		goGroupImpl, subGroupImpl     *GoGroup
 		goError, goError2             parl.GoError
 		g                             parl.Go
 		hasValue                      bool
-		isTimeout                     int
-		goGroupErrors, subGroupErrors *parl.AwaitableSlice[parl.GoError]
+		isTimeout                     timeoutFlag
+		goGroupErrors, subGroupErrors parl.Source1[parl.GoError]
 	)
 
 	// Go SubGo SubGroup GoError Wait WaitCh EnableTermination
@@ -381,10 +392,11 @@ func TestSubGroup(t *testing.T) {
 	var subGroup parl.SubGroup
 	var reset = func() {
 		goGroup = NewGoGroup(context.Background())
-		goGroupErrors = goGroup.GoError().(*parl.AwaitableSlice[parl.GoError])
+		goGroupImpl = goGroup.(*GoGroup)
+		goGroupErrors = &goGroupImpl.goErrorStream
 		subGroup = goGroup.SubGroup()
 		subGroupImpl = subGroup.(*GoGroup)
-		subGroupErrors = subGroup.GoError().(*parl.AwaitableSlice[parl.GoError])
+		subGroupErrors = &subGroupImpl.goErrorStream
 	}
 
 	// A SubGroup non-fatal error should be read from GoGroup
@@ -464,13 +476,13 @@ func TestSubGroup(t *testing.T) {
 	}
 	// subgroup should exit when it last thread exits
 	select {
-	case <-subGroup.GoError().EmptyCh(parl.CloseAwaiter):
+	case <-subGroupImpl.goErrorStream.EmptyCh(parl.CloseAwaiter):
 	default:
 		t.Error("subGroup did not terminate")
 	}
 	// gogroup should exit when its last thread exits
 	select {
-	case <-goGroup.GoError().EmptyCh(parl.CloseAwaiter):
+	case <-goGroupImpl.goErrorStream.EmptyCh(parl.CloseAwaiter):
 	default:
 		t.Errorf("goGroup did not terminate %s", goGroup)
 	}
@@ -606,26 +618,41 @@ func waiter(
 	goGroup.Wait()
 }
 
-// awaitGoError awaits a GoError optionally with timeout
-//   - goErrors the error source
+// awaitGoError awaits a single GoError optionally with timeout
+//   - goErrors: the GoError stream source.
+//     To await using select statement, an iterator does not work.
+//     Must have the stream-source object
 //   - timeout: 0 or timeout
-//   - goError: the value
-//   - hasValue true if a value was read
-//   - isTimeout true if receive timed out
-func awaitGoError(goErrors parl.IterableSource[parl.GoError], timeout time.Duration) (goError parl.GoError, hasValue bool, isTimeout int) {
+//   - goError: any GoError value
+//   - hasValue: true if a value was read
+//   - isTimeout: true if receive timed out
+func awaitGoError(goErrors parl.Source1[parl.GoError], timeout time.Duration) (goError parl.GoError, hasValue bool, isTimeout timeoutFlag) {
+
+	// C is timeout channel or nil if no timeout
+	//	- nil waits indefinitely
 	var C <-chan time.Time
 	if timeout > 0 {
 		var timer = time.NewTimer(timeout)
 		defer timer.Stop()
 		C = timer.C
 	}
+
+	// await error or timeout
 	select {
 	case <-goErrors.DataWaitCh():
 		goError, hasValue = goErrors.Get()
 	case <-C:
 		isTimeout = timeoutYES
 	}
+
 	return
 }
 
-const timeoutYES = 1
+const (
+	// timeoutYES means timeout occured
+	timeoutYES timeoutFlag = 1
+)
+
+// timeoutFlag is typesafe timeout indicator
+//   - [timeoutYES] means timeout occured
+type timeoutFlag int

@@ -20,20 +20,6 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const (
-	// 1 is for NewGoGroup/.SubGo/.SubGroup
-	//	1 is for new
-	goGroupNewObjectFrames = 2
-	// 1 is for .Go
-	// 1 is for newGo
-	goGroupStackFrames  = 2
-	goFromGoStackFrames = goGroupStackFrames + 1
-	// 1 is for Go method
-	// 1 is for NewGoGroup/.SubGo/.SubGroup/.Go
-	//	1 is for new
-	fromGoNewFrames = goGroupNewObjectFrames + 1
-)
-
 // GoGroup is a Go thread-group. Thread-safe.
 //   - GoGroup has its own error channel and waitgroup and no parent thread-group.
 //   - thread exits are processed by G1Done and the g1WaitGroup
@@ -43,38 +29,41 @@ const (
 //   - SubGroup creates a subordinate thread-group using this threadgroup’s error channel
 type GoGroup struct {
 	// creator is the code line that invoked new for this GoGroup SubGo or SubGroup
+	//	- from: [NewGoGroup] [GoGroup.SubGo] [Go.SubGo] [GoGroup.SubGroup] [Go.SubGroup]
 	creator pruntime.CodeLocation
 	// parent for SubGo SubGroup, nil for GoGroup
+	//	- from: [GoGroup.SubGo] [Go.SubGo] [GoGroup.SubGroup] [Go.SubGroup]
 	parent goGroupParent
-	// true if instance has error channel, ie. is GoGroup or SubGroup
+	// hasErrorChannel is true if instance has error channel, ie. is GoGroup or SubGroup not SubGo
 	hasErrorChannel bool
-	// true if instance is SubGroup and not GoGroup or SubGo
+	// isSubGroup is true if instance is SubGroup and not GoGroup or SubGo
 	isSubGroup bool
-	// invoked on first fatal thread-exit
+	// onFirstFatal is set is invoked on first fatal thread-exit
 	onFirstFatal parl.GoFatalCallback
 	// gos is a map from goEntityId to subordinate SubGo SunGroup Go
 	gos parli.ThreadSafeMap[parl.GoEntityID, *ThreadData]
-	// unbound error channel used when instance is GoGroup or SubGroup
+	// goErrorStream is an unbound error channel used when instance is GoGroup or SubGroup
 	goErrorStream parl.AwaitableSlice[parl.GoError]
-	// channel that closes when this threadGroup ends
+	// endCh is a channel that closes when this threadGroup ends
 	endCh parl.Awaitable
-	// provides Go entity ID, sub-object waitgroup, cancel-context
+	// goContext provides Go entity ID, sub-object waitgroup, cancel-context
 	//	- Cancel() Context() EntityID()
 	goContext
 
-	// whether a fatal exit has occurred
+	// hadFatal indicates that a fatal exit occurred
 	hadFatal atomic.Bool
-	// whether thread-group termination is allowed
-	//	- set by EnableTermination
+	// isNoTermination controls whether thread-group termination is allowed
+	//	- set by [GoGroup.EnableTermination]
 	isNoTermination atomic.Bool
-	// controls whether debug information is printed
-	//	- set by SetDebug
+	// isDebug is per-instance control whether debug information is printed
+	//	- set by [GoGroup.SetDebug]
 	isDebug atomic.Bool
-	// controls whether trean information is stroed in gos
-	//	- set by SetDebug
+	// isAggregateThreads controls whether thread information is stored in gos
+	//	- set by [GoGroup.SetDebug]
 	isAggregateThreads atomic.Bool
-	onceWaiter         atomic.Pointer[parl.OnceWaiter]
-	// debug-log set by SetDebug
+	// onceWaiter controls isFirstFatal invocations
+	onceWaiter atomic.Pointer[parl.OnceWaiter]
+	// log is debug-log output set by [GoGroup.SetDebug]
 	log atomic.Pointer[parl.PrintfFunc]
 
 	// doneLock ensures:
@@ -94,7 +83,10 @@ type GoGroup struct {
 	doneLock sync.Mutex
 }
 
+// GoGroup implements goGroupParent
 var _ goGroupParent = &GoGroup{}
+
+// GoGroup implements goParent
 var _ goParent = &GoGroup{}
 
 // NewGoGroup returns a stand-alone thread-group with its own error channel. Thread-safe.
@@ -129,6 +121,7 @@ func (g *GoGroup) Go() (g2 parl.Go) { return g.newGo(goGroupStackFrames) }
 func (g *GoGroup) FromGoGo() (g2 parl.Go) { return g.newGo(goFromGoStackFrames) }
 
 // newGo creates parl.Go objects
+//   - from [GoGroup.Go] or [Go.Go]
 func (g *GoGroup) newGo(frames int) (g2 parl.Go) {
 	// At this point, Go invocation is accessible so retrieve it
 	// the goroutine has not been created yet, so there is no creator
@@ -166,7 +159,7 @@ func (g *GoGroup) SubGo(onFirstFatal ...parl.GoFatalCallback) (g2 parl.SubGo) {
 	return new(g, nil, false, false, goGroupNewObjectFrames, onFirstFatal...)
 }
 
-// FromGoSubGo returns a subordinate thread-group witthout an error channel. Thread-safe.
+// FromGoSubGo returns a subordinate thread-group without an error channel. Thread-safe.
 func (g *GoGroup) FromGoSubGo(onFirstFatal ...parl.GoFatalCallback) (g1 parl.SubGo) {
 	return new(g, nil, false, false, fromGoNewFrames, onFirstFatal...)
 }
@@ -194,7 +187,7 @@ func (g *GoGroup) FromGoSubGroup(onFirstFatal ...parl.GoFatalCallback) (g2 parl.
 	return new(g, nil, true, true, fromGoNewFrames, onFirstFatal...)
 }
 
-// new returns a new GoGroup as parl.GoGroup
+// new returns a new GoGroup as [parl.GoGroup]
 func new(
 	parent goGroupParent, ctx context.Context,
 	hasErrorChannel, isSubGroup bool,
@@ -391,10 +384,13 @@ func (g *GoGroup) ConsumeError(goError parl.GoError) {
 	g.goErrorStream.Send(goError)
 }
 
-// GoError returns a channel sending the all fatal termination errors when
-// the FailChannel option is present, or only the first when both
-// FailChannel and StoreSubsequentFail options are present.
-func (g *GoGroup) GoError() (goErrors parl.IterableSource[parl.GoError]) { return &g.goErrorStream }
+// GoError iterates over fatal termination errors
+//   - only one iterator should operate at a time
+//   - when the FailChannel option is present, or only the first when both
+//     FailChannel and StoreSubsequentFail options are present.
+func (g *GoGroup) GoError() (goErrorSource parl.IterableAllSource[parl.GoError]) {
+	return &g.goErrorStream
+}
 
 // FirstFatal allows to await or inspect the first thread terminating with error.
 // it is valid if this SubGo has LocalSubGo or LocalChannel options.
@@ -515,13 +511,18 @@ func (g *GoGroup) Internals() (
 	isAggregateThreads *atomic.Bool,
 	setCancelListener func(f func()),
 	endCh <-chan struct{},
+	goError *parl.AwaitableSlice[parl.GoError],
 ) {
+	isEnd = g.isEnd
+	isAggregateThreads = &g.isAggregateThreads
+	setCancelListener = g.goContext.setCancelListener
 	if g.hasErrorChannel {
 		endCh = g.goErrorStream.EmptyCh(parl.CloseAwaiter)
 	} else {
 		endCh = g.endCh.Ch()
 	}
-	return g.isEnd, &g.isAggregateThreads, g.goContext.setCancelListener, endCh
+	goError = &g.goErrorStream
+	return
 }
 
 // the available data for all threads
@@ -743,3 +744,17 @@ func (g *GoGroup) invokeOnFirstFatal() (err error) {
 
 	return
 }
+
+const (
+	// 1 is for NewGoGroup/.SubGo/.SubGroup
+	//	1 is for new
+	goGroupNewObjectFrames = 2
+	// 1 is for .Go
+	// 1 is for newGo
+	goGroupStackFrames  = 2
+	goFromGoStackFrames = goGroupStackFrames + 1
+	// 1 is for Go method
+	// 1 is for NewGoGroup/.SubGo/.SubGroup/.Go
+	//	1 is for new
+	fromGoNewFrames = goGroupNewObjectFrames + 1
+)

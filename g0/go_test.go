@@ -18,73 +18,76 @@ import (
 )
 
 func TestGo(t *testing.T) {
-	var err = errors.New("x")
-	var label = "label"
+	const (
+		label = "label"
+	)
+	var (
+		err = errors.New("x")
+	)
 
-	var goGroup parl.GoGroup
-	var g0 parl.Go
-	var g0Impl *Go
-	var subGroup parl.SubGroup
-	var subGo parl.SubGo
-	var goError parl.GoError
-	var ok bool
-	var ctx0, ctx context.Context
+	var (
+		goGroup       parl.GoGroup
+		goGroupImpl   *GoGroup
+		goErrorSource parl.Source1[parl.GoError]
+		goImpl        *Go
+		subGroup      parl.SubGroup
+		subGo         parl.SubGo
+		goError       parl.GoError
+		ok            bool
+		ctx0, ctx     context.Context
+	)
 
 	// Register() AddError() Go() SubGo() SubGroup() Done() Wait()
 	// WaitCh() Cancel() Context() ThreadInfo() Creator()
 	// GoRoutine() GoID() EntityID()
 	var g parl.Go
-	var goGroup2 parl.GoGroup
 	var reset = func() {
-		goGroup2 = NewGoGroup(context.Background())
+		goGroup = NewGoGroup(context.Background())
+		goGroupImpl = goGroup.(*GoGroup)
+		goErrorSource = &goGroupImpl.goErrorStream
 		g = goGroup.Go()
+		goImpl = g.(*Go)
 	}
-	_ = g
-	_ = reset
-	_ = goGroup2
 
 	// Register() AddError() Go() SubGo() SubGroup() Done() ThreadInfo()
 	// GoID() Wait()
-	goGroup = NewGoGroup(context.Background())
-	g0 = goGroup.Go()
-	g0Impl = g0.(*Go)
-	if g0Impl.endCh.IsClosed() {
-		t.Error("Go terminated")
+	reset()
+	if goImpl.endCh.IsClosed() {
+		t.Error("Go created terminated")
 	}
-	g0.Register(label)
-	if !g0.GoID().IsValid() {
+	g.Register(label)
+	if !g.GoID().IsValid() {
 		t.Error("Go.GoID bad")
 	}
-	if g0.ThreadInfo().Name() != label {
-		t.Error("g0.Register bad")
+	if g.ThreadInfo().Name() != label {
+		t.Error("Go.Register bad")
 	}
-	if subGroup = g0.SubGroup(); subGroup == nil {
+	if subGroup = g.SubGroup(); subGroup == nil {
 		t.Error("Go.SubGroup bad")
 	}
-	if subGo = g0.SubGo(); subGo == nil {
+	if subGo = g.SubGo(); subGo == nil {
 		t.Error("Go.SubGo bad")
 	}
-	g0.AddError(err)
-	if goError, _ = parl.AwaitValue(goGroup.GoError()); !errors.Is(goError.Err(), err) ||
+	g.AddError(err)
+	if goError, _ = parl.AwaitValue(goErrorSource); !errors.Is(goError.Err(), err) ||
 		goError.ErrContext() != parl.GeNonFatal {
 		t.Error("g0.AddError bad")
 	}
-	g0.Done(&err)
-	if goError, _ = parl.AwaitValue(goGroup.GoError()); !errors.Is(goError.Err(), err) ||
+	g.Done(&err)
+	if goError, _ = parl.AwaitValue(goErrorSource); !errors.Is(goError.Err(), err) ||
 		goError.ErrContext() != parl.GeExit {
 		t.Error("g0.Done bad")
 	}
-	if _, ok = parl.AwaitValue(goGroup.GoError()); ok {
+	if _, ok = parl.AwaitValue(goErrorSource); ok {
 		t.Error("g0.Done goGroup errch did not close")
 	}
-	g0.Wait()
+	g.Wait()
 
 	// Cancel() Context()
-	goGroup = NewGoGroup(context.Background())
+	reset()
 	ctx0 = goGroup.Context()
-	g0 = goGroup.Go()
-	g0.Cancel()
-	if ctx = g0.Context(); ctx.Err() == nil {
+	g.Cancel()
+	if ctx = g.Context(); ctx.Err() == nil {
 		t.Error("Go.Cancel did not cancel context")
 	}
 	if ctx0 != ctx {
@@ -92,70 +95,63 @@ func TestGo(t *testing.T) {
 	}
 
 	// String(): "go:34:testing.(*T).Run()-testing.go:1629"
-	t.Log(g0.String())
-	//t.Fail()
-}
-
-type T struct {
-	g0                parl.Go
-	label             string
-	cL                *pruntime.CodeLocation
-	goroutineThreadID *parl.ThreadID
-	wg                sync.WaitGroup
-}
-
-// tt.g must have Register and NewCodeLocation on same line
-//   - tt.g is the goFunction of a goroutine
-func (tt *T) g() { tt.g0.Register(tt.label); tt.h(pruntime.NewCodeLocation(0)) }
-func (tt *T) h(g0RegisterLine *pruntime.CodeLocation) {
-	defer tt.wg.Done()
-
-	*tt.cL = *g0RegisterLine
-	*tt.goroutineThreadID = goid.GoID()
+	t.Log(g.String())
 }
 
 func TestGo_Frames(t *testing.T) {
-	var expLabel = "LABEL"
-	var expThreadID = goid.GoID()
-	var cL *pruntime.CodeLocation
-	var g0 parl.Go
-	var subGo parl.SubGo
-	var subGroup parl.SubGroup
-	var goFunctionCL pruntime.CodeLocation
-	var goroutineThreadID parl.ThreadID
+	const (
+		expLabel = "LABEL"
+	)
+	var (
+		expThreadID = goid.GoID()
+	)
 
-	var goGroup parl.GoGroup = NewGoGroup(context.Background())
-	var parentGo parl.Go = goGroup.Go()
+	var (
+		// goGroup provides Go objects
+		goGroup = NewGoGroup(context.Background())
+		// parentGo is a fake Go that generates the Go used by the goroutine
+		parentGo          parl.Go = goGroup.Go()
+		goInvocationLine  *pruntime.CodeLocation
+		g                 parl.Go
+		subGo             parl.SubGo
+		subGroup          parl.SubGroup
+		goFunctionCL      *pruntime.CodeLocation
+		goroutineThreadID parl.ThreadID
+		regTester         *registerTester
+		creatorThreadID   parl.ThreadID
+		createLocation    *pruntime.CodeLocation
+	)
 
-	// Go.Go(): Go.String() has caller location
+	// Go.Go(): Go.String() should have caller location
 	//	- the location is stored in the thread field
-	// g0 and cL assignments on same line
-	g0, cL = parentGo.Go(), pruntime.NewCodeLocation(0)
-	if !strings.HasSuffix(g0.String(), cL.Short()) {
+	//	- generate g and the code-line where it was created
+	//	- g and goInvocationLine assignments on same line
+	g, goInvocationLine = parentGo.Go(), pruntime.NewCodeLocation(0)
+	if s := g.String(); !strings.HasSuffix(s, goInvocationLine.Short()) {
 		var _ = (&Go{}).String
 		var _ ThreadData
-		t.Errorf("Go.Go: Go.String BAD: %q exp suffix: %q", g0.String(), cL.Short())
+		t.Errorf("Go.Go: Go.String BAD: %q exp suffix: %q", s, goInvocationLine.Short())
 	}
 
-	// Go.Go(): before g0.Register(), there is an intermediate createLocation
+	// Go.Creator() should be initialized with creating thread first
+	//	- Go.Go(): before g0.Register(), there is an intermediate createLocation
 	//	- this has only creator set
-	id, cre := g0.Creator()
+	creatorThreadID, createLocation = g.Creator()
 	var _ ThreadData
 	// Go.Go() before g0.Register: Go.ThreadInfo: cre:g0.TestGo_Frames()-go_test.go:113 creatorID: 4
-	t.Logf("Go.Go() before g0.Register: Go.ThreadInfo: %s creatorID: %s", g0.ThreadInfo(), id)
-	if id != expThreadID {
-		t.Errorf("Go.CreatorID: %q exp %q", id, expThreadID)
+	t.Logf("Go.Go() before g0.Register: Go.ThreadInfo: %s creatorID: %s", g.ThreadInfo(), creatorThreadID)
+	if creatorThreadID != expThreadID {
+		t.Errorf("Go.CreatorID: %q exp %q", creatorThreadID, expThreadID)
 	}
-	if cre.Short() != cL.Short() {
-		t.Errorf("Go.Creator Short: %q exp %q", cre.Short(), cL.Short())
+	if createLocation.Short() != goInvocationLine.Short() {
+		t.Errorf("Go.Creator Short: %q exp %q", createLocation.Short(), goInvocationLine.Short())
 	}
 
-	// Go.Register(): updates ThreadID goFuncLocation and label
-	tt := T{g0: g0, label: expLabel, cL: &goFunctionCL, goroutineThreadID: &goroutineThreadID}
-	tt.wg.Add(1)
-	go tt.g()
-	tt.wg.Wait()
-	var threadData = g0.ThreadInfo()
+	// Go.Register() should update ThreadID goFuncLocation and label
+	regTester = newRegisterTester(g, expLabel)
+	go regTester.goMethod().goFunction()
+	goFunctionCL, goroutineThreadID = regTester.result()
+	var threadData = g.ThreadInfo()
 	if threadData.ThreadID() != goroutineThreadID {
 		t.Errorf("Go ThreadID: %q exp %q", threadData.ThreadID(), goroutineThreadID)
 	}
@@ -168,14 +164,66 @@ func TestGo_Frames(t *testing.T) {
 		t.Errorf("Go thread label: %q exp %q", threadData.Name(), expLabel)
 	}
 
-	// g0.SubGo() g0.SubGroup() have invoking creator location
+	// g0.SubGo() should have invoking creator location
 	var _ parl.Go
-	subGo, cL = g0.SubGo(), pruntime.NewCodeLocation(0)
-	if !strings.HasSuffix(subGo.String(), cL.Short()) {
-		t.Errorf("g0.SubGo() invoker location: %q expPrefix %q", subGo.String(), cL.Short())
+	subGo, goInvocationLine = g.SubGo(), pruntime.NewCodeLocation(0)
+	if !strings.HasSuffix(subGo.String(), goInvocationLine.Short()) {
+		t.Errorf("g0.SubGo() invoker location: %q expPrefix %q", subGo.String(), goInvocationLine.Short())
 	}
-	subGroup, cL = g0.SubGroup(), pruntime.NewCodeLocation(0)
-	if !strings.HasSuffix(subGroup.String(), cL.Short()) {
-		t.Errorf("g0.SubGroup() invoker location: %q expPrefix %q", subGroup.String(), cL.Short())
+
+	// g0.SubGroup() should have invoking creator location
+	subGroup, goInvocationLine = g.SubGroup(), pruntime.NewCodeLocation(0)
+	if !strings.HasSuffix(subGroup.String(), goInvocationLine.Short()) {
+		t.Errorf("g0.SubGroup() invoker location: %q expPrefix %q", subGroup.String(), goInvocationLine.Short())
 	}
+}
+
+// registerTester tests Go.Register method
+type registerTester struct {
+	// g is the Go object managing the goFunction goroutine
+	g parl.Go
+	// label is the thread-name the goroutine registers as
+	label string
+	// the code line from the goroutine
+	cL *pruntime.CodeLocation
+	// goroutineThreadID is the thread ID for the launched goroutine
+	goroutineThreadID parl.ThreadID
+	// wg makes the goroutine awaitable
+	wg sync.WaitGroup
+}
+
+// newRegisterTester returns a tester for [Go.Regsiter]
+func newRegisterTester(g parl.Go, label string) (r *registerTester) {
+	return &registerTester{
+		g:     g,
+		label: label,
+	}
+}
+
+// goMethod returns the method to use in go statement
+func (r *registerTester) goMethod() (r2 *registerTester) {
+	r2 = r
+	r.wg.Add(1)
+	return
+}
+
+// goFunction fixture is the function launching a new goroutine
+//   - goFunction must have Register and NewCodeLocation on same line
+//   - tt.goFunction is the goFunction of a goroutine
+func (t *registerTester) goFunction() { t.g.Register(t.label); t.h(pruntime.NewCodeLocation(0)) }
+
+// h stores register values and ends the goroutine
+func (t *registerTester) h(g0RegisterLine *pruntime.CodeLocation) {
+	defer t.wg.Done()
+
+	t.cL = g0RegisterLine
+	t.goroutineThreadID = goid.GoID()
+}
+
+// result awaits gorotuine eexits and returns actual values
+func (r *registerTester) result() (cL *pruntime.CodeLocation, goroutineThreadID parl.ThreadID) {
+	r.wg.Wait()
+	cL = r.cL
+	goroutineThreadID = r.goroutineThreadID
+	return
 }

@@ -61,11 +61,16 @@ func Test_newRateCounter(t *testing.T) {
 	timer = time.NewTimer(waitOneSecond)
 	defer timer.Stop()
 	isTimeout = false
+	var goGroup = threadGroup.(*g0.GoGroup)
+	var _ /*isEnd*/, _, /*isAggregateThreads*/
+		_ /*setCancelListener*/, _, /*endCh*/
+		goErrorStream = goGroup.Internals()
+
 	for {
 		select {
-		case <-threadGroup.GoError().DataWaitCh():
+		case <-goErrorStream.DataWaitCh():
 			var hasValue bool
-			if goError, hasValue = threadGroup.GoError().Get(); !hasValue {
+			if goError, hasValue = goErrorStream.Get(); !hasValue {
 				continue
 			}
 		case <-timer.C:

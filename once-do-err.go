@@ -9,7 +9,7 @@ package parl
 // that executes a function returning an error that may panic
 //   - onceDoErr is a tuple value-type
 //   - — if used as local variable, function argument or return value,
-//     no allocation tajkes place
+//     no allocation takes place
 //   - — taking its address causes allocation
 type onceDoErr struct {
 	doErrFuncArgument func() (err error)

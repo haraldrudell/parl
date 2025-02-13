@@ -12,14 +12,20 @@ import (
 )
 
 func TestAwaitableSlice(t *testing.T) {
-	var value1, value2, value3 = 1, 2, 3
-	var values = []int{value1, value2, value3}
-	var size = 25
+	const (
+		value1, value2, value3 = 1, 2, 3
+		size                   = 25
+	)
+	var (
+		values = []int{value1, value2, value3}
+	)
 
-	var actual int
-	var actuals []int
-	var hasValue, isOpen bool
-	var ch AwaitableCh
+	var (
+		actual           int
+		actuals          []int
+		hasValue, isOpen bool
+		ch               AwaitableCh
+	)
 
 	// DataWaitCh EmptyCh Get Get1 GetAll Send SendSlice SetSize
 	var slice *AwaitableSlice[int]
@@ -191,20 +197,12 @@ func TestAwaitableSliceFor(t *testing.T) {
 	var value1 = 1
 	var expValue1 = []int{value1}
 
-	var actual, zeroValue int
 	var a *AwaitableForTester
 	var actuals []int
 
 	var slice *AwaitableSlice[int]
 	var reset = func() {
 		slice = &AwaitableSlice[int]{}
-	}
-
-	// Init should return zero-value
-	reset()
-	actual = slice.Init()
-	if actual != zeroValue {
-		t.Errorf("Init %d exp %d", actual, zeroValue)
 	}
 
 	// Condition active on value appearing and slice closing
@@ -473,7 +471,7 @@ func NewAwaitableForTester(slice *AwaitableSlice[int]) (a *AwaitableForTester) {
 
 func (a *AwaitableForTester) GoFor() {
 	a.IsReady.Close()
-	for value := a.slice.Init(); a.slice.Condition(&value); {
+	for value := range a.slice.Seq {
 		a.addValue(value)
 	}
 	a.IsClosed.Close()

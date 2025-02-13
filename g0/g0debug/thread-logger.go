@@ -96,7 +96,7 @@ func NewThreadLogger(goGen parl.GoGen, logFn ...parl.PrintfFunc) (threadLogger *
 	}
 
 	// retrieve internals from the goGroup
-	t.isEnd, t.isAggregateThreads, t.setCancelListener, t.gEndCh = t.goGroup.Internals()
+	t.isEnd, t.isAggregateThreads, t.setCancelListener, t.gEndCh, _ /*goError*/ = t.goGroup.Internals()
 
 	return &t
 }

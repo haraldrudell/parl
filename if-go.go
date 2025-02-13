@@ -8,6 +8,7 @@ package parl
 import (
 	"context"
 	"fmt"
+	"iter"
 	"time"
 
 	"github.com/haraldrudell/parl/pruntime"
@@ -227,7 +228,7 @@ type GoGroup interface {
 	//	    if !hasValue {
 	//	      continue
 	//	    …
-	GoError() (goErrors IterableSource[GoError])
+	GoError() (goErrorSource IterableAllSource[GoError])
 	// Wait waits for this thread-group to end
 	Wait()
 	// EnableTermination controls temporarily preventing the GoGroup from
@@ -325,7 +326,7 @@ type SubGroup interface {
 	//	    if !hasValue {
 	//	      continue
 	//	    …
-	GoError() (goErrors IterableSource[GoError])
+	GoError() (goErrorSource IterableAllSource[GoError])
 	// FirstFatal allows to await or inspect the first thread terminating with error.
 	// it is valid if this SubGo has LocalSubGo or LocalChannel options.
 	// To wait for first fatal error using multiple-semaphore mechanic:
@@ -444,3 +445,15 @@ const (
 )
 
 type GoDebug uint8
+
+// Iterator is an for range iterator over T
+type GoErrorIterator interface {
+	// Seq is an iterator over sequences of individual values.
+	// When called as seq(yield), seq calls yield(v) for
+	// each value v in the sequence, stopping early if yield returns false.
+	GoError(yield func(value GoError) (keepGoing bool))
+}
+
+// GoErrorIterator.GoError is iter.Seq
+//   - type Seq[V any] func(yield func(V) bool)
+var _ = func(i GoErrorIterator) (seq iter.Seq[GoError]) { return i.GoError }

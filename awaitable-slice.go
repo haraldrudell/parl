@@ -85,21 +85,22 @@ import (
 //	  if value, hasValue = valueQueue.Get(); hasValue {
 //	    doSomething(value)
 type AwaitableSlice[T any] struct {
-	// allocation size for new slices, set by [AwaitableSlice.SetSize]
+	// size is allocation size for new slices, set by [AwaitableSlice.SetSize]
 	//	- effective slice allocation capacity:
 	//	- if size is unset or less than 1: 10: defaultSize
-	//	- otherwise, set size value
+	//	- otherwise, the value provided to [AwaitableSlice.SetSize]
 	size Atomic64[int]
 	// maxRetainSize is the longest slice capacity that will be reused
 	//	- not retaining large slices avoids temporary memory leaks
 	//	- reusing slices of reasonable size reduces allocations
 	//	- effective value depends on size set by [AwaitableSlice.SetSize]
-	//	- if size is unset or less than 100 maxForPrealloc: 100
-	//	- otherwise, set size value
+	//	- if size is unset or less than 100, use maxForPrealloc: 100
+	//	- otherwise, use value provided to [AwaitableSlice.SetSize]
 	maxRetainSize Atomic64[int]
 	// queueLock makes queue and slices thread-safe
 	//	- queueLock also makes Send SendSlice critical sections
 	//	- high-contention lock
+	//	- two locks separates contention of sink and source
 	queueLock sync.Mutex
 	// queue is a locally made slice for individual values
 	//	- behind queueLock
@@ -114,15 +115,17 @@ type AwaitableSlice[T any] struct {
 	//	- behind queueLock
 	isLocalSlice bool
 	// indicates at all times whether the queue is empty
-	//	- allows for updateDataWait to be invoked without any locks held
+	//	- atomic allows for updateDataWait to be invoked
+	//		without any locks held
 	//	- written behind queueLock
 	hasData atomic.Bool
 	// a pre-allocated slice for queue
 	//	- behind queueLock
 	//	- allocated by Get Get1 GetAll prior to acquiring queueLock
 	cachedInput []T
-	// outputLock makes output thread-safe
-	//	- outputLock also makes Get1 Get critical sections
+	// outputLock makes output slices thread-safe
+	//	- outputLock also makes Get GetSlice GetAll critical sections
+	//	- two locks separates contention of sink and source
 	outputLock sync.Mutex
 	// output is a slice being sliced away from
 	//	- behind outputLock, slice-away slice
@@ -134,14 +137,37 @@ type AwaitableSlice[T any] struct {
 	//	- behind outputLock
 	//	- allocated by Get Get1 GetAll prior to acquiring queueLock
 	cachedOutput []T
-	// lazy DataWaitCh
+	// dataWait provides a channel that is closed upon slice empty
+	//	- channel returned by [AwaitableSlice.DataWaitCh]
+	//	- upon each transition empty to non-empty, channel is re-initialized
+	//	- lazy initialization until any source-sink operation or
+	//		DataWaitCh AwaitValue
 	dataWait LazyCyclic
-	// true if EmptyCh has been invoked, ie.
-	// close state is tracked
+	// isEmptyWait is triggered upon starting the drain-close phases
+	//	- ie. [AwaitableSlice.EmptyCh] invoked without argument
+	//	- state changes to drain and closed states are irreversible
+	//	- [AwaitableSlice.IsClosed] returns true after drain-close
+	//		started and the slice being or becoming empty
+	//	- between isEmptyWait triggered and isEmpty triggered,
+	//		close state is tracked
 	isEmptyWait Awaitable
-	// true if slice is closed
+	// isEmpty is triggered upon the slice in close state
+	//	- close means [AwaitableSlice.EmptyCh] was invoked without argument
+	//		and the slice was or became empty
+	//	- close means [AwaitableSlice.IsClosed] returns true
+	//	- state changes to drain and closed states are irreversible
+	//	- initialization of isEmpty is deferred until isEmptyWait triggered
 	isEmpty Awaitable
 }
+
+// AwaitableSlice is [IterableSource]
+var _ IterableSource[int] = &AwaitableSlice[int]{}
+
+// AwaitableSlice is [ClosableAllSource]
+var _ ClosableAllSource[int] = &AwaitableSlice[int]{}
+
+// AwaitableSlice is [Sink]
+var _ Sink[int] = &AwaitableSlice[int]{}
 
 // Send enqueues a single value. Thread-safe
 func (s *AwaitableSlice[T]) Send(value T) {
@@ -215,6 +241,7 @@ func (s *AwaitableSlice[T]) SendClone(values []T) {
 //   - each DataWaitCh invocation may return a different channel value
 //   - Thread-safe
 func (s *AwaitableSlice[T]) DataWaitCh() (ch AwaitableCh) {
+
 	// this may initialize the cyclic awaitable
 	ch = s.dataWait.Cyclic.Ch()
 
@@ -226,18 +253,14 @@ func (s *AwaitableSlice[T]) DataWaitCh() (ch AwaitableCh) {
 	// establish proper state
 	//	- data wait ch now in use
 	if !s.dataWait.IsActive.CompareAndSwap(false, true) {
-		return
+		return // another thread initialized dataWait
 	}
 
-	// set initial state
+	// set initial state of dataWait
 	s.updateWait()
 
 	return
 }
-
-// [AwaitableSlice.EmptyCh] initialize: this invocation
-// will wait for close-like state, do not activate EmptyCh awaitable
-const CloseAwaiter = false
 
 // EmptyCh returns an awaitable channel that closes on queue being or
 // becoming empty
@@ -248,13 +271,16 @@ const CloseAwaiter = false
 //     act as a deferred Close function
 //   - EmptyCh always returns the same channel value
 //   - thread-safe
-func (s *AwaitableSlice[T]) EmptyCh(doNotInitialize ...bool) (ch AwaitableCh) {
-	// this may initialize the awaitable
+func (s *AwaitableSlice[T]) EmptyCh(doNotClose ...CloseStrategy) (ch AwaitableCh) {
+
+	// ch is a channel is closed or closes upon queue becoming empty
+	//	- this invocation may initialize isEmpty awaitable
 	ch = s.isEmpty.Ch()
 
 	// if previously invoked, no need for initialization
-	if len(doNotInitialize) > 0 || s.isEmptyWait.IsClosed() {
-		return // not first invocation
+	if (len(doNotClose) > 0 && doNotClose[0] == CloseAwaiter) ||
+		s.isEmptyWait.IsClosed() {
+		return // already closed or do not change close-state return
 	}
 
 	// establish proper state
@@ -526,19 +552,69 @@ func (s *AwaitableSlice[T]) IsClosed() (isClosed bool) {
 	return
 }
 
-// Init allows for AwaitableSlice to be used in a for clause
-//   - returns zero-value for a short variable declaration in
-//     a for init statement
+// Seq allows for AwaitableSlice to be used in a for range clause
+//   - each value is provided to yield
+//   - iterates until yield retuns false or
+//   - the slice was empty and in drain-close states
 //   - thread-safe
 //
 // Usage:
 //
-//	var a AwaitableSlice[…] = …
-//	for value := a.Init(); a.Condition(&value); {
-//	  // process value
+//	for value := range awaitableSlice.Seq {
+//	  value…
 //	}
-//	// the AwaitableSlice closed
-func (s *AwaitableSlice[T]) Init() (value T) { return }
+//	// the AwaitableSlice was empty and in drain-closed state
+func (s *AwaitableSlice[T]) Seq(yield func(value T) (keepGoing bool)) {
+
+	// endCh is deferred initialization waiting for slice empty
+	var endCh AwaitableCh
+	for {
+
+		// try obtaining value
+		if s.hasData.Load() {
+			// the slice is not empty
+			//	- get value in competition with other threads
+			if v, hasValue := s.Get(); hasValue {
+				if !yield(v) {
+					return // consumer canceled iteration return
+				}
+				continue
+			}
+		}
+		// the slice was empty
+
+		//	- wait until the slice has data or
+		//	- the slice closes
+		// atomic-performance check for channel end
+		if s.isEmptyWait.IsClosed() {
+			// slice was empty and in drain or close state
+			return // end of values iteration end
+		}
+		// the slice was empty and was not in drain or close states
+
+		// await more data or transition to drain-close states
+
+		// initialize endCh to detect state change to drain-close
+		if endCh == nil {
+			// get endCh without initializing close mechanic
+			endCh = s.EmptyCh(CloseAwaiter)
+		}
+		select {
+
+		// await data, possibly initializing dataWait
+		case <-s.DataWaitCh():
+			// data was detected, try to retrieve it
+			// in compeition with other threads
+
+			// await close and end of data
+		case <-endCh:
+			// the slice is empty and
+			// the slice transiotioned to drain-close states
+			return // slice empty and in drain-close state
+		}
+		// there was data available
+	}
+}
 
 // Condition allows for AwaitableSlice to be used in a for clause
 //   - updates a value variable and returns whether values are present

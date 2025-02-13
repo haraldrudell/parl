@@ -12,8 +12,8 @@ replace github.com/haraldrudell/parl/psql => ../psql
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/haraldrudell/parl v0.4.190
-	github.com/haraldrudell/parl/psql v0.4.190
+	github.com/haraldrudell/parl v0.4.191
+	github.com/haraldrudell/parl/psql v0.4.191
 	modernc.org/sqlite v1.34.5
 )
 

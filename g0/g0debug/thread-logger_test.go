@@ -17,17 +17,15 @@ func TestThreadLogger(t *testing.T) {
 
 	var (
 		// goGroup being logged
-		goGroup  parl.GoGroup = g0.NewGoGroup(context.Background())
-		goErrors parl.IterableSource[parl.GoError]
-		hasValue bool
-		goError  parl.GoError
-		endCh    parl.AwaitableCh
+		goGroup parl.GoGroup = g0.NewGoGroup(context.Background())
+		hadExit bool
 	)
 
-	// Log Wait
+	// Log() Wait()
 	var threadLogger *ThreadLogger = NewThreadLogger(goGroup)
 
 	// arm logging for the thread-group
+	//	- logging starts on thread-group Cancel
 	threadLogger.Log()
 
 	// launch a quickly terminating goroutine
@@ -37,21 +35,21 @@ func TestThreadLogger(t *testing.T) {
 
 	// read error channel to end
 	//	- this will cause the thread-group to end
-	goErrors = goGroup.GoError()
-	endCh = goErrors.EmptyCh(parl.CloseAwaiter)
-	for {
-		select {
-		case <-goErrors.DataWaitCh():
-			if goError, hasValue = goErrors.Get(); !hasValue {
-				continue
-			} else if goError == nil {
-				continue
-			} else if goError.Err() != nil {
-				t.Errorf("goGroup err: %s", goError)
-			}
-		case <-endCh:
+	for goError := range goGroup.GoError().Seq {
+
+		// there should be one GeExit with nil error
+		if goError != nil &&
+			!hadExit &&
+			goError.ErrContext() == parl.GeExit &&
+			goError.Err() == nil {
+			hadExit = true
+			continue
 		}
-		break
+
+		t.Errorf("goGroup err: %s", GoErrorDump(goError))
+	}
+	if !hadExit {
+		t.Error("no thread exit")
 	}
 
 	// await thread logger exit

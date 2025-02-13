@@ -8,35 +8,27 @@ package g0
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// for [Reader]
-var NoShouldTerm *atomic.Bool
-
-// for [Reader]
-var NoAddErr parl.AddError
-
-// for [Reader]
-var NoLog parl.PrintfFunc
-
 // Reader thread reads the error channel of a [GoGroup] or [SubGroup]
-//   - shouldTerminate is an optional pointer that an application’s most important goroutine sets to true
+//   - shouldTerminate: is an optional pointer that an application’s most important goroutine sets to true
 //     prior to exit, causing graceful shutdown
-//   - addError receives fatal thread-exits.
-//     If not present, those are logged.
-//     typically [github.com/haraldrudell/parl/mains.Executable.AddErr]
-//   - log outputs warnings and more, default [parl.Log] standard error
-//   - g is from [parl.NewGoResult] or [parl.NewGoResult2] making Reader awaitable
+//   - shouldTerminate [parl.NoSTReader]: should terminate not used
+//   - errorSink present: receives fatal thread-exits
+//   - errorSink [parl.NoErrorSink1]: fatal thread-exits are output to log with “FATAL: ” heading
+//   - log present: outputs warnings and more
+//   - log [parl.NoPrintfFunc]: use [parl.Log] standard error output
+//   - goGroup: the error channel listened to and have Cancel invoked
+//   - g: from [parl.NewGoResult] or [parl.NewGoResult2] making Reader awaitable
+//   - —
 //   - a GoGroup’s or SubGroup’s error channel is unbound buffer so Reader is only required for:
 //   - — real-time warning output
 //   - — terminating the process while additional goroutines are still running:
 //   - — on fatal thread exit or
 //   - — on exit of a primary goroutine
-//   - —
 //   - because reading of the threadgroup’s error channel must not stop,
 //     it is done in this separate thread.
 //   - reading continues until:
@@ -54,10 +46,10 @@ var NoLog parl.PrintfFunc
 //	  defer goGroup.Wait()
 //	  var goResult = parl.NewGoResult()
 //	  defer goResult.ReceiveError(&err)
-//	  go g0.Reader(g0.NoSholdTerm, g0.NoAddErr, g0.NoLog, goGroup, goResult)
+//	  go g0.Reader(parl.NoSTReader, parl.NoErrorSink1, parl.NoPrintfFunc, goGroup, goResult)
 //	  defer goGroup.Cancel()
 //	  go someGoroutine(goGroup.Go())
-func Reader(shouldTerminate *atomic.Bool, addError parl.AddError, log parl.PrintfFunc, goGroup parl.GoGroup, g parl.GoResult) {
+func Reader(shouldTerminate parl.ShouldTerminateReader, errorSink parl.ErrorSink1, log parl.PrintfFunc, goGroup parl.GoGroup, g parl.GoResult) {
 	var err error
 	defer g.SendError(&err)
 	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
@@ -65,7 +57,7 @@ func Reader(shouldTerminate *atomic.Bool, addError parl.AddError, log parl.Print
 	if log == nil {
 		log = parl.Log
 	}
-	for goError := goGroup.GoError().Init(); goGroup.GoError().Condition(&goError); {
+	for goError := range goGroup.GoError().Seq {
 
 		// if not thread-exit, it is a warning
 		//	- if panic: full stack trace
@@ -103,8 +95,8 @@ func Reader(shouldTerminate *atomic.Bool, addError parl.AddError, log parl.Print
 
 		// fatal thread-exit shuts down the app
 		if e != nil {
-			if addError != nil {
-				addError(e)
+			if errorSink != nil {
+				errorSink.AddError(e)
 			} else {
 				log("FATAL: " + goError.ErrString())
 			}
@@ -114,7 +106,7 @@ func Reader(shouldTerminate *atomic.Bool, addError parl.AddError, log parl.Print
 
 		// shouldTerminate is for apps that has a primary sub-thread that on exit
 		// should shut down the app
-		if t := shouldTerminate; t != nil && t.Load() && goGroup.Context().Err() == nil {
+		if t := shouldTerminate; t != nil && t.IsTerminate() && goGroup.Context().Err() == nil {
 			goGroup.Cancel()
 			// shouldTerminate processed
 		}
