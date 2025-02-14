@@ -36,11 +36,11 @@ func TestThreshold(t *testing.T) {
 		g       parl.GoResult
 	)
 
-	var haltDetector *HaltDetector = NewHaltDetector()
-
-	// configure halt detector
-	haltDetector.SetInterval(intervalToUse)
-	haltDetector.SetThreshold(reportingThreshold)
+	var haltDetector *HaltDetector = NewHaltDetector2(
+		NoHaltFieldp,
+		reportingThreshold,
+		intervalToUse,
+	)
 
 	// create thread-group
 	goGroup = g0.NewGoGroup(context.Background())
@@ -57,8 +57,8 @@ func TestThreshold(t *testing.T) {
 	t.Log("typically happens in a matter of seconds")
 	t.Log("^C to cancel")
 	t.Logf("isMonotonic %t interval %s",
-		haltDetector.isMonotonic.Load(),
-		haltDetector.interval.Load(),
+		haltDetector.isMonotonic,
+		haltDetector.interval,
 	)
 	go haltDetector.Thread(goGroup.Go())
 

@@ -10,8 +10,8 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/haraldrudell/parl v0.4.191
-	github.com/haraldrudell/parl/sqliter v0.4.191
+	github.com/haraldrudell/parl v0.4.192
+	github.com/haraldrudell/parl/sqliter v0.4.192
 )
 
 require (
@@ -26,5 +26,5 @@ require (
 	modernc.org/libc v1.61.13 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.8.2 // indirect
-	modernc.org/sqlite v1.34.5 // indirect
+	modernc.org/sqlite v1.35.0 // indirect
 )

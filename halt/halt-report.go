@@ -12,20 +12,20 @@ import (
 	"github.com/haraldrudell/parl/ptime"
 )
 
-// HaltReport is a value object representing a detected Go runtime execution halt
+// HaltReport is a value type representing a detected Go runtime execution halt
 type HaltReport struct {
 	// report number 1…
-	N int
+	Number int
 	// when halt started
-	T time.Time
+	Timestamp time.Time
 	// halt duration
-	D time.Duration
+	Duration time.Duration
 }
 
 func (r *HaltReport) String() (s string) {
 	return parl.Sprintf("%s %d %s",
-		parl.ShortSpace(r.T),
-		r.N,
-		ptime.Duration(r.D),
+		parl.ShortSpace(r.Timestamp),
+		r.Number,
+		ptime.Duration(r.Duration),
 	)
 }

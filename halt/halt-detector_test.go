@@ -44,19 +44,18 @@ func TestHaltDetector(t *testing.T) {
 	)
 
 	// Ch() Thread()
-	var haltDetector *HaltDetector = NewHaltDetector()
+	var haltDetector *HaltDetector = NewHaltDetector2(
+		NoHaltFieldp,
+		reportingThreshold,
+		intervalToUse,
+		MonotonicYes,
+	)
 
 	// Ch should return channel for HaltReports
 	ch = haltDetector.Ch()
 	if ch == nil {
 		t.Error("Ch nil")
 	}
-
-	// ensure a halt report is created after first period
-	//	- default interval is 30 ms
-	haltDetector.SetMonotonic()
-	haltDetector.SetThreshold(reportingThreshold)
-	haltDetector.SetInterval(intervalToUse)
 
 	// haltDetector.Thread should produce a halt report within 1 second
 	//	- start halt detector with a thread-group that can cancel it
@@ -78,18 +77,18 @@ func TestHaltDetector(t *testing.T) {
 	// a halt report was received within 1 second
 
 	// halt report should be consistent
-	if haltReport.N != 1 {
-		t.Errorf("haltReport.N not 1: %d", haltReport.N)
+	if haltReport.Number != 1 {
+		t.Errorf("haltReport.N not 1: %d", haltReport.Number)
 	}
-	if haltReport.T.Before(start) {
+	if haltReport.Timestamp.Before(start) {
 		t.Error("haltReport.T Before start")
 	}
-	if haltReport.T.After(end) {
+	if haltReport.Timestamp.After(end) {
 		t.Error("haltReport.T After end")
 	}
 	maxDuration = end.Sub(start)
-	if haltReport.D < 0 || haltReport.D > maxDuration {
-		t.Errorf("haltReport.D bad %s", haltReport.D)
+	if haltReport.Duration < 0 || haltReport.Duration > maxDuration {
+		t.Errorf("haltReport.D bad %s", haltReport.Duration)
 	}
 
 	// context cancel should shutdown thread

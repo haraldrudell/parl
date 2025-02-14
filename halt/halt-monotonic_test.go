@@ -39,20 +39,20 @@ func TestMonotonic(t *testing.T) {
 		hTester                      *haltTester
 	)
 
-	var haltDetector *HaltDetector = NewHaltDetector()
-
-	// configure halt detector
-	haltDetector.SetMonotonic()
-	haltDetector.SetInterval(intervalToUse)
-	haltDetector.SetThreshold(reportingThreshold)
+	var haltDetector *HaltDetector = NewHaltDetector2(
+		NoHaltFieldp,
+		reportingThreshold,
+		intervalToUse,
+		MonotonicYes,
+	)
 
 	// create thread
 	goGroup = g0.NewGoGroup(context.Background())
 	t.Logf("creating thread to run for %s", runFor)
 	t.Logf("isMonotonic %t threshold %s interval %s",
-		haltDetector.isMonotonic.Load(),
-		haltDetector.reportingThreshold.Load(),
-		haltDetector.interval.Load(),
+		haltDetector.isMonotonic,
+		haltDetector.reportingThreshold,
+		haltDetector.interval,
 	)
 	go haltDetector.Thread(goGroup.Go())
 
