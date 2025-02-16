@@ -5,7 +5,11 @@ ISC License
 
 package parl
 
-import "github.com/haraldrudell/parl/perrors"
+import (
+	"iter"
+
+	"github.com/haraldrudell/parl/perrors"
+)
 
 var (
 	// NoErrorSink1 is value to use when no [ErrorSink1] is provided
@@ -102,11 +106,16 @@ type Errs interface {
 //   - [ErrorSource1] interface is not awaitable
 //   - [DeferredErrorSource] collects errors from ErrorSource1
 type ErrsIter interface {
-	// Error() WaitCh() EndCh() Errors()
+	// Error WaitCh EndCh Errors
 	Errs
-	Init() (err error)
-	Condition(errp *error) (hasValue bool)
+	// Seq is an iterator over sequences of individual errors.
+	// When called as seq(yield), seq calls yield(v) for each value v in the sequence,
+	// stopping early if yield returns false.
+	Seq(yield func(err error) (keepGoing bool))
 }
+
+// ErrsIter.Seq is iters.Seq[error]
+var _ = func(e ErrsIter) (seq iter.Seq[error]) { return e.Seq }
 
 // ErrorsSource provides receiving multiple
 // errors at once
@@ -175,15 +184,3 @@ func (p *privateErrorSink) EndErrors() {
 		endable.EndErrors()
 	}
 }
-
-// AddError is a function to submit non-fatal errors
-//
-// Deprecated: should use [github.com/haraldrudell/parl.ErrorSink]
-// possibly the error container [github.com/haraldrudell/parl.ErrSlice]
-type AddError func(err error)
-
-// absent [parl.AddError] argument
-//
-// Deprecated: should use [github.com/haraldrudell/parl.ErrorSink]
-// possibly the error container [github.com/haraldrudell/parl.ErrSlice]
-var NoAddErr AddError

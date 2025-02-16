@@ -83,5 +83,16 @@ func (e *ErrSlice) AppendErrors(errp *error) {
 	}
 }
 
-func (e *ErrSlice) Init() (err error)                     { return }
-func (e *ErrSlice) Condition(errp *error) (hasValue bool) { return e.errs.Condition(errp) }
+// Seq allows for ErrSlice to be used in a for range clause
+//   - each value is provided to yield
+//   - iterates until yield retuns false or
+//   - the slice was empty and in drain-close states
+//   - thread-safe
+//
+// Usage:
+//
+//	for value := range errSlice.Seq {
+//	  value…
+//	}
+//	// the AwaitableSlice was empty and in drain-closed state
+func (e *ErrSlice) Seq(yield func(value error) (keepGoing bool)) { e.errs.Seq(yield) }

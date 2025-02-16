@@ -73,7 +73,7 @@ func NewHaltDetector(reportingThreshold ...time.Duration) (haltDetector *HaltDet
 //   - sleep: how long to sleep prior to check for halt
 //   - — to detect a given halt duration, sleep should be 50% or less of reportingThreshold
 //   - — for monotonic, sleep is dynamically increased
-//   - isMonotonic MonotonicYes: reports only monotonically increasing halts
+//   - isMonotonic [MonotonicYes]: reports only monotonically increasing halts
 //   - — useful to detect prevailing halts for a give architecture
 //   - — interval and reportingThreshold are dynamically adjusted
 //   - — interval goes towards 1 ms

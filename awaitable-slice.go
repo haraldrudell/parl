@@ -616,57 +616,6 @@ func (s *AwaitableSlice[T]) Seq(yield func(value T) (keepGoing bool)) {
 	}
 }
 
-// Condition allows for AwaitableSlice to be used in a for clause
-//   - updates a value variable and returns whether values are present
-//   - thread-safe
-//
-// Usage:
-//
-//	var a AwaitableSlice[…] = …
-//	for value := a.Init(); a.Condition(&value); {
-//	  // process received value
-//	}
-//	// the AwaitableSlice closed
-func (s *AwaitableSlice[T]) Condition(valuep *T) (hasValue bool) {
-	var endCh AwaitableCh
-	for {
-
-		// try obtaining value
-		if s.hasData.Load() {
-			var v T
-			if v, hasValue = s.Get(); hasValue {
-				*valuep = v
-				return // value obtained: *valuep valid, hasValue true
-			}
-			continue
-		}
-		// hasData is false
-		//	- wait until the slice has data or
-		//	- the slice closes
-
-		// atomic-performance check for channel end
-		if s.isEmptyWait.IsClosed() {
-			// channel is out of items and closed
-			return // closed: hasValue false, *valuep unchanged
-		}
-
-		// await data or close
-		if endCh == nil {
-			// get endCh without initializing close mechanic
-			endCh = s.EmptyCh(CloseAwaiter)
-		}
-		select {
-
-		// await data, possibly initializing dataWait
-		case <-s.DataWaitCh():
-
-			// await close and end of data
-		case <-endCh:
-			return // closed: hasValue false, *valuep unchanged
-		}
-	}
-}
-
 // SetSize set initial allocation size of slices. Thread-safe
 func (s *AwaitableSlice[T]) SetSize(size int) {
 	var maxSize int

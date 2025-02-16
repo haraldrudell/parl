@@ -13,7 +13,7 @@ import "golang.org/x/exp/maps"
 //   - — Clear using fast, scavenging re-create
 //   - — Clone using range, optionally appending to provided instance
 //   - — these methods require access to the underlying Go map
-//   - not thread-safe:
+//   - since Map is not thread-safe:
 //   - — zero-value delete can be implemented by consumer
 //   - — range-Clear with zero-value write can be implemented by consumer
 //   - — order methods List and Keys can be implemented by consumer
@@ -24,9 +24,13 @@ type Map[K comparable, V any] struct{ goMap map[K]V }
 func NewMap[K comparable, V any]() (mapping *Map[K, V]) { return &Map[K, V]{goMap: make(map[K]V)} }
 
 // NewMap2 is field initializer with optional Go map pointer
-//   - fieldp: saves one allocation on field initialization
-//   - m: saves one allocation on clone: is the Go map to use
-//   - goMap saves allocation on clone to field: is pointer to internal Go map
+//   - fieldp: pre-allocated location. Saves allocation on field initialization
+//   - fieldp nil: regular allocation
+//   - m non-nil: a Go map to base Map[K, V] on. Saves allocation on clone
+//   - goMap optional: receives pointer to the internal Go map.
+//     Saves allocation on clone to field.
+//     Because [Map.Clear] may change the map value, a pointer is required.
+//     The map is not thread-safe: atomics is not required
 func NewMap2[K comparable, V any](fieldp *Map[K, V], m map[K]V, goMap ...**map[K]V) (mapping *Map[K, V]) {
 
 	// mapping points to result
@@ -50,6 +54,7 @@ func NewMap2[K comparable, V any](fieldp *Map[K, V], m map[K]V, goMap ...**map[K
 	} else if gm = goMap[0]; gm == nil {
 		return
 	}
+
 	*gm = &mapping.goMap
 
 	return

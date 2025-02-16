@@ -4,7 +4,9 @@
 //	- 250210 use of [iter.Seq] requires go1.23
 //	- go1.23 supported 240813–2025-08 upon go1.25 released
 //	- go1.23 will be oldest supported Go release 2025-02
-go 1.23
+go 1.23.0
+
+toolchain go1.24.0
 
 // synchronize dependencies
 // go work sync

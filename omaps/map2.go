@@ -21,6 +21,7 @@ type map2[K comparable, V any] struct {
 	// m2 identifier protects public identifiers from being promoted
 	m2 pmaps2.Map[K, V]
 	// goMap is allocation-saving helper for cloning
+	//	- because the referenced map value may change, it has to be pointer to map
 	goMap *map[K]V
 }
 
