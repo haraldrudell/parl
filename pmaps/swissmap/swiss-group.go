@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pmaps2
+package swissmap
 
 // [Group]
 //   - updated go1.24 250211

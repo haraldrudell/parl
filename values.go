@@ -12,6 +12,8 @@ import "iter"
 //   - implementation may be thread-safe by using atomics, lock or being read-only
 //   - an implementation is [NewValues]
 //   - a similar value-type is [AnyCount]
+//   - the map values copies the implicit pointer of the interface value
+//   - the value pointed to is allocated on the heap
 //
 // iteration:
 //

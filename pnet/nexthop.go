@@ -377,7 +377,7 @@ func (n *NextHop) ifCidr(srcIP netip.Addr, is4 bool) (cidr netip.Prefix, err err
 	}
 	// prefixes are list of cidrs assigned top network interface
 	var prefixes []netip.Prefix
-	if prefixes, err = AddrSlicetoPrefix(addrs, Do46); err != nil {
+	if prefixes, err = AddrSlicetoPrefix(addrs, Do46Yes); err != nil {
 		return // addr slice failed to convert
 	}
 	if !srcIP.IsValid() {

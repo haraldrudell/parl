@@ -30,12 +30,22 @@ type Values0[T any] struct {
 // Values0 implements the Values interface
 var _ Values[int] = &Values0[int]{}
 
-// NewValues retuyrns a Values any-count map-value implementation
+// NewValues returns a [Values] interface any-count map-value implementation
+//   - values: zeero or more values put into the container
+//   - —
+//   - the map is map[K]V where V is [parl.Value[T]]
+//   - because V is interface, it is a pointer copied by the map
+//   - the value pointed to must be on the heap and it is allocated here
 func NewValues[T any](values ...T) (v Values[T]) {
+
+	// allocate any-count value container on the heap
 	v = &Values0[T]{}
+
+	// put values into container
 	for _, t := range values {
 		v.Add(t)
 	}
+
 	return
 }
 

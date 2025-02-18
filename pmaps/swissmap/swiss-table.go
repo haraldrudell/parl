@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pmaps2
+package swissmap
 
 // table is a Swiss table hash table structure [SwissTable]
 //   - Each table is a complete hash table implementation.

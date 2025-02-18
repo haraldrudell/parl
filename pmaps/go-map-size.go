@@ -7,7 +7,7 @@ package pmaps
 
 import (
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pmaps/pmaps2"
+	"github.com/haraldrudell/parl/pmaps/swissmap"
 )
 
 // GoMapSize returns current properties for Go swiss map m
@@ -59,12 +59,12 @@ import (
 func GoMapSize[K comparable, V any](m map[K]V) (loadFactor float32, allocatedEntries int) {
 
 	// ensure a swiss map structure to be available
-	if m == nil || pmaps2.IsBucketMap() {
+	if m == nil || swissmap.IsBucketMap() {
 		return // nil map or bucket-map return: loadFactor and allocatedEntries zero
 	}
 
 	// get swiss-map internal structure
-	var swissMap = pmaps2.GetSwissMap(m)
+	var swissMap = swissmap.GetSwissMap(m)
 	// already checked, should never happen
 	if swissMap == nil {
 		panic(perrors.New("swissMap cannot be nil"))

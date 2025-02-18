@@ -8,7 +8,7 @@ package pmaps
 import (
 	"testing"
 
-	"github.com/haraldrudell/parl/pmaps/pmaps2"
+	"github.com/haraldrudell/parl/pmaps/swissmap"
 )
 
 // prior to go1.24, map implementation was hmap map header,
@@ -29,7 +29,7 @@ var _ int
 
 func TestLegacyGoMapSize(t *testing.T) {
 
-	if !pmaps2.IsBucketMap() {
+	if !swissmap.IsBucketMap() {
 		t.Skip("Go not featuring legacy bucket map")
 	}
 

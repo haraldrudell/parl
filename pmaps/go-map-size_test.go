@@ -10,7 +10,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/haraldrudell/parl/pmaps/pmaps2"
+	"github.com/haraldrudell/parl/pmaps/swissmap"
 )
 
 // a nil map value is of unknown implementation
@@ -18,7 +18,7 @@ import (
 func TestGoMapSizeNil(t *testing.T) {
 	//t.Error("LoggingOn")
 
-	if pmaps2.IsBucketMap() {
+	if swissmap.IsBucketMap() {
 		t.Skip("older Go featuring legacy bucket map")
 	}
 
@@ -71,7 +71,7 @@ func TestGoMapSizeNil(t *testing.T) {
 func TestGoMapSizeMakeNoSize(t *testing.T) {
 	//t.Error("LoggingOn")
 
-	if pmaps2.IsBucketMap() {
+	if swissmap.IsBucketMap() {
 		t.Skip("older Go featuring legacy bucket map")
 	}
 
@@ -146,7 +146,7 @@ func TestGoMapSizeMakeNoSize(t *testing.T) {
 func TestGoMapSizeMake9(t *testing.T) {
 	//t.Error("LoggingOn")
 
-	if pmaps2.IsBucketMap() {
+	if swissmap.IsBucketMap() {
 		t.Skip("older Go featuring legacy bucket map")
 	}
 
@@ -225,7 +225,7 @@ func TestGoMapSizeMake9(t *testing.T) {
 func TestGoMapSizeLiteral(t *testing.T) {
 	//t.Error("LoggingOn")
 
-	if pmaps2.IsBucketMap() {
+	if swissmap.IsBucketMap() {
 		t.Skip("older Go featuring legacy bucket map")
 	}
 
@@ -300,7 +300,7 @@ func TestGoMapSizeLiteral(t *testing.T) {
 func TestGoMapSize10K(t *testing.T) {
 	//t.Error("LoggingOn")
 
-	if pmaps2.IsBucketMap() {
+	if swissmap.IsBucketMap() {
 		t.Skip("older Go featuring legacy bucket map")
 	}
 
@@ -374,7 +374,7 @@ func TestGoMapSize10K(t *testing.T) {
 type swissMapTester struct {
 	mp                                                               *map[int]int
 	label                                                            string
-	actSwissMap                                                      *pmaps2.SwissMap
+	actSwissMap                                                      *swissmap.SwissMap
 	actLoadFactor                                                    float32
 	actDirLen, actEntryAllocationCount, actTableCount, actGroupCount int
 	actDirectory, actTables                                          int
@@ -398,7 +398,7 @@ func (s *swissMapTester) reset(label string, m0 map[int]int) {
 	var t = s.t
 	s.label = label
 	*s.mp = m0
-	s.actSwissMap = pmaps2.GetSwissMap(m0)
+	s.actSwissMap = swissmap.GetSwissMap(m0)
 	if s.actSwissMap == nil {
 		t.Fatalf("FAIL %s: GetSwissMap nil", label)
 	}

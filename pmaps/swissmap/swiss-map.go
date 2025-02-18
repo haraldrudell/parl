@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pmaps2
+package swissmap
 
 import (
 	"iter"

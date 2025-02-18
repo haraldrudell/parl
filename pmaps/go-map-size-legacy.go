@@ -10,7 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pmaps/pmaps2"
+	"github.com/haraldrudell/parl/pmaps/swissmap"
 )
 
 const (
@@ -66,7 +66,7 @@ const (
 func LegacyGoMapSize[K comparable, V any](m map[K]V) (size int) {
 
 	// filter for hashmap in use
-	if m == nil || !pmaps2.IsBucketMap() {
+	if m == nil || !swissmap.IsBucketMap() {
 		return
 	}
 
