@@ -7,13 +7,6 @@ package parl
 
 import "sync/atomic"
 
-const (
-	// [OnceCh.IsWinner] loser threads do not wait
-	NoOnceWait = true
-	// [OnceCh.IsWinner] loser threads wait
-	LoserWait = false
-)
-
 // OnceCh implements a one-time execution filter
 //   - initialization free
 //   - OnceCh is similar to [sync.Once] with improvements:
@@ -38,32 +31,35 @@ type OnceCh struct {
 	// done allows:
 	//	- winner thread to indicate completion
 	//	- loser threads to await winner completion
+	//	- mechanic: closing channel
+	//	- separate struct provided to winner as Done implementation
 	done doneOnce
 }
 
+// doneOnce provides single exported method Done to winner only
 type doneOnce struct {
 	// awaitable is mechanic for loser threads to
 	// await winner execution complete
 	awaitable Awaitable
 }
 
+// doneOnce implements Done interface
 var _ Done = &doneOnce{}
 
-func (d *doneOnce) Done() {
-	d.awaitable.Close()
-}
+// Done allows the winner to signal completion
+func (d *doneOnce) Done() { d.awaitable.Close() }
 
 // IsWinner selects winner thread as the first of invokers
-//   - noWait missing or LoserWait: loser thread wait for winner thread invoking done.Done
+//   - noWait missing: loser thread wait for winner thread invoking [done.Done]
 //   - noWait NoOnceWait: eventually consistent: loser threads immediately return
-//   - isWinner true: this is the winner first invocation.
-//   - — must invoke done.Done upon task completion
-//   - isWinner false: loser thread, done is nil.
-//     May have already awaited winner thread completion
-func (o *OnceCh) IsWinner(noWait ...bool) (isWinner bool, done Done) {
+//   - isWinner true: invoker thread is winner, ie. the first invoker of [OnceCh.IsWinner]
+//   - — must invoke [done.Done] upon task completion
+//   - isWinner false: loser thread, done is nil
+//   - done: non-nil for winner only. Provides [done.Done] method
+func (o *OnceCh) IsWinner(noWait ...OnceChStrategy) (isWinner bool, done Done) {
 
 	// pick winner thread
-	if isWinner = o.winner.CompareAndSwap(false, true); isWinner {
+	if isWinner = !o.winner.Load() && o.winner.CompareAndSwap(false, true); isWinner {
 		done = &o.done
 		return // winner return
 	}
@@ -82,5 +78,5 @@ func (o *OnceCh) Ch() (ch AwaitableCh) { return o.done.awaitable.Ch() }
 // IsInvoked indicates that a winner was selected
 func (o *OnceCh) IsInvoked() (isInvoked bool) { return o.winner.Load() }
 
-// IsClosed indicates that a winner was selected and invoked done
+// IsClosed indicates that a winner was selected and the winneer invoked done
 func (o *OnceCh) IsClosed() (isClosed bool) { return o.done.awaitable.IsClosed() }

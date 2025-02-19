@@ -82,10 +82,15 @@ type goResult interface {
 	// IsError returns if any goroutine has returned an error
 	//	- only for [NewGoResult2]
 	IsError() (isError bool)
+	// SetIsError sets error state regardless of whether any goroutine has returned an error
+	//	- only for [NewGoResult2]
 	SetIsError()
 	// Remaining returns the number of goroutines that have yet to exit
+	//	- add: optional add of launching a goroutine
+	//	- adds: the cumulative number of add values provided
+	//	- remaining: the dimensioned capacity less SendError invocations
 	//	- only for [NewGoResult2]
-	Remaining() (remaining int)
+	Remaining(add ...int) (adds, remaining int)
 	// pritable representation
 	String() (s string)
 }

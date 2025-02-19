@@ -21,19 +21,32 @@ import (
 type Network string
 
 const (
-	NetworkDefault    Network = ""           // default
-	NetworkTCP        Network = "tcp"        // tcp IPv4 or IPv6
-	NetworkTCP4       Network = "tcp4"       // net network tcp ipv4
-	NetworkTCP6       Network = "tcp6"       // tcp IPv6
-	NetworkUDP        Network = "udp"        // udp is udp IPv4 or IPv6
-	NetworkUDP4       Network = "udp4"       // udp4 is udp IPv4
-	NetworkUDP6       Network = "udp6"       // udp6 is udp IPv6
-	NetworkIP         Network = "ip"         // ip is IP protocol IPv4 or IPv6 addressing
-	NetworkIP4        Network = "ip4"        // ip4 is IP protocol IPv4
-	NetworkIP6        Network = "ip6"        // ip6 is IP protocol IPv6
-	NetworkUnix       Network = "unix"       // unix is tcp or udp over Unix socket
-	NetworkUnixGram   Network = "unixgram"   // unixgram is udp over Unix socket
-	NetworkUnixPacket Network = "unixpacket" // unixpacket is tcp over Unix socket
+	// default
+	NetworkDefault Network = ""
+	// tcp IPv4 or IPv6
+	NetworkTCP Network = "tcp"
+	// net network tcp ipv4
+	NetworkTCP4 Network = "tcp4"
+	// tcp IPv6
+	NetworkTCP6 Network = "tcp6"
+	// udp is udp IPv4 or IPv6
+	NetworkUDP Network = "udp"
+	// udp4 is udp IPv4
+	NetworkUDP4 Network = "udp4"
+	// udp6 is udp IPv6
+	NetworkUDP6 Network = "udp6"
+	// ip is IP protocol IPv4 or IPv6 addressing
+	NetworkIP Network = "ip"
+	// ip4 is IP protocol IPv4
+	NetworkIP4 Network = "ip4"
+	// ip6 is IP protocol IPv6
+	NetworkIP6 Network = "ip6"
+	// unix is tcp or udp over Unix socket
+	NetworkUnix Network = "unix"
+	// unixgram is udp over Unix socket
+	NetworkUnixGram Network = "unixgram"
+	// unixpacket is tcp over Unix socket
+	NetworkUnixPacket Network = "unixpacket"
 )
 
 // ParseNetwork checks if network is valid

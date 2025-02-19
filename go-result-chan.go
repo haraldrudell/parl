@@ -119,7 +119,7 @@ func (g goResultChan) IsError() (isError bool) {
 	panic(perrors.NewPF("NewGoResult does not provide IsError: use NewGoResult2"))
 }
 
-func (g goResultChan) Remaining() (remaining int) {
+func (g goResultChan) Remaining(add ...int) (adds, remaining int) {
 	panic(perrors.NewPF("NewGoResult does not provide Remaining: use NewGoResult2"))
 }
 

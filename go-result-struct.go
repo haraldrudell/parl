@@ -7,23 +7,28 @@ package parl
 
 import (
 	"fmt"
-	"math"
 	"sync/atomic"
 
+	"github.com/haraldrudell/parl/internal/cyclebreaker"
 	"github.com/haraldrudell/parl/perrors"
 )
 
 // when when GoResult.g is has multiple values
 type goResultStruct struct {
+	// error channel of initialized buffered length
 	goResultChan
-	remaining atomic.Uint64
-	isError   atomic.Bool
+	// the cumulatice of all add provided to Remaining
+	adds cyclebreaker.Atomic64[int]
+	// the dimentioned size less
+	remaining cyclebreaker.Atomic64[int]
+	// true if any thread failed or SetIsError was invoked
+	isError atomic.Bool
 }
 
 // NewGoResult2 also has isError
 func newGoResultStruct(ch goResultChan) (goResult *goResultStruct) {
 	g := goResultStruct{goResultChan: ch}
-	g.remaining.Store(uint64(cap(ch)))
+	g.remaining.Store(cap(ch))
 	return &g
 }
 
@@ -53,7 +58,7 @@ func (g *goResultStruct) ReceiveError(errp *error, n ...int) (err error) {
 		// blocks here
 		//	- wait for a result from a goroutine
 		var e = <-g.goResultChan
-		if g.remaining.Add(math.MaxUint64) == 0 {
+		if g.remaining.Add(-1) == 0 {
 			break // end of configured errors
 		} else if e == nil {
 			continue // good return: ignore
@@ -77,6 +82,7 @@ func (g *goResultStruct) ReceiveError(errp *error, n ...int) (err error) {
 	return
 }
 
+// SetIsError sets the error flag regardless if any thread failed
 func (g *goResultStruct) SetIsError() {
 	if g.isError.Load() {
 		return
@@ -88,7 +94,21 @@ func (g *goResultStruct) SetIsError() {
 func (g *goResultStruct) IsError() (isError bool) { return g.isError.Load() }
 
 // Remaining returns the number of goroutines that have yet to exit
-func (g *goResultStruct) Remaining() (remaining int) { return int(g.remaining.Load()) }
+func (g *goResultStruct) Remaining(add ...int) (adds, remaining int) {
+	var didAdd bool
+	if len(add) > 0 {
+		if a := add[0]; a != 0 {
+			adds = g.adds.Add(a)
+			didAdd = true
+		}
+	}
+	if !didAdd {
+		adds = g.adds.Load()
+	}
+	remaining = g.remaining.Load()
+
+	return
+}
 
 func (g *goResultStruct) String() (s string) {
 	return fmt.Sprintf("goResult_remain:%d_ch:%d(%d)_isError:%t",

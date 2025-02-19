@@ -176,15 +176,24 @@ func getInterface(linkAddr *LinkAddr, cacheParameter NameCacher) (netInterface *
 }
 
 // NewNextHop2 assembles a route destination based on IfIndex
+//   - index: optional interface index
+//   - gateway: optional gateway to use for nextHop
+//   - src: optional source address to use for nextHop
+//   - err: index is valid but the network interface could not be retrieved
+//   - — typically because it was deleted: adapter removed or VPN link down
 func NewNextHop2(index IfIndex, gateway netip.Addr, src netip.Addr) (next *NextHop, err error) {
+
+	// local network interface for nextHop
 	var linkAddr *LinkAddr
 	if index.IsValid() {
 		linkAddr = NewLinkAddr(index, "")
 		if linkAddr, err = linkAddr.UpdateName(); err != nil {
-			return
+			return // retrieve network interface failed error return
 		}
 	}
-	return NewNextHop(gateway, linkAddr, src), err
+	next = NewNextHop(gateway, linkAddr, src)
+
+	return
 }
 
 func NewNextHop3(gateway netip.Addr, linkAddr *LinkAddr, src netip.Addr, nIPv4, nIPv6 int) (nextHop *NextHop) {

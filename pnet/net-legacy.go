@@ -435,8 +435,12 @@ func IsNzIP(ip net.IP) (isNzIP bool) {
 }
 
 // IPNetToPrefix returns [netip.Prefix] for legacy [*net.IPNet]
-//   - net.IPNet input is "1.2.3.4/24" or "fe80::1/64"
-//   - returned netip.Prefix values are valid
+//   - net.IPNet: legacy network prefix string like "1.2.3.4/24" or "fe80::1/64"
+//   - noIs4In6Translation missing: default is to translate IPv4 embedded in
+//     IPv6 to an IPv4 prefix address
+//   - noIs4In6Translation Dp46No: IPv4 translation
+//   - prefix: valid returned prefix
+//   - err: bad [net.IPNet.IP], bad [net.IPNet.Mask], mask does not fit address
 //   - returned IPv6 addresses has blank Zone
 //
 // legacy net pre-go1.18 220315 functions:
@@ -454,33 +458,37 @@ func IsNzIP(ip net.IP) (isNzIP bool) {
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
-func IPNetToPrefix(netIPNet *net.IPNet, noIs4In6Translation ...bool) (prefix netip.Prefix, err error) {
-	var i4Translation = true
-	if len(noIs4In6Translation) > 0 {
-		i4Translation = noIs4In6Translation[0]
-	}
+func IPNetToPrefix(netIPNet *net.IPNet, noIs4In6Translation ...Do46) (prefix netip.Prefix, err error) {
+
+	// get network address from legacy [net.IP]
 	var netipAddr netip.Addr
 	var ok bool
 	if netipAddr, ok = netip.AddrFromSlice(netIPNet.IP); !ok {
 		// netIPNet.IP is []byte
 		err = perrors.ErrorfPF("conversion to netip.Addr failed: IP: %#v", netIPNet.IP)
-		return
+		return // [netIPNet.IP] invalid error return
 	}
+
 	// translate an IPv6 address that is 4in6 to IPv4
 	//	- IPv6 "::ffff:127.0.0.1" becomes IPv4 "127.0.0.1"
-	if i4Translation && netipAddr.Is4In6() {
+	if (len(noIs4In6Translation) == 0 || bool(noIs4In6Translation[0])) && netipAddr.Is4In6() {
+		// IPv4 can only be extracted as slice
+		//	- extract the slice, convert it back to [netip.Addr]
 		netipAddr = netip.AddrFrom4(netipAddr.As4())
 	}
+
+	// gets network bits to use for prefix
 	var bits int
 	if bits, err = MaskToBits(netIPNet.Mask); err != nil { // net.IPMask is []byte
-		return
+		return // [netIPNet.Mask] invalid error return
 	}
+
+	// create [netip.Prefix]
 	var p = netip.PrefixFrom(netipAddr, bits)
 	if !p.IsValid() {
 		err = perrors.ErrorfPF("conversion to netip.Addr failed net.IPNet: %#v", netIPNet.IP)
-		return
+		return // mismatched IP address familty and prefix bits error return
 	}
-
 	prefix = p
 
 	return

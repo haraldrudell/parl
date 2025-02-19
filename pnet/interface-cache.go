@@ -55,7 +55,7 @@ func (i *InterfaceCache) CachedName(ifIndex ...IfIndex) (name string, err error)
 		var interface1 = &interfaces[ix]
 		var name1 = interface1.Name
 		var ifIndex1 IfIndex
-		if name == "" {
+		if name1 == "" {
 			continue // nameless interface ignore
 		} else if ifIndex1, err = NewIfIndexInt(interface1.Index); err != nil {
 			return // interface without index error

@@ -36,9 +36,12 @@ func (ifIndex IfIndex) IsValid() (isValid bool) {
 	return ifIndex > 0
 }
 
-// Interface gets net.Interface for ifIndex
+// Interface gets [net.Interface] for ifIndex
 //   - netInterface.Name is interface name "eth0"
 //   - netInterface.Addr() returns assigned IP addresses
+//   - isErrNoSuchInterface: error is that interface number ifIndex does not exist
+//   - — typically because it was deleted: adapter removed or VPN link down
+//   - err: [net.InterfaceByIndex]
 func (ifIndex IfIndex) Interface() (netInterface *net.Interface, isErrNoSuchInterface bool, err error) {
 	if netInterface, err = net.InterfaceByIndex(int(ifIndex)); err != nil {
 		isErrNoSuchInterface = errors.Is(err, ErrNoSuchInterface)
@@ -103,7 +106,8 @@ func (ifIndex IfIndex) Zone() (zone string, isNumeric bool, err error) {
 
 	// get network interface name or numeric value from index
 	var iface *net.Interface
-	if iface, _, err = ifIndex.Interface(); err == nil { // may fail if interface already deleted
+	// may fail if interface already deleted
+	if iface, _, err = ifIndex.Interface(); err == nil {
 		zone = iface.Name
 		if zone != "" {
 			return
