@@ -4,14 +4,12 @@ module github.com/haraldrudell/parl/psql
 
 go 1.23.0
 
-toolchain go1.24.0
-
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/haraldrudell/parl v0.4.195
-	github.com/haraldrudell/parl/sqliter v0.4.195
+	github.com/haraldrudell/parl v0.4.196
+	github.com/haraldrudell/parl/sqliter v0.4.196
 )
 
 require (

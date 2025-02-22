@@ -4,13 +4,11 @@ module github.com/haraldrudell/parl/omaps
 
 go 1.23.0
 
-toolchain go1.24.0
-
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/btree v1.1.3
-	github.com/haraldrudell/parl v0.4.195
+	github.com/haraldrudell/parl v0.4.196
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
 )
 

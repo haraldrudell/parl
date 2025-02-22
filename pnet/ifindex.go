@@ -51,7 +51,7 @@ func (ifIndex IfIndex) Interface() (netInterface *net.Interface, isErrNoSuchInte
 }
 
 // InterfaceAddrs gets Addresses for interface augmented with cache
-//   - useNameCache missing: cache of previously up neetwork interfaces is not used
+//   - useNameCache missing: cache of previously up network interfaces is not used
 //   - useNameCache [pnet.Update]: cache used after update
 //   - useNameCache [pnet.NoUpdate]: cache used without update
 //   - netInterface.Name is interface name “eth0”

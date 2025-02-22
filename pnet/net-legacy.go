@@ -18,6 +18,7 @@ import (
 //	- but uses pnet: Addr46 IfIndex
 
 // legacy [net.Addr] is [netip.Addr]
+//   - Interface [netip.Addr.Network] [netip.Addr.String]
 //   - possible [net.Addr.Network]: "tcp" "tcp4" "tcp6"
 //     "udp" "udp4" "udp6" "ip" "ip4" "ip6" "unix" "unixgram" "unixpacket"
 //   - interface implemented by:
@@ -48,10 +49,13 @@ var _ net.IPMask
 var _ = net.IPMask.Size
 
 // legacy [net.IPAddr] is [netip.Addr]
+//   - is IP address holding IPv6 Zone information
 var _ net.IPAddr
 
 // legacy [net.IPNet] is [netip.Prefix]
 var _ net.IPNet
+
+//new type directory:
 
 // [netip.Addr] is legacy [net.Addr] [net.IPAddr] [net.IP]
 var _ netip.Addr
@@ -85,7 +89,7 @@ var (
 //   - TODO 250217 unused, deprecate
 //
 // legacy net pre-go1.18 220315 functions:
-//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
+//   - [AddrToIPAddr] returns legacy [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr2] returns legacy “udp” [*net.UDPAddr] string socket address from [netip.AddrPort]
@@ -98,6 +102,7 @@ var (
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func AddrToIPAddr(addr netip.Addr) (addrInterface net.Addr) {
 	if !addr.IsValid() {
@@ -128,6 +133,7 @@ func AddrToIPAddr(addr netip.Addr) (addrInterface net.Addr) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func AddrPortToUDPAddr(addrPort netip.AddrPort) (addrInterface net.Addr) {
 	var IP, port, zone = SplitAddrPort(addrPort)
@@ -153,6 +159,7 @@ func AddrPortToUDPAddr(addrPort netip.AddrPort) (addrInterface net.Addr) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func IPAddr(IP net.IP, index IfIndex, zone string) (ipa *net.IPAddr, err error) {
 
@@ -189,6 +196,7 @@ func IPAddr(IP net.IP, index IfIndex, zone string) (ipa *net.IPAddr, err error) 
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func AddrPortToUDPAddr2(addrPort netip.AddrPort) (addr *net.UDPAddr) {
 	var IP, port, zone = SplitAddrPort(addrPort)
@@ -217,6 +225,7 @@ func AddrPortToUDPAddr2(addrPort netip.AddrPort) (addr *net.UDPAddr) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func SplitAddrPort(addrPort netip.AddrPort) (IP net.IP, port int, zone string) {
 	if !addrPort.IsValid() {
@@ -246,6 +255,7 @@ func SplitAddrPort(addrPort netip.AddrPort) (IP net.IP, port int, zone string) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func AddrPortToTCPAddr(addrPort netip.AddrPort) (addrInterface net.Addr) {
 	IP, port, zone := SplitAddrPort(addrPort)
@@ -271,6 +281,7 @@ func AddrPortToTCPAddr(addrPort netip.AddrPort) (addrInterface net.Addr) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func InvertMask(IPMask net.IPMask) (out net.IPMask) {
 	out = make(net.IPMask, len(IPMask))
@@ -297,6 +308,7 @@ func InvertMask(IPMask net.IPMask) (out net.IPMask) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func IPNetString(ipNet net.IPNet) (s string) {
 
@@ -324,10 +336,11 @@ func shorten(IP net.IP) (s string) {
 	return
 }
 
-// IsIPv4 returns true if legacy [net.IP] is IPv4 or IPv4 in IPv6 and not unset or IPv6
-//   - ip: an IPv4/IPv6 address to examine
-//   - ip nil or invalid: isIPv4 is false
-//   - IPv4-mapped addresses are considered IPv4 “::ffff:1.2.3.4”
+// IsIPv4 returns true if legacy [net.IP] is IPv4 or IPv4-mapped IPv6 address and not unset, corrupt or IPv6
+//   - ip: a legacy IP address to examine
+//   - isIPv4 true: ip is IPv4 or IPv4-mapped IPv6 address
+//   - — IPv4-mapped IPv6 address are considered IPv4 “::ffff:1.2.3.4”
+//   - isIPv4 false: ip is uninitialized, corrupt or other IPv6
 //     -
 //   - IP implementation is []byte byte-slice
 //   - an unitialized net.IP is nil
@@ -347,16 +360,22 @@ func shorten(IP net.IP) (s string) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func IsIPv4(ip net.IP) (isIPv4 bool) {
+
+	// [net.IP.To4] returns n IPv4 address for valid IPv4 or IPv4-mapped IPv6 address
+	//	- nil otherwise
 	isIPv4 = len(ip.To4()) == net.IPv4len
+
 	return
 }
 
 // IsIPv6 returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - ip: an IPv4/IPv6 address to examine
-//   - ip nil or invalid: isIPv4 is false
-//   - IPv4-mapped addresses are considered IPv4 “::ffff:1.2.3.4”
+//   - isIPv6 true: ip is valid IPv6 but not IPv4-mapped IPv6 address
+//   - — IPv4-mapped addresses are considered IPv4 “::ffff:1.2.3.4”
+//   - isIPv6 false: ip is nil, invalid or IPv4 or IPv4-mapped IPv6 address
 //     -
 //   - IP implementation is []byte byte-slice
 //   - an unitialized net.IP is nil
@@ -376,13 +395,20 @@ func IsIPv4(ip net.IP) (isIPv4 bool) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func IsIPv6(ip net.IP) (isIPv6 bool) {
+
+	// [net.IP.To4] returns n IPv4 address for valid IPv4 or IPv4-mapped IPv6 address
+	//	- nil otherwise
 	isIPv6 = len(ip.To4()) != net.IPv4len && len(ip) == net.IPv6len
+
 	return
 }
 
 // IsValid returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address
+//   - ip: an IP address
+//   - isValid true: ip is initialized IPv4 or IPv6 address
 //
 // legacy net pre-go1.18 220315 functions:
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
@@ -398,6 +424,7 @@ func IsIPv6(ip net.IP) (isIPv6 bool) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func IsValid(ip net.IP) (isValid bool) {
 	isValid =
@@ -426,11 +453,16 @@ func IsValid(ip net.IP) (isValid bool) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
 func IsNzIP(ip net.IP) (isNzIP bool) {
+
+	// IsValid is true if ip is initialized IPv4 or IPv6
 	if IsValid(ip) {
+		// [net.IP.IsUnspecified] checks against “0/0” and “::/0”
 		isNzIP = !ip.IsUnspecified()
 	}
+
 	return
 }
 
@@ -457,35 +489,62 @@ func IsNzIP(ip net.IP) (isNzIP bool) {
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
-func IPNetToPrefix(netIPNet *net.IPNet, noIs4In6Translation ...Do46) (prefix netip.Prefix, err error) {
+func IPNetToPrefix(netIPNet *net.IPNet) (prefix netip.Prefix, err error) {
 
 	// get network address from legacy [net.IP]
 	var netipAddr netip.Addr
 	var ok bool
+	// [net.IPNet.IP] is []byte
 	if netipAddr, ok = netip.AddrFromSlice(netIPNet.IP); !ok {
-		// netIPNet.IP is []byte
+		// must be length 4 or 16 or error
 		err = perrors.ErrorfPF("conversion to netip.Addr failed: IP: %#v", netIPNet.IP)
-		return // [netIPNet.IP] invalid error return
+		return // [netIPNet.IP] bad length error return
 	}
 
-	// translate an IPv6 address that is 4in6 to IPv4
-	//	- IPv6 "::ffff:127.0.0.1" becomes IPv4 "127.0.0.1"
-	if (len(noIs4In6Translation) == 0 || bool(noIs4In6Translation[0])) && netipAddr.Is4In6() {
-		// IPv4 can only be extracted as slice
-		//	- extract the slice, convert it back to [netip.Addr]
-		netipAddr = netip.AddrFrom4(netipAddr.As4())
-	}
-
-	// gets network bits to use for prefix
+	// get prefix bits: 0–32 for IPv4, 0–128 for IPv6
 	var bits int
-	if bits, err = MaskToBits(netIPNet.Mask); err != nil { // net.IPMask is []byte
-		return // [netIPNet.Mask] invalid error return
+	// true if the mask is 128-bit IPv6
+	//	- false if mask is 32-bit IPv4
+	//	- any other length is error
+	var isIPv6 bool
+	if bits, isIPv6, err = MaskToBits(netIPNet.Mask); perrors.IsPF(&err, "%w mask: %v", err, netIPNet.Mask) {
+		return
+	}
+
+	// do possible IPv4 in IPv6 translation
+	if netipAddr.Is4In6() {
+		netipAddr = Addr46(netipAddr)
+		if isIPv6 {
+			// convert mask to IPv4
+			isIPv6 = false
+			// for IPv6 mask less than /96, IPv4 mask is zero
+			if bits < 128-32 {
+				bits = 0
+			} else {
+				// IPv6 /128 → IPv4 /32
+				// IPv6 /96 → IPv4 /0
+				bits = 32 - (128 - bits)
+			}
+		}
+	}
+
+	// ensure Addr and mask address family matches
+	if netipAddr.Is6() {
+		if !isIPv6 {
+			err = perrors.ErrorfPF("IPv6 address with IPv4 mask")
+			return
+		}
+	} else if isIPv6 {
+		err = perrors.ErrorfPF("IPv4 address with IPv6 mask")
+		return
 	}
 
 	// create [netip.Prefix]
 	var p = netip.PrefixFrom(netipAddr, bits)
 	if !p.IsValid() {
+		// only if netipAddr invalid or bits negative or too large
 		err = perrors.ErrorfPF("conversion to netip.Addr failed net.IPNet: %#v", netIPNet.IP)
 		return // mismatched IP address familty and prefix bits error return
 	}
@@ -495,10 +554,16 @@ func IPNetToPrefix(netIPNet *net.IPNet, noIs4In6Translation ...Do46) (prefix net
 }
 
 // AddrSlicetoPrefix returns a [netip.Prefix] list from an [net.Addr] list
+//   - converts the result from [net.Interface.Addrs] to non-legacy types
 //   - addrs: list of [net.Addr], ie. [*net.IPNet] listing cidr “1.2.3.4/24” or “::/3”
-//   - do46 Do46Yes: convert 4in6 IPv6 addresses to IPv4
-//   - err: element not *net.IPNet, bad ipNet.IP, bad ipNet.Mask slice
+//   - err: element not *net.IPNet, bad ipNet.IP, bad ipNet.Mask slice,
+//     mismatched address family between addr and mask
 //   - —
+//   - IPv4-mapped IPv6 address is returned as IPv4
+//   - — any IPv6 mask is then converted to IPv4 mask
+//   - IPv4-mapped IPv6 address: “::ffff:127.0.0.1/8” often has an IPv4 mask
+//   - — [net.IPNet.IP] is IPv6: “::ffff:127.0.0.1”
+//   - — [net.IPNet.Mask] is 32-bit IPv4: [255, 0, 0, 0]
 //   - [net.Interface.Addrs] returns []net.Addr which is really []*net.IPNet
 //
 // legacy net pre-go1.18 220315 functions:
@@ -515,11 +580,12 @@ func IPNetToPrefix(netIPNet *net.IPNet, noIs4In6Translation ...Do46) (prefix net
 //   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
 //   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
 //   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
 //   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
-func AddrSlicetoPrefix(addrs []net.Addr, do46 ...Do46) (prefixes []netip.Prefix, err error) {
+func AddrSlicetoPrefix(addrs []net.Addr) (prefixes []netip.Prefix, err error) {
 
 	// iterate of input
-	prefixes = make([]netip.Prefix, len(addrs))
+	var ps = make([]netip.Prefix, len(addrs))
 	for i, netAddr := range addrs {
 
 		// type assert net.Addr to *net.IPNet
@@ -527,63 +593,70 @@ func AddrSlicetoPrefix(addrs []net.Addr, do46 ...Do46) (prefixes []netip.Prefix,
 		var ok bool
 		if ipNet, ok = netAddr.(*net.IPNet); !ok {
 			err = perrors.ErrorfPF("not net.IPNet at #%d: %q", i, netAddr)
+			return // [net.Addr] not [*net.IPNet] error return
+		}
+
+		var p netip.Prefix
+		if p, err = IPNetToPrefix(ipNet); err != nil {
+			err = perrors.ErrorfPF("AddrFromSlice at #%d: %w", i, err)
 			return
 		}
-
-		// convert [net.IP] to [netip.Addr]
-		var netipAddr netip.Addr
-		if netipAddr, ok = netip.AddrFromSlice(ipNet.IP); !ok {
-			err = perrors.ErrorfPF("AddrFromSlice at #%d: %q", i, netAddr)
-			return
-		}
-
-		// get prefix bits
-		var bits int
-		if bits, err = MaskToBits(ipNet.Mask); perrors.IsPF(&err, "AddrFromSlice at #%d: %q %q", i, netAddr, err) {
-			return
-		}
-
-		// do possible IPv4 in IPv6 translation
-		if len(do46) > 0 && bool(do46[0]) && netipAddr.Is4In6() {
-			netipAddr = Addr46(netipAddr)
-			// bits is for IPv4 already
-		}
-
-		// create [netip.Prefix]
-		prefixes[i] = netip.PrefixFrom(netipAddr, bits)
+		ps[i] = p
 	}
+	prefixes = ps
 
 	return
 }
 
-// MaskToBits returns number of leading 1-bits in byts
-//   - convert from legacy [net.IPMask] to [netip.Prefix]
-func MaskToBits(mask net.IPMask) (bits int, err error) {
-	var hadZero bool
-	for _, byt := range mask {
-		if hadZero && byt != 0 {
-			err = perrors.ErrorfPF("mask has intermediate zeroes: %v", mask)
+// MaskToBits validates legacy [net.IPMask] and returns number of leading 1-bits
+//   - ones: the network prefix length in bits 0–128: “1.2.3.4/24”: 24, “::/3”: 3
+//   - isIPv6 true: the mask length is for IPv6: 128 bits, otherwise IPv4: 32 bits
+//   - err any error condition:
+//   - — uninitialized: mask is nil or length zero
+//   - — bad length: mask byte-length does not match IPv4: 4 bytes 32 bits or
+//     IPv6: 16 bytes 128 bits
+//   - — corrupt: mask is not leading all-one bits, zero or more, followed by all-zero bits
+//   - MaskToBits is used to create [netip.Prefix] from legacy [net.IPMask]
+//
+// legacy net pre-go1.18 220315 functions:
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
+//   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
+//   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
+//   - [AddrPortToUDPAddr2] returns legacy “udp” [*net.UDPAddr] string socket address from [netip.AddrPort]
+//   - [AddrSlicetoPrefix] returns a [netip.Prefix] list from legacy [net.Addr] list
+//   - [InvertMask] inverts legacy [net.IPMask]
+//   - [IPAddr] returns legacy “ip” [*net.IPAddr] interface string socket address [*net.IPAddr] from legacy [net.IP] [IfIndex] and zone
+//   - [IPNetString] returns abbreviated IPv4 “0/0” from legacy [net.IPNet]
+//   - [IPNetToPrefix] returns [netip.Prefix] for legacy [*net.IPNet]
+//   - [IsIPv4] returns true if legacy [net.IP] is IPv4 or IPv4 in IPv6 and not unset or IPv6
+//   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
+//   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
+//   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
+//   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
+func MaskToBits(mask net.IPMask) (ones int, isIPv6 bool, err error) {
+
+	// length of mask 0–128, unit bits
+	var bits int
+	ones, bits = mask.Size()
+
+	// for illegal mask not strictly ones followed by zeroes: [net.IPMask.Size] returns 0, 0
+	//	- Size does not check mask length to match IPv4 or IPv6
+	//	- Size does not explicitly check for nil or zero-length mask
+	switch len(mask) {
+	case 0: // uninitialized or invalid mask
+		if len(mask) == 0 {
+			err = perrors.NewPF("uninitialized mask nil or zero length")
 			return
-		} else if byt == 255 {
-
-			// byte with all 1s
-			bits += 8
-			continue
 		}
-
-		// byte with mixed 0 and 1 bits
-		hadZero = true
-		for byt != 0 {
-			if byt&128 != 0 {
-				bits++
-				byt <<= 1
-				continue
-			}
-
-			// there was a zero bit before all 1 bits were found
-			err = perrors.ErrorfPF("mask has intermediate zeroes: %v", mask)
-			return
-		}
+		err = perrors.ErrorfPF("mask has intermediate zeroes: %v", mask)
+	case net.IPv4len: // valid IPv4 mask
+	case net.IPv6len: // valid IPv6 mask
+		isIPv6 = true
+	default: // mask of bad length
+		err = perrors.ErrorfPF("invalid mask length: %d allowed: IPv4: %d bytes; IPv6: %d bytes",
+			bits, net.IPv4len, net.IPv6len,
+		)
 	}
 
 	return

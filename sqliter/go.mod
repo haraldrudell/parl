@@ -4,16 +4,14 @@ module github.com/haraldrudell/parl/sqliter
 
 go 1.23.0
 
-toolchain go1.24.0
-
 replace github.com/haraldrudell/parl => ../../parl
 
 replace github.com/haraldrudell/parl/psql => ../psql
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/haraldrudell/parl v0.4.195
-	github.com/haraldrudell/parl/psql v0.4.195
+	github.com/haraldrudell/parl v0.4.196
+	github.com/haraldrudell/parl/psql v0.4.196
 	modernc.org/sqlite v1.35.0
 )
 

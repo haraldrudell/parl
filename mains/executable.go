@@ -29,9 +29,6 @@ import (
 const (
 	// if [Executable.OKtext] is assigned NoOK there ir no successful message on app exit
 	NoOK = "-"
-	// displays error location for errors printed without stack trace
-	//	- second argument to [Executable.LongErrors]
-	OutputErrorLocationTrue = true
 	// error location is not appended to errors printed without stack trace
 	//	- second argument to [Executable.LongErrors]
 	NoErrorLocationTrue = false
@@ -153,26 +150,30 @@ func (x *Executable) Init() (ex2 *Executable) {
 	return
 }
 
-// LongErrors sets if errors are printed with stack trace and values. LongErrors
-// supports functional chaining:
+// LongErrors configures error output
+// sets if errors are printed with stack trace and values. LongErrors
+//   - isLongErrors true: prints full stack traces, related errors and error data in string
+//     lists and string maps
+//   - isLongErrors false: prints one-liner error messages
+//   - isErrorLocation missing: error location is output for errors printed without stack trace
+//   - isErrorLocation NoLocation: error location is not output
+//   - functional chaining
+//
+// Usage:
 //
 //	exe.Init().
-//	  …
-//	  LongErrors(options.Debug, options.Verbosity != "").
-//	  ConfigureLog()…
-//
-// isLongErrors prints full stack traces, related errors and error data in string
-// lists and string maps.
-//
-// isErrorLocation appends the innermost location to the error message when isLongErrors
-// is not set:
-//
-//	error-message at error116.(*csTypeName).FuncName-chainstring_test.go:26
-func (x *Executable) LongErrors(isLongErrors bool, isErrorLocation bool) *Executable {
+//	…
+//	LongErrors(options.Debug, options.Verbosity != "").
+//	ConfigureLog()…
+func (x *Executable) LongErrors(isLongErrors bool, isErrorLocation ...ErrLoc) (x2 *Executable) {
+	x2 = x
+
 	parl.Debug("exe.LongErrors long: %t location: %t", isLongErrors, isErrorLocation)
 	x.IsLongErrors = isLongErrors
-	x.IsErrorLocation = isErrorLocation
-	return x
+	x.IsErrorLocation = len(isErrorLocation) == 0 ||
+		isErrorLocation[0] != NoLocation
+
+	return
 }
 
 // PrintBannerAndParseOptions prints greeting like:
@@ -270,6 +271,8 @@ func (x *Executable) PrintBannerAndParseOptions(optionsList []pflags.OptionData)
 //	  ConfigureLog().
 //	  ApplyYaml(…)
 func (x *Executable) ConfigureLog() (ex1 *Executable) {
+	ex1 = x
+
 	if BaseOptions.Silent {
 		parl.SetSilent(true)
 	}
@@ -283,7 +286,8 @@ func (x *Executable) ConfigureLog() (ex1 *Executable) {
 	}
 	parl.Debug("exe.ConfigureLog silent: %t debug: %t verbosity: %q\n",
 		BaseOptions.Silent, BaseOptions.Debug, BaseOptions.Verbosity)
-	return x
+
+	return
 }
 
 // errEarlyPanicError is a non-nil error value between EarlyPanic and Recover

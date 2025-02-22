@@ -7,13 +7,13 @@ package pnet
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -40,15 +40,51 @@ var ErrNoSuchInterface = func() (err error) {
 	return
 }()
 
-// list of allowable length for hardware address
-var HardwareAddrLengths = []int{HardwareAddrMac48, HardwareAddrEui64, HardwareAddrInfini}
+// hardwareAddrLengthsMap is O(1) allowed harware address lengths
+var hardwareAddrLengthsMap = map[int]struct{}{
+	HardwareAddrMac48:  {},
+	HardwareAddrEui64:  {},
+	HardwareAddrInfini: {},
+}
 
-// list of aallowable lengths for ardware addresss including zero
-var HardwareAddrLengthsWithZero = append([]int{0}, HardwareAddrLengths...)
+// “6 8 20”
+var goodList = fmt.Sprintf("%d %d %d",
+	HardwareAddrMac48, HardwareAddrEui64, HardwareAddrInfini,
+)
 
-// IsHardwareAddrLength returns true if byte-slice length is allowed hardwware address length
-func IsHardwareAddrLength(byts []byte) (isHardwareAddrLength bool) {
-	return slices.Contains(HardwareAddrLengths, len(byts))
+const (
+	// [IsHardwareAddrLength] zeroOK: zero-length is OK
+	HwZeroOK HWZero = 1
+)
+
+// [HwZeroOK]: [IsHardwareAddrLength] zeroOK: zero-length is OK
+type HWZero uint8
+
+// IsHardwareAddrLength returns err: nil if
+// byte-slice length is an allowed hardware address length
+//   - byts candidate bytes for hardware address
+//   - — [net.HardwareAddr] implementation is []byte
+//   - zeroOK true: zero length is OK, too 0, 6, 8 20 bytes
+//   - zeroOk false: 6, 8, 20 bytes
+func IsHardwareAddrLength(mac []byte, zeroOK ...HWZero) (err error) {
+	var isZeroOK = len(zeroOK) > 0 && zeroOK[0] == HwZeroOK
+
+	if isZeroOK && len(mac) == 0 {
+		return // zero-length OK return
+	} else if _, ok := hardwareAddrLengthsMap[len(mac)]; ok {
+		return // good length return
+	}
+
+	// bad return
+	var lengths = goodList
+	if isZeroOK {
+		lengths = "0 " + lengths
+	}
+	err = perrors.ErrorfPF("bad mac net.HardwareAddr length: %d not: %s",
+		len(mac), lengths,
+	)
+
+	return
 }
 
 // LinkAddr contains an Ethernet mac address, its interface name and interface index
@@ -92,12 +128,12 @@ func (a *LinkAddr) UpdateFrom(b *LinkAddr) (isComplete bool) {
 
 // SetHw sets hardware address, zero-length allowed
 func (a *LinkAddr) SetHw(hw net.HardwareAddr) (err error) {
-	if !slices.Contains(HardwareAddrLengthsWithZero, len(hw)) {
-		err = perrors.ErrorfPF("hardware address bad length: %d allowed: [%v]", hw)
+	if err = IsHardwareAddrLength(hw, HwZeroOK); err != nil {
 		return
 	} else if len(hw) > 0 {
 		a.HardwareAddr = hw
 	}
+
 	return
 }
 

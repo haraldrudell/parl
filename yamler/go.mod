@@ -4,12 +4,10 @@ module github.com/haraldrudell/parl/yamler
 
 go 1.23.0
 
-toolchain go1.24.0
-
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.195
+	github.com/haraldrudell/parl v0.4.196
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
 	gopkg.in/yaml.v3 v3.0.1
 )
