@@ -89,6 +89,9 @@ var (
 //   - TODO 250217 unused, deprecate
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns legacy [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -120,6 +123,9 @@ func AddrToIPAddr(addr netip.Addr) (addrInterface net.Addr) {
 //   - —
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -146,6 +152,9 @@ func AddrPortToUDPAddr(addrPort netip.AddrPort) (addrInterface net.Addr) {
 //   - TODO 250217 deprecate, unused
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -183,6 +192,9 @@ func IPAddr(IP net.IP, index IfIndex, zone string) (ipa *net.IPAddr, err error) 
 //   - — [*net.UDPAddr] is used by [net.ListenUDP] [net.Dialer.LocalAddr]
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -212,6 +224,9 @@ func AddrPortToUDPAddr2(addrPort netip.AddrPort) (addr *net.UDPAddr) {
 //     optional for IPv6 addresses
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -242,6 +257,9 @@ func SplitAddrPort(addrPort netip.AddrPort) (IP net.IP, port int, zone string) {
 //   - [net.TCPAddr] is used by [net.Dialer.LocalAddr]
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -268,6 +286,9 @@ func AddrPortToTCPAddr(addrPort netip.AddrPort) (addrInterface net.Addr) {
 //   - TODO 250217 unused possibly deprecate
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -295,6 +316,9 @@ func InvertMask(IPMask net.IPMask) (out net.IPMask) {
 //   - TODO 250217 unsued possibly deprecate
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -347,6 +371,9 @@ func shorten(IP net.IP) (s string) {
 //   - net.IP of length other than 0, 4 or 16 is invalid
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -382,6 +409,9 @@ func IsIPv4(ip net.IP) (isIPv4 bool) {
 //   - net.IP of length other than 0, 4 or 16 is invalid
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -411,6 +441,9 @@ func IsIPv6(ip net.IP) (isIPv6 bool) {
 //   - isValid true: ip is initialized IPv4 or IPv6 address
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -440,6 +473,9 @@ func IsValid(ip net.IP) (isValid bool) {
 //   - ip unintialized or bad: isNzIP false
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -476,6 +512,9 @@ func IsNzIP(ip net.IP) (isNzIP bool) {
 //   - returned IPv6 addresses has blank Zone
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -567,6 +606,9 @@ func IPNetToPrefix(netIPNet *net.IPNet) (prefix netip.Prefix, err error) {
 //   - [net.Interface.Addrs] returns []net.Addr which is really []*net.IPNet
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -619,6 +661,8 @@ func AddrSlicetoPrefix(addrs []net.Addr) (prefixes []netip.Prefix, err error) {
 //   - MaskToBits is used to create [netip.Prefix] from legacy [net.IPMask]
 //
 // legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
 //   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
 //   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
 //   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
@@ -658,6 +702,66 @@ func MaskToBits(mask net.IPMask) (ones int, isIPv6 bool, err error) {
 			bits, net.IPv4len, net.IPv6len,
 		)
 	}
+
+	return
+}
+
+// AddrPortFromAddr returns [netip.AddrPort] address literal from
+// legacy [net.Addr] implemented by [*net.TCPAddr] address literal
+//   - addr: [net.Addr] interface for tcp-network address
+//   - — implemented by [*net.TCPAddr] legacy IP address with zone
+//   - near: valid [netip.AddrPort] binary-coded socket address
+//     “1.2.3.4:80” “::1:443” with optional zone
+//   - err: concrete type not [*net.TCPAddr], bad [net.IP] length
+//   - —
+//   - — port number is not checked for being uint16
+//     -— zone is not validated
+//   - [net.Addr] is legacy type [net.Dial] uses to enable DNS strings for
+//     socket address
+//   - [*net.TCPAddr] returns
+//   - — [net.TCPAddr.Network] “tcp” [NetworkTCP]
+//   - — [net.TCPAddr.String] “[fe80::%eth0]:80”
+//
+// legacy net pre-go1.18 220315 functions:
+//   - [AddrPortFromAddr] returns [netip.AddrPort] address literal from
+//     legacy [net.Addr] implemented by [*net.TCPAddr]
+//   - [AddrToIPAddr] returns [net.Addr] string IP address from [netip.Addr]
+//   - [AddrPortToTCPAddr] returns legacy “tcp” [net.Addr] interface string socket address [*net.TCPAddr] from [netip.AddrPort]
+//   - [AddrPortToUDPAddr] returns legacy “udp” [net.Addr] interface string socket address [*net.UDPAddr] from [netip.AddrPort]
+//   - [AddrPortToUDPAddr2] returns legacy “udp” [*net.UDPAddr] string socket address from [netip.AddrPort]
+//   - [AddrSlicetoPrefix] returns a [netip.Prefix] list from legacy [net.Addr] list
+//   - [InvertMask] inverts legacy [net.IPMask]
+//   - [IPAddr] returns legacy “ip” [*net.IPAddr] interface string socket address [*net.IPAddr] from legacy [net.IP] [IfIndex] and zone
+//   - [IPNetString] returns abbreviated IPv4 “0/0” from legacy [net.IPNet]
+//   - [IPNetToPrefix] returns [netip.Prefix] for legacy [*net.IPNet]
+//   - [IsIPv4] returns true if legacy [net.IP] is IPv4 or IPv4 in IPv6 and not unset or IPv6
+//   - [IsIPv6] returns true if legacy [net.IP] is IPv6 and not unset or IPv4 or IPv4 in IPv6
+//   - [IsNzIP] returns true if legacy [net.IP] is valid IPv4 or IPv6 that is not the zero address]
+//   - [IsValid] returns true if legacy [net.IP] is an initialized IPv4 or IPv6 address]
+//   - [MaskToBits] returns [netip.Prefix.Bits] from legacy [net.IPMask]
+//   - [SplitAddrPort] returns legacy [net.IP], port and zone from [netip.AddrPort]
+func AddrPortFromAddr(addr net.Addr) (near netip.AddrPort, err error) {
+
+	// typoe assert to [*net.TCPAddr]
+	var tcpAddr, ok = addr.(*net.TCPAddr)
+	if !ok {
+		err = perrors.ErrorfPF("listener.Addr runtime type not *net.TCPAddr: %T", addr)
+		return
+	}
+
+	// convert tcp address literal to [netip.Addr] with optional IPv6 zone
+	var tcpIP netip.Addr
+	if tcpIP, ok = netip.AddrFromSlice(tcpAddr.IP); !ok {
+		// [net.IP] slice lenth does not match [net.IPv4Length] or [net.IPv6Length]
+		err = perrors.ErrorfPF("listener.Addr bad length: %d", len(tcpAddr.IP))
+		return
+	} else if tcpAddr.Zone != "" {
+		// copy over IPv6 zone
+		tcpIP = tcpIP.WithZone(tcpAddr.Zone)
+	}
+
+	// create [netip.AddrPort]
+	near = netip.AddrPortFrom(tcpIP, uint16(tcpAddr.Port))
 
 	return
 }

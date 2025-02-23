@@ -29,42 +29,14 @@ import (
 const (
 	// if [Executable.OKtext] is assigned NoOK there ir no successful message on app exit
 	NoOK = "-"
-	// error location is not appended to errors printed without stack trace
-	//	- second argument to [Executable.LongErrors]
-	NoErrorLocationTrue = false
 	// always output error stack traces
-	//	- first argument to [Executable.LongErrors]
+	//	- [Executable.LongErrors] isLongErrors
 	AlwaysStackTrace = true
 	// stack traces are not output for errors
 	//	- stack traces are printed for panic
-	//	- first argument to [Executable.LongErrors]
+	//	- [Executable.LongErrors] isLongErrors
 	NoStackTrace = false
 )
-
-const (
-	rfcTimeFormat = "2006-01-02 15:04:05-07:00"
-	usageHeader   = "Usage:"
-	optionsSyntax = "[options…]"
-	helpHelp      = "\x20\x20-help -h --help\n\x20\x20\tShows this help"
-	timeHeader    = "time: %s"
-	hostHeader    = "host: %s"
-	defaultOK     = "completed successfully"
-	// count (Recover or EarlyPanic) and doPanicFrames
-	//	- must have at least one of the two, so use 1
-	doPanicFrames = 1
-)
-
-const (
-	// NoArguments besides switches, zero trailing arguments is allowed
-	NoArguments = 1 << iota
-	// OneArgument besides switches, exactly one trailing arguments is allowed
-	OneArgument
-	// ManyArguments besides switches, one or more trailing arguments is allowed
-	ManyArguments
-)
-
-// ArgumentSpec bitfield for 0, 1, many arguments following command-line switches
-type ArgumentSpec uint32
 
 // Executable constant strings that describes an executable
 // advisable static values include Program Version Comment Description Copyright License Arguments
@@ -82,39 +54,69 @@ type ArgumentSpec uint32
 type Executable struct {
 
 	// fields typically statically assigned in main
+	//	- therefore, no thread-safe access
 
-	Program        string       // “gonet”
-	Version        string       // “0.0.1”
-	Comment        string       // [ banner text after program and version] “options parsing” changes in last version
-	Description    string       // [Description part of usage] “configures firewall and routing”
-	Copyright      string       // “© 2020…”
-	License        string       // “ISC License”
-	OKtext         string       // “Completed successfully”
-	ArgumentsUsage string       // usage help text for arguments after options
-	Arguments      ArgumentSpec // eg. mains.NoArguments
+	// “gonet” used for:
+	//	- banner
+	//	- panic recovery output
+	//	- successful exit or status exit message
+	//	- usage help
+	//	- used in yaml parameter processing
+	Program string
+	// “0.0.1” used in banner
+	Version string
+	// comment text on the program version “250131 -list option”
+	//	- used in banner
+	Comment     string
+	Description string // [Description part of usage] “configures firewall and routing”
+	// “© 2020…” used in banner
+	Copyright string
+	// “ISC License” used in -help output
+	License string
+	// “Completed successfully”
+	//	- custom app exit OK message or [NoOK] for none
+	OKtext string
+	// usage help text for arguments after options
+	//	- additional help text
+	//	- 250222 unused
+	ArgumentsUsage string
+	// controls command-line arguments after options eg. [mains.NoArguments]
+	Arguments ArgumentSpec
 
-	// fields below popualted by .Init()
+	// process start time
+	//	- populated by [Executable.Init] no thread-safety
+	Launch time.Time
+	// Launch as printable rfc 3339 time string
+	//	- populated by [Executable.Init] no thread-safety
+	LaunchString string
+	// short hostname, ie. no dots “mymac”
+	//	- populated by [Executable.Init] no thread-safety
+	Host string
+	// number of post-options strings during parse
+	// - [Executable.PrintBannerAndParseOptions]
+	ArgCount int
+	// if one post-options string and that is allowed, this is the string
+	// - [Executable.PrintBannerAndParseOptions]
+	Arg string
+	// any post-options strings if allowed
+	// - [Executable.PrintBannerAndParseOptions]
+	Args []string
+	// errors are printed with stack traces, associated values and errors
+	//	- panics are always printed long
+	//	- if errors long or more than 1 error, the first error is repeated last as a one-liner
+	//	- [Executable.LongErrors]
+	IsLongErrors bool
+	// adds a code location to errors if not IsLongErrors
+	//	- [Executable.LongErrors]
+	IsErrorLocation bool
 
-	Launch       time.Time // process start time
-	LaunchString string    // Launch as printable rfc 3339 time string
-	Host         string    // short hostname, ie. no dots “mymac”
-
-	// additional fields
+	// additional fields: thread-safe access
 
 	// errors addded by AddErr and other methods
 	//	- because an error added may have associated errors,
 	//		err must be a slice, to distinguish indivdual error adds
 	//	- that slice must be thread-safe
-	err      malib.ErrStore
-	ArgCount int      // number of post-options strings during parse
-	Arg      string   // if one post-options string and that is allowed, this is the string
-	Args     []string // any post-options strings if allowed
-	// errors are printed with stack traces, associated values and errors
-	//	- panics are always printed long
-	//	- if errors long or more than 1 error, the first error is repeated last as a one-liner
-	IsLongErrors bool
-	// adds a code location to errors if not IsLongErrors
-	IsErrorLocation bool
+	err malib.ErrStore
 	// optionsWereParsed signals that parsing completed without panic
 	optionsWereParsed atomic.Bool
 	// a specific status code to use on exit
@@ -629,7 +631,7 @@ func (x *Executable) printErr(err error, panicString ...string) (printedLong boo
 
 // usage prints options usage
 func (x *Executable) usage() {
-	writer := flag.CommandLine.Output()
+	var writer = flag.CommandLine.Output()
 	var license string
 	if x.License != "" {
 		license = "License: " + x.License
@@ -652,3 +654,23 @@ func (x *Executable) usage() {
 	flag.PrintDefaults()
 	fmt.Fprintln(writer, helpHelp)
 }
+
+const (
+	// time layout for [Executable.LaunchString]
+	rfcTimeFormat = "2006-01-02 15:04:05-07:00"
+	// usage header
+	usageHeader = "Usage:"
+	// options wording in usage message
+	optionsSyntax = "[options…]"
+	// option descriptions at end of usage message
+	helpHelp = "\x20\x20-help -h --help\n\x20\x20\tShows this help"
+	// header for [Executable.LaunchString]
+	timeHeader = "time: %s"
+	// header for [Executable.Host]
+	hostHeader = "host: %s"
+	// default [Executable.OKtext]
+	defaultOK = "completed successfully"
+	// count (Recover or EarlyPanic) and doPanicFrames
+	//	- must have at least one of the two, so use 1
+	doPanicFrames = 1
+)

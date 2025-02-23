@@ -6,6 +6,7 @@ ISC License
 package pnet
 
 import (
+	"errors"
 	"net"
 	"net/netip"
 
@@ -34,11 +35,20 @@ var (
 )
 
 // IsDirect determines if the route is direct
-//   - route Is4: IPv4: true if prefix length is /32
-//   - — IPv4-mapped IPv6 addresses are considered IPv6
-//   - route.Is6: IPv6: true if prefix length is /128
+//   - route.Addr valid IPv4: isDirect true if prefix length is /32
+//   - route.Addr valid IPv6: isDirect true if prefix length is /128
 //   - route invalid: isDirect false
+//   - —
 //   - a direct route has mask 32 or 128 bit length /32 /128
+//   - IsDirect considers an IPv4-mapped IPv6 address IPv6
+//   - — therefore must have /128 prefix to be direct route
+//   - with legacy type [net.IPMask], the mask has a prefix and a length
+//   - — an IPv4-mapped IPv6 address is then paired with
+//     a 32-bit-length IPv4 mask
+//   - [netip.Prefix] does not have mask size
+//   - — when legacy [net.IPNet] is converted to [netip.Prefix],
+//     the IPv4-mapped IPv6 addresses is converted to IPv4
+//   - — therefore the /128 approach is unlikely to be a problem
 func IsDirect(route netip.Prefix) (isDirect bool) {
 	return route.Addr().Is4() && route.Bits() == 32 ||
 		route.Addr().Is6() && route.Bits() == 128
@@ -52,7 +62,10 @@ var _ = netip.Prefix.Bits
 //   - routingPrefix: the number of significant bits forming network with remaining bits
 //     used for host addressing
 //   - network: the first network address
-//   - network invalid: addr or routingPrefix is invalid
+//   - — “fd19::1/64” → “fd19::/64”
+//   - — “1.2.3.4/24” → “1.2.3.0/24”
+//   - err: addr invalid, routingPrefix < 0,
+//     routingPrefix > bit-lenght(addr) - 2
 func NetworkAddress(addr netip.Addr, routingPrefix int) (network netip.Addr, err error) {
 
 	// validate parameters
@@ -69,6 +82,10 @@ func NetworkAddress(addr netip.Addr, routingPrefix int) (network netip.Addr, err
 //   - addr: an IPv4 or IPv6 address defining the network
 //   - routingPrefix: the number of significant bits separating the network
 //     from host addressing
+//   - — “fd19::1/64” → “fd19::ffff:ffff:ffff:ffff/64”
+//   - — “1.2.3.4/24” → “1.2.3.255/24”
+//   - err: addr invalid, routingPrefix < 0,
+//     routingPrefix > bit-lenght(addr) - 2
 func NetworkBroadcast(addr netip.Addr, routingPrefix int) (broadcast netip.Addr, err error) {
 
 	// validate parameters
@@ -85,6 +102,10 @@ func NetworkBroadcast(addr netip.Addr, routingPrefix int) (broadcast netip.Addr,
 //   - addr: an IPv4 or IPv6 address defining the network
 //   - routingPrefix: the number of significant bits separating the network
 //     from host addressing
+//   - — “fd19::1/64” → “fd19::1/64”
+//   - — “1.2.3.4/24” → “1.2.3.1/24”
+//   - err: addr invalid, routingPrefix < 0,
+//     routingPrefix > bit-lenght(addr) - 2
 func FirstHost(addr netip.Addr, routingPrefix int) (firstHost netip.Addr, err error) {
 
 	// validate parameters
@@ -97,9 +118,9 @@ func FirstHost(addr netip.Addr, routingPrefix int) (firstHost netip.Addr, err er
 	return
 }
 
-// AddrRoutingPrefixValid returns true if:
+// AddrRoutingPrefixValid returns err nil if:
 //   - addr is a valid IPv4 or IPv6 address
-//   - routingPrefix is valid and not zero or negative
+//   - routingPrefix is not negative
 //   - routingPrefix is at least 2 less than [netip.Addr.Bitlen].
 //     This means there are at least four host addresses available:
 //   - host address 0: the network address
@@ -121,7 +142,7 @@ func AddrRoutingPrefixValid(addr netip.Addr, routingPrefix int) (err error) {
 	//	- [netip.Prefix] has prefix -1 as invalid
 	//	- legacy [net.IPMask] has prefix 0 as invalid
 	//	- routing prefix zero is default route “0/0” or “::/0”
-	if routingPrefix <= 0 {
+	if routingPrefix < 0 {
 		err = perrors.ErrorfPF("invalid routingPrefix: %d", routingPrefix)
 		return
 	}
@@ -192,8 +213,17 @@ func setEndingBits(addr netip.Addr, routingPrefix int, addressChange setHostAdre
 
 // IsBroadcast determines whether addr is the last address of a routing prefix
 //   - the last host address is typically broadcast
+//   - addr: an IPv4 or IPv6 address defining the network
+//   - routingPrefix: the number of significant bits separating the network
+//     from host addressing
+//   - isBroadcast true: if addr is the network broadcast address
+//   - — “fd19::ffff:ffff:ffff:ffff/64” → true
+//   - — “1.2.3.255/24” → true
+//   - isBroadcast false: other address,
+//     addr invalid, routingPrefix < 0,
+//     routingPrefix > bit-lenght(addr) - 2
+//   - —
 //   - for 1.2.3.4/24 the network address 1.2.3.255 returns true
-//     -
 //   - an IP address can be split into a network and host addresses
 //   - the network is defined by a routing prefix that has
 //     a number of leading significant bits separating
@@ -219,33 +249,24 @@ func IsBroadcast(addr netip.Addr, routingPrefix int) (isBroadcast bool) {
 	return
 }
 
-// IsErrClosed returns true if err is when waiting for accept and the socket is closed
-//   - can be used with net.Conn.Accept
+// IsErrClosed returns true if err is caused by socket closing while waiting for accept
+//   - err: error returned by a net listener such as [net.Listener.Accept] [net.Conn.Accept]
+//   - isErrNetClosing: true if error due to socket closed
 func IsErrClosed(err error) (isErrNetClosing bool) {
-	// if err is nil, ok is false
-	if netOpError, ok := err.(*net.OpError); ok { // error occured during the operation
-		isErrNetClosing = netOpError.Err == net.ErrClosed // and it is that the listener was closed
-	}
-	return
-}
 
-func NetworkPrefixBitCount(byts []byte) (bits int) {
+	// opError indicates an error ocurring during the operation and
+	// not a parameter error or such
+	var opError *net.OpError
 
-	// count bits that are 1 from the high order bit until a zero bit is found
-	for _, byt := range byts {
-		if byt == 255 {
-			bits += 8
-			continue
-		}
-		for byt != 0 {
-			if byt&128 != 0 {
-				bits++
-			}
-			byt <<= 1
-		}
-		break
+	// check for error during operation
+	if !errors.As(err, &opError) {
+		return // other error cause return: isErrNetClosing false
 	}
-	return
+
+	// check if cause is and it is that the listener was closed
+	isErrNetClosing = opError.Err == net.ErrClosed
+
+	return // isErrNetClosing valid
 }
 
 const (

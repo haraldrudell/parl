@@ -69,7 +69,7 @@ func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen,
 		ID:       slowIDGenerator.ID(),
 		callback: callback,
 		thread:   NewSlowDetectorThread(slowTyp, nonReturnPeriod0, goGen),
-		max:      *NewAtomicMax[time.Duration](minReportedDuration),
+		max:      *NewAtomicMax(minReportedDuration),
 		average:  *ptime.NewAverager[time.Duration](),
 	}
 }

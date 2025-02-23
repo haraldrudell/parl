@@ -8,6 +8,7 @@ go 1.23.0
 
 // synchronize dependencies
 // go work sync
+// find . -name go.mod -exec egrep -Hn '^(toolchain|go)' {} ';'
 
 // go work use -r .
 use (

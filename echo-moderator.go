@@ -77,7 +77,7 @@ func NewEchoModerator(
 		log:       log,
 		waiting:   *NewAtomicMax(waitingWarningPoint),
 	}
-	m.invocationTimer = *NewInvocationTimer[mcReturnTicket](
+	m.invocationTimer = *NewInvocationTimer(
 		m.loggingCallback, m.returnMcTicket,
 		latencyWarningPoint,
 		// no parallelism warnings

@@ -13,27 +13,11 @@ import (
 )
 
 const (
-	// as second argument to [BaseOptionData], indicates that yaml options -yamlFile -yamlKey should not be present
-	YamlNo YamlOption = false
 	// indicates silent: no banner. Must be first option on command-line ‘-silent’
 	SilentString = "-" + silentOption
 	// name of version option
 	Version = "version"
 )
-
-const (
-	// name of silent option
-	silentOption = "silent"
-	// help text for -verbose
-	verboseOptionHelp = "Regular expression for selective debug matched against CodeLocation FuncName" +
-		"\nmain.main: -verbose=main.main" +
-		"\ngithub.com/haraldrudell/parl/mains.(*Executable).Init: -verbose=mains...Executable" +
-		"\ngithub.com/haraldrudell/parl/mains.Func: -verbose=mains.Func" +
-		"\nper https://github.com/google/re2/wiki/Syntax"
-)
-
-// type for second argument to [BaseOptionData] [YamlNo]
-type YamlOption bool
 
 // BaseOptionsType is the type that holds mains’ effective option values
 //   - -yamlFile -yamlKey -verbose -debug -silent -version -no-yaml
@@ -72,3 +56,14 @@ func BaseOptionData(program string, yaml ...YamlOption) (optionData []pflags.Opt
 
 	return
 }
+
+const (
+	// name of silent option
+	silentOption = "silent"
+	// help text for -verbose
+	verboseOptionHelp = "Regular expression for selective debug matched against CodeLocation FuncName" +
+		"\nmain.main: -verbose=main.main" +
+		"\ngithub.com/haraldrudell/parl/mains.(*Executable).Init: -verbose=mains...Executable" +
+		"\ngithub.com/haraldrudell/parl/mains.Func: -verbose=mains.Func" +
+		"\nper https://github.com/google/re2/wiki/Syntax"
+)
