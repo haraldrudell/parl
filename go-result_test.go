@@ -25,7 +25,7 @@ func TestGoResult(t *testing.T) {
 		expString: "goResult_len:0",
 	}, {
 		label:     "NewGoResult2",
-		expString: "goResult_remain:1_ch:0(1)_isError:false",
+		expString: "goResult_adds:0_sends:0_ch:0(1)_isError:false",
 	}}
 	var (
 		isValid bool

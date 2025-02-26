@@ -5,24 +5,33 @@ ISC License
 
 package parl
 
-// GoResult makes any number of goroutines awaitable
+// GoResult makes a small fixed number of goroutines awaitable at
+// minimum panic, error, bugs, wait and dead-lock troubles
 //   - requires new-function invocation:
 //   - — [NewGoResult] is the simplest, goroutines are awaited by [GoResult.ReceiveError]
-//   - — [NewGoResult2] also has [IsError] method indicating if any goroutine
-//     exited with fatal error
-//   - — number of goroutines must be known at time of new
-//   - [GoResult.IsValid] true if the GoResult is initialized
+//   - — [NewGoResult2] has error flag and goroutine counter
+//   - — number of goroutines must be known at time of new, it dimensions the channel
 //   - [GoResult.SendError](errp *error) deferrable, how goroutine sends results
-//   - [GoResult.ReceiveError](errp *error, n ...int) (err error)
-//   - [GoResult.Count]() (count int) number of buffered errors
+//   - [GoResult.ReceiveError](errp *error, n ...int) (err error) how managing thread
+//     receives goroutine exits
 //   - [NewGoResult2] also has:
 //   - — [GoResult.IsError]() (isError bool) true if any goroutine returned error
 //   - — [GoResult.SetIsError]() sets the error flag manually
-//   - — [GoResult.Remaining]() (remaining int) number of goroutines that have yet to exit
+//   - — [GoResult.Remaining](add ...int) goroutine counter
 //   - —
-//   - passed by value
-//   - getting around that receiver cannot be interface
-//   - receiver is value struct with pointer in the form of an interface
+//   - Requirement: GoResult should be pass-by-value similar to channel, not as pointer
+//   - Requirement: GoResult should be usable in variable declaration
+//   - Requirement: two innermost types, simple and feature-rich implementations
+//   - Requirement: the innermost concrete type could be chan or struct with multiple fields
+//   - to avoid duplication when passed as function parameter, innermost type must be pointed to
+//   - to support multiple innermost types, the type chain must include interface
+//     which implictly is pointer
+//   - to support interface, the GoResult type cannot be chan
+//   - to be in a variable declaration, GoResult cannot be interface
+//   - to minimize levels of indirection, GoResult is struct value with single interface field
+//   - note: a type with methods cannot be pointer or interface-value
+//   - because GoResult is used multiple times in go and defer statements, it must have identifier
+//   - new-functions returns GoResult value with internal pointer
 type GoResult struct{ goResult }
 
 // true if the GoResult is initialized by new-function
@@ -47,10 +56,16 @@ func (g GoResult) String() (s string) {
 	return g.goResult.String()
 }
 
+// internal GoResultIf
+type goResult interface{ GoResultIf }
+
+// GoResult implements GoResultIf
+var _ GoResultIf = &GoResult{}
+
 // goResult is internally interface pointer
 //   - allows copy of value
 //   - points to a channel type wih method-set
-type goResult interface {
+type GoResultIf interface {
 	// SendError sends error as the final action of a goroutine
 	//   - SendError makes a goroutine:
 	//   - — awaitable and
@@ -63,9 +78,12 @@ type goResult interface {
 	//   - deferrable thread-safe
 	SendError(errp *error)
 	// ReceiveError is a deferrable function receiving error values from goroutines
-	//   - n is number of goroutines to wait for, default 1
-	//	- — for [NewGoResult2] default wait for all remaining threads
-	//   - errp may be nil
+	//   - n: number of goroutines to wait for
+	//	- n missing: wait for all goroutines.
+	//		[NewGoResult]: the number provided to new-function
+	//	- [NewGoResult2]: if adds non-zero, wait for adds goroutines.
+	//		otherwise wait for number provided to new-function
+	//   - errp: may be nil
 	//   - ReceiveError makes a goroutine:
 	//   - — awaitable and
 	//   - — able to return a fatal error
@@ -76,22 +94,32 @@ type goResult interface {
 	//   - ReceiveError only panics from structural coding problems
 	//   - deferrable thread-safe
 	ReceiveError(errp *error, n ...int) (err error)
-	// Count returns number of results that can be currently collected
+	//	- available: the number of results that can be currently collected.
+	//		That is len of the result channel, ie.
+	//		SendError invocations yet to be collected by ReceiveError
+	//	- stillRunning [NewGoResult2] only: the number of created goroutines yet to invoke SendError.
+	//		That is cumulative adds less SendError invocations.
+	//		If adds is zero, the dimensioned capacity provided to new-function
+	//		less SendError invocations
 	//   - Thread-safe
-	Count() (count int)
+	Count() (available, stillRunning int)
 	// IsError returns if any goroutine has returned an error
 	//	- only for [NewGoResult2]
 	IsError() (isError bool)
 	// SetIsError sets error state regardless of whether any goroutine has returned an error
+	//	- code inspecting IsError will carry out error behavior wihtout the need for a fatal thread exit
 	//	- only for [NewGoResult2]
 	SetIsError()
-	// Remaining returns the number of goroutines that have yet to exit
-	//	- add: optional add of launching a goroutine
+	// Remaining returns the number of goroutines that should be awaited
+	//	- add: optional add for count-based number of created goroutines
 	//	- adds: the cumulative number of add values provided
-	//	- remaining: the dimensioned capacity less SendError invocations
+	//	- — adds allow for not waiting on goroutines that were never created
+	//	- if adds is zero, ie. no add was ever provided, adds is the dimensioned
+	//		capacity provided to the new-function
 	//	- only for [NewGoResult2]
-	Remaining(add ...int) (adds, remaining int)
-	// pritable representation
+	Remaining(add ...int) (adds int)
+	// printable representation
+	//	- never panics, never empty string
 	String() (s string)
 }
 
@@ -118,7 +146,7 @@ type goResult interface {
 //	  err = …
 func NewGoResult(n ...int) (goResult GoResult) { return GoResult{goResult: newGoResultChan(n...)} }
 
-// NewGoResult2 also has [GoResult.IsError] [GoResult.Remaining]
+// NewGoResult2 also has [GoResult.IsError] [GoResult.Remaining] [GoResult.SetIsError]
 func NewGoResult2(n ...int) (goResult GoResult) {
 	return GoResult{goResult: newGoResultStruct(newGoResultChan(n...))}
 }

@@ -15,26 +15,33 @@ import (
 
 // when when GoResult.g is has multiple values
 type goResultStruct struct {
-	// error channel of initialized buffered length
+	// error channel with capacity from new-function
+	//	- has methods: Count() IsError() ReceiveError() Remaining()
+	//		SendError() SetIsError() String()
 	goResultChan
-	// the cumulatice of all add provided to Remaining
+	// the cumulative of all add provided to Remaining
+	//	- zero if no add were ever invoked
 	adds cyclebreaker.Atomic64[int]
-	// the dimentioned size less
-	remaining cyclebreaker.Atomic64[int]
+	// the number of SendError invocations
+	sendCount cyclebreaker.Atomic64[int]
 	// true if any thread failed or SetIsError was invoked
 	isError atomic.Bool
 }
 
 // NewGoResult2 also has isError
 func newGoResultStruct(ch goResultChan) (goResult *goResultStruct) {
-	g := goResultStruct{goResultChan: ch}
-	g.remaining.Store(cap(ch))
-	return &g
+	return &goResultStruct{goResultChan: ch}
+}
+
+func (g *goResultStruct) SendError(errp *error) {
+	g.goResultChan.SendError(errp)
+	g.sendCount.Add(1)
 }
 
 // ReceiveError is a deferrable function receiving error values from goroutines
-//   - n is number of goroutines to wait for, default 1
-//   - errp may be nil
+//   - n: number of goroutines to wait for
+//   - n missing: waits for adds if non-zero, otherwise new-function capacity
+//   - errp: may be nil
 //   - ReceiveError makes a goroutine:
 //   - — awaitable and
 //   - — able to return a fatal error
@@ -45,11 +52,13 @@ func newGoResultStruct(ch goResultChan) (goResult *goResultStruct) {
 //   - ReceiveError only panics from structural coding problems
 //   - deferrable thread-safe
 func (g *goResultStruct) ReceiveError(errp *error, n ...int) (err error) {
+
+	// how many results to wait for
 	var remainingErrors int
 	if len(n) > 0 {
 		remainingErrors = n[0]
-	} else {
-		remainingErrors = int(g.remaining.Load())
+	} else if remainingErrors = g.adds.Load(); remainingErrors == 0 {
+		remainingErrors = cap(g.goResultChan)
 	}
 
 	// await goroutine results
@@ -58,20 +67,19 @@ func (g *goResultStruct) ReceiveError(errp *error, n ...int) (err error) {
 		// blocks here
 		//	- wait for a result from a goroutine
 		var e = <-g.goResultChan
-		if g.remaining.Add(-1) == 0 {
-			break // end of configured errors
-		} else if e == nil {
+		if e == nil {
 			continue // good return: ignore
 		}
+		// a goroutune exited with error
 
-		// goroutine exited with error
+		//	flag error state
 		if !g.isError.Load() {
 			g.isError.Store(true)
 		}
-		// ensure e has stack
-		e = perrors.Stack(e)
-		// build error list
-		err = perrors.AppendError(err, e)
+
+		// append to error list
+		//	- // ensure e has stack
+		err = perrors.AppendError(err, perrors.Stack(e))
 	}
 
 	// final action: update errp if present
@@ -93,26 +101,58 @@ func (g *goResultStruct) SetIsError() {
 // IsError returns if any goroutine has returned an error
 func (g *goResultStruct) IsError() (isError bool) { return g.isError.Load() }
 
-// Remaining returns the number of goroutines that have yet to exit
-func (g *goResultStruct) Remaining(add ...int) (adds, remaining int) {
-	var didAdd bool
+//   - available: the number of results that can be currently collected.
+//     That is len of the result channel, ie.
+//     SendError invocations yet to be collected by ReceiveError
+//   - stillRunning [NewGoResult2] only: the number of created goroutines
+//     yet to invoke SendError.
+//     That is cumulative adds less SendError invocations.
+//     If cumulative adds is zero, the dimensioned capacity provided to
+//     new-function less SendError invocations
+//   - Thread-safe
+func (g *goResultStruct) Count() (available, stillRunning int) {
+	available, stillRunning = len(g.goResultChan), g.adds.Load()
+	if stillRunning == 0 {
+		stillRunning = cap(g.goResultChan)
+	}
+	stillRunning -= g.sendCount.Load()
+
+	return
+}
+
+// Remaining returns the number of goroutines that should be awaited
+//   - add: optional add for count-based number of created goroutines
+//   - adds: the cumulative number of add values provided
+//   - — adds allow for not waiting on goroutines that were never created
+//   - if adds is zero, ie. no add was ever provided, adds is the dimensioned
+//     capacity provided to the new-function
+func (g *goResultStruct) Remaining(add ...int) (adds int) {
+
+	// do any add
+	var a int
 	if len(add) > 0 {
-		if a := add[0]; a != 0 {
+		if a = add[0]; a != 0 {
 			adds = g.adds.Add(a)
-			didAdd = true
 		}
 	}
-	if !didAdd {
+
+	// ensure adds is read
+	if a == 0 {
 		adds = g.adds.Load()
 	}
-	remaining = g.remaining.Load()
+	// adds is g.adds
+
+	// use capacity if no adds
+	if adds == 0 {
+		adds = cap(g.goResultChan)
+	}
 
 	return
 }
 
 func (g *goResultStruct) String() (s string) {
-	return fmt.Sprintf("goResult_remain:%d_ch:%d(%d)_isError:%t",
-		g.remaining.Load(),
+	return fmt.Sprintf("goResult_adds:%d_sends:%d_ch:%d(%d)_isError:%t",
+		g.adds.Load(), g.sendCount.Load(),
 		len(g.goResultChan), cap(g.goResultChan),
 		g.IsError(),
 	)

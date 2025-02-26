@@ -109,7 +109,10 @@ func (g goResultChan) ReceiveError(errp *error, n ...int) (err error) {
 
 // Count returns number of results that can be currently collected
 //   - Thread-safe
-func (g goResultChan) Count() (count int) { return len(g) }
+func (g goResultChan) Count() (available, stillRunning int) {
+	available = len(g)
+	return
+}
 
 func (g goResultChan) SetIsError() {
 	panic(perrors.NewPF("NewGoResult does not provide SetIsError: use NewGoResult2"))
@@ -119,7 +122,7 @@ func (g goResultChan) IsError() (isError bool) {
 	panic(perrors.NewPF("NewGoResult does not provide IsError: use NewGoResult2"))
 }
 
-func (g goResultChan) Remaining(add ...int) (adds, remaining int) {
+func (g goResultChan) Remaining(add ...int) (adds int) {
 	panic(perrors.NewPF("NewGoResult does not provide Remaining: use NewGoResult2"))
 }
 
