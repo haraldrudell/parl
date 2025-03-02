@@ -21,8 +21,6 @@ const (
 
 var echoModeratorID atomic.Uint64
 
-type mcReturnTicket func()
-
 // EchoModerator is a parallelism-limiting Moderator that:
 //   - prints any increase in parallelism over the concurrency value
 //   - prints exhibited invocation slowness exceeding latencyWarningPoint
@@ -45,10 +43,10 @@ type EchoModerator struct {
 	// label preceds all printouts, default is “echoModerator1”
 	label string
 	// waiting causes printout if too many threads are waiting at the moderator
-	waiting AtomicMax[uint64]
+	waiting AtomicMax[int]
 	log     PrintfFunc
 	// examines individual invocations
-	invocationTimer InvocationTimer[mcReturnTicket]
+	invocationTimer InvocationTimer[TicketReturner]
 }
 
 // NewEchoModerator returns a parallelism-limiting moderator with printouts for
@@ -59,9 +57,9 @@ type EchoModerator struct {
 //   - — too slow or hung invocations
 //   - stores self-referencing pointers
 func NewEchoModerator(
-	concurrency uint64,
+	concurrency int,
 	latencyWarningPoint time.Duration,
-	waitingWarningPoint uint64,
+	waitingWarningPoint int,
 	timerPeriod time.Duration,
 	label string, goGen GoGen, log PrintfFunc,
 ) (echoModerator *EchoModerator) {
@@ -72,11 +70,11 @@ func NewEchoModerator(
 		label = "echoModerator" + strconv.Itoa(int(echoModeratorID.Add(1)))
 	}
 	m := EchoModerator{
-		moderator: *NewModeratorCore(concurrency),
-		label:     label,
-		log:       log,
-		waiting:   *NewAtomicMax(waitingWarningPoint),
+		label: label,
+		log:   log,
 	}
+	NewAtomicMaxp(&m.waiting, waitingWarningPoint)
+	NewModeratorCorep(&m.moderator, concurrency)
 	m.invocationTimer = *NewInvocationTimer(
 		m.loggingCallback, m.returnMcTicket,
 		latencyWarningPoint,
@@ -106,7 +104,7 @@ func (m *EchoModerator) Ticket() (returnTicket func()) {
 	}
 
 	// blocks here
-	var ticketReturn mcReturnTicket = m.moderator.Ticket()
+	var ticketReturn TicketReturner = m.moderator.Ticket()
 
 	// hand the ticket return to invocation
 	//	- to avoid additional object creation, invocation
@@ -118,8 +116,8 @@ func (m *EchoModerator) Ticket() (returnTicket func()) {
 }
 
 // returnMcTicket receives tickets to be returned from an ending Invocation
-func (m *EchoModerator) returnMcTicket(ticketReturn mcReturnTicket) {
-	ticketReturn()
+func (m *EchoModerator) returnMcTicket(ticketReturn TicketReturner) {
+	ticketReturn.ReturnTicket()
 }
 
 // loggingCallback logs output from invocationTimer

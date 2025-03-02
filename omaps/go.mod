@@ -8,8 +8,8 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/btree v1.1.3
-	github.com/haraldrudell/parl v0.4.198
-	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
+	github.com/haraldrudell/parl v0.4.199
+	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7
 )
 
 require golang.org/x/text v0.22.0 // indirect

@@ -43,6 +43,15 @@ func NewAtomicMax[T constraints.Integer](threshold T) (atomicMax *AtomicMax[T]) 
 	return &m
 }
 
+// NewAtomicMaxp populates an AtomicMax field
+func NewAtomicMaxp[T constraints.Integer](fieldp *AtomicMax[T], threshold T) (atomicMax *AtomicMax[T]) {
+	atomicMax = fieldp
+	atomicMax.threshold = atomicMax.tToUint64(threshold)
+	atomicMax.value.Store(0)
+	atomicMax.hasValue.Store(false)
+	return
+}
+
 // Value updates the container with a possible max value
 //   - value cannot be negative, that is panic
 //   - isNewMax is true if:

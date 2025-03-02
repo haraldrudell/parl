@@ -21,6 +21,11 @@ type Moderator struct {
 	//ctx context.Context
 }
 
+// moderatorCore is a parl-private version of ModeratorCore
+type moderatorCore struct {
+	*ModeratorCore
+}
+
 // NewModerator creates a cancelable Moderator used to limit parallelism
 // func NewModerator(parallelism uint64, ctx context.Context) (mo *Moderator) {
 // 	return NewModeratorFromCore(NewModeratorCore(parallelism), ctx)
