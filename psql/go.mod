@@ -8,8 +8,8 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/haraldrudell/parl v0.4.199
-	github.com/haraldrudell/parl/sqliter v0.4.199
+	github.com/haraldrudell/parl v0.4.200
+	github.com/haraldrudell/parl/sqliter v0.4.200
 )
 
 require (

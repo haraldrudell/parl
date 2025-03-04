@@ -8,7 +8,7 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/google/btree v1.1.3
-	github.com/haraldrudell/parl v0.4.199
+	github.com/haraldrudell/parl v0.4.200
 	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7
 )
 
