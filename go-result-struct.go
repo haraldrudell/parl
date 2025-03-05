@@ -48,6 +48,9 @@ func (g *goResultStruct) count() (available, stillRunning int) {
 		stillRunning = cap(g.goResultChan)
 	}
 	stillRunning -= g.sendCount.Load()
+	if stillRunning < 0 {
+		stillRunning = 0
+	}
 
 	return
 }

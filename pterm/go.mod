@@ -2,12 +2,14 @@
 // ISC License
 module github.com/haraldrudell/parl/pterm
 
-go 1.23.0
+go 1.23.1
+
+toolchain go1.24.0
 
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.201
+	github.com/haraldrudell/parl v0.4.202
 	golang.org/x/term v0.30.0
 )
 

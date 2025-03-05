@@ -145,16 +145,21 @@ func (g GoResult) ReceiveError(errp *error, n ...int) (err error) {
 		panic(perrors.NewPF("uninitialized GoResult"))
 	}
 
+	// the error-receiving channel
+	var ch = gp.ch()
+
 	// get error count
 	var remainingErrors int
 	if len(n) > 0 {
 		remainingErrors = n[0]
+	} else if goResultStruct, _ := g.goResult.(*goResultStruct); goResultStruct != nil {
+		remainingErrors = goResultStruct.remaining(0)
 	} else {
-		remainingErrors = defaultReceive
+		// default for simple GoResult: dimension of channel
+		remainingErrors = cap(ch)
 	}
 
 	// await goroutine results
-	var ch = gp.ch()
 	for i := range remainingErrors {
 		_ = i
 
@@ -188,6 +193,11 @@ func (g GoResult) ReceiveError(errp *error, n ...int) (err error) {
 //     If adds is zero, the dimensioned capacity provided to new-function
 //     less SendError invocations
 //   - Thread-safe
+//   - —
+//   - stillRunning lack integrity with Remaining and Done invocations
+//     compared to available
+//   - — a parallel Remaining may increase stillRunning
+//   - — a parallel Done may decrease stillRunning
 func (g GoResult) Count() (available, stillRunning int) {
 
 	// get implementation
@@ -277,8 +287,3 @@ func (g GoResult) String() (s string) {
 
 	return
 }
-
-const (
-	// default number of errors to receive
-	defaultReceive = 1
-)

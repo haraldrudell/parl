@@ -2,12 +2,14 @@
 // ISC License
 module github.com/haraldrudell/parl/yamler
 
-go 1.23.0
+go 1.23.1
+
+toolchain go1.24.0
 
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.201
+	github.com/haraldrudell/parl v0.4.202
 	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7
 	gopkg.in/yaml.v3 v3.0.1
 )
