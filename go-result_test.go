@@ -111,7 +111,7 @@ func runGoroutine(text string) (err error) {
 // goroutine is a goroutine function exiting with error
 func goroutine(text string, g GoResult) {
 	var err error
-	defer g.SendError(&err)
+	defer g.Done(&err)
 	defer RecoverErr(func() DA { return A() }, &err)
 
 	err = perrors.New(text)

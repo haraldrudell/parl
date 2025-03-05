@@ -5,6 +5,10 @@ ISC License
 
 package parl
 
+import (
+	"github.com/haraldrudell/parl/perrors"
+)
+
 // GoResult makes a small fixed number of goroutines awaitable at
 // minimum panic, error, bugs, wait and dead-lock troubles
 //   - requires new-function invocation:
@@ -34,102 +38,16 @@ package parl
 //   - new-functions returns GoResult value with internal pointer
 type GoResult struct{ goResult }
 
-// true if the GoResult is initialized by new-function
-func (g GoResult) IsValid() (isValid bool) { return g.goResult != nil }
+// GoResult implements Done(errp *error)
+var _ Doner = &GoResult{}
 
-// String method always works
-//   - “GoResult_nil”:
-//     uninitialized, invalid GoResult nil or no new-function
-//   - “goResult_len:0”: from NewGoResult
-//   - — has channel capacity 1
-//   - — len is whether any result is pending in the channel
-//   - “goResult_remain:1_ch:0(1)_isError:false” from NewGoResult2
-//   - — Has buffered channel of certain capacity
-//   - — remain is how many results remain to be read from channel
-//   - — ch is how many items are pending in channel
-//   - — isError is true if an error was read from a goroutine
-//     or SetIsError was invoked
-func (g GoResult) String() (s string) {
-	if g.goResult == nil {
-		return "GoResult_nil"
-	}
-	return g.goResult.String()
-}
-
-// internal GoResultIf
-type goResult interface{ GoResultIf }
-
-// GoResult implements GoResultIf
-var _ GoResultIf = &GoResult{}
-
-// goResult is internally interface pointer
-//   - allows copy of value
-//   - points to a channel type wih method-set
-type GoResultIf interface {
-	// SendError sends error as the final action of a goroutine
-	//   - SendError makes a goroutine:
-	//   - — awaitable and
-	//   - — able to return a fatal error
-	//   - — other needs of a goroutine is to initiate and detect cancel and
-	//     submit non-fatal errors
-	//   - errCh should be a buffered channel large enough for all its goroutines
-	//   - — this prevents goroutines from blocking in channel send
-	//   - SendError only panics from structural coding problems
-	//   - deferrable thread-safe
-	SendError(errp *error)
-	// ReceiveError is a deferrable function receiving error values from goroutines
-	//   - n: number of goroutines to wait for
-	//	- n missing: wait for all goroutines.
-	//		[NewGoResult]: the number provided to new-function
-	//	- [NewGoResult2]: if adds non-zero, wait for adds goroutines.
-	//		otherwise wait for number provided to new-function
-	//   - errp: may be nil
-	//   - ReceiveError makes a goroutine:
-	//   - — awaitable and
-	//   - — able to return a fatal error
-	//   - — other needs of a goroutine is to initiate and detect cancel and
-	//     submit non-fatal errors
-	//   - GoRoutine should have enough capacity for all its goroutines
-	//   - — this prevents goroutines from blocking in channel send
-	//   - ReceiveError only panics from structural coding problems
-	//   - deferrable thread-safe
-	ReceiveError(errp *error, n ...int) (err error)
-	//	- available: the number of results that can be currently collected.
-	//		That is len of the result channel, ie.
-	//		SendError invocations yet to be collected by ReceiveError
-	//	- stillRunning [NewGoResult2] only: the number of created goroutines yet to invoke SendError.
-	//		That is cumulative adds less SendError invocations.
-	//		If adds is zero, the dimensioned capacity provided to new-function
-	//		less SendError invocations
-	//   - Thread-safe
-	Count() (available, stillRunning int)
-	// IsError returns if any goroutine has returned an error
-	//	- only for [NewGoResult2]
-	IsError() (isError bool)
-	// SetIsError sets error state regardless of whether any goroutine has returned an error
-	//	- code inspecting IsError will carry out error behavior wihtout the need for a fatal thread exit
-	//	- only for [NewGoResult2]
-	SetIsError()
-	// Remaining returns the number of goroutines that should be awaited
-	//	- add: optional add for count-based number of created goroutines
-	//	- adds: the cumulative number of add values provided
-	//	- — adds allow for not waiting on goroutines that were never created
-	//	- if adds is zero, ie. no add was ever provided, adds is the dimensioned
-	//		capacity provided to the new-function
-	//	- only for [NewGoResult2]
-	Remaining(add ...int) (adds int)
-	// printable representation
-	//	- never panics, never empty string
-	String() (s string)
-}
-
-// NewGoResult returns the minimum mechanic to make a goroutine awaitable
-//   - n is goroutine capacity, default 1
+// NewGoResult returns the minimum mechanic to make goroutines awaitable
+//   - n: optional goroutine capacity, default 1
+//   - — capacity ensures goroutines do not block on exit
+//   - —
+//   - a thread-creator provides GoResult to its goroutines in go statements making them awaitable
+//   - each exiting thread sends an error value that may be nil
 //   - mechanic is buffered channel
-//   - a thread-launcher provides a GoResult value of sufficient capacity to its launched threads
-//   - exiting threads send an error value that may be nil
-//   - the thread-launcher awaits results one by one
-//   - to avoid threads blocking prior to exiting, the channel must have sufficient capacity
 //
 // Usage:
 //
@@ -140,13 +58,227 @@ type GoResultIf interface {
 //	  …
 //	func goroutine(text string, g parl.GoResult) {
 //	  var err error
-//	  defer g.SendError(&err)
+//	  defer g.Done(&err)
 //	  defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
 //
 //	  err = …
-func NewGoResult(n ...int) (goResult GoResult) { return GoResult{goResult: newGoResultChan(n...)} }
+func NewGoResult(n ...int) (goResult GoResult) {
+	return GoResult{goResult: newGoResultChan(n...)}
+}
 
-// NewGoResult2 also has [GoResult.IsError] [GoResult.Remaining] [GoResult.SetIsError]
+// NewGoResult2 is [NewGoResult] with additional error flag and goroutine counter
+//   - n: optional goroutine capacity, default 1
+//   - — capacity ensures goroutines do not block on exit
+//   - —
+//   - [GoResult.Remaining] a counter enabling waiting for fewer goroutines than n
+//   - [GoResult.IsError] true if any goroutine exited with error or SetIsError was invoked
+//   - [GoResult.SetIsError] sets error state regardless of goroutine exits
+//   - a thread-creator provides GoResult to its goroutines in go statements making them awaitable
+//   - each exiting thread sends an error value that may be nil
+//   - mechanic is buffered channel
+//
+// Usage:
+//
+//	func someFunc(text string) (err error) {
+//	  var g = parl.NewGoResult2()
+//	  go goroutine(text, g)
+//	  defer g.ReceiveError(&err)
+//	  …
+//	func goroutine(text string, g parl.GoResult) {
+//	  var err error
+//	  defer g.Done(&err)
+//	  defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
+//
+//	  err = …
 func NewGoResult2(n ...int) (goResult GoResult) {
 	return GoResult{goResult: newGoResultStruct(newGoResultChan(n...))}
 }
+
+// true if the GoResult is initialized by new-function
+func (g GoResult) IsValid() (isValid bool) { return g.goResult != nil }
+
+// Done indicates that this goroutine is exiting
+//   - *errp nil: successful exit
+//   - *errp non-nil: fatal error exit
+//   - —
+//   - deferrable
+//   - Done makes a goroutine:
+//   - — awaitable and
+//   - — able to return error
+//   - — other needs of a goroutine is to initiate and detect cancel and
+//     submit non-fatal errors
+func (g GoResult) Done(errp *error) {
+
+	// get implementation
+	var gp = g.goResult
+	if gp == nil {
+		panic(perrors.NewPF("uninitialized GoResult"))
+	}
+	NilPanic("errp", errp)
+
+	g.done(*errp)
+}
+
+// ReceiveError is a deferrable function receiving error values from goroutines
+//   - n: number of goroutines to wait for
+//   - n missing: wait for all goroutines.
+//     [NewGoResult]: the number provided to new-function
+//   - [NewGoResult2]: if adds non-zero, wait for adds goroutines.
+//     Otherwise, wait for number provided to new-function
+//   - — if consumer uses Remaining and adds may be zero,
+//     the output from Remaining must be provided to ReceiveError.
+//   - errp: may be nil
+//   - ReceiveError makes a goroutine:
+//   - — awaitable and
+//   - — able to return a fatal error
+//   - — other needs of a goroutine is to initiate and detect cancel and
+//     submit non-fatal errors
+//   - GoRoutine should have enough capacity for all its goroutines
+//   - — this prevents goroutines from blocking in channel send
+//   - ReceiveError only panics from structural coding problems
+//   - deferrable thread-safe
+func (g GoResult) ReceiveError(errp *error, n ...int) (err error) {
+
+	// get implementation
+	var gp = g.goResult
+	if gp == nil {
+		panic(perrors.NewPF("uninitialized GoResult"))
+	}
+
+	// get error count
+	var remainingErrors int
+	if len(n) > 0 {
+		remainingErrors = n[0]
+	} else {
+		remainingErrors = defaultReceive
+	}
+
+	// await goroutine results
+	var ch = gp.ch()
+	for i := range remainingErrors {
+		_ = i
+
+		// blocks here
+		//	- wait for a result from a goroutine
+		var e = <-ch
+		if e == nil {
+			continue // good return: ignore
+		}
+
+		// goroutine exited with error
+		// ensure e has stack
+		e = perrors.Stack(e)
+		// build error list
+		err = perrors.AppendError(err, e)
+	}
+
+	// final action: update errp if present
+	if err != nil && errp != nil {
+		*errp = perrors.AppendError(*errp, err)
+	}
+
+	return
+}
+
+//   - available: the number of results that can be currently collected.
+//     ie. len of the results channel which is
+//     Done invocations yet to be collected by ReceiveError
+//   - stillRunning [NewGoResult2] only: the number of created goroutines yet to invoke SendError.
+//     That is cumulative adds less SendError invocations.
+//     If adds is zero, the dimensioned capacity provided to new-function
+//     less SendError invocations
+//   - Thread-safe
+func (g GoResult) Count() (available, stillRunning int) {
+
+	// get implementation
+	var gp = g.goResult
+	if gp == nil {
+		panic(perrors.NewPF("uninitialized GoResult"))
+	}
+
+	return g.count()
+}
+
+// IsError returns if any goroutine has returned an error
+//   - only for [NewGoResult2]
+func (g GoResult) IsError() (isError bool) { return g.doError() }
+
+// SetIsError sets error state regardless of whether any goroutine has returned an error
+//   - consumer will exhibit error behavior without fatal thread-exit
+//   - only for [NewGoResult2]
+func (g GoResult) SetIsError() { g.doError(true) }
+
+// doError handles set and detect of errors
+func (g GoResult) doError(setIsError ...bool) (isError bool) {
+
+	// get implementation
+	var goResultStruct, _ = g.goResult.(*goResultStruct)
+	if goResultStruct == nil {
+		if g.goResult == nil {
+			panic(perrors.NewPF("uninitialized GoResult"))
+		}
+		panic(perrors.NewPF("NewGoResult does not provide IsError SetIsError: use NewGoResult2"))
+	}
+
+	// get set error
+	var setError = len(setIsError) > 0 && setIsError[0]
+
+	return goResultStruct.doError(setError)
+}
+
+// Remaining returns the number of goroutines that should be awaited
+//   - add: optional add for count-based number of created goroutines
+//   - — add cannot be negative
+//   - adds: the cumulative number of add values provided
+//   - — adds allow for not waiting on goroutines that were never created
+//   - if adds is zero, ie. no add was ever provided, adds is the dimensioned
+//     capacity provided to the new-function
+//   - only for [NewGoResult2]
+func (g GoResult) Remaining(add ...int) (adds int) {
+
+	// get implementation
+	var goResultStruct, _ = g.goResult.(*goResultStruct)
+	if goResultStruct == nil {
+		if g.goResult == nil {
+			panic(perrors.NewPF("uninitialized GoResult"))
+		}
+		panic(perrors.NewPF("NewGoResult does not provide IsError SetIsError: use NewGoResult2"))
+	}
+
+	// get add
+	var addValue int
+	if len(add) > 0 {
+		addValue = add[0]
+	}
+	if addValue < 0 {
+		panic(perrors.ErrorfPF("negative add: %d", addValue))
+	}
+
+	return goResultStruct.remaining(addValue)
+}
+
+// String method always works
+//   - “GoResult_nil”:
+//     uninitialized, invalid GoResult nil or no new-function
+//   - “goResult_len:0”: from NewGoResult
+//   - — has channel capacity 1
+//   - — len is whether any result is pending in the channel
+//   - “goResult_adds:2_sends:1_ch:0(2)_isError:false” from NewGoResult2
+//   - — Has buffered channel of certain capacity
+//   - — remain is how many results remain to be read from channel
+//   - — ch is how many items are pending in channel
+//   - — isError is true if an error was read from a goroutine
+//     or SetIsError was invoked
+func (g GoResult) String() (s string) {
+	if g.goResult == nil {
+		return "GoResult_nil"
+	}
+	s = g.goResult.String()
+
+	return
+}
+
+const (
+	// default number of errors to receive
+	defaultReceive = 1
+)

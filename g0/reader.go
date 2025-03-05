@@ -49,9 +49,9 @@ import (
 //	  go g0.Reader(parl.NoSTReader, parl.NoErrorSink1, parl.NoPrintfFunc, goGroup, goResult)
 //	  defer goGroup.Cancel()
 //	  go someGoroutine(goGroup.Go())
-func Reader(shouldTerminate parl.ShouldTerminateReader, errorSink parl.ErrorSink1, log parl.PrintfFunc, goGroup parl.GoGroup, g parl.GoResult) {
+func Reader(shouldTerminate parl.ShouldTerminateReader, errorSink parl.ErrorSink1, log parl.PrintfFunc, goGroup parl.GoGroup, g parl.Doner) {
 	var err error
-	defer g.SendError(&err)
+	defer g.Done(&err)
 	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
 
 	if log == nil {

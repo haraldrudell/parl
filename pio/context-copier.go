@@ -202,7 +202,7 @@ func (c *ContextCopier) Shutdown() {
 //     immediately cancel copying
 func (c *ContextCopier) contextCopierCloserThread(done <-chan struct{}) {
 	var err error
-	defer c.g.SendError(&err)
+	defer c.g.Done(&err)
 	defer parl.PanicToErr(&err)
 
 	// wait for thread exit order

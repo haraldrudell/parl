@@ -88,12 +88,12 @@ var NoErrp *error
 // nil OnError function
 //   - public for RecoverAnnotation
 //
-// deprecated: use [ErrorSink]
+// Deprecated: use [ErrorSink]
 var NoOnError OnError
 
 // OnError is a function that receives error values from an errp error pointer or a panic
 //
-// deprecated: use [ErrorSink]
+// Deprecated: use [ErrorSink]
 type OnError func(err error)
 
 const (

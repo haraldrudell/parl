@@ -83,3 +83,21 @@ type Doneable interface {
 	Add(delta int)
 	Done()
 }
+
+// Doner implements awaitable exit for a goroutine
+//   - implemented by:
+//   - [parl.Go.Done]
+//   - [parl.GoResult.Done]
+type Doner interface {
+	// Done indicates that this goroutine is exiting
+	//	- err nil: successful exit
+	//	- err non-nil: fatal error exit
+	//	- —
+	// 	- deferrable
+	//   - Done makes a goroutine:
+	//   - — awaitable and
+	//   - — able to return error
+	//   - — other needs of a goroutine is to initiate and detect cancel and
+	//		submit non-fatal errors
+	Done(errp *error)
+}

@@ -75,10 +75,16 @@ type Go interface {
 	//	- the threads of its subordinate thread-groups.
 	SubGroup(onFirstFatal ...GoFatalCallback) (subGroup SubGroup)
 	// Done indicates that this goroutine is exiting
-	//	- err == nil means successful exit
-	//	- non-nil err indicates fatal error
+	//	- err nil: successful exit
+	//	- err non-nil: fatal error exit
+	//	- —
 	// 	- deferrable
-	Done(errp *error)
+	//   - Done makes a goroutine:
+	//   - — awaitable and
+	//   - — able to return error
+	//   - — other needs of a goroutine is to initiate and detect cancel and
+	//		submit non-fatal errors
+	Doner
 	// Wait awaits exit of this Go thread
 	Wait()
 	// ch closes upon exit of this Go thread

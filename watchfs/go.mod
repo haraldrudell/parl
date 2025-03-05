@@ -9,11 +9,11 @@ replace github.com/haraldrudell/parl => ../../parl
 require (
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/google/uuid v1.6.0
-	github.com/haraldrudell/parl v0.4.200
+	github.com/haraldrudell/parl v0.4.201
 )
 
 require (
 	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 )
