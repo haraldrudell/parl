@@ -58,7 +58,9 @@ func (a *CyclicAwaitable) IsClosed() (isClosed bool) { return a.aw().IsClosed() 
 //   - eventuallyConsistent [EvCon]: may return before the channel is atcually closed
 //     for higher performance
 //   - idempotent, deferrable, panic-free, thread-safe
-func (a *CyclicAwaitable) Close(eventuallyConsistent ...bool) (didClose bool) { return a.aw().Close() }
+func (a *CyclicAwaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClose bool) {
+	return a.aw().Close()
+}
 
 // Open rearms the awaitable for another cycle
 //   - ch is guaranteed to have been open at time of invocation.

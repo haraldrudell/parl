@@ -13,24 +13,29 @@ import (
 )
 
 func TestWaitGroupCh(t *testing.T) {
-	var adds0 = 2
-	var adds1 = 1
-	var currentCountExp0 = 1
-	var sExp = "waitGroupCh_count:0(adds:0)"
+	const (
+		adds0            = 2
+		adds1            = 1
+		currentCountExp0 = 1
+		sExp             = "waitGroupCh_count:0(adds:0)_isWaiting:false_isClosed:false"
+	)
 
-	var awaitableCh AwaitableCh
-	var isClosed, isExit, isZero bool
-	var currentCount, totalAdds int
-	var s string
+	var (
+		awaitableCh              AwaitableCh
+		isClosed, isExit, isZero bool
+		currentCount, totalAdds  int
+		s                        string
+	)
 
-	// Add() Ch() Count() Done() DoneBool() IsZero() Reset() String()
-	// Wait()
+	// Add() Done() DoneBool() Wait()
+	// Ch() Count() Counts() IsZero()
+	// Reset() String()
 	var w WaitGroupCh
 	var reset = func() {
 		w = WaitGroupCh{}
 	}
 
-	// Ch returns a non-closed channel
+	// Ch should return a non-closed channel
 	reset()
 	w.Add(adds1)
 	awaitableCh = w.Ch()
@@ -44,7 +49,7 @@ func TestWaitGroupCh(t *testing.T) {
 		t.Error("Ch is closed")
 	}
 
-	// Ch channel closes
+	// Add-Done should close channel
 	reset()
 	w.Add(adds1)
 	awaitableCh = w.Ch()
@@ -59,7 +64,7 @@ func TestWaitGroupCh(t *testing.T) {
 		t.Error("Ch not closed")
 	}
 
-	// Count returns zeroes
+	// Count should return zeroes
 	reset()
 	currentCount, totalAdds = w.Counts()
 	if currentCount != 0 {
@@ -69,9 +74,8 @@ func TestWaitGroupCh(t *testing.T) {
 		t.Errorf("Count totalAdds %d exp 0", totalAdds)
 	}
 
-	// Count reflect Adds Dones
-	//	- Add
-	//	- Done
+	// Count should reflect Adds Dones
+	//	- Add() Done()
 	reset()
 	w.Add(adds0)
 	w.Done()
@@ -95,24 +99,29 @@ func TestWaitGroupCh(t *testing.T) {
 		t.Error("DoneBool isExit false")
 	}
 
-	// Reset
+	// Reset should reset adds
 	reset()
 	w.Add(adds0)
-	if w.p.Load() == nil {
-		t.Error("w.p.Load nil")
+	currentCount, totalAdds = w.Counts()
+	_ = currentCount
+	if totalAdds == 0 {
+		t.Error("totalAdds zero")
 	}
 	w.Reset()
-	if w.p.Load() != nil {
-		t.Error("w.p.Load not nil")
+	currentCount, totalAdds = w.Counts()
+	_ = currentCount
+	if totalAdds != 0 {
+		t.Error("totalAdds not zero")
 	}
 
-	// IsZero
+	// IsZero should be false after Add
 	reset()
 	w.Add(adds1)
 	isZero = w.IsZero()
 	if isZero {
 		t.Error("IsZero true")
 	}
+	// IsZero should be true after Add-Done
 	w.Done()
 	isZero = w.IsZero()
 	if !isZero {
@@ -174,7 +183,7 @@ func TestWaitGroupChWait(t *testing.T) {
 func waiter(
 	w *WaitGroupCh,
 	isWaitReturn *atomic.Bool,
-	isReady Doneable,
+	isReady DoneLegacy,
 	isDone chan struct{},
 ) {
 	defer close(isDone)

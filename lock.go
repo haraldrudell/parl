@@ -7,8 +7,6 @@ package parl
 
 import (
 	"sync"
-
-	"github.com/haraldrudell/parl/psync"
 )
 
 // parl.Mutex is a one-liner mutex
@@ -20,4 +18,4 @@ import (
 type Mutex struct{ sync.Mutex }
 
 // Lock returns lock reference
-func (m *Mutex) Lock() (m2 psync.Unlocker) { m.Mutex.Lock(); return m }
+func (m *Mutex) Lock() (m2 Unlocker) { m.Mutex.Lock(); return m }

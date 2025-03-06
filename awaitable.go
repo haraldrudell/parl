@@ -5,7 +5,10 @@ All rights reserved
 
 package parl
 
-import "sync/atomic"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 // Awaitable is a semaphore allowing any number of threads to observe
 // and await any number of events in parallel
@@ -29,111 +32,162 @@ import "sync/atomic"
 //     employ a re-created pointer and value
 //   - — both are less performant for the managing thread
 type Awaitable struct {
+	// ch is lazy atomic-shielded-lock creation of channel
+	ch AtomicLockArg[chan struct{}, Awaitable]
+	// wg is lazy atomic-shielded-lock creation of wait-group
+	//	- wg is separated from ch, reducing contention
+	wg AtomicLock[sync.WaitGroup]
 	// closeWinner selects the thread to close the channel
-	closeWinner atomic.Bool
-	// channel managed by atomicCh
-	//	- lazy initialization
-	chanp atomic.Pointer[chan struct{}]
-	// isClosed indicates whether the channel is closed at atomic performance
-	//	- set to true after channel close complete
-	//	- shields channel close detection
+	//	- non-zero when close is in progress or completed
+	closeWinner atomic.Uint32
+	// isClosed is close-complete flag
+	//	- atomic-performance shield around the slower channel
 	isClosed atomic.Bool
 }
 
 // Ch returns an awaitable channel. Thread-safe
-func (a *Awaitable) Ch() (ch AwaitableCh) { return a.atomicCh() }
+//   - ch: non-nil channel
+//   - lazy-initialized atomic-shielded-lock
+func (a *Awaitable) Ch() (ch AwaitableCh) { return *a.ch.Get(makeCh, a) }
 
 // isClosed inspects whether the awaitable has been triggered
-//   - on true return, it is guaranteed that the channel has been closed
+//   - isClosed true: channel is closed
 //   - Thread-safe
 func (a *Awaitable) IsClosed() (isClosed bool) {
 
-	// read close state with atomic performance
+	// read whether Close has completed at atomic performance
 	//	- reading atomic is 0.4955 ns
-	if isClosed = a.isClosed.Load(); isClosed {
-		return
+	if a.isClosed.Load() {
+		isClosed = true
+		return // already closed return: isClosed true
+	}
+	// no channel close has completed
+
+	// read whether Close was initiated at atomic performance
+	if a.closeWinner.Load() == 0 {
+		// no channel close has begun
+		return // no close return: isClosed false
+	}
+	// a close is in progress
+
+	// obtain the channel to check its status
+	//	- the channel itself must be checked because
+	//		previous invokers of Ch may hold the channel value
+	var ch = *a.ch.Get(makeCh, a)
+
+	// check whether close assigned a fake channel
+	if ch == fakeCh {
+		isClosed = true
+		return // faster fake-check return: isClosed true
 	}
 
 	// get exact close state from the channel
 	//	- determining channel close is 3.479 ns
 	select {
-	case <-a.atomicCh():
+	// if channel sends data, it is because it is closed
+	case <-ch:
 		isClosed = true
 	default:
 	}
 
-	return
+	return // status from channel return: isClosed valid
 }
 
-// [Awaitable.Close] argument to Close meaning eventually consistency
-//   - may return before the channel is actually closed
-const EvCon = true
-
 // Close triggers awaitable by closing the channel
-//   - upon return, the channel is guaranteed to be closed
-//   - eventuallyConsistent [EvCon]: may return before the channel is atcually closed
-//     for higher performance
+//   - eventuallyConsistent missing: upon return, the channel is
+//     guaranteed to be closed
+//   - eventuallyConsistent [EvCon]: Close may return before the channel
+//     is atcually closed for higher performance. The close operation is
+//     guaranteed to complete in the near future
+//   - didClose true: this thread executed close
 //   - idempotent, deferrable, panic-free, thread-safe
-func (a *Awaitable) Close(eventuallyConsistent ...bool) (didClose bool) {
+func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClose bool) {
 
-	// select close winner
-	//	- CAS fail is 21.195 ns, CAS success if 8.419 ns
-	//	- atomic read: 0.4955 ns
-	if didClose = !( //
-	// this thread does not close if:
-	//	- a winner was already selected, atomic Load performance or
-	a.closeWinner.Load() ||
-		// this thread is not the winner
-		!a.closeWinner.CompareAndSwap(false, true)); //
-	!didClose {
+	// already closed case
+	//	- reading atomic is 0.4955 ns
+	if a.isClosed.Load() {
+		return // already closed return: didClose false
+	}
+
+	// pick very first thread as winner
+	//	- Add is faster that CAS
+	//	- winner thread is 8.9 ns (read 0.4955 ns + successful CAS 8.419 ns)
+	//	- losing thread is 21.5 ns (read 0.4955 ns + failing CAS 21 ns)
+	//	- subsequent thread is 0.4955 ns
+	var isWinner = a.closeWinner.Load() == 0 && // if already incremented, this thread is not winner
+		a.closeWinner.Add(1) == 1 // the first thread to increment is the write is winner
+
+	if !isWinner {
 
 		// eventually consistent case does not wait
 		//	- this makes eventually consistent Close a blazing 8.655 ns parallel!
-		if len(eventuallyConsistent) > 0 && eventuallyConsistent[0] {
-			return // eventually consistent: another thread is closing the channel
+		if len(eventuallyConsistent) > 0 && bool(eventuallyConsistent[0]) {
+			// eventually consistent: another thread is closing the channel
+			return // eventually consistent return: didClose false
 		}
+		// this thread should await channel close, there is little hurry
 
-		// prevent returning before channel close
-		//	- closing thread successful CAS and channel close is 17 ns
-		//	- losing thread failing CAS is 21 ns
-		//	- the channel is likely already closed
-		if a.isClosed.Load() {
-			return
-		}
-
-		// single-thread: ≈2 ns
-		//	- unshielded parallel contention makes channel read an extremely slow 916 ns
-		//	- shielded parallel: 66% is spent in channel read
-		<-a.atomicCh()
-		return // close completed by other thread return
+		// wait for shared waitGroup
+		var wg = a.wg.GetFunc(makeWaitGroup)
+		wg.Wait()
+		return // waited return: didClose false
 	}
-	// only the winner thread arrives here
+	// this thread should close the channel
 
-	// channel close
-	//	- ≈9 ns
-	close(a.atomicCh())
+	// execute close
+	// single-thread: ≈2 ns
+	//	- unshielded parallel contention makes channel read an extremely slow 916 ns
+	//	- shielded parallel: 66% is spent in channel read
+	if ch := *a.ch.Get(makeCh, a); ch != fakeCh {
+		close(ch)
+	}
+	// close completed
+
 	// on close complete, store atomic performance flag
 	a.isClosed.Store(true)
+	// release any waiting loser threads
+	var wg = a.wg.GetFunc(makeWaitGroup)
+	wg.Done()
 
-	return // didClose return
+	didClose = true
+	return // didClose return: didClose true
 }
 
-// atomicCh returns a non-nil channel using atomic mechanic
-func (a *Awaitable) atomicCh() (ch chan struct{}) {
+// lazyCh creates the channel
+//   - *chp is zero-value
+//   - invoked maximum once per Awaitable
+//   - a.ch.Get delegates to lazyCh
+func (a *Awaitable) lazyCh(chp *chan struct{}) {
 
-	// get channel previously created by another thread
-	//	- 1-pointer Load 0.5167 ns
-	if cp := a.chanp.Load(); cp != nil {
-		return *cp // channel from atomic pointer
+	// if close in progress, use closed fake static channel
+	//	- saves a channel make and channel close
+	if a.closeWinner.Load() != 0 {
+		*chp = fakeCh
+		return
 	}
-
-	// attempt to create the authoritative channel
-	//	- make of channel is 21.10 ns, 31.13 ns parallel
-	//	- CAS fail is 21.195 ns, CAS success if 8.419 ns
-	if ch2 := make(chan struct{}); a.chanp.CompareAndSwap(nil, &ch2) {
-		return ch2 // channel written to atomic pointer
-	}
-
-	// get channel created by other thread
-	return *a.chanp.Load()
+	// create new channel
+	//	- invoker is Ch or isClosed while close in progress
+	*chp = make(chan struct{})
 }
+
+// fakeCh is a static closed channel
+var fakeCh = func() (ch chan struct{}) {
+	ch = make(chan struct{})
+	close(ch)
+	return
+}()
+
+// makeCh is channel creator function. Thread-safe
+//   - Awaitable.ch.Get delegates to makeCh
+//   - *chp: zero-value
+//   - invoked maximum once per Awaitable
+func makeCh(chp *chan struct{}, a *Awaitable) {
+	NilPanic("makeCh argument", a)
+	a.lazyCh(chp)
+}
+
+// makeWaitGroup is wait-group creator function. Thread-safe
+//   - Awaitable.wg.GetFunc delegates to makeWaitGroup
+//   - *wgp: zero-value
+//   - invoked maximum once per Awaitable
+func makeWaitGroup(wgp *sync.WaitGroup) { wgp.Add(1) }

@@ -10,8 +10,8 @@ replace github.com/haraldrudell/parl => ../../parl
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/haraldrudell/parl v0.4.202
-	github.com/haraldrudell/parl/sqliter v0.4.202
+	github.com/haraldrudell/parl v0.4.203
+	github.com/haraldrudell/parl/sqliter v0.4.203
 )
 
 require (
@@ -20,7 +20,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7 // indirect
+	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	modernc.org/libc v1.61.13 // indirect

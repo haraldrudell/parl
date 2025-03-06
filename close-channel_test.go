@@ -9,7 +9,6 @@ import "testing"
 
 func TestCloseChannel(t *testing.T) {
 	var value = 3
-	var doDrain = true
 
 	var ch chan int
 	var err, errp error
@@ -29,7 +28,7 @@ func TestCloseChannel(t *testing.T) {
 	// n should return number of items when draining
 	ch = make(chan int, 1)
 	ch <- value
-	isNilChannel, isCloseOfClosedChannel, n, err = CloseChannel(ch, &errp, doDrain)
+	isNilChannel, isCloseOfClosedChannel, n, err = CloseChannel(ch, &errp, DoDrain)
 	if n != 1 {
 		t.Errorf("n bad %d exp %d", n, 1)
 	}

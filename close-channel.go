@@ -10,29 +10,34 @@ import (
 	"github.com/haraldrudell/parl/pruntime"
 )
 
-const (
-	CloseChannelDrain = true
-)
-
-// CloseChannel closes a channel
-//   - CloseChannel is thread-safe, deferrable and panic-free,
-//     handles closed-channel panic, nil-channel case and
-//     has channel drain feature
-//   - isNilChannel returns true if ch is nil.
-//     closing a nil channel would cause panic.
-//   - isCloseOfClosedChannel is true if close paniced due to
+// CloseChannel closes a channel handling panic, nil channel and
+// optionally draining the channel prior to close
+//   - ch: channel to close
+//   - errp non-nil: receives any panic using [perrors.AppendError]
+//   - drainChannel missing: no drain prior to close
+//   - drainChannel [DoDrain]: drain channel prior to close.
+//     If a thread is continuously sending items and DoDrain is present,
+//     CloseChannel may block indefinitely.
+//   - isNilChannel: true with no error when ch is nil.
+//     Closing a nil channel is panic.
+//   - isCloseOfClosedChannel: true with error if close paniced due to
 //     the channel already closed.
 //     A channel transferring data cannot be inspected for being
 //     closed
-//   - if errp is non-nil, panic values updates it using errors.AppendError.
-//   - if doDrain is [parl.CloseChannelDrain], the channel is drained first.
-//     Note: closing a channel while a thread is blocked in channel send is
+//   - n: number of drained items with DoDrain
+//   - Note: closing a channel while a thread is blocked in channel send is
 //     a data race.
-//     If a thread is continuously sending items and doDrain is true,
-//     CloseChannel will block indefinitely.
-//   - n returns the number of drained items.
-func CloseChannel[T any](ch chan T, errp *error, drainChannel ...bool) (
-	isNilChannel, isCloseOfClosedChannel bool, n int, err error,
+//   - thread-safe deferrable panic-free.
+//     Handles closed-channel panic, nil-channel case and
+//     has channel drain feature
+func CloseChannel[T any](
+	ch chan T,
+	errp *error,
+	drainChannel ...ChannelDrain,
+) (
+	isNilChannel, isCloseOfClosedChannel bool,
+	n int,
+	err error,
 ) {
 
 	// nil channel case

@@ -7,8 +7,6 @@ package parl
 
 import (
 	"sync"
-
-	"github.com/haraldrudell/parl/psync"
 )
 
 // parl.Mutex is a one-liner mutex
@@ -20,7 +18,7 @@ import (
 type RWMutex struct{ sync.RWMutex }
 
 // Lock returns lock reference
-func (m *RWMutex) Lock() (m2 psync.Unlocker) { m.RWMutex.Lock(); return m }
+func (m *RWMutex) Lock() (m2 Unlocker) { m.RWMutex.Lock(); return m }
 
 // RLock returns lock reference
-func (m *RWMutex) RLock() (m2 psync.RUnlocker) { m.RWMutex.RLock(); return m }
+func (m *RWMutex) RLock() (m2 RUnlocker) { m.RWMutex.RLock(); return m }

@@ -610,7 +610,7 @@ func TestGoGroup2Termination(t *testing.T) {
 // waiter tests GoGroup.Wait()
 func waiter(
 	goGroup parl.GoGroup,
-	isReady, isDone parl.Doneable,
+	isReady, isDone parl.DoneLegacy,
 ) {
 	defer isDone.Done()
 

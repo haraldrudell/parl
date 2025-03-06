@@ -109,8 +109,8 @@ func BenchmarkCaIsClosedFalse(b *testing.B) {
 // pkg: codeberg.org/haraldrudell/goprogramming/pkg/github.com_haraldrudell_parl
 // BenchmarkCaEventuallyConsistentFalse/BenchmarkEventuallyConsistentFalse-10         	826047098	         1.612 ns/op	        16.12 wall-ns/op	       0 B/op	       0 allocs/op
 func BenchmarkCaEventuallyConsistentFalse(b *testing.B) {
-	var evCon bool
-	b.Run("BenchmarkEventuallyConsistentFalse", NewCaCloseTest(evCon).Benchmark)
+	var ec EventuallyConsistent
+	b.Run("BenchmarkEventuallyConsistentFalse", NewCaCloseTest(ec).Benchmark)
 }
 
 // 16.99 ns
@@ -120,14 +120,14 @@ func BenchmarkCaEventuallyConsistentFalse(b *testing.B) {
 // pkg: codeberg.org/haraldrudell/goprogramming/pkg/github.com_haraldrudell_parl
 // BenchmarkCaEventuallyConsistentTrue/BenchmarkEventuallyConsistentTrue-10         	660889242	         1.699 ns/op	        16.99 wall-ns/op	       0 B/op	       0 allocs/op
 func BenchmarkCaEventuallyConsistentTrue(b *testing.B) {
-	b.Run("BenchmarkEventuallyConsistentTrue", NewCaCloseTest(EvCon).Benchmark)
+	b.Run("BenchmarkEventuallyConsistentTrue", NewCaCloseTest(EventuallyConsistency).Benchmark)
 }
 
 // CaCloseTest tests Awaitable eventually consistent Close
-type CaCloseTest struct{ evCon bool }
+type CaCloseTest struct{ evCon EventuallyConsistent }
 
 // NewAwCloseTest returns a subbenchmark testing Awaitable eventually consistent Close
-func NewCaCloseTest(evCon bool) (a *CaCloseTest) { return &CaCloseTest{evCon: evCon} }
+func NewCaCloseTest(evCon EventuallyConsistent) (a *CaCloseTest) { return &CaCloseTest{evCon: evCon} }
 
 // subbenchmark testing Awaitable eventually consistent Close
 func (t *CaCloseTest) Benchmark(b *testing.B) {

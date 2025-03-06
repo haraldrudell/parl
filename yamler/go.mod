@@ -9,8 +9,8 @@ toolchain go1.24.0
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.202
-	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7
+	github.com/haraldrudell/parl v0.4.203
+	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
 	gopkg.in/yaml.v3 v3.0.1
 )
 

@@ -56,7 +56,7 @@ func (g *goResultStruct) count() (available, stillRunning int) {
 }
 
 // SetIsError sets the error flag regardless if any thread failed
-func (g *goResultStruct) doError(setError bool) (isError bool) {
+func (g *goResultStruct) doError(setError isError) (isError bool) {
 
 	// handle setError true
 	if setError {
@@ -106,3 +106,13 @@ func (g *goResultStruct) String() (s string) {
 		g.isError.Load(),
 	)
 }
+
+const (
+	// it is SetIsError invocation
+	setErrorToTrue = true
+	// it is IsError invocation
+	noSetError = false
+)
+
+// isError determines action for doError
+type isError bool

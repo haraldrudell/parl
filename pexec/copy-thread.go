@@ -27,7 +27,7 @@ import (
 func copyThread(
 	label string,
 	reader io.Reader, writer io.Writer,
-	errorSink parl.ErrorSink, execCtx context.Context, wg parl.Doneable,
+	errorSink parl.ErrorSink, execCtx context.Context, wg parl.DoneLegacy,
 ) {
 	defer wg.Done()
 	var err error
