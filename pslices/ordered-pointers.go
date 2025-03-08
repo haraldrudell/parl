@@ -22,7 +22,7 @@ type OrderedPointers[E constraints.Ordered] struct {
 
 func NewOrderedPointers[E constraints.Ordered]() (list parli.OrderedPointers[E]) {
 	var o = OrderedPointers[E]{}
-	o.OrderedAny = *NewOrderedAny(o.Cmp).(*OrderedAny[*E])
+	NewOrderedAny(o.Cmp, &o.OrderedAny)
 	return &o
 }
 

@@ -35,7 +35,8 @@ type Iterator struct {
 //   - [NewDirEntryIterator] single-level directory iterator
 //   - delegates to [pfs.NewTraverser]
 func NewIterator(path string) (iterator iters.Iterator[ResultEntry]) {
-	i := Iterator{traverser: *NewTraverser(path)}
+	i := Iterator{}
+	NewTraverser(path, &i.traverser)
 	i.BaseIterator = *iters.NewBaseIterator(i.iteratorAction)
 	return &i
 }

@@ -6,8 +6,8 @@ github.com/google/pprof v0.0.0-20240409012703-83162a5b38cd h1:gbpYu9NMq8jhDVbvlG
 github.com/google/pprof v0.0.0-20240409012703-83162a5b38cd/go.mod h1:kf6iHlnVGwgKolg33glAes7Yg/8iWP8ukqeldJSO7jw=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/haraldrudell/parl/sqliter v0.4.203 h1:6CYZzn0ELyjRsuXg7p6uTvkrNeoYMPu4sEJvfzuq32U=
-github.com/haraldrudell/parl/sqliter v0.4.203/go.mod h1:9VUhwpBX0Ry/krZSXcdrIhMm/VxVqx0xCbjG/J2dwfk=
+github.com/haraldrudell/parl/sqliter v0.4.204 h1:5WLL2Oxzm02OKFt2BQy97gv8hjZx6auGzQJ0AhMMTUs=
+github.com/haraldrudell/parl/sqliter v0.4.204/go.mod h1:iEWA5HyPHD1E7Vi/y8Y9+9Gx9T0roOsRcHT6UVuTjE0=
 github.com/kisielk/sqlstruct v0.0.0-20201105191214-5f3e10d3ab46/go.mod h1:yyMNCyc/Ib3bDTKd379tNMpB/7/H5TjM2Y9QJ5THLbE=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=

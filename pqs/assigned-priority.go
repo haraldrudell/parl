@@ -20,8 +20,21 @@ type AssignedPriority[V any, P constraints.Ordered] struct {
 	Value    *V  // the pointer provides identity for this priority
 }
 
-func NewAssignedPriority[V any, P constraints.Ordered](priority P, index int, value *V) (assignedPriority *AssignedPriority[V, P]) {
-	return &AssignedPriority[V, P]{Priority: priority, Index: index, Value: value}
+func NewAssignedPriority[V any, P constraints.Ordered](priority P, index int, value *V, fieldp ...*AssignedPriority[V, P]) (assignedPriority *AssignedPriority[V, P]) {
+
+	if len(fieldp) > 0 {
+		assignedPriority = fieldp[0]
+	}
+	if assignedPriority == nil {
+		assignedPriority = &AssignedPriority[V, P]{}
+	}
+
+	*assignedPriority = AssignedPriority[V, P]{
+		Priority: priority,
+		Index:    index,
+		Value:    value,
+	}
+	return
 }
 
 func (ap *AssignedPriority[V, P]) SetPriority(priority P) {

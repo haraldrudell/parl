@@ -26,7 +26,7 @@ func TestNewOrderedMapFunc(t *testing.T) {
 
 	var vPointers []*V
 
-	m = *NewOrderedMapFunc[int, *V](ascendingVvalueLess)
+	NewOrderedMapFunc(ascendingVvalueLess, &m)
 
 	// put in order 2, 3, 1
 	m.Put(v2.value, &v2)

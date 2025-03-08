@@ -75,13 +75,14 @@ func NewEchoModerator(
 	}
 	NewAtomicMaxp(&m.waiting, waitingWarningPoint)
 	NewModeratorCorep(&m.moderator, concurrency)
-	m.invocationTimer = *NewInvocationTimer(
+	NewInvocationTimer(
 		m.loggingCallback, m.returnMcTicket,
 		latencyWarningPoint,
 		// no parallelism warnings
 		//	- instead warning on too many threads waiting at moderator
 		math.MaxUint64,
 		timerPeriod, goGen,
+		&m.invocationTimer,
 	)
 	return &m
 }

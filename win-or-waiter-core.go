@@ -13,6 +13,11 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
+var (
+	// [NewWinOrWaiterCore] no fieldp
+	NoWinOrWaiterCore *WinOrWaiterCore
+)
+
 // WinOrWaiter picks a winner thread to carry out some task used by many threads.
 //   - threads in WinOrWait for an idle WinorWaiter may become winners completing the task
 //   - threads in WinOrWait while a calculation is in progress are held waiting using
@@ -52,22 +57,28 @@ type WinOrWaiterCore struct {
 // waiting for the result.
 //   - strategy: WinOrWaiterAnyValue WinOrWaiterMustBeLater
 //   - ctx allows foir cancelation of the WinOrWaiter
-func NewWinOrWaiterCore(strategy WinOrWaiterStrategy, calculator func() (err error), ctx ...context.Context) (winOrWaiter *WinOrWaiterCore) {
+func NewWinOrWaiterCore(fieldp *WinOrWaiterCore, strategy WinOrWaiterStrategy, calculator func() (err error), ctx ...context.Context) (winOrWaiter *WinOrWaiterCore) {
 	if !strategy.IsValid() {
 		panic(perrors.ErrorfPF("Bad WinOrWaiter strategy: %s", strategy))
 	}
 	if calculator == nil {
 		panic(perrors.ErrorfPF("calculator function cannot be nil"))
 	}
-	var ctx0 context.Context
-	if len(ctx) > 0 {
-		ctx0 = ctx[0]
+
+	if fieldp != nil {
+		winOrWaiter = fieldp
+	} else {
+		winOrWaiter = &WinOrWaiterCore{}
 	}
-	return &WinOrWaiterCore{
+
+	*winOrWaiter = WinOrWaiterCore{
 		strategy:   strategy,
 		calculator: calculator,
-		ctx:        ctx0,
 	}
+	if len(ctx) > 0 {
+		winOrWaiter.ctx = ctx[0]
+	}
+	return
 }
 
 // WinOrWaiter picks a winner thread to carry out some task used by many threads.

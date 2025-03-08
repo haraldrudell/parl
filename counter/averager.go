@@ -20,11 +20,20 @@ type datapoint struct {
 }
 
 // NewAverager returns an 64-bit averager over size values
-func NewAverager(size int) (averager *Averager) {
-	return &Averager{
+func NewAverager(size int, fieldp ...*Averager) (averager *Averager) {
+
+	if len(fieldp) > 0 {
+		averager = fieldp[0]
+	}
+	if averager == nil {
+		averager = &Averager{}
+	}
+
+	*averager = Averager{
 		values: make([]datapoint, size),
 		size:   size,
 	}
+	return
 }
 
 // Add adds a new value and computes current average

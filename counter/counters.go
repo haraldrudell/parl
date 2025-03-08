@@ -32,10 +32,12 @@ var _ parl.CounterSetData = &Counters{} // Counters is a parl.CounterSet
 var _ parl.CounterStore = &Counters{}   // Counters is a parl.CounterStore
 
 func newCounters(g parl.GoGen) (counters parl.Counters) {
-	return &Counters{
-		m:          map[parl.CounterID]any{},
-		RateRunner: *NewRateRunner(g),
+	c := &Counters{
+		m: map[parl.CounterID]any{},
 	}
+	NewRateRunner(g, &c.RateRunner)
+	counters = c
+	return
 }
 
 func (cs *Counters) GetOrCreateCounter(name parl.CounterID, period ...time.Duration) (counter parl.Counter) {

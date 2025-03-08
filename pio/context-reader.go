@@ -28,11 +28,12 @@ var _ io.ReadCloser = &ContextReader{}
 //   - If the runtime type of reader implements [io.Close], it can be closed
 func NewContextReader(reader io.Reader, ctx context.Context) (contextReader *ContextReader) {
 	var closer, _ = reader.(io.Closer)
-	return &ContextReader{
-		reader:        reader,
-		ContextCloser: *NewContextCloser(closer),
-		ctx:           ctx,
+	contextReader = &ContextReader{
+		reader: reader,
+		ctx:    ctx,
 	}
+	NewContextCloser(closer, &contextReader.ContextCloser)
+	return
 }
 
 var _ = context.Canceled

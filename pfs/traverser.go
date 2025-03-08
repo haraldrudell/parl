@@ -93,13 +93,22 @@ type dirEntry struct {
 //	  }
 //	  println(result.Abs)
 //	}
-func NewTraverser(path string) (traverser *Traverser) {
-	return &Traverser{
-		initialPath:   path,
-		skipMap:       make(map[uint64]struct{}),
-		rootsRegistry: *NewRegistry[Root2](),
-		obsoleteRoots: *NewRegistry[Root2](),
+func NewTraverser(path string, fieldp ...*Traverser) (traverser *Traverser) {
+
+	if len(fieldp) > 0 {
+		traverser = fieldp[0]
 	}
+	if traverser == nil {
+		traverser = &Traverser{}
+	}
+
+	*traverser = Traverser{
+		initialPath: path,
+		skipMap:     make(map[uint64]struct{}),
+	}
+	NewRegistry(&traverser.rootsRegistry)
+	NewRegistry(&traverser.obsoleteRoots)
+	return
 }
 
 // skip marks no for skipping

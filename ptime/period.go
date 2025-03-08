@@ -37,19 +37,27 @@ type Period struct {
 }
 
 // NewPeriod returns a new numbered-interval sequence.
-func NewPeriod(interval time.Duration) (period *Period) {
-	t := time.Now()
-	p := Period{interval: interval}
-	p.period0 = p.Index(t)
+func NewPeriod(interval time.Duration, fieldp ...*Period) (period *Period) {
+	if len(fieldp) > 0 {
+		period = fieldp[0]
+	}
+	if period == nil {
+		period = &Period{}
+	}
+	var t = time.Now()
+	*period = Period{
+		interval: interval,
+	}
+	period.period0 = period.Index(t)
 
 	// calculate what fraction of the first period is active
 	// uint64 valid decimal digits is : 64 * log10(2) ≈ 19
 	// use scale factor that is power of 2: 2^63
-	t0 := t.Truncate(interval)
-	inactiveDuration := t.Sub(t0)
-	p.fraction0 = FractionScale - uint64(float64(inactiveDuration)/float64(interval)*float64(FractionScale))
+	var t0 = t.Truncate(interval)
+	var inactiveDuration = t.Sub(t0)
+	period.fraction0 = FractionScale - uint64(float64(inactiveDuration)/float64(interval)*float64(FractionScale))
 
-	return &p
+	return
 }
 
 // Index returns the index number for the current period or the period at time t

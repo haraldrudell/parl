@@ -35,11 +35,22 @@ type OrderedAny[E any] struct {
 //   - duplicate values are allowed and inserted in order with later values last
 //   - if E is an interface-type and cmp is nil, every provided value must be checked
 //     to be comparable
-func NewOrderedAny[E any](cmp func(a, b E) (result int)) (list parli.Ordered[E]) {
+func NewOrderedAny[E any](cmp func(a, b E) (result int), fieldp ...*OrderedAny[E]) (list parli.Ordered[E]) {
 	if cmp == nil {
 		panic(perrors.NewPF("cmp cannot be nil"))
 	}
-	return &OrderedAny[E]{cmp: cmp}
+
+	var op *OrderedAny[E]
+	if len(fieldp) > 0 {
+		op = fieldp[0]
+	}
+	if op == nil {
+		op = &OrderedAny[E]{}
+	}
+
+	*op = OrderedAny[E]{cmp: cmp}
+	list = op
+	return
 }
 
 // Insert adds a value to the ordered slice.

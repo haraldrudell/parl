@@ -6,47 +6,54 @@ ISC License
 package parl
 
 import (
-	"sync/atomic"
 	"time"
 
-	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/ptime"
 )
-
-const (
-	defaultMinReportDuration = 100 * time.Millisecond
-	defaultNonReturnPeriod   = time.Minute
-)
-
-type CbSlowDetector func(sdi *SlowDetectorInvocation, hasReturned bool, duration time.Duration)
-type slowID uint64
-
-var slowIDGenerator UniqueIDTypedUint64[slowID]
 
 // SlowDetectorCore measures latency via Start-Stop invocations
 //   - Thread-Safe and multi-threaded, parallel invocations
 //   - Separate thread measures time of non-returning, hung invocations
 type SlowDetectorCore struct {
-	ID       slowID
-	callback CbSlowDetector
-	thread   *SlowDetectorThread
+	// slowID is unique opaque identifier [constraints.Ordered] typically integral
+	//	- used as map key
+	ID slowID
+	// callback receives reports for the slowest-to-date invocation
+	// and non-return reports every minute
+	callback SlowReporter
+	// thread watches non-returning invocations
+	//	- may be a shared object so must be pointer
+	thread *SlowDetectorThread
+	//SlowDetectorInvocationEnder
+	endr ender
+	// reportReceiver receives reports for the slowest-to-date invocation
+	// and non-return reports every minute
+	reportReceiver SlowReporter
 
-	max       AtomicMax[time.Duration]
+	// max holds the minimum value to produce slow-invocation report
+	max AtomicMax[time.Duration]
+	// alwaysMax is the slowest ever invocation
 	alwaysMax AtomicMax[time.Duration]
-	last      time.Duration // atomic
-	average   ptime.Averager[time.Duration]
+	// last is latency for last invocation
+	last Atomic64[time.Duration]
+	// average is average latency across all invocations
+	average ptime.Averager[time.Duration]
 }
 
 // NewSlowDetectorCore returns an object tracking nonm-returning or slow function invocations
-//   - callback receives offending slow-detector invocations, cannot be nil
+//   - callback: receives offending slow-detector invocations
 //   - slowTyp configures whether the support-thread is shared
 //   - goGen is used for a possible deferred thread-launch
 //   - optional values are:
 //   - — nonReturnPeriod: how often non-returning invocations are reported, default once per minute
 //   - — minimum slowness duration that is being reported, default 100 ms
-func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen, nonReturnPeriod ...time.Duration) (slowDetector *SlowDetectorCore) {
-	if callback == nil {
-		panic(perrors.NewPF("callback cannot be nil"))
+func NewSlowDetectorCore(fieldp *SlowDetectorCore, reportReceiver SlowReporter, slowTyp SlowType, goGen GoGen, nonReturnPeriod ...time.Duration) (slowDetector *SlowDetectorCore) {
+	NilPanic("reportReceiver", reportReceiver)
+
+	if fieldp != nil {
+		slowDetector = fieldp
+	} else {
+		slowDetector = &SlowDetectorCore{}
 	}
 
 	// nonReturnPeriod[0]: time between non-return reports, default 1 minute
@@ -65,73 +72,125 @@ func NewSlowDetectorCore(callback CbSlowDetector, slowTyp slowType, goGen GoGen,
 		minReportedDuration = defaultMinReportDuration
 	}
 
-	return &SlowDetectorCore{
+	*slowDetector = SlowDetectorCore{
 		ID:       slowIDGenerator.ID(),
-		callback: callback,
+		callback: reportReceiver,
 		thread:   NewSlowDetectorThread(slowTyp, nonReturnPeriod0, goGen),
-		max:      *NewAtomicMax(minReportedDuration),
 		average:  *ptime.NewAverager[time.Duration](),
 	}
+	NewAtomicMaxp(&slowDetector.max, minReportedDuration)
+	slowDetector.endr.sdc = slowDetector
+	return
 }
 
 // Start returns the effective start time for a new timing cycle
-//   - value is optional start time, default time.Now()
-func (sd *SlowDetectorCore) Start(invoLabel string, value ...time.Time) (invocation *SlowDetectorInvocation) {
+//   - invoLabel: printable identifier for the invocation, often short code location:
+//     “mains.(*Executable).AddErr-executable.go:25”
+//   - timeStamp: optional start time, default time.Now()
+func (s *SlowDetectorCore) Start(invoLabel string, timeStamp ...time.Time) (invocation *SlowDetectorInvocation) {
 
 	// get time value for this operation
 	var t0 time.Time
-	if len(value) > 0 {
-		t0 = value[0]
+	if len(timeStamp) > 0 {
+		t0 = timeStamp[0]
 	} else {
 		t0 = time.Now()
 	}
 
 	// save in map, launch thread if not already running
-	s := SlowDetectorInvocation{
-		sID:       slowIDGenerator.ID(),
-		invoLabel: invoLabel,
-		threadID:  goID(),
-		t0:        t0,
-		stop:      sd.stop,
-		sd:        sd,
-	}
-	sd.thread.Start(&s)
-	return &s
-}
+	//	- thread stores invocation in map, so it must be on heap
+	invocation = NewSlowDetectorInvocation(slowIDGenerator.ID(), invoLabel, goID(), t0, &s.endr)
+	s.thread.Start(invocation)
 
-func (sd *SlowDetectorCore) Values() (
-	last, average, max time.Duration,
-	hasValue bool,
-) {
-	last = time.Duration(atomic.LoadInt64((*int64)(&sd.last)))
-	averageFloat, _ := sd.average.Average()
-	average = time.Duration(averageFloat)
-	max, hasValue = sd.alwaysMax.Max()
 	return
 }
 
-// Stop is invoked via SlowDetectorInvocation
-func (sd *SlowDetectorCore) stop(sdi *SlowDetectorInvocation, value ...time.Time) {
+// Values returns statistics metrics
+//   - last: latency of last invocation, zero when none
+//   - average: average latency for all invocations, zero when none
+//   - max: the slowest invocation if hasValue true
+//   - hasValue: indicates if values are valid, false for no invocations
+func (s *SlowDetectorCore) Values() (
+	last, average, max time.Duration,
+	hasValue bool,
+) {
+	last = s.last.Load()
+	var averageFloat, _ = s.average.Average()
+	average = time.Duration(averageFloat)
+	max, hasValue = s.alwaysMax.Max()
+	return
+}
 
-	// remove from map and possibly shutdown thread
-	sd.thread.Stop(sdi)
+// reportDuration reports an invocation duration
+func (s *SlowDetectorCore) reportDuration(duration time.Duration) (isNewMax bool) {
+	s.alwaysMax.Value(duration)
+	isNewMax = s.max.Value(duration)
+	return
+}
+
+// stop handles the end of an invocation
+//   - invocation: the invocation that ended
+//   - timestamp: the ending time, default now
+//   - stop is delegated from [SlowDetectorInvocation.Stop]
+func (s *SlowDetectorCore) stop(invocation *SlowDetectorInvocation, timestamp ...time.Time) {
+
+	// remove invoaction from map and possibly shutdown thread
+	s.thread.Stop(invocation)
 
 	// get time value for this operation
 	var t1 time.Time
-	if len(value) > 0 {
-		t1 = value[0]
+	if len(timestamp) > 0 {
+		t1 = timestamp[0]
 	} else {
 		t1 = time.Now()
 	}
 
 	// store last and average
-	duration := t1.Sub(sdi.t0)
-	atomic.StoreInt64((*int64)(&sd.last), int64(duration))
-	sd.average.Add(duration, t1)
-	sd.alwaysMax.Value(duration)
+
+	// duration is elapsed time for this invocation
+	var duration = t1.Sub(invocation.t0)
+	s.last.Store(duration)
+	s.average.Add(duration, t1)
+	s.alwaysMax.Value(duration)
 
 	// check against max
-	if sd.max.Value(duration) {
-		sd.callback(sdi, true, duration)
+	if s.max.Value(duration) {
+		s.reportReceiver.Report(invocation, true, duration)
 	}
+}
+
+const (
+	defaultMinReportDuration = 100 * time.Millisecond
+	defaultNonReturnPeriod   = time.Minute
+)
+
+// slowID is a unique identifier for slow-detector entities
+//   - usable as map key
+type slowID uint64
+
+// slowIDGenerator generates unique ID values
+var slowIDGenerator UniqueIDTypedUint64[slowID]
+
+// ender is SlowDetectorInvocationEnder
+type ender struct{ sdc *SlowDetectorCore }
+
+// ender is SlowDetectorInvocationEnder
+var _ SlowDetectorInvocationEnder = &ender{}
+
+// ender is SlowDetectorIf
+var _ SlowDetectorIf = &ender{}
+
+// Stop ends an invocation created by SlowDetectorCore
+//   - invocation: th einvocation object
+//   - timestamp: optional ending timestamp, default now
+func (e *ender) Stop(invocation *SlowDetectorInvocation, timestamp ...time.Time) {
+	e.sdc.stop(invocation, timestamp...)
+}
+
+func (e *ender) Duration(duration time.Duration) (isNewMax bool) {
+	return e.sdc.reportDuration(duration)
+}
+
+func (e *ender) Report(invocation *SlowDetectorInvocation, didReturn bool, duration time.Duration) {
+	e.sdc.reportReceiver.Report(invocation, didReturn, duration)
 }

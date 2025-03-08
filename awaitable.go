@@ -11,7 +11,7 @@ import (
 )
 
 // Awaitable is a semaphore allowing any number of threads to observe
-// and await any number of events in parallel
+// and await any number of events in parallel: wait-free-locked
 //   - [Awaitable.Ch] returns an awaitable channel closing on trig of awaitable.
 //     The initial channel state is open
 //   - [Awaitable.Close] triggers the awaitable, ie. closes the channel.
@@ -21,21 +21,25 @@ import (
 //     for higher performance
 //   - [Awaitable.IsClosed] returns whether the awaitable is triggered, ie. if the channel is closed
 //   - initialization-free, one-to-many wait mechanic, synchronizes-before, observable
-//   - use of channel as mechanic allows consumers to await multiple events
-//   - Awaitable costs a lazy channel and pointer allocation
+//   - use of channel as mechanic allows consumers to await multiple events: wait-free-locked
+//   - Awaitable costs lazy channel allocation
 //   - note: [parl.CyclicAwaitable] is re-armable, cyclic version
 //   - —
 //   - alternative low-blocking inter-thread mechanics are [sync.WaitGroup] and [sync.RWMutex]
-//   - — neither is observable and the consumer cannot await other events in parallel
+//   - — neither is observable and the consumer cannot await multiple events
 //   - — RWMutex cyclic use has inversion of control issues
 //   - — WaitGroup lacks control over waiting threads requiring cyclic use to
 //     employ a re-created pointer and value
 //   - — both are less performant for the managing thread
 type Awaitable struct {
+	// isGet is true if a channel-read operation was initiated
+	//	- the channel is or will be created
+	isGet atomic.Bool
 	// ch is lazy atomic-shielded-lock creation of channel
 	ch AtomicLockArg[chan struct{}, Awaitable]
 	// wg is lazy atomic-shielded-lock creation of wait-group
-	//	- wg is separated from ch, reducing contention
+	//	- wg wait is separate from ch, reducing contention
+	//	- wg ensures no close invocation returns before channel close
 	wg AtomicLock[sync.WaitGroup]
 	// closeWinner selects the thread to close the channel
 	//	- non-zero when close is in progress or completed
@@ -47,8 +51,7 @@ type Awaitable struct {
 
 // Ch returns an awaitable channel. Thread-safe
 //   - ch: non-nil channel
-//   - lazy-initialized atomic-shielded-lock
-func (a *Awaitable) Ch() (ch AwaitableCh) { return *a.ch.Get(makeCh, a) }
+func (a *Awaitable) Ch() (ch AwaitableCh) { return a.getCh() }
 
 // isClosed inspects whether the awaitable has been triggered
 //   - isClosed true: channel is closed
@@ -70,10 +73,10 @@ func (a *Awaitable) IsClosed() (isClosed bool) {
 	}
 	// a close is in progress
 
-	// obtain the channel to check its status
+	// IsClosed must get its status by reading the channel
 	//	- the channel itself must be checked because
-	//		previous invokers of Ch may hold the channel value
-	var ch = *a.ch.Get(makeCh, a)
+	//		Close progress is uncertain
+	var ch = a.getCh()
 
 	// check whether close assigned a fake channel
 	if ch == fakeCh {
@@ -115,7 +118,7 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 	//	- losing thread is 21.5 ns (read 0.4955 ns + failing CAS 21 ns)
 	//	- subsequent thread is 0.4955 ns
 	var isWinner = a.closeWinner.Load() == 0 && // if already incremented, this thread is not winner
-		a.closeWinner.Add(1) == 1 // the first thread to increment is the write is winner
+		a.closeWinner.Add(1) == 1 // the first thread to increment obtaining 1 is winner
 
 	if !isWinner {
 
@@ -135,11 +138,16 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 	// this thread should close the channel
 
 	// execute close
-	// single-thread: ≈2 ns
-	//	- unshielded parallel contention makes channel read an extremely slow 916 ns
-	//	- shielded parallel: 66% is spent in channel read
-	if ch := *a.ch.Get(makeCh, a); ch != fakeCh {
-		close(ch)
+	//	- if the channel wasn’t read, its close can be deferred
+	if a.isGet.Load() {
+		// the channel was read
+		//	- we must close any channel that is not fake
+		if ch := *a.ch.Get(makeCh, a); ch != fakeCh {
+			// single-thread: ≈2 ns
+			//	- unshielded parallel contention makes channel read an extremely slow 916 ns
+			//	- shielded parallel: 66% is spent in channel read
+			close(ch)
+		}
 	}
 	// close completed
 
@@ -151,6 +159,18 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 
 	didClose = true
 	return // didClose return: didClose true
+}
+
+// getCh creates the channel
+//   - sets indicator that channel is about to be created
+//   - lazy-initialized atomic-shielded-lock
+func (a *Awaitable) getCh() (ch chan struct{}) {
+	if !a.isGet.Load() {
+		a.isGet.Store(true)
+	}
+	ch = *a.ch.Get(makeCh, a)
+
+	return
 }
 
 // lazyCh creates the channel
@@ -166,7 +186,7 @@ func (a *Awaitable) lazyCh(chp *chan struct{}) {
 		return
 	}
 	// create new channel
-	//	- invoker is Ch or isClosed while close in progress
+	//	- invoker is Ch or IsClosed while close in progress
 	*chp = make(chan struct{})
 }
 

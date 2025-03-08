@@ -40,11 +40,18 @@ type Averager[T constraints.Integer] struct {
 // NewAverager returns an object that calculates average over a number of interval periods.
 //   - interval-length is 1 s
 //   - averaging over 10 intervals
-func NewAverager[T constraints.Integer]() (averager *Averager[T]) {
-	return &Averager[T]{
-		period:   *NewPeriod(averagerDefaultPeriod),
+func NewAverager[T constraints.Integer](fieldp ...*Averager[T]) (averager *Averager[T]) {
+	if len(fieldp) > 0 {
+		averager = fieldp[0]
+	}
+	if averager == nil {
+		averager = &Averager[T]{}
+	}
+	*averager = Averager[T]{
 		maxCount: averagerDefaultCount,
 	}
+	NewPeriod(averagerDefaultPeriod, &averager.period)
+	return
 }
 
 // NewAverager2 returns an object that calculates average over a number of interval periods.
@@ -61,10 +68,11 @@ func NewAverager2[T constraints.Integer](period time.Duration, periodCount int) 
 	} else if periodCount < 2 {
 		perrors.ErrorfPF("periodCount cannot be less than 2: %d", periodCount)
 	}
-	return &Averager[T]{
-		period:   *NewPeriod(period),
+	averager = &Averager[T]{
 		maxCount: periodCount,
 	}
+	NewPeriod(period, &averager.period)
+	return
 }
 
 // Add adds a new value basis for averaging

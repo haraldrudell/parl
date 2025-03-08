@@ -43,12 +43,21 @@ type StatusDebug struct {
 }
 
 // - to activate d, use option “-verbose StatusTerminal..Status”
-func NewStatusDebug(lines []string, width int) (debug *StatusDebug) {
-	return &StatusDebug{
+func NewStatusDebug(lines []string, width int, fieldp ...*StatusDebug) (debug *StatusDebug) {
+
+	if len(fieldp) > 0 {
+		debug = fieldp[0]
+	}
+	if debug == nil {
+		debug = &StatusDebug{}
+	}
+
+	*debug = StatusDebug{
 		n:                true,
 		metaNewlineCount: len(lines) - 1,
 		width:            width,
 	}
+	return
 }
 
 // meta formatting string: “01n02e03w004L05N06”

@@ -28,11 +28,12 @@ var _ io.WriteCloser = &ContextWriter{}
 //   - If the runtime type of reader implements [io.Close], it can be closed
 func NewContextWriter(writer io.Writer, ctx context.Context) (contextWriter *ContextWriter) {
 	var closer, _ = writer.(io.Closer)
-	return &ContextWriter{
-		writer:        writer,
-		ContextCloser: *NewContextCloser(closer),
-		ctx:           ctx,
+	contextWriter = &ContextWriter{
+		writer: writer,
+		ctx:    ctx,
 	}
+	NewContextCloser(closer, &contextWriter.ContextCloser)
+	return
 }
 
 // Write is like [io.Writer.Write] but cancels if the context is canceled

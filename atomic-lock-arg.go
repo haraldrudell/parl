@@ -5,22 +5,27 @@ All rights reserved
 
 package parl
 
-// AtomicLock provides a lazy-initialized value behind atomics-shielded lock
+// AtomicLockArg provides a lazy-initialized singleton value
+// behind atomics-shielded lock
 //   - T is type created
 //   - P is argument to creator function
+//   - AtomicLockArg is used when creating T requires a parameter
 type AtomicLockArg[T any, P any] struct {
 	aLock AtomicLock[T]
 }
 
 // TMakerArg is creator function that is provided argument
-//   - tp: where to create T
-//   - arg: argument provided to [AtomicLockArg.Get]
+//   - tp: where to create T, *tp is zero-value
+//   - arg: argument provided to [AtomicLockArg.Get].
+//     arg allows for invoking method on struct value
+//   - invoked once per AtomicLockArg
 type TMakerArg[T any, P any] func(tp *T, arg *P)
 
 // Get returns T possibly creating it using tMaker
 //   - tMaker: creator function
 //   - arg: argument to tMaker
-//   - tp: pointer to valid T
+//   - tp: pointer to created singleton T
+//   - T can hold lock or atomic
 func (a *AtomicLockArg[T, P]) Get(tMaker TMakerArg[T, P], arg ...*P) (tp *T) {
 
 	// T already created case

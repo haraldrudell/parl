@@ -30,9 +30,11 @@ type DirIterator struct {
 //     Broken symlinks are ignored.
 //   - any errored file-system entry cancels the iterator with error.
 func NewDirIterator(path string) (iterator iters.Iterator[ResultEntry]) {
-	i := DirIterator{traverser: *NewTraverser(path)}
+	i := DirIterator{}
+	NewTraverser(path, &i.traverser)
 	i.BaseIterator = *iters.NewBaseIterator(i.iteratorAction)
-	return &i
+	iterator = &i
+	return
 }
 
 // Init implements the right-hand side of a short variable declaration in

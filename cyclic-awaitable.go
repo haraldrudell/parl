@@ -94,6 +94,13 @@ func (a *CyclicAwaitable) Open() (didOpen bool, ch AwaitableCh) {
 		//	- uninitialized or
 		//	- closed
 
+		// access:
+		//	- there is atomic, locked, atomic-shielded-lock, and atomic-pointer
+		//	- cyclic changes requires known end to previous access
+		//	- this is only provided by locked and atomic-pointer
+		//	- locked is slower
+		//	- atomic-pointer provides infinite unused storage via allocation
+
 		// create Awaitable candidate
 		if openAwaitable == nil {
 			openAwaitable = &Awaitable{}
@@ -121,5 +128,7 @@ func (a *CyclicAwaitable) aw() (aw *Awaitable) {
 	}
 
 	// return other thread’s Awaitable
-	return a.awp.Load()
+	aw = a.awp.Load()
+
+	return
 }

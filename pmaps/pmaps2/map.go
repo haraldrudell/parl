@@ -21,7 +21,17 @@ import "golang.org/x/exp/maps"
 type Map[K comparable, V any] struct{ goMap map[K]V }
 
 // NewMap returns a reusable Go Map object
-func NewMap[K comparable, V any]() (mapping *Map[K, V]) { return &Map[K, V]{goMap: make(map[K]V)} }
+func NewMap[K comparable, V any](fieldp ...*Map[K, V]) (mapping *Map[K, V]) {
+
+	if len(fieldp) > 0 {
+		mapping = fieldp[0]
+	}
+	if mapping == nil {
+		mapping = &Map[K, V]{}
+	}
+	*mapping = Map[K, V]{goMap: make(map[K]V)}
+	return
+}
 
 // NewMap2 is field initializer with optional Go map pointer
 //   - fieldp: pre-allocated location. Saves allocation on field initialization

@@ -6,56 +6,60 @@ ISC License
 package parl
 
 import (
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/haraldrudell/parl/parli"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pmaps"
-	"github.com/haraldrudell/parl/sets"
 )
 
-const (
-	SlowDefault slowType = iota
-	SlowOwnThread
-	SlowShutdownThread
-
-	slowScanPeriod = time.Second
-)
-
-// shared SlowDetectorThread for SlowDefault threads
-var slowDetectorThread SlowDetectorThread
-
+// SlowDetectorThread is a thread that monitors invocations for non-return
 type SlowDetectorThread struct {
-	slowTyp         slowType
+	// thread type identifier: [SlowDefault] [SlowOwnThread]
+	//	- default is thread shared across multiple slow detectors
+	slowTyp SlowType
+	// nonReturnPeriod is time after reporting as non-return, common default 1 minute
 	nonReturnPeriod time.Duration
-	slowMap         pmaps.RWMap[slowID, *SlowDetectorInvocation]
-	hasThread       atomic.Bool
-
-	slowLock sync.Mutex
-	goGen    GoGen
-	cancelGo func()
+	// active invocations being monitored
+	//	- key: unique ID
+	//	- value: an invocation that may fail to return
+	invocations pmaps.RWMap[slowID, *SlowDetectorInvocation]
+	// hasThread is lazy thread creation
+	hasThread atomic.Bool
+	// goGen is used for creating the thread: shared or dedicated
+	goGen GoGen
+	// slowLock makes subGo thread-safe and
+	// creates critical section for initializing the shared thread
+	slowLock Mutex
+	// subGo for any running thread
+	subGo SubGo
 }
 
-func NewSlowDetectorThread(slowTyp slowType, nonReturnPeriod time.Duration, goGen GoGen) (sdt *SlowDetectorThread) {
+// NewSlowDetectorThread
+//   - slowType SlowDefault: use shared thread
+//   - slowType SlowOwnThread: use dedicated thread
+//   - nonReturnPeriod: time after reporting as non-return, common default 1 minute
+//   - goGen: used for creating the thread: shared or dedicated
+//   - must be pointer because a shared value may be returned
+func NewSlowDetectorThread(slowTyp SlowType, nonReturnPeriod time.Duration, goGen GoGen) (sdt *SlowDetectorThread) {
 	if goGen == nil {
 		panic(perrors.NewPF("goGen cannot be nil"))
 	}
 
 	// dedicated thread case
 	if slowTyp != SlowDefault {
-		return &SlowDetectorThread{
+		sdt = &SlowDetectorThread{
 			slowTyp:         slowTyp,
 			nonReturnPeriod: nonReturnPeriod,
-			slowMap:         *pmaps.NewRWMap2[slowID, *SlowDetectorInvocation](),
 			goGen:           goGen,
 		}
+		pmaps.NewRWMap2(&sdt.invocations)
+		return
 	}
 
 	sdt = &slowDetectorThread
-	sdt.slowLock.Lock()
-	defer sdt.slowLock.Unlock()
+	defer sdt.slowLock.Lock().Unlock()
 
 	if sdt.goGen != nil {
 		return // slowDetectorThread already initialized return
@@ -64,99 +68,112 @@ func NewSlowDetectorThread(slowTyp slowType, nonReturnPeriod time.Duration, goGe
 	// slowDetectorThread initialization
 	sdt.slowTyp = slowTyp
 	sdt.nonReturnPeriod = nonReturnPeriod
-	sdt.slowMap = *pmaps.NewRWMap2[slowID, *SlowDetectorInvocation]()
+	pmaps.NewRWMap2(&sdt.invocations)
 	sdt.goGen = goGen
 
 	return
 }
 
-func (sdt *SlowDetectorThread) Start(sdi *SlowDetectorInvocation) {
+func (s *SlowDetectorThread) Start(sdi *SlowDetectorInvocation) {
 
 	// store in map
-	sdt.slowMap.Put(sdi.sID, sdi)
+	s.invocations.Put(sdi.sID, sdi)
 
-	if !sdt.hasThread.CompareAndSwap(false, true) {
+	if s.hasThread.Load() || !s.hasThread.CompareAndSwap(false, true) {
 		return // thread already running return
 	}
 
 	// launch thread
-	subGo := sdt.goGen.SubGo()
-	g0 := subGo.Go()
-	go sdt.thread(g0)
-	if sdt.slowTyp != SlowShutdownThread {
-		return // thread is not to be shutdown return
+	var g = s.newSubGo()
+	if g == nil {
+		return
 	}
-
-	// save cancel method
-	sdt.slowLock.Lock()
-	defer sdt.slowLock.Unlock()
-
-	sdt.cancelGo = subGo.Cancel
+	go s.thread(g)
 }
 
-func (sdt *SlowDetectorThread) Stop(sdi *SlowDetectorInvocation) {
+func (s *SlowDetectorThread) Stop(sdi *SlowDetectorInvocation) {
 
 	// remove from map
-	sdt.slowMap.Delete(sdi.sID, parli.MapDeleteWithZeroValue)
+	s.invocations.Delete(sdi.sID, parli.MapDeleteWithZeroValue)
 
-	if sdt.slowMap.Length() > 0 || sdt.slowTyp != SlowShutdownThread {
+	if s.slowTyp != SlowShutdownThread || s.invocations.Length() > 0 {
 		return // not to be shutdown or not to be shutdown now return
 	}
 
-	sdt.cancelGo()
+	// exit the thread
+	defer s.slowLock.Lock().Unlock()
+
+	var subGo = s.subGo
+	if subGo == nil {
+		panic(perrors.NewPF("spurios SlowDetectorThread.Stop"))
+	}
+	s.subGo = nil
+	s.hasThread.Store(false)
+
+	s.subGo.Cancel()
 }
 
-func (sdt *SlowDetectorThread) thread(g0 Go) {
-	var err error
-	defer g0.Register("SlowDetectorThread" + goID().String()).Done(&err)
-	defer PanicToErr(&err)
+// newSubGo creeates new subGo
+//   - g non-nil: do start the thread
+func (s *SlowDetectorThread) newSubGo() (g Go) {
+	defer s.slowLock.Lock().Unlock()
 
-	ticker := time.NewTicker(slowScanPeriod)
+	if s.invocations.Length() == 0 {
+		return // no invocations
+	}
+	s.subGo = s.goGen.SubGo()
+	g = s.subGo.Go()
+
+	return
+}
+
+// thread until context cancel or Stop of last invocation
+func (s *SlowDetectorThread) thread(g Go) {
+	var err error
+	defer g.Register("SlowDetectorThread" + goID().String()).Done(&err)
+	defer RecoverErr(func() DA { return A() }, &err)
+
+	// ticker starts scan for non-returns every second
+	var ticker = time.NewTicker(slowScanPeriod)
 	defer ticker.Stop()
 
 	var C <-chan time.Time = ticker.C
-	var done <-chan struct{} = g0.Context().Done()
+	var done <-chan struct{} = g.Context().Done()
 	var t time.Time
 	for {
 		select {
 		case <-done:
 			return // context cancelled return
-		case t = <-C:
+		case <-C:
+			t = time.Now()
 		}
 
 		// check all invocations for non-return
-		for _, sdi := range sdt.slowMap.List() {
+		for _, invocation := range s.invocations.List() {
+
 			// duration is how long the invocation has been in progress
-			duration := t.Sub(sdi.t0)
-			if duration < 0 {
-				// if t coming from the ticker was delayed,
-				// then t may be a time in the past,
-				// so early that sdi.t0 is after t
-				continue // ignore negative durations
-			}
-			sd := sdi.sd
-			sd.alwaysMax.Value(duration)
-			if sd.max.Value(duration) {
+			var duration = t.Sub(invocation.t0)
+
+			// sdc is slow-detector-core for the invocation
+			var sdc = invocation.If()
+			if sdc.Duration(duration) {
 				// it is a new max, check whether nonReturnPeriod has elapsed
-				if tLast := sdi.Time(time.Time{}); tLast.IsZero() || t.Sub(tLast) >= sdt.nonReturnPeriod {
+				if tLast := invocation.Time(time.Time{}); tLast.IsZero() || t.Sub(tLast) >= s.nonReturnPeriod {
 
 					// store new nonReturnPeriod start
-					sdi.Time(t)
-					sd.callback(sdi, false, duration)
+					invocation.Time(t)
+					sdc.Report(invocation, false, duration)
 				}
 			}
 		}
 	}
 }
 
-type slowType uint8
+const (
+	// how often threads scan for non-return
+	slowScanPeriod = time.Second
+)
 
-func (st slowType) String() (s string) {
-	return slowTypeSet.StringT(st)
-}
-
-var slowTypeSet = sets.NewSet[slowType]([]sets.SetElement[slowType]{
-	{ValueV: SlowDefault, Name: "sharedThread"},
-	{ValueV: SlowOwnThread, Name: "ownThread"},
-	{ValueV: SlowShutdownThread, Name: "shutdownThread"},
-})
+// shared SlowDetectorThread for SlowDefault threads
+//   - purpose is fewer threads than slow detectors
+var slowDetectorThread SlowDetectorThread

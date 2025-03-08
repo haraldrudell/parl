@@ -8,8 +8,6 @@ package parl
 import (
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/haraldrudell/parl/ptime"
@@ -17,30 +15,50 @@ import (
 
 // SlowDetectorInvocation is a container used by SlowDetectorCore
 type SlowDetectorInvocation struct {
-	sID       slowID
-	threadID  ThreadID
+	// slowID is unique opaque identifier [constraints.Ordered] typically integral
+	//	- used as map key
+	sID slowID
+	// threadID is the Go goroutine identifier integer that
+	// invoked [SlowDetectorCore.Start] creeating this invocation
+	threadID ThreadID
+	// invoLabel is printable identifier for the invocation, often short code location:
+	// “mains.(*Executable).AddErr-executable.go:25”
 	invoLabel string
-	t0        time.Time
-	stop      func(sdi *SlowDetectorInvocation, value ...time.Time)
-	sd        *SlowDetectorCore
-
-	tx        atomic.Pointer[time.Time]
-	lock      sync.Mutex
-	intervals []Interval
+	// t0 is the timestamp for when the invocation was made,
+	// default [time.Now] of [SlowDetectorCore.Start] invocation
+	t0 time.Time
+	// ender handles [SlowDetectorInvocation.Stop] invocations
+	ender SlowDetectorIf3
+	// timestamp for last non-return report. [ptime.Epoch] is time fitting an integral atomic
+	lastNonReturnReportTimestamp Atomic64[ptime.Epoch]
+	// lock makes intervals thread-safe
+	lock Mutex
+	// accessed behind lock
+	intervals []interval
 }
 
-type Interval struct {
-	label string
-	t     time.Time
+// SlowDetectorInvocation is SlowInvocation
+var _ SlowInvocation = &SlowDetectorInvocation{}
+
+func NewSlowDetectorInvocation(ID slowID, invoLabel string, threadID ThreadID, t0 time.Time, ender SlowDetectorIf3) (invocation *SlowDetectorInvocation) {
+	return &SlowDetectorInvocation{
+		sID:       ID,
+		invoLabel: invoLabel,
+		threadID:  threadID,
+		t0:        t0,
+		ender:     ender,
+	}
 }
 
-// Stop ends an invocation part of SlowDetectorCore
-func (sdi *SlowDetectorInvocation) Stop(value ...time.Time) {
-	sdi.stop(sdi, value...)
-}
+// Stop ends an invocation created by SlowDetectorCore
+func (s *SlowDetectorInvocation) Stop(value ...time.Time) { s.ender.Stop(s, value...) }
 
-// Stop ends an invocation part of SlowDetectorCore
-func (sdi *SlowDetectorInvocation) Interval(label string, t ...time.Time) {
+// Interval adds a timestamped label to an ongoing invocation
+//   - label: printable timestamp identifier “lsofComplete”
+//   - t: optional timestamp, default now
+func (s *SlowDetectorInvocation) Interval(label string, t ...time.Time) {
+
+	// timestamp default now
 	var t0 time.Time
 	if len(t) > 0 {
 		t0 = t[0]
@@ -48,58 +66,63 @@ func (sdi *SlowDetectorInvocation) Interval(label string, t ...time.Time) {
 	if t0.IsZero() {
 		t0 = time.Now()
 	}
+	defer s.lock.Lock().Unlock()
 
-	sdi.lock.Lock()
-	defer sdi.lock.Unlock()
-
+	// append label and timestamp to intervals
 	if label == "" {
-		label = strconv.Itoa(len(sdi.intervals) + 1)
+		label = strconv.Itoa(len(s.intervals) + 1)
 	}
-	sdi.intervals = append(sdi.intervals, Interval{label: label, t: t0})
+	s.intervals = append(s.intervals, interval{label: label, t: t0})
 }
 
 // ThreadID returns the thread ID dor the thread invoking Start
-func (sdi *SlowDetectorInvocation) ThreadID() (threadID ThreadID) {
-	return sdi.threadID
-}
+func (s *SlowDetectorInvocation) ThreadID() (threadID ThreadID) { return s.threadID }
 
-// T0 returns the effective time of the invocation of Start
-func (sdi *SlowDetectorInvocation) T0() (t0 time.Time) {
-	return sdi.t0
-}
+// T0 returns Start invocation timestamp
+func (s *SlowDetectorInvocation) T0() (t0 time.Time) { return s.t0 }
 
-// Label returns the label for this invocation
-func (sdi *SlowDetectorInvocation) Label() (label string) {
-	return sdi.invoLabel
-}
+// Label returns the invocation label
+func (s *SlowDetectorInvocation) Label() (label string) { return s.invoLabel }
 
-// T0 returns the effective time of the invocation of Start
-func (sdi *SlowDetectorInvocation) Time(t time.Time) (previousT time.Time) {
-	var tp *time.Time
+// Time returns the last non-return report timestamp
+//   - t zero-value: retrieve any previous timestamp
+//   - t: new timestamp to set
+//   - previousT: retrievd or previous timestamp, zero-time for none
+func (s *SlowDetectorInvocation) Time(t time.Time) (previousT time.Time) {
 	if t.IsZero() {
-		tp = sdi.tx.Load()
+		// t zero-value means retrieve current value
+		previousT = s.lastNonReturnReportTimestamp.Load().Time()
 	} else {
-		tp = sdi.tx.Swap(&t)
-	}
-	if tp != nil {
-		previousT = *tp
+		previousT = s.lastNonReturnReportTimestamp.Swap(ptime.EpochNow(t)).Time()
 	}
 	return
 }
 
-func (sdi *SlowDetectorInvocation) Intervals() (intervalStr string) {
-	sdi.lock.Lock()
-	defer sdi.lock.Unlock()
+// Intervals returns printable space-separated string of intervals
+//   - printable label “lsofComplete” and a time relative to initial Start
+func (s *SlowDetectorInvocation) Intervals() (intervalStr string) {
+	defer s.lock.Lock().Unlock()
 
-	if length := len(sdi.intervals); length > 0 {
-		sList := make([]string, length)
-		t0 := sdi.t0
-		for i, ivl := range sdi.intervals {
-			t := ivl.t
+	if len(s.intervals) > 0 {
+		var sList = make([]string, len(s.intervals))
+		var t0 = s.t0
+		for i, ivl := range s.intervals {
+			var t = ivl.t
 			sList[i] = ptime.Duration(t.Sub(t0)) + "\x20" + ivl.label
 			t0 = t
 		}
 		intervalStr = "\x20" + strings.Join(sList, "\x20")
 	}
+
 	return
+}
+
+func (s *SlowDetectorInvocation) If() (sdcIf SlowDetectorIf) {
+	return s.ender
+}
+
+// interval is a labelled timestamp for an ongoing invocation
+type interval struct {
+	label string
+	t     time.Time
 }

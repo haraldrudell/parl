@@ -24,11 +24,20 @@ type RateRunner struct {
 }
 
 // NewRateRunner returns a thread-container for running rate-counter averaging
-func NewRateRunner(g parl.GoGen) (rr *RateRunner) {
-	return &RateRunner{
+func NewRateRunner(g parl.GoGen, fieldp ...*RateRunner) (rr *RateRunner) {
+
+	if len(fieldp) > 0 {
+		rr = fieldp[0]
+	}
+	if rr == nil {
+		rr = &RateRunner{}
+	}
+
+	*rr = RateRunner{
 		g: g,
 		m: map[time.Duration]*runner{},
 	}
+	return
 }
 
 // RateRunnerTask describes a rate counter

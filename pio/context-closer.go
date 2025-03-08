@@ -22,8 +22,17 @@ type ContextCloser struct {
 // NewContextCloser returns a an idempotent [io.Closer]
 //   - closer may be nil
 //   - panic-free idempotent observable
-func NewContextCloser(closer io.Closer) (contextCloser *ContextCloser) {
-	return &ContextCloser{closer: closer}
+func NewContextCloser(closer io.Closer, fieldp ...*ContextCloser) (contextCloser *ContextCloser) {
+
+	if len(fieldp) > 0 {
+		contextCloser = fieldp[0]
+	}
+	if contextCloser == nil {
+		contextCloser = &ContextCloser{}
+	}
+
+	*contextCloser = ContextCloser{closer: closer}
+	return
 }
 
 // Close closes the io.Closer

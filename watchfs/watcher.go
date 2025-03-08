@@ -71,13 +71,23 @@ type Watcher struct {
 func NewWatcher(
 	filter Op, ignores *regexp.Regexp,
 	eventFn func(event *WatchEvent), errorSink parl.ErrorSink1,
+	fieldp ...*Watcher,
 ) (watcher *Watcher) {
-	return &Watcher{
+
+	if len(fieldp) > 0 {
+		watcher = fieldp[0]
+	}
+	if watcher == nil {
+		watcher = &Watcher{}
+	}
+
+	*watcher = Watcher{
 		eventFn:   eventFn,
 		errorSink: errorSink,
 		filter:    filter,
 		ignores:   ignores,
 	}
+	return
 }
 
 // Watch adds file-system entry-watchers

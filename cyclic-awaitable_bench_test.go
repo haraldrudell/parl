@@ -28,6 +28,15 @@ var cyclicAwaitablesuite = []func(b *testing.B){
 
 // Running tool: /opt/homebrew/bin/go test -benchmem -run=^$ -bench ^BenchmarkCyclicAwitable$ github.com/haraldrudell/parl
 //
+// 250306 c66 AtomicLock: ClosedFalse OpenOpened OpenClosed faster
+// BenchmarkCyclicAwitable/BenchmarkCaCh-10         	 3985760	       297.2 ns/op	         2.972 wall-ns/op	       0 B/op	       0 allocs/op
+// BenchmarkCyclicAwitable/BenchmarkCaIsClosedTrue-10         	 4032711	       297.4 ns/op	         2.974 wall-ns/op	       0 B/op	       0 allocs/op
+// BenchmarkCyclicAwitable/BenchmarkCaIsClosedFalse-10        	 4046834	       297.4 ns/op	         2.974 wall-ns/op	       0 B/op	       0 allocs/op
+// BenchmarkCyclicAwitable/BenchmarkCaEventuallyConsistentTrue/BenchmarkEventuallyConsistentTrue-10         	576939488	         1.953 ns/op	        19.53 wall-ns/op	       0 B/op	       0 allocs/op
+// BenchmarkCyclicAwitable/BenchmarkCaEventuallyConsistentFalse/BenchmarkEventuallyConsistentFalse-10       	760322566	         1.893 ns/op	        18.93 wall-ns/op	       0 B/op	       0 allocs/op
+// BenchmarkCyclicAwitable/BenchmarkCaOpenOpened-10                                                         	 3023618	       397.9 ns/op	         3.979 wall-ns/op	       0 B/op	       0 allocs/op
+// BenchmarkCyclicAwitable/BenchmarkCaOpenClosed-10                                                         	 2156744	       555.8 ns/op	         5.558 wall-ns/op	       0 B/op	       0 allocs/op
+//
 // 240517 c66
 // pkg: github.com/haraldrudell/parlBenchmarkCyclicAwitable/BenchmarkCaCh-10         	 4066071	       296.8 ns/op	         2.968 wall-ns/op	       0 B/op	       0 allocs/op
 // BenchmarkCyclicAwitable/BenchmarkCaIsClosedTrue-10         	 4500962	       267.4 ns/op	         2.674 wall-ns/op	       0 B/op	       0 allocs/op

@@ -57,21 +57,31 @@ func NewInvocationTimer[T any](
 	latencyWarningPoint time.Duration, parallelismWarningPoint uint64,
 	timerPeriod time.Duration,
 	goGen GoGen,
+	fieldp ...*InvocationTimer[T],
 ) (invokeTimer *InvocationTimer[T]) {
 	if callback == nil {
 		panic(NilError("callback"))
 	}
+
+	if len(fieldp) > 0 {
+		invokeTimer = fieldp[0]
+	}
+	if invokeTimer == nil {
+		invokeTimer = &InvocationTimer[T]{}
+	}
+
 	if timerPeriod < defaultTimer {
 		timerPeriod = defaultTimer
 	}
-	return &InvocationTimer[T]{
+	*invokeTimer = InvocationTimer[T]{
 		callback:    callback,
 		endCb:       endCb,
 		timerPeriod: timerPeriod,
 		goGen:       goGen,
-		latency:     *NewAtomicMax(latencyWarningPoint),
-		parallelism: *NewAtomicMax(parallelismWarningPoint),
 	}
+	NewAtomicMaxp(&invokeTimer.latency, latencyWarningPoint)
+	NewAtomicMaxp(&invokeTimer.parallelism, parallelismWarningPoint)
+	return
 }
 
 // Oldest returns the oldest invocation

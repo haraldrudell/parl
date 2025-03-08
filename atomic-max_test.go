@@ -30,7 +30,7 @@ func TestAtomicMax(t *testing.T) {
 	}
 
 	// Value below threshold should not be a max
-	a = *NewAtomicMax(threshold1)
+	NewAtomicMaxp(&a, threshold1)
 	isNewMax = a.Value(zeroValue)
 	if isNewMax {
 		t.Error("below isNewMax")
@@ -67,7 +67,7 @@ func TestAtomicMax(t *testing.T) {
 	}
 
 	// equal to threshold should be max
-	a = *NewAtomicMax(threshold1)
+	NewAtomicMaxp(&a, threshold1)
 	isNewMax = a.Value(value1)
 	if !isNewMax {
 		t.Error("equal isNewMax false")

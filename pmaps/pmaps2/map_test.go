@@ -29,7 +29,7 @@ func TestMap(t *testing.T) {
 		ok    bool
 	)
 
-	m = *NewMap[int, *testMapValue]()
+	NewMap(&m)
 	m.Put(v1.value, &v1)
 	m.Put(v2.value, &v2)
 	m.Put(v1.value, &v1)

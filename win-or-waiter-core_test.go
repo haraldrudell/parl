@@ -25,7 +25,7 @@ func TestNewWinOrWaiterCore(t *testing.T) {
 	var result time.Time
 	var isValid bool
 
-	var winOrWaiter *WinOrWaiterCore = NewWinOrWaiterCore(winOrWaiterStrategy, calculator)
+	var winOrWaiter *WinOrWaiterCore = NewWinOrWaiterCore(NoWinOrWaiterCore, winOrWaiterStrategy, calculator)
 
 	if winOrWaiter.strategy != winOrWaiterStrategy {
 		t.Errorf("bad startegy: %d exp %d", winOrWaiter.strategy, winOrWaiterStrategy)

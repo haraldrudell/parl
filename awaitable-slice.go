@@ -6,10 +6,11 @@ ISC License
 package parl
 
 import (
+	"io"
 	"slices"
-	"sync"
 	"sync/atomic"
 
+	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pslices"
 )
 
@@ -101,7 +102,7 @@ type AwaitableSlice[T any] struct {
 	//	- queueLock also makes Send SendSlice critical sections
 	//	- high-contention lock
 	//	- two locks separates contention of sink and source
-	queueLock sync.Mutex
+	queueLock Mutex
 	// queue is a locally made slice for individual values
 	//	- behind queueLock
 	//	- not a slice-away slice
@@ -126,7 +127,7 @@ type AwaitableSlice[T any] struct {
 	// outputLock makes output slices thread-safe
 	//	- outputLock also makes Get GetSlice GetAll critical sections
 	//	- two locks separates contention of sink and source
-	outputLock sync.Mutex
+	outputLock Mutex
 	// output is a slice being sliced away from
 	//	- behind outputLock, slice-away slice
 	output, output0 []T
@@ -443,8 +444,7 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 
 	// aggregate queueLock data
 	s.preAlloc(onlyCachedTrue)
-	defer s.queueLock.Unlock()
-	s.queueLock.Lock()
+	defer s.queueLock.Lock().Unlock()
 	s.transferCached()
 
 	// aggregate queueLock data
@@ -488,6 +488,85 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 	}
 	pslices.SetLength(&s.slices, 0)
 
+	return
+}
+
+var _ io.Reader
+
+// Read makes AwaitableSlice [io.Reader]
+//   - p: buffer to read items to
+//   - n: number of items read
+//   - err: possible [io.EOF] once closed and read to empty
+//   - — EOF may be returned along with read items
+//   - —
+//   - useful if a limited number of items is to be read
+//   - may be less efficient by discarding internal slices
+//   - combines data transfer with close which the slice otherwise treats separately
+//   - if further data is written to slice after EOF, Read provides additional data after returning EOF
+func (s *AwaitableSlice[T]) Read(p []T) (n int, err error) {
+
+	// fast check outside lock
+	if !s.hasData.Load() {
+		if s.isEmptyWait.IsClosed() {
+			err = io.EOF
+		}
+		return // slice empty return
+	} else if len(p) == 0 {
+		return // buffer zero-length return
+	}
+	// slice was observed to have data and buffer is of non-zero length
+
+	var checkedQueue = true
+	defer s.postGet(&checkedQueue, &checkedQueue)
+	s.outputLock.Lock()
+
+	// check inside lock
+	if !s.hasData.Load() {
+		if s.isEmptyWait.IsClosed() {
+			err = io.EOF
+		}
+		return // slice empty return
+	}
+	// the slice has data and buffer is non-zero length: data will be read
+	// data is behing queueLock or outputLock
+
+	// whether p has been completely read
+	var isDone bool
+
+	// iterate i: 0, 1
+	for i := range 2 {
+
+		// read outputLock data
+		if !isDone {
+			isDone = s.copyToSlice(&s.output, &p, &n)
+			if !isDone {
+				for len(s.outputs) > 0 {
+					var isDone = s.copyToSlice(&s.outputs[0], &p, &n)
+					if len(s.outputs[0]) == 0 {
+						s.outputs = s.outputs[1:]
+					}
+					if isDone {
+						break
+					}
+				}
+			}
+		}
+		if i != 0 {
+			continue
+		}
+
+		// case before accessing queueLock
+		var outputIsEmpty = len(s.output) == 0 && len(s.outputs) == 0
+		if isDone && !outputIsEmpty {
+			// read complete and hasData does not need update
+			return // Read complete return
+		}
+		// transfer data from queueLock and update hasData
+		s.sliceFromQueue(getMax, len(p))
+	}
+	if !s.hasData.Load() && s.isEmptyWait.IsClosed() {
+		err = io.EOF
+	}
 	return
 }
 
@@ -651,10 +730,11 @@ func (s *AwaitableSlice[T]) make(value ...T) (newSlice []T) {
 }
 
 // sliceFromQueue fetches a value, a slice of values from queue to output
-// or updates hasData
-//   - action getValue: seeking single value
+// or updates hasData. Upon return all data is with outputLock and hasData is updated
+//   - action getValue: seeking single value. Longer returned slice is saved as s.output
 //   - action getSlice: seeking entire slice
-//   - action getNothing: update hasData
+//   - action getNothing: slice is nil
+//   - slice: any non-empty slice from queueLock, slice is not stored in outputLock
 //   - upon sliceFromQueue invocation:
 //   - — outputLock is empty
 //   - — outputLock is held
@@ -662,11 +742,10 @@ func (s *AwaitableSlice[T]) make(value ...T) (newSlice []T) {
 //   - to reduce queueLock contention, sliceFromQueue:
 //   - — transfers all values to outputLock and
 //   - — transfers pre-allocated slices to queueLock
-func (s *AwaitableSlice[T]) sliceFromQueue(action getAction) (slice []T) {
+func (s *AwaitableSlice[T]) sliceFromQueue(action getAction, maxCount ...int) (slice []T) {
 	// prealloc outside queueLock
 	s.preAlloc()
-	s.queueLock.Lock()
-	defer s.queueLock.Unlock()
+	defer s.queueLock.Lock().Unlock()
 	s.transferCached()
 
 	// three tasks while holding queueLock:
@@ -677,7 +756,8 @@ func (s *AwaitableSlice[T]) sliceFromQueue(action getAction) (slice []T) {
 	// output and outputLock is empty
 
 	// try to get data to slice
-	if action != getNothing {
+	switch action {
+	case getValue, getSlice:
 
 		// retrieve queue if non-empty
 		if len(s.queue) > 0 {
@@ -691,7 +771,7 @@ func (s *AwaitableSlice[T]) sliceFromQueue(action getAction) (slice []T) {
 			s.slices[0] = nil
 			s.slices = s.slices[1:]
 		}
-	} else {
+	case getNothing, getMax:
 
 		// getNothing: transfer any non-empty queue
 		if len(s.queue) > 0 {
@@ -701,6 +781,8 @@ func (s *AwaitableSlice[T]) sliceFromQueue(action getAction) (slice []T) {
 			s.output = s0
 			s.output0 = s0
 		}
+	default:
+		panic(perrors.ErrorfPF("Bad action: %d", action))
 	}
 
 	// possibly transfer pre-made output0 to queueLock
@@ -730,13 +812,39 @@ func (s *AwaitableSlice[T]) sliceFromQueue(action getAction) (slice []T) {
 		// if fetching single value and more than one value in that slice,
 		// not end of data: hasData should remain true
 		if len(slice) > 1 {
-			return // fetchign multiple values return: hasData true
+			return // fetching multiple values return: hasData true
 		}
 	case getNothing:
 		// if output is not empty, hasData should remain true
 		if len(s.output) > 0 {
 			return // values in outputLock return: hasData true
 		}
+	case getSlice:
+		// slice will be consumed entirely
+		//	- there are no more slices, so hasData is now false
+	case getMax:
+		// looking for specific number of items
+		//	- if s.output, s.outputs is less, hasData false
+		// get how many items are sought
+		var n int
+		if len(maxCount) > 0 {
+			n = maxCount[0]
+		}
+		// subtract all available items
+		n -= len(s.output)
+		if n >= 0 {
+			for i := range len(s.outputs) {
+				n -= len(s.outputs[i])
+				if n < 0 {
+					break
+				}
+			}
+		}
+		if n < 0 {
+			return // values in outputLock return: hasData true
+		}
+	default:
+		panic(perrors.ErrorfPF("Bad action: %d", action))
 	}
 	// queueLock and outputLock are both empty
 
@@ -959,6 +1067,30 @@ func (s *AwaitableSlice[T]) postSend() {
 	s.updateWait()
 }
 
+// copyToSlice does slice-away from src, copying to dst and adding to *np
+//   - src: pointer to source-slice
+//   - dst: pointer to Read p-slice buffer
+//   - np: pointer to Read n integer
+//   - isDone: true if dst was filled
+func (s *AwaitableSlice[T]) copyToSlice(src, dst *[]T, np *int) (isDone bool) {
+
+	// copy if anything to copy
+	var d = *dst
+	var nCopy = copy(d, *src)
+	if nCopy == 0 {
+		return // nothing to copy: isDone false
+	}
+
+	// update n and *dst
+	*np += nCopy
+	if isDone = len(d) == nCopy; isDone {
+		return // Read complete return: isDOne true
+	}
+	*dst = d[nCopy:]
+
+	return // more buffer available: isDone false
+}
+
 const (
 	// default allocation size for new slices if Size is < 1
 	defaultSize = 10
@@ -973,8 +1105,10 @@ const (
 	getSlice
 	// sliceFromQueue is invoked to update hasData
 	getNothing
+	// want maxCount elements
+	getMax
 )
 
 // action for sliceFromQueue
-//   - getValue getSlice getNothing
+//   - getValue getSlice getNothing getMax
 type getAction uint8

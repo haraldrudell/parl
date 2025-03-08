@@ -22,10 +22,12 @@ func NewAggregatePriority[V any, P constraints.Ordered](
 	index int,
 	aggregator parl.Aggregator[V, P],
 ) (aggregatePriority parl.AggregatePriority[V, P]) {
-	return &AggregatePriority[V, P]{
-		assignedPriority: *NewAssignedPriority(aggregator.Priority(), index, value),
-		aggregator:       aggregator,
+	var a = &AggregatePriority[V, P]{
+		aggregator: aggregator,
 	}
+	NewAssignedPriority(aggregator.Priority(), index, value, &a.assignedPriority)
+	aggregatePriority = a
+	return
 }
 
 var _ = ((parl.AggregatePriority[int, int])(&AggregatePriority[int, int]{})).Aggregator

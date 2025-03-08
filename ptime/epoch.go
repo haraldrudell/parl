@@ -23,7 +23,8 @@ func EpochNow(t ...time.Time) (epoch Epoch) {
 	if t0.IsZero() {
 		return // zero value: epoch 0
 	}
-	return Epoch(t0.Sub(ptimeEpoch))
+	epoch = Epoch(t0.Sub(ptimeEpoch))
+	return
 }
 
 // Time returns the time.Time value corresponding to epoch
@@ -35,6 +36,4 @@ func (epoch Epoch) Time() (t time.Time) {
 }
 
 // IsValid returns true if epoch is not zero-time, ie. Epoch(0) corredsponding to time.TIME{} and Time.IsZero
-func (epoch Epoch) IsValid() (isValid bool) {
-	return epoch != 0
-}
+func (epoch Epoch) IsValid() (isValid bool) { return epoch != 0 }

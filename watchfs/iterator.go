@@ -67,7 +67,10 @@ func NewIterator(path string, filter Op, ignores *regexp.Regexp, ctx ...context.
 	if len(ctx) > 0 {
 		i.ctx = ctx[0]
 	}
-	i.watcher = *NewWatcher(filter, ignores, i.receiveEventFromWatcher, newErrorSink(&i))
+	NewWatcher(
+		filter, ignores, i.receiveEventFromWatcher, newErrorSink(&i),
+		&i.watcher,
+	)
 	return iters.NewFunctionIterator(i.iteratorFunction, i.asyncCancel)
 }
 

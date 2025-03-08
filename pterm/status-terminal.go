@@ -39,11 +39,12 @@ type IsTerminal bool
 //   - [CopyLogRemove]
 type CopyLogRemover bool
 
-// [pterm.StatusTerminalFd] no write function
-var STDefaultWriter io.Writer
-
-// [pterm.StatusTerminalFd] no printf function
-var NoPrintf parl.PrintfFunc
+var (
+	// [pterm.StatusTerminalFd] no write function
+	STDefaultWriter io.Writer
+	// [pterm.StatusTerminalFd] no printf function
+	NoPrintf parl.PrintfFunc
+)
 
 // StatusTerminal provides an updatable status area at the bottom
 // of the terminal window with log lines flowing upwards above it
@@ -237,7 +238,7 @@ func (s *StatusTerminal) Status(statusLines string) {
 	//	- to activate d, use option “-verbose StatusTerminal..Status”
 	var d = StatusDebug{}
 	if parl.IsThisDebug() {
-		d = *NewStatusDebug(lines, width)
+		NewStatusDebug(lines, width, &d)
 		// insert a pre-release of debug data to have fixed status length
 		lines[len(lines)-1] += d.DebugText()
 	}

@@ -23,7 +23,9 @@ type Averager3[T constraints.Integer] struct {
 
 // NewAverager3 returns an calculator for last, average and max values.
 func NewAverager3[T constraints.Integer]() (averager *Averager3[T]) {
-	return &Averager3[T]{Averager: *NewAverager[T]()}
+	averager = &Averager3[T]{}
+	NewAverager(&averager.Averager)
+	return
 }
 
 // Status returns "[last]/[average]/[max]"

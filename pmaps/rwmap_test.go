@@ -314,10 +314,11 @@ func TestRWMapRace(t *testing.T) {
 		limitedSlice[i] = randomAZ(randomLength)
 	}
 
-	var rwMap RWMap[string, int] = *NewRWMap2[string, int]()
+	var rwMap RWMap[string, int]
+	NewRWMap2[string, int](&rwMap)
 	var ctx, cancelFunc = context.WithCancel(context.Background())
 	defer cancelFunc()
-	rand.Seed(time.Now().UnixNano())
+	//rand.Seed(time.Now().UnixNano())
 
 	// put thread
 	go func() {

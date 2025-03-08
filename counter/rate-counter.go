@@ -6,50 +6,50 @@ ISC License
 package counter
 
 import (
-	"sync"
 	"time"
 
 	"github.com/haraldrudell/parl"
 	"golang.org/x/exp/maps"
 )
 
-const (
-	averagerSize = 10
-	minInterval  = time.Microsecond
-)
-
 // RateCounter is a value/running/max counter with averaging.
 //   - rate of increase, maximum and average rate of increase in value
 //   - rate of increase, maximum increase and decrease rates and average of value
 type RateCounter struct {
-	Counter // value-running-max atomic-access container
+	// value-running-max atomic-access container
+	Counter
 
-	lock             sync.Mutex
-	lastDoInvocation time.Time // used to calculate true duration of each period
-	hasValues        bool      // indicates that value and running was initialized at start of period
-	value            uint64    // value at beginning of period
-	running          uint64    // running at beginning of period
-	m                map[parl.RateType]float64
-	valueAvg         Averager
-	runningAvg       Averager
+	lock parl.Mutex
+	// used to calculate true duration of each period
+	lastDoInvocation time.Time
+	// indicates that value and running was initialized at start of period
+	hasValues bool
+	// value at beginning of period
+	value uint64
+	// running at beginning of period
+	running    uint64
+	m          map[parl.RateType]float64
+	valueAvg   Averager
+	runningAvg Averager
 }
 
-var _ parl.RateCounterValues = &RateCounter{} // RateCounter is parl.RateCounterValues
+// RateCounter is parl.RateCounterValues
+var _ parl.RateCounterValues = &RateCounter{}
 
 // newRateCounter returns a rate-counter, an extension to a regular 3-value counter
 func newRateCounter() (counter *RateCounter) {
-	return &RateCounter{
+	counter = &RateCounter{
 		lastDoInvocation: time.Now(),
 		m:                make(map[parl.RateType]float64),
-		valueAvg:         *NewAverager(averagerSize),
-		runningAvg:       *NewAverager(averagerSize),
 	}
+	NewAverager(averagerSize, &counter.valueAvg)
+	NewAverager(averagerSize, &counter.runningAvg)
+	return
 }
 
 // Rates returns a map of current rate-results
 func (r *RateCounter) Rates() (rates map[parl.RateType]float64) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	defer r.lock.Lock().Unlock()
 
 	rates = maps.Clone(r.m)
 	return
@@ -59,8 +59,7 @@ func (r *RateCounter) Rates() (rates map[parl.RateType]float64) {
 //   - Do is invoked by the task container
 //   - at is an accurate timestamp, ie. not from a time.Interval
 func (r *RateCounter) Do(at time.Time) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	defer r.lock.Lock().Unlock()
 
 	// calculate interval duration: positive, at least minInterval
 	var duration = at.Sub(r.lastDoInvocation)
@@ -125,9 +124,14 @@ func (r *RateCounter) do(from, to uint64, seconds float64, rateIndex, maxRateInd
 	if maxDecRateIndex == parl.NotAValue {
 		return // max decrease rate should not be calculated
 	}
-	rate := (float64(to) - float64(from)) / seconds
+	var rate = (float64(to) - float64(from)) / seconds
 	if rate < m[maxDecRateIndex] {
 		m[maxDecRateIndex] = rate
 	}
 	// negative rate return
 }
+
+const (
+	averagerSize = 10
+	minInterval  = time.Microsecond
+)

@@ -21,7 +21,18 @@ type pathTuple[V any] struct {
 }
 
 // NewRegistry returns a registry of values by absolute path
-func NewRegistry[V any]() (registry *Registry[V]) { return &Registry[V]{paths: make(map[string]*V)} }
+func NewRegistry[V any](fieldp ...*Registry[V]) (registry *Registry[V]) {
+
+	if len(fieldp) > 0 {
+		registry = fieldp[0]
+	}
+	if registry == nil {
+		registry = &Registry[V]{}
+	}
+
+	*registry = Registry[V]{paths: make(map[string]*V)}
+	return
+}
 
 // Add adds a value to the registry
 func (r *Registry[V]) Add(abs string, value *V) {
