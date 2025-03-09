@@ -44,7 +44,7 @@ func NewThreadSafeOrderedMapFunc[K comparable, V any](
 	}
 
 	// initialize all fields
-	newThreadSafeMap[K, V](&orderedMap.threadSafeMap)
+	newThreadSafeMap(&orderedMap.threadSafeMap)
 	orderedMap.tree = btree.NewG(BtreeDegree, less)
 	orderedMap.less = less
 

@@ -34,7 +34,7 @@ func newThreadSafeMap[K comparable, V any](fieldp ...*threadSafeMap[K, V]) (m *t
 	}
 
 	// initialize all fields
-	pmaps2.NewThreadSafeMap[K, V](&m.m2)
+	pmaps2.NewThreadSafeMap(&m.m2)
 
 	return
 }

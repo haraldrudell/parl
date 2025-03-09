@@ -29,7 +29,7 @@ func newThreadSafeMap[K comparable, V any](fieldp *threadSafeMap[K, V]) (m *thre
 	}
 
 	// initialize all fields
-	pmaps2.NewThreadSafeMap[K, V](&m.tsm)
+	pmaps2.NewThreadSafeMap(&m.tsm)
 
 	return
 }
@@ -89,7 +89,7 @@ func (m *threadSafeMap[K, V]) clone(tsm *threadSafeMap[K, V]) { m.tsm.Clone(&tsm
 // encapsulated thread-safe map
 func (m *threadSafeMap[K, V]) cloneToGomap(goMap *map[K]V) { m.tsm.CloneToGoMap(goMap) }
 
-func (m *threadSafeMap[K, V]) Get(key K) (value V, ok bool) {
+func (m *threadSafeMap[K, V]) Get(key K) (value V, hasValue bool) {
 	defer m.tsm.RLock().RUnlock()
 
 	return m.tsm.Get(key)

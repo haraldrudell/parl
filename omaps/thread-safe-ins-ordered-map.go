@@ -27,7 +27,7 @@ func NewThreadSafeInsOrderedMap[K comparable, V any](fieldp ...*ThreadSafeInsOrd
 	}
 
 	// initialize all fields
-	NewInsOrderedMap[K, V](&orderedMap.InsOrderedMap)
+	NewInsOrderedMap(&orderedMap.InsOrderedMap)
 
 	return
 }

@@ -26,7 +26,7 @@ func newBTreeMap2Any[K comparable, V any](fieldp *btreeMap[K, V], less btree.Les
 	}
 
 	// initialize all fields
-	NewBTreeMapAny[K, V](less, &m.BTreeMap)
+	NewBTreeMapAny(less, &m.BTreeMap)
 
 	return
 }

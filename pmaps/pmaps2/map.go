@@ -5,7 +5,10 @@ ISC License
 
 package pmaps2
 
-import "golang.org/x/exp/maps"
+import (
+	"github.com/haraldrudell/parl/parli"
+	"golang.org/x/exp/maps"
+)
 
 // Map is a reusable promotable Go map
 //   - 5 native Go Map functions: Get Put Delete Length Range
@@ -19,6 +22,9 @@ import "golang.org/x/exp/maps"
 //   - — order methods List and Keys can be implemented by consumer
 //   - all public methods intended to be public to final consumer
 type Map[K comparable, V any] struct{ goMap map[K]V }
+
+// Map is parli.Map
+var _ parli.Map[int, string] = &Map[int, string]{}
 
 // NewMap returns a reusable Go Map object
 func NewMap[K comparable, V any](fieldp ...*Map[K, V]) (mapping *Map[K, V]) {
@@ -78,7 +84,7 @@ func (m *Map[K, V]) Get(key K) (value V, ok bool) {
 	return
 }
 
-// Put create or replaces a mapping
+// Put creates or replaces a mapping
 func (m *Map[K, V]) Put(key K, value V) { m.goMap[key] = value }
 
 // Delete removes mapping for key
@@ -109,10 +115,18 @@ func (m *Map[K, V]) Range(rangeFunc func(key K, value V) (keepGoing bool)) (rang
 func (m *Map[K, V]) Clear() { m.goMap = make(map[K]V) }
 
 // Clone returns a shallow clone of the map
+//   - goMap is an optional pointer to an already allocated map instance
+//     to be used and appended to
+//   - delegates to [maps.Clone] ranging all keys
+func (m *Map[K, V]) Clone(goMap ...*map[K]V) (clone parli.Map[K, V]) {
+	return m.Clone2(goMap...)
+}
+
+// Clone2 returns a shallow clone of the map
 //   - mp is an optional pointer to an already allocated map instance
 //     to be used and appended to
 //   - delegates to [maps.Clone] ranging all keys
-func (m *Map[K, V]) Clone(goMap ...*map[K]V) (clone *Map[K, V]) {
+func (m *Map[K, V]) Clone2(goMap ...*map[K]V) (clone *Map[K, V]) {
 
 	// clone to Go map case
 	if len(goMap) > 0 {

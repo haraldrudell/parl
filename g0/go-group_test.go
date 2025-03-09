@@ -42,20 +42,21 @@ func TestGoGroup(t *testing.T) {
 	)
 
 	var (
-		g                          parl.Go
-		goError                    parl.GoError
-		isClosed, allowTermination bool
-		subGo                      parl.SubGo
-		subGroup                   parl.SubGroup
-		ctx, ctxAct                context.Context
-		cancelFunc                 context.CancelFunc
-		err                        error
-		noError                    *error
-		isReady, isDone            parl.WaitGroupCh
-		timer                      *time.Timer
-		goGroupImpl                *GoGroup
-		isTimeout                  timeoutFlag
-		hasValue                   bool
+		g                parl.Go
+		goError          parl.GoError
+		isClosed         bool
+		allowTermination parl.GoTermination
+		subGo            parl.SubGo
+		subGroup         parl.SubGroup
+		ctx, ctxAct      context.Context
+		cancelFunc       context.CancelFunc
+		err              error
+		noError          *error
+		isReady, isDone  parl.WaitGroupCh
+		timer            *time.Timer
+		goGroupImpl      *GoGroup
+		isTimeout        timeoutFlag
+		hasValue         bool
 	)
 
 	// Go SubGo SubGroup GoError Wait EnableTermination
@@ -93,15 +94,15 @@ func TestGoGroup(t *testing.T) {
 	// EnableTermination should be true on new GoGroup
 	reset()
 	allowTermination = goGroup.EnableTermination()
-	if !allowTermination {
-		t.Error("EnableTermination false")
+	if allowTermination != parl.AllowTermination {
+		t.Errorf("EnableTermination %s not %s", allowTermination, parl.AllowTermination)
 	}
 
 	// EnableTermination(parl.PreventTermination) should be false
 	reset()
 	allowTermination = goGroup.EnableTermination(parl.PreventTermination)
-	if allowTermination {
-		t.Error("EnableTermination true")
+	if allowTermination != parl.PreventTermination {
+		t.Errorf("EnableTermination %s not %s", allowTermination, parl.PreventTermination)
 	}
 
 	// EnableTermination(parl.AllowTermination)
@@ -126,8 +127,8 @@ func TestGoGroup(t *testing.T) {
 		t.Error("EnableTermination(parl.PreventTermination) does not prevent termination")
 	}
 	allowTermination = goGroup.EnableTermination(parl.AllowTermination)
-	if !allowTermination {
-		t.Error("EnableTermination false")
+	if allowTermination != parl.AllowTermination {
+		t.Errorf("EnableTermination %s not %s", allowTermination, parl.AllowTermination)
 	}
 	isClosed = goGroupImpl.endCh.IsClosed()
 	if !isClosed {
@@ -577,18 +578,42 @@ func TestGoGroupTermination(t *testing.T) {
 }
 
 func TestSubGoTermination(t *testing.T) {
-	var goGroup = NewGoGroup(context.Background())
-	var subGo = goGroup.SubGo()
+	const (
+		timeout = time.Second
+	)
+	var (
+		goGroup parl.GoGroup
+		subGo   parl.SubGo
+		timer   *time.Timer
+	)
 
-	// an unused subGo will only terminate after EnableTermination
+	// an unused subGo should terminate on EnableTermination AllowTermination
+	goGroup = NewGoGroup(context.Background())
+	subGo = goGroup.SubGo()
 	subGo.EnableTermination(parl.AllowTermination)
 
-	subGo.Wait()
+	// subGo.Wait() should not block
+	timer = time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-subGo.WaitCh():
+		timer.Stop()
+	case <-timer.C:
+		t.Fatal("SubGo failed to terminate")
+	}
 
 	// CascadeTermination does this
 	//goGroup.EnableTermination(parl.AllowTermination)
 
-	goGroup.Wait()
+	// goGroup.Wait() should not block
+	timer = time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-goGroup.WaitCh():
+		timer.Stop()
+	case <-timer.C:
+		t.Fatal("GoGroup failed to terminate")
+	}
 }
 
 func TestGoGroup2Termination(t *testing.T) {

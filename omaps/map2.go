@@ -35,7 +35,7 @@ func newMap[K comparable, V any](fieldp *map2[K, V]) (m *map2[K, V]) {
 
 	// initialize all fields
 	var noGoMap map[K]V
-	pmaps2.NewMap2[K, V](&m.m2, noGoMap, &m.goMap)
+	pmaps2.NewMap2(&m.m2, noGoMap, &m.goMap)
 
 	return
 }

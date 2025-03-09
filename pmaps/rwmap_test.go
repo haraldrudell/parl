@@ -315,7 +315,7 @@ func TestRWMapRace(t *testing.T) {
 	}
 
 	var rwMap RWMap[string, int]
-	NewRWMap2[string, int](&rwMap)
+	NewRWMap2(&rwMap)
 	var ctx, cancelFunc = context.WithCancel(context.Background())
 	defer cancelFunc()
 	//rand.Seed(time.Now().UnixNano())

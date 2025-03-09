@@ -45,7 +45,7 @@ type Go interface {
 	// Register performs no function but allows the Go object to collect
 	// information on the new thread.
 	// - label is an optional name that can be assigned to a Go goroutine thread
-	Register(label ...string) (g0 Go)
+	Register(label ...string) (g Go)
 	// AddError emits a non-fatal errors
 	AddError(err error)
 	// Go returns a Go object to be provided as a go-statement function-argument
@@ -84,6 +84,7 @@ type Go interface {
 	//   - — able to return error
 	//   - — other needs of a goroutine is to initiate and detect cancel and
 	//		submit non-fatal errors
+	//	- Done(errp *error)
 	Doner
 	// Wait awaits exit of this Go thread
 	Wait()
@@ -133,7 +134,7 @@ type GoFatalCallback func(goGen GoGen)
 //     ie. any Go-interface object
 type GoGen interface {
 	// Go returns a Go object to be provided as a go statement function argument.
-	Go() (g0 Go)
+	Go() (g Go)
 	// SubGo returns a thread-group whose fatal errors go to GoGen’s parent.
 	//   - both non-fatal and fatal errors in SubGo threads are sent to GoGen’s parent
 	// 		like Go.AddError and Go.Done.
@@ -200,7 +201,7 @@ type GoGen interface {
 //     thread-groups.
 type GoGroup interface {
 	// Go returns a Go object to be provided as a go statement function argument.
-	Go() (g0 Go)
+	Go() (g Go)
 	// SubGo returns a thread-group whose fatal errors go to Go’s parent.
 	//   - both non-fatal and fatal errors in SubGo threads are sent to Go’s parent
 	// 		like Go.AddError and Go.Done.
@@ -237,15 +238,25 @@ type GoGroup interface {
 	GoError() (goErrorSource IterableAllSource[GoError])
 	// Wait waits for this thread-group to end
 	Wait()
-	// EnableTermination controls temporarily preventing the GoGroup from
+	// ch closes upon exit of this Go thread
+	WaitCh() (ch AwaitableCh)
+	// EnableTermination allows to temporarily prevent the GoGroup from
 	// terminating.
-	// EnableTermination is initially true.
-	//	- invoked with no argument returns the current state of EnableTermination
-	//	- invoked with [AllowTermination] again allows for termination and
-	//		immediately terminates the thread-group if no threads are currently running.
+	//   - allowTermination: desired state [AllowTermination] [PreventTermination]
+	//   - mayTerminate: if allowTermination missing, returns current state.
+	//     Otherwise, returns the set state
+	//   - — a terminated go-group always returns AllowTermination
+	//	- —
+	//	- EnableTermination is initially [AllowTermination]
+	//   - invoking with AllowTermination while child-object count is zero,
+	//     terminates the thread-group regardless of previous enableTermination state.
+	//     This is used prior to Wait when a thread-group was not used.
+	//     Using the alternative Cancel would signal to threads to exit.
 	//	- invoked with [PreventTermination] allows for the number of managed
-	//		threads to be temporarily zero without terminating the thread-group
-	EnableTermination(allowTermination ...bool) (mayTerminate bool)
+	//		threads to be temporarily zero without terminating the thread-group.
+	//		For example, if exiting threads during creation of multiple threads causes
+	//		thread-count to reach zero, the thread-group prematurely terminates
+	EnableTermination(allowTermination ...GoTermination) (mayTerminate GoTermination)
 	// Cancel terminates the threads in this and subordinate thread-groups.
 	Cancel()
 	// Context will Cancel when the parent context Cancels.
@@ -285,15 +296,23 @@ type SubGo interface {
 	Wait()
 	// returns a channel that closes on subGo end similar to Wait
 	WaitCh() (ch AwaitableCh)
-	// EnableTermination controls temporarily preventing the GoGroup from
+	// EnableTermination allows to temporarily prevent the GoGroup from
 	// terminating.
-	// EnableTermination is initially true.
-	//	- invoked with no argument returns the current state of EnableTermination
-	//	- invoked with [AllowTermination] again allows for termination and
-	//		immediately terminates the thread-group if no threads are currently running.
+	//   - allowTermination: desired state [AllowTermination] [PreventTermination]
+	//   - mayTerminate: if allowTermination missing, returns current state.
+	//     Otherwise, returns the set state
+	//   - — a terminated go-group always returns AllowTermination
+	//	- —
+	//	- EnableTermination is initially [AllowTermination]
+	//   - invoking with AllowTermination while child-object count is zero,
+	//     terminates the thread-group regardless of previous enableTermination state.
+	//     This is used prior to Wait when a thread-group was not used.
+	//     Using the alternative Cancel would signal to threads to exit.
 	//	- invoked with [PreventTermination] allows for the number of managed
-	//		threads to be temporarily zero without terminating the thread-group
-	EnableTermination(allowTermination ...bool) (mayTerminate bool)
+	//		threads to be temporarily zero without terminating the thread-group.
+	//		For example, if exiting threads during creation of multiple threads causes
+	//		thread-count to reach zero, the thread-group prematurely terminates
+	EnableTermination(allowTermination ...GoTermination) (mayTerminate GoTermination)
 	// Cancel terminates the threads in this and subordinate thread-groups.
 	Cancel()
 	// Context will Cancel when the parent context Cancels.
@@ -353,8 +372,12 @@ type GoFactory interface {
 }
 
 const (
-	AllowTermination   = true
-	PreventTermination = false
+	// [GoGroup] [SubGo] [SubGroup] may again terminate
+	AllowTermination GoTermination = iota
+	// [GoGroup] [SubGo] [SubGroup] will not terminate until [AllowTermination]
+	//	- used to avoid exiting threads causing thread-count to reach zero
+	//		during thread-creation
+	PreventTermination
 )
 
 // data types
@@ -445,12 +468,13 @@ const (
 )
 
 const (
+	// default, no debug printing
 	NoDebug GoDebug = iota
+	// debug print on go-group events
 	DebugPrint
+	// the go-group internally collects extended thread information
 	AggregateThread
 )
-
-type GoDebug uint8
 
 // Iterator is an for range iterator over T
 type GoErrorIterator interface {

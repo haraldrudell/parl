@@ -40,14 +40,14 @@ type BTreeMap[K comparable, V any] struct {
 // NewBTreeMap returns a mapping whose values are provided in order
 //   - btree.Ordered does not include ~uintptr. For other ordered V, use [NewBTreeMapAny]
 func NewBTreeMap[K comparable, V btree.Ordered](fieldp ...*BTreeMap[K, V]) (orderedMap *BTreeMap[K, V]) {
-	return newBTreeMap[K, V](btree.NewOrderedG[V](BtreeDegree), fieldp...)
+	return newBTreeMap(btree.NewOrderedG[V](BtreeDegree), fieldp...)
 }
 
 // NewBTreeMapAny returns a mapping whose values are provided in custom order
 //   - supports uintptr. If using default ordered V not uintptr, use [NewBTreeMap]
 func NewBTreeMapAny[K comparable, V any](less btree.LessFunc[V], fieldp ...*BTreeMap[K, V]) (orderedMap *BTreeMap[K, V]) {
 	parl.NilPanic("less", less)
-	return newBTreeMap[K, V](btree.NewG[V](BtreeDegree, less), fieldp...)
+	return newBTreeMap(btree.NewG(BtreeDegree, less), fieldp...)
 }
 
 // NewBTreeMapAny returns a mapping whose values are provided in custom order
@@ -83,7 +83,7 @@ func newBTreeMap[K comparable, V any](tree *btree.BTreeG[V], fieldp ...*BTreeMap
 	}
 
 	// initialize all fields
-	newMap[K, V](&orderedMap.map2)
+	newMap(&orderedMap.map2)
 	orderedMap.tree = tree
 
 	return

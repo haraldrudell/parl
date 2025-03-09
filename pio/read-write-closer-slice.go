@@ -50,8 +50,18 @@ var _ io.ReadWriteCloser = &ReadWriteCloserSlice{}
 
 // NewReadWriteCloserSlice returns an object that copies from Write to Read
 // and has Close
-func NewReadWriteCloserSlice() (readWriteCloser *ReadWriteCloserSlice) {
-	return &ReadWriteCloserSlice{}
+func NewReadWriteCloserSlice(fieldp ...*ReadWriteCloserSlice) (readWriteCloser *ReadWriteCloserSlice) {
+
+	if len(fieldp) > 0 {
+		readWriteCloser = fieldp[0]
+	}
+	if readWriteCloser == nil {
+		readWriteCloser = &ReadWriteCloserSlice{}
+	} else {
+		*readWriteCloser = ReadWriteCloserSlice{}
+	}
+
+	return
 }
 
 // Write copies data directly to Reader buffer or to intermediate data slice

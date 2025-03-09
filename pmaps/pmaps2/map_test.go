@@ -58,7 +58,7 @@ func TestMap(t *testing.T) {
 	}
 
 	// Clone should return duplicate
-	m2 = m.Clone()
+	m2 = m.Clone2()
 	if m2.Length() != expLength {
 		t.Errorf("Length m2 %d exp %d", m2.Length(), expLength)
 	}

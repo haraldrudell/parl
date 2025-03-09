@@ -22,8 +22,17 @@ type Averager3[T constraints.Integer] struct {
 }
 
 // NewAverager3 returns an calculator for last, average and max values.
-func NewAverager3[T constraints.Integer]() (averager *Averager3[T]) {
-	averager = &Averager3[T]{}
+func NewAverager3[T constraints.Integer](fieldp ...*Averager3[T]) (averager *Averager3[T]) {
+
+	if len(fieldp) > 0 {
+		averager = fieldp[0]
+	}
+	if averager == nil {
+		averager = &Averager3[T]{}
+	} else {
+		*averager = Averager3[T]{}
+	}
+
 	NewAverager(&averager.Averager)
 	return
 }

@@ -100,7 +100,7 @@ func (m *ThreadSafeMap[K, V]) Put(key K, value V) { m.goMap[key] = value }
 func (m *ThreadSafeMap[K, V]) Delete(key K, useZeroValue ...parli.DeleteMethod) {
 
 	// if doZero is not present and true, regular map delete
-	if len(useZeroValue) == 0 || useZeroValue[0] != parli.SetZeroValue {
+	if len(useZeroValue) == 0 || useZeroValue[0] != parli.MapDeleteWithZeroValue {
 		delete(m.goMap, key)
 		return // non-zero-value delete
 	}

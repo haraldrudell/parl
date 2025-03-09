@@ -34,7 +34,7 @@ func NewOrderedMap[K comparable, V btree.Ordered](fieldp ...*OrderedMap[K, V]) (
 	}
 
 	// initialize all fields
-	newOrderedMapFunc[K, V](&orderedMap.orderedMapFunc)
+	newOrderedMapFunc(&orderedMap.orderedMapFunc)
 
 	return
 }
@@ -51,7 +51,7 @@ func NewOrderedMapUintptr[K comparable, V ~uintptr](fieldp ...*OrderedMap[K, V])
 	}
 
 	// initialize all fields
-	newOrderedMapFuncUintptr[K, V](LessOrdered[V], &orderedMap.orderedMapFunc)
+	newOrderedMapFuncUintptr(LessOrdered[V], &orderedMap.orderedMapFunc)
 
 	return
 }

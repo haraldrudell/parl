@@ -39,7 +39,7 @@ func NewFunctionIterator[T any](
 		panic(cyclebreaker.NilError("iteratorFunction"))
 	}
 	f := &Function[T]{iteratorFunction: iteratorFunction}
-	f.BaseIterator = NewBaseIterator[T](f.iteratorAction, asyncCancel...)
+	f.BaseIterator = NewBaseIterator(f.iteratorAction, asyncCancel...)
 	return f
 }
 

@@ -7,6 +7,7 @@ package omaps
 
 import (
 	"github.com/google/btree"
+	"github.com/haraldrudell/parl/parli"
 )
 
 // OrderedMapFunc is a mapping whose values are provided in custom order
@@ -26,6 +27,9 @@ type OrderedMapFunc[K comparable, V any] struct {
 	//   - — a equals b must not return true
 	less btree.LessFunc[V]
 }
+
+// OrderedMapFunc is parli.OrderedMapFunc
+var _ parli.ValueOrderedMap[int, string] = &OrderedMapFunc[int, string]{}
 
 // NewOrderedMapFunc returns a mapping whose values are provided in custom order.
 //   - less(a, b) implements sort order and returns:
@@ -47,7 +51,7 @@ func NewOrderedMapFunc[K comparable, V any](
 	}
 
 	// initialize all fields
-	newBTreeMap2Any[K, V](&orderedMap.btreeMap, less)
+	newBTreeMap2Any(&orderedMap.btreeMap, less)
 	orderedMap.less = less
 
 	return
@@ -60,7 +64,13 @@ func (m *OrderedMapFunc[K, V]) Put(key K, value V) {
 
 // Clone returns a shallow clone of the map
 //   - clone is done by ranging all keys
-func (m *OrderedMapFunc[K, V]) Clone(goMap ...*map[K]V) (clone *OrderedMapFunc[K, V]) {
+func (m *OrderedMapFunc[K, V]) Clone(goMap ...*map[K]V) (clone parli.ValueOrderedMap[K, V]) {
+	return m.Clone2(goMap...)
+}
+
+// Clone2 returns a shallow clone of the map
+//   - clone is done by ranging all keys
+func (m *OrderedMapFunc[K, V]) Clone2(goMap ...*map[K]V) (clone *OrderedMapFunc[K, V]) {
 
 	// clone to Go map case
 	if len(goMap) > 0 {

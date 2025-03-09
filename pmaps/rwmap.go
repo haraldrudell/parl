@@ -36,6 +36,9 @@ type RWMap[K comparable, V any] struct {
 	threadSafeMap[K, V]
 }
 
+// RWMap is parli.ThreadSafeMap
+var _ parli.ThreadSafeMap[int, string] = &RWMap[int, string]{}
+
 // NewRWMap returns a thread-safe map implementation as interface
 func NewRWMap[K comparable, V any]() (rwMap parli.ThreadSafeMap[K, V]) {
 	return NewRWMap2[K, V]()
@@ -53,7 +56,7 @@ func NewRWMap2[K comparable, V any](fieldp ...*RWMap[K, V]) (rwMap *RWMap[K, V])
 	}
 
 	// initialize all fields
-	newThreadSafeMap[K, V](&rwMap.threadSafeMap)
+	newThreadSafeMap(&rwMap.threadSafeMap)
 
 	return
 }
