@@ -983,8 +983,12 @@ func (s *AwaitableSlice[T]) transferCached() {
 
 // postGet relinquishes outputLock and
 // initializes eventual update of DataWaitCh and EmptyCh
-//   - gotValue: true if the Get GetSlice GetAll operation retrieved a value
+//   - gotValue: true if the Get GetSlice GetAll Read operation retrieved a value
+//   - — on true, if queue wsn’t checked, queue has to be checked
 //   - checkedQueue: true if queueLock data was checked
+//   - —
+//   - expensive action is taken on gotValue true, checkedQueue false
+//     and output empty
 //   - postGet aggregates deferred actions to reduce latency
 //   - postGet is invoked while holding outputLock
 func (s *AwaitableSlice[T]) postGet(gotValue, checkedQueue *bool) {
@@ -1076,19 +1080,20 @@ func (s *AwaitableSlice[T]) copyToSlice(src, dst *[]T, np *int) (isDone bool) {
 
 	// copy if anything to copy
 	var d = *dst
-	var nCopy = copy(d, *src)
+	var sc = *src
+	var nCopy = copy(d, sc)
 	if nCopy == 0 {
 		return // nothing to copy: isDone false
 	}
+	// items were copied
 
-	// update n and *dst
+	// update n *src *dst isDone
 	*np += nCopy
-	if isDone = len(d) == nCopy; isDone {
-		return // Read complete return: isDOne true
-	}
+	*src = sc[nCopy:]
 	*dst = d[nCopy:]
+	isDone = len(d) == nCopy
 
-	return // more buffer available: isDone false
+	return // bytes were copied return
 }
 
 const (

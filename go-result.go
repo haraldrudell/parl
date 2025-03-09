@@ -144,7 +144,7 @@ func (g GoResult) Done(errp *error) {
 //     Otherwise, wait for number provided to new-function
 //   - — if consumer uses Remaining and adds may be zero,
 //     the output from Remaining must be provided to ReceiveError.
-//   - errp: may be nil
+//   - errp: may be [parl.NoErrp] or nil
 //   - ReceiveError makes a goroutine:
 //   - — awaitable and
 //   - — able to return a fatal error

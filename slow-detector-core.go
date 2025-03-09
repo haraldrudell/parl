@@ -12,23 +12,24 @@ import (
 )
 
 // SlowDetectorCore measures latency via Start-Stop invocations
-//   - Thread-Safe and multi-threaded, parallel invocations
-//   - Separate thread measures time of non-returning, hung invocations
+//   - a thread measures time of non-returning, hung invocations
 type SlowDetectorCore struct {
 	// slowID is unique opaque identifier [constraints.Ordered] typically integral
 	//	- used as map key
 	ID slowID
-	// callback receives reports for the slowest-to-date invocation
-	// and non-return reports every minute
-	callback SlowReporter
-	// thread watches non-returning invocations
-	//	- may be a shared object so must be pointer
-	thread *SlowDetectorThread
-	//SlowDetectorInvocationEnder
-	endr ender
 	// reportReceiver receives reports for the slowest-to-date invocation
 	// and non-return reports every minute
 	reportReceiver SlowReporter
+	// thread watches non-returning invocations
+	//	- may be a shared object so must be pointer
+	thread *SlowDetectorThread
+	// endr is provided to [NewSlowDetectorInvocation]
+	//	- it provides client methods Duration Report Stop
+	//	- it is privatee struct delegating those methods to this SlowDetectorCore
+	//	- implements [SlowDetectorIf] SlowDetectorInvocationEnder
+	endr ender
+
+	// thread-safe field after new-function
 
 	// max holds the minimum value to produce slow-invocation report
 	max AtomicMax[time.Duration]
@@ -44,10 +45,13 @@ type SlowDetectorCore struct {
 //   - callback: receives offending slow-detector invocations
 //   - slowTyp configures whether the support-thread is shared
 //   - goGen is used for a possible deferred thread-launch
-//   - optional values are:
+//   - nonReturnPeriod is one or two values
 //   - — nonReturnPeriod: how often non-returning invocations are reported, default once per minute
 //   - — minimum slowness duration that is being reported, default 100 ms
-func NewSlowDetectorCore(fieldp *SlowDetectorCore, reportReceiver SlowReporter, slowTyp SlowType, goGen GoGen, nonReturnPeriod ...time.Duration) (slowDetector *SlowDetectorCore) {
+func NewSlowDetectorCore(
+	fieldp *SlowDetectorCore, reportReceiver SlowReporter, slowTyp SlowType,
+	goGen GoGen, nonReturnPeriod ...time.Duration,
+) (slowDetector *SlowDetectorCore) {
 	NilPanic("reportReceiver", reportReceiver)
 
 	if fieldp != nil {
@@ -73,10 +77,10 @@ func NewSlowDetectorCore(fieldp *SlowDetectorCore, reportReceiver SlowReporter, 
 	}
 
 	*slowDetector = SlowDetectorCore{
-		ID:       slowIDGenerator.ID(),
-		callback: reportReceiver,
-		thread:   NewSlowDetectorThread(slowTyp, nonReturnPeriod0, goGen),
-		average:  *ptime.NewAverager[time.Duration](),
+		ID:             slowIDGenerator.ID(),
+		reportReceiver: reportReceiver,
+		thread:         NewSlowDetectorThread(slowTyp, nonReturnPeriod0, goGen),
+		average:        *ptime.NewAverager[time.Duration](),
 	}
 	NewAtomicMaxp(&slowDetector.max, minReportedDuration)
 	slowDetector.endr.sdc = slowDetector

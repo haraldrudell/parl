@@ -14,18 +14,14 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-const (
-	averagerDefaultPeriod = time.Second
-	averagerDefaultCount  = 10
-)
-
 // Averager is a container for averaging integer values providing perioding and history.
-//   - maxCount is the maximum interval over which average is calculated
+//   - maxCount is the maximum interval over which average is calculated 1…
 //   - average is the average value of provided datapoints during all periods
 //   - because averaging is over 10 or many periods, the average will change slowly
 type Averager[T constraints.Integer] struct {
 	// period provides linear interval-numbering from a time.Time timestamp
-	period   Period
+	period Period
+	//	- for initialized Averager, maxCount is >= 2 minMaxCount
 	maxCount int
 
 	sliceLock sync.RWMutex
@@ -41,12 +37,14 @@ type Averager[T constraints.Integer] struct {
 //   - interval-length is 1 s
 //   - averaging over 10 intervals
 func NewAverager[T constraints.Integer](fieldp ...*Averager[T]) (averager *Averager[T]) {
+
 	if len(fieldp) > 0 {
 		averager = fieldp[0]
 	}
 	if averager == nil {
 		averager = &Averager[T]{}
 	}
+
 	*averager = Averager[T]{
 		maxCount: averagerDefaultCount,
 	}
@@ -55,19 +53,27 @@ func NewAverager[T constraints.Integer](fieldp ...*Averager[T]) (averager *Avera
 }
 
 // NewAverager2 returns an object that calculates average over a number of interval periods.
-//   - period 0 means default 1 s interval-length
-//   - periodCount 0 means averaging over 10 intervals
+//   - period 0: means default 1 s interval-length
+//   - — period cannot be less than 1 ns
+//   - periodCount 0: means default averaging over default 10 intervals
+//   - periodCount >=2: the number of periods to average over
+//   - periodCount cannot be 1 or negative
 func NewAverager2[T constraints.Integer](period time.Duration, periodCount int) (averager *Averager[T]) {
+
+	// get period
 	if period == 0 {
 		period = averagerDefaultPeriod
 	} else if period < 1 {
-		perrors.ErrorfPF("period cannot be less than 1 ns: %s", period)
+		panic(perrors.ErrorfPF("period cannot be less than 1 ns: %s", period))
 	}
+
+	// get periodCount
 	if periodCount == 0 {
 		periodCount = averagerDefaultCount
-	} else if periodCount < 2 {
-		perrors.ErrorfPF("periodCount cannot be less than 2: %d", periodCount)
+	} else if periodCount < minMaxCount {
+		panic(perrors.ErrorfPF("periodCount cannot be less than 2: %d", periodCount))
 	}
+
 	averager = &Averager[T]{
 		maxCount: periodCount,
 	}
@@ -79,6 +85,9 @@ func NewAverager2[T constraints.Integer](period time.Duration, periodCount int) 
 //   - value is the sample value
 //   - t is the sample time, default time.Now()
 func (a *Averager[T]) Add(value T, t ...time.Time) {
+	if a.maxCount < minMaxCount {
+		panic(perrors.NewPF("uninitialized Averager"))
+	}
 	if interval := a.getCurrent(a.period.Index(t...)); interval != nil {
 		interval.Add(float64(value))
 	}
@@ -89,6 +98,9 @@ func (a *Averager[T]) Add(value T, t ...time.Time) {
 //   - if sample count aggregated across the slice zero, average is zero
 //   - count is number of values making up the average
 func (a *Averager[T]) Average(t ...time.Time) (average float64, count uint64) {
+	if a.maxCount < minMaxCount {
+		panic(perrors.NewPF("uninitialized Averager"))
+	}
 
 	// invoking getCurrent ensure periods are updated
 	//	- if no recent datapoints were provided, the slice may contain old values
@@ -196,3 +208,12 @@ func (a *Averager[T]) getLastInterval() (interval *AverageInterval) {
 
 	return
 }
+
+const (
+	// default period time
+	averagerDefaultPeriod = time.Second
+	// default number of periods no average over
+	averagerDefaultCount = 10
+	// cannot be less than 2 periods
+	minMaxCount = 2
+)

@@ -20,6 +20,16 @@ import (
 //   - [time.Now] on macOS is μs precision
 type Epoch int64
 
+// EpochZeroValue is the zero-value for Epoch
+//   - the value of an unitialized Epoch field
+//   - corresponds to January 1, 1970 UTC
+var EpochZeroValue Epoch
+
+// EpochZeroValueTime is the [Epoch.Time] for Epoch zero-value
+//   - the Time value returned by an unitialized Epoch field
+//   - corresponds to January 1, 1970 UTC
+var EpochZeroValueTime = EpochZeroValue.Time()
+
 // EpochNow translates a time value to a 64-bit integral value that can be
 // stored with atomic access in [Atomic64[Epoch]]
 //   - t present: a time in [time.Local] or [time.UTC] that can be zero-value

@@ -13,6 +13,8 @@ import (
 )
 
 const (
+	// fraction subdivides a period
+	// maximum bits are used: 2^63 is 100% of period
 	FractionScale = uint64(1) << 63
 )
 
@@ -24,7 +26,7 @@ type PeriodIndex uint64
 // Period provides real-time based fixed-length interval perioding ordered using a uint64 zero-based index.
 //   - Period provides first period index and fractional usage of the first period
 type Period struct {
-	// interval is ns duration of  period
+	// interval is ns duration of a period
 	interval time.Duration
 	// period0 is the numeric value for the first period
 	//	- the exact number is relative to a process-wide timestamp
@@ -37,13 +39,21 @@ type Period struct {
 }
 
 // NewPeriod returns a new numbered-interval sequence.
+//   - interval: 1ns to 24 hours
 func NewPeriod(interval time.Duration, fieldp ...*Period) (period *Period) {
+	if interval == 0 {
+		panic(perrors.NewPF("interval cannot be zero"))
+	} else if interval > 24*time.Hour {
+		panic(perrors.NewPF("interval cannot be longer than 24 hours"))
+	}
+
 	if len(fieldp) > 0 {
 		period = fieldp[0]
 	}
 	if period == nil {
 		period = &Period{}
 	}
+
 	var t = time.Now()
 	*period = Period{
 		interval: interval,
@@ -61,10 +71,12 @@ func NewPeriod(interval time.Duration, fieldp ...*Period) (period *Period) {
 }
 
 // Index returns the index number for the current period or the period at time t
-//   - index is a number p.period0 or larger
+//   - t: optional timestamp, default now
+//   - — timestamp cannot be prior to [NewPeriod] invocation
+//   - index: number p.period0 or larger
 func (p *Period) Index(t ...time.Time) (index PeriodIndex) {
-	if p.interval <= 0 {
-		panic(perrors.ErrorfPF("period must be positive: %s", Duration(p.interval)))
+	if p.interval == 0 {
+		panic(perrors.NewPF("uninitialized period"))
 	}
 
 	// get the time for which to get index
@@ -75,6 +87,7 @@ func (p *Period) Index(t ...time.Time) (index PeriodIndex) {
 	if t0.IsZero() {
 		t0 = time.Now()
 	}
+
 	if t0.Before(tPeriodEpoch) {
 		panic(perrors.ErrorfPF("time before epoch: %s %s", t0.Format(cyclebreaker.Rfc3339ns), tPeriodEpoch.Format(cyclebreaker.Rfc3339ns)))
 	}
@@ -91,11 +104,15 @@ func (p *Period) Index(t ...time.Time) (index PeriodIndex) {
 }
 
 // Since returns the number of periods difference that now is greater than before
-//   - periods is >= 0
-//   - now and before must be at least p.period0
-//   - before cannot be greater than now
+//   - now: a later index, cannot be less than period0 or before
+//   - before: an earlier index, cannot be less than period0
+//   - periods: >= 0
+//   - —
+//   - now and before are obtained from [Period.Index] or [Period.Sub]
 func (p *Period) Since(now, before PeriodIndex) (periods int) {
-	if before < p.period0 {
+	if p.interval == 0 {
+		panic(perrors.NewPF("uninitialized period"))
+	} else if before < p.period0 {
 		panic(perrors.ErrorfPF("Period.Sub with before less than period0: %d now: %d period0: %d",
 			before, now, p.period0))
 	} else if now < before {
@@ -108,31 +125,48 @@ func (p *Period) Since(now, before PeriodIndex) (periods int) {
 	return
 }
 
-// Sub returns a past period index by n intervals
-//   - periodIndex will not be less than p.period0
-//   - now cannot be less than p.period0
+// Sub returns a previous period index by n intervals
+//   - now: cannot be less than period0
+//   - n: cannot be negative
+//   - periodIndex: will not be less than period0
+//   - —
+//   - now is obtained from [Period.Index] or [Period.Sub]
 func (p *Period) Sub(now PeriodIndex, n int) (periodIndex PeriodIndex) {
-	if now < p.period0 {
+	if p.interval == 0 {
+		panic(perrors.NewPF("uninitialized period"))
+	} else if now < p.period0 {
 		panic(perrors.ErrorfPF("Period.Sub with now less than period0: %d %d", now, p.period0))
-	} else if n == 0 {
-		return // nothing to do return
 	} else if n < 0 {
 		panic(perrors.ErrorfPF("Period.Sub with n negative: %d", n))
-	} else if maxN := int(now - p.period0); n > maxN {
-		n = maxN
 	}
 
+	// zero periods
+	if n == 0 {
+		periodIndex = now
+		return // nothing to do return
+	}
+
+	// maxN is the n value that returns period0
+	var maxN = int(now - p.period0)
+	if n > maxN {
+		n = maxN
+	}
 	periodIndex = now - PeriodIndex(n)
 
 	return
 }
 
-// Available returns the correct number of slice entries to incldue now
-//   - after the inital few periods, returns cap
-//   - possible values 1… but no greater than cap
-//   - now cannot be less than period0
+// Available returns the correct number of slice entries to include now
+//   - now: cannot be less than period0
+//   - periods: length of range from period0 to now, but no larger than cap
+//   - — value: 1…cap
+//   - — after the inital few periods, always returns cap
+//   - —
+//   - now is obtained from [Period.Index] or [Period.Sub]
 func (p *Period) Available(now PeriodIndex, cap int) (periods int) {
-	if now < p.period0 {
+	if p.interval == 0 {
+		panic(perrors.NewPF("uninitialized period"))
+	} else if now < p.period0 {
 		panic(perrors.ErrorfPF("Period.Sub with now less than period0: %d %d", now, p.period0))
 	}
 	if periods = int(now-p.period0) + 1; periods > cap {

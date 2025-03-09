@@ -19,13 +19,22 @@ type CachedCounters struct {
 }
 
 // NewCachedCounters returns a cache of parl.CounterID reducing map contention
-func NewCachedCounters(counterStore parl.CounterStore) (cachedCounters *CachedCounters) {
-	return &CachedCounters{
+func NewCachedCounters(counterStore parl.CounterStore, fieldp ...*CachedCounters) (cachedCounters *CachedCounters) {
+
+	if len(fieldp) > 0 {
+		cachedCounters = fieldp[0]
+	}
+	if cachedCounters == nil {
+		cachedCounters = &CachedCounters{}
+	}
+
+	*cachedCounters = CachedCounters{
 		counterStore:      counterStore,
 		counterValues:     make(map[parl.CounterID]parl.CounterValues),
 		rateCounterValues: make(map[parl.CounterID]parl.RateCounterValues),
 		datapointValue:    make(map[parl.CounterID]parl.DatapointValue),
 	}
+	return
 }
 
 // CounterValues never returns nil

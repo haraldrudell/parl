@@ -15,7 +15,7 @@ func (g GoDebug) String() (s string) {
 	return goDebugSet.StringT(g)
 }
 
-// set providing striung values for GoDebug
+// set providing string values for GoDebug
 var goDebugSet = sets.NewSet[GoDebug]([]sets.SetElement[GoDebug]{
 	{ValueV: NoDebug, Name: "NoDebug"},
 	{ValueV: DebugPrint, Name: "DebugPrint"},
