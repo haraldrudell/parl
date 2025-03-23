@@ -45,12 +45,12 @@ func KeystrokesThread(silent bool, errorSink parl.ErrorSink1, stdin parl.Closabl
 	// if a panic is recovered, or err holds an error, both are printed to standard error
 	defer parl.Recover(func() parl.DA { return parl.A() }, &err, errorSink)
 	// ensure string-channel closes on exit without discarding any input
-	defer stdin.EmptyCh()
+	defer stdin.Close()
 
 	var isStdinReaderError atomic.Bool
 	// scanner splits input into lines
 	var scanner = bufio.NewScanner(NewStdinReader(errorSink, &isStdinReaderError))
-	var stdinClosedCh = stdin.EmptyCh(parl.CloseAwaiter)
+	var stdinClosedCh = stdin.EmptyCh()
 
 	// blocks here
 	for scanner.Scan() {

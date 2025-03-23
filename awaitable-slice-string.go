@@ -13,10 +13,8 @@ import (
 )
 
 func AwaitableSliceString[T any](a *AwaitableSlice[T]) (s string) {
-	defer a.outputLock.Unlock()
-	defer a.queueLock.Unlock()
-	a.outputLock.Lock()
-	a.queueLock.Lock()
+	defer a.outputLock.Lock().Unlock()
+	defer a.queueLock.Lock().Unlock()
 
 	var sL []string
 
@@ -24,12 +22,12 @@ func AwaitableSliceString[T any](a *AwaitableSlice[T]) (s string) {
 	sL = append(sL, Sprintf(
 		"hasData: %t q %s slices %s loc %t cached %d",
 		// “hasData: false”
-		a.hasData.Load(),
+		a.hasDataBits.Load(),
 		// queue: “q 0(10)”
 		printSlice(a.queue),
 		// slices, slices0, isLocalSlice, cachedInput
 		// “slices 0(cap0/0 tot0 offs-1) loc false cached 10”
-		printSlice2Away(a.slices, a.slices0), a.isLocalSlice, cap(a.cachedInput),
+		printSlice2Away(a.qSos, a.qSos0), a.isLocalSlice, cap(a.cachedInput),
 	))
 
 	// behind outputLock
@@ -43,7 +41,7 @@ func AwaitableSliceString[T any](a *AwaitableSlice[T]) (s string) {
 	))
 
 	// data Wait
-	var isEmptyWait = a.isEmptyWait.IsClosed()
+	var isEmptyWait = a.isCloseInvoked.Load()
 	var isEmpty bool
 	if isEmptyWait {
 		isEmpty = a.isEmpty.IsClosed()

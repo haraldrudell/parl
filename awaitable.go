@@ -113,7 +113,7 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 	}
 
 	// pick very first thread as winner
-	//	- Add is faster that CAS
+	//	- Add is faster than CAS
 	//	- winner thread is 8.9 ns (read 0.4955 ns + successful CAS 8.419 ns)
 	//	- losing thread is 21.5 ns (read 0.4955 ns + failing CAS 21 ns)
 	//	- subsequent thread is 0.4955 ns
@@ -139,9 +139,10 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 
 	// execute close
 	//	- if the channel wasn’t read, its close can be deferred
+	//	- isGet checks closeWinner which is already set
 	if a.isGet.Load() {
 		// the channel was read
-		//	- we must close any channel that is not fake
+		//	- must close any channel that is not fake
 		if ch := *a.ch.Get(makeCh, a); ch != fakeCh {
 			// single-thread: ≈2 ns
 			//	- unshielded parallel contention makes channel read an extremely slow 916 ns
@@ -155,6 +156,9 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 	a.isClosed.Store(true)
 	// release any waiting loser threads
 	var wg = a.wg.GetFunc(makeWaitGroup)
+	// [sync.WaitGroup.Done] Pike’s best invention:
+	//	- no inversion of control
+	//	- lock-free to releasing thread
 	wg.Done()
 
 	didClose = true

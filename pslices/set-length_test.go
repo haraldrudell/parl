@@ -8,6 +8,8 @@ package pslices
 import (
 	"slices"
 	"testing"
+
+	"github.com/haraldrudell/parl/pslices/pslib"
 )
 
 func TestSetLength(t *testing.T) {
@@ -33,7 +35,7 @@ func TestSetLength(t *testing.T) {
 	// noZero should work
 	slice0 = slices.Clone(slice1)
 	slice = slice0
-	SetLength(&slice, 0, NoZeroOut)
+	SetLength(&slice, 0, pslib.NoZeroOut)
 	if !slices.Equal(slice0, slice1) {
 		t.Errorf("SetLength 1 for nil: %v exp%v", slice, slice1)
 	}

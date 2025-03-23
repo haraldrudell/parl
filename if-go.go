@@ -224,7 +224,7 @@ type GoGroup interface {
 	//	var goErrors = goGroup.GoError()
 	//	for goError := goErrors.Init(); goErrors.Condition(&goError); {
 	//	  …
-	//	var goEndCh = goErrors.EmptyCh(parl.CloseAwaiter)
+	//	var goEndCh = goErrors.EmptyCh()
 	//	for {
 	//	  select {
 	//	  case <-goEndCh:
@@ -340,7 +340,7 @@ type SubGroup interface {
 	//	var goErrors = goGroup.GoError()
 	//	for goError := goErrors.Init(); goErrors.Condition(&goError); {
 	//	  …
-	//	var goEndCh = goErrors.EmptyCh(parl.CloseAwaiter)
+	//	var goEndCh = goErrors.EmptyCh()
 	//	for {
 	//	  select {
 	//	  case <-goEndCh:

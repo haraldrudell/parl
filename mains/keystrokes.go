@@ -103,4 +103,4 @@ func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...SilentType) (ke
 func (k *Keystrokes) StringSource() (stringSource parl.ClosableSource1[string]) { return &k.stdin }
 
 // CloseNow closes the string-sending channel discarding any pending characters
-func (k *Keystrokes) CloseNow(errp *error) { k.stdin.EmptyCh() }
+func (k *Keystrokes) CloseNow(errp *error) { k.stdin.Close() }

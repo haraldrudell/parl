@@ -5,6 +5,8 @@ ISC License
 
 package pslices
 
+import "github.com/haraldrudell/parl/pslices/pslib"
+
 // SetLength adjusts the lenght of *slicep extending with append if necessary
 //   - slicep: pointer to slice whose length is adjusted
 //   - newLength : the length of *slicep on return
@@ -12,7 +14,7 @@ package pslices
 //   - noZero missing or DoZeroOut: elements becoming unused are set to zero-value
 //   - — if element contain pointers, such elements are a temporary memory leak
 //   - noZero NoZeroOut: no zero-out of elements
-func SetLength[E any](slicep *[]E, newLength int, noZero ...bool) {
+func SetLength[E any](slicep *[]E, newLength int, noZero ...pslib.ZeroOut) {
 
 	s := *slicep
 	length := len(s)
@@ -22,7 +24,7 @@ func SetLength[E any](slicep *[]E, newLength int, noZero ...bool) {
 
 	doZero := true
 	if len(noZero) > 0 {
-		doZero = !noZero[0]
+		doZero = noZero[0] != pslib.NoZeroOut
 	}
 
 	// shortening slice case

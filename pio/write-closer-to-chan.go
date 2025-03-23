@@ -31,7 +31,7 @@ func (wc *WriteCloserToChan) Write(p []byte) (n int, err error) {
 	return
 }
 func (wc *WriteCloserToChan) Close() (err error) {
-	wc.ch.EmptyCh()
+	wc.ch.Close()
 	return
 }
 

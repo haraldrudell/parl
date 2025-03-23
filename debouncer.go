@@ -199,7 +199,7 @@ func (d *debouncerIn[T]) inputThread() {
 	defer Recover(func() DA { return A() }, NoErrp, d.errorSink)
 	defer d.maxDelayTimer.Stop()
 	defer d.debounceTimer.Stop()
-	defer d.buffer.EmptyCh() // close of buffer causes output thread to eventually exit
+	defer d.buffer.Close() // close of buffer causes output thread to eventually exit
 
 	// debounce timer was started
 	var debounceTimerRunning bool

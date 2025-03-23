@@ -19,7 +19,7 @@ func AwaitValue[T any](stream Source1[T]) (value T, hasValue bool) {
 	//	- nil if not closable
 	var endCh AwaitableCh
 	if closable, isClosable := stream.(Closable[T]); isClosable {
-		endCh = closable.EmptyCh(CloseAwaiter)
+		endCh = closable.EmptyCh()
 	}
 
 	// loop until value or closed
@@ -42,7 +42,7 @@ func AwaitValue[T any](stream Source1[T]) (value T, hasValue bool) {
 //   - IsClosed wraps a 6-line read into a single-value boolean expression
 func IsClosed[T any](closable Closable[T]) (isClosed bool) {
 	select {
-	case <-closable.EmptyCh(CloseAwaiter):
+	case <-closable.EmptyCh():
 		isClosed = true
 	default:
 	}

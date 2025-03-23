@@ -10,23 +10,15 @@ import (
 	"testing"
 )
 
-// There are three outcomes for a slice-away append:
-//   - 1 realloc: the result is larger than the underlying array
-//   - 2 append: appending fits slicedAway capacity
-//   - 3 copy: appending to SlicedAway fits the underlying array but
-//     not slicedAway capacity
-
-func TestSliceAwayAppend_Realloc(t *testing.T) {
+func TestSliceAwayAppend1_Realloc(t *testing.T) {
 	//t.Error("logging on")
 	var (
 		// unsliced slice0
-		slice00 = []int{1, 2, 3}
+		slice00 = []int{1}
 		// values to append 4 5 6
-		values = []int{4, 5, 6}
-		// slice-away index for 1-element slicedAway slice
-		slicedAwayIndex = 1
+		value = 4
 		// expected slice0 slicedAway result: 2, 4, 5, 6
-		expSlice0 = append([]int{slice00[slicedAwayIndex]}, values...)
+		expSlice0 = append(slices.Clone(slice00), value)
 	)
 
 	var (
@@ -35,11 +27,11 @@ func TestSliceAwayAppend_Realloc(t *testing.T) {
 	)
 
 	var slice0 = slice00
-	var slicedAway = slice0[slicedAwayIndex : slicedAwayIndex+1]
-	// before: slice0: [1 2 3] slicedAway: [2] values: [4 5 6]
-	t.Logf("before: slice0: %v slicedAway: %v values: %v", slice0, slicedAway, values)
-	SliceAwayAppend(&slicedAway, &slice0, values)
-	// after: slice0: [2 4 5 6] slicedAway: [2 4 5 6]
+	var slicedAway = slice0
+	// before: slice0: [1] slicedAway: [1] value: 4
+	t.Logf("before: slice0: %v slicedAway: %v value: %v", slice0, slicedAway, value)
+	SliceAwayAppend1(&slicedAway, &slice0, value)
+	// after: slice0: [1 4] slicedAway: [1 4]
 	t.Logf("after: slice0: %v slicedAway: %v", slice0, slicedAway)
 
 	// slicedAway value should match
@@ -67,19 +59,19 @@ func TestSliceAwayAppend_Realloc(t *testing.T) {
 	}
 }
 
-func TestSliceAwayAppend_Append(t *testing.T) {
+func TestSliceAwayAppend1_Append(t *testing.T) {
 	//t.Error("logging on")
 	var (
 		// a slice with all values known 1 2 3 4
 		slice00 = []int{1, 2, 3, 4}
 		// values to append 5
-		values = []int{5}
+		value = 5
 		// slice-away index for 1-element slicedAway slice
 		sliceAwayIndex = 1
 		// 1 2 5 4
-		expSlice0 = append(append(slices.Clone(slice00[:sliceAwayIndex+1]), values...), slice00[sliceAwayIndex+1+len(values):]...)
+		expSlice0 = append(append(slices.Clone(slice00[:sliceAwayIndex+1]), value), slice00[sliceAwayIndex+2:]...)
 		// 2 5
-		expSlicedAway = append([]int{slice00[sliceAwayIndex]}, values...)
+		expSlicedAway = append([]int{slice00[sliceAwayIndex]}, value)
 	)
 
 	var (
@@ -89,9 +81,9 @@ func TestSliceAwayAppend_Append(t *testing.T) {
 
 	var slice0 = slice00
 	var slicedAway = slice0[sliceAwayIndex : sliceAwayIndex+1]
-	// before: slice0: [1 2 3 4] slicedAway: [2] values: [5]
-	t.Logf("before: slice0: %v slicedAway: %v values: %v", slice0, slicedAway, values)
-	SliceAwayAppend(&slicedAway, &slice0, values)
+	// before: slice0: [1 2 3 4] slicedAway: [2] value: 5
+	t.Logf("before: slice0: %v slicedAway: %v value: %v", slice0, slicedAway, value)
+	SliceAwayAppend1(&slicedAway, &slice0, value)
 	// after: slice0: [1 2 5 4] slicedAway: [2 5]
 	t.Logf("after: slice0: %v slicedAway: %v", slice0, slicedAway)
 
@@ -120,42 +112,32 @@ func TestSliceAwayAppend_Append(t *testing.T) {
 	}
 }
 
-func TestSliceAwayAppend_Copy(t *testing.T) {
+func TestSliceAwayAppend1_Copy(t *testing.T) {
 	//t.Error("logging on")
 	// requirements:
-	//	- slicedAway and values should fit slice00
-	//	- slicedAway should be sliced away so far that its capacity cannot
-	//		fit values
-	//	- the last element of slice00 should be untouched
-	//	- the second-to-last element of slice00 should be zeroed out
+	//	- to force a copy while appending a single element,
+	//		slicedAway should be at the end of slice0
+	//	- slicedAway and the appended value should fit slice0
+	//	- the last element of slice0 should be zeroed out,
+	//		therefore slice0 should be at least one longer than
+	//		slicedAway and value
 	//	- slicedAway can be length 1
-	//	- therefore, values must be at least length 2
-	//	- values and slicedAway must be less than the second to last element of slicedAway
-	//	- calc: 2 + 1 < len(slice00) - 2: slice00 is length 5
+	//	- slice0 should then be capacity 3 or more
 	var (
-		// unsliced slice0
-		slice00 = []int{1, 2, 3, 4, 5}
-		// values to append 5
-		values           = []int{6, 7}
-		slicedAwayIndex0 = len(slice00) - 2
-		slicedAwayIndex1 = len(slice00) - 1
-		// 4, 6, 7, 0, 5
-		expSlice0 = append(
-			append(
-				append(
-					// slicedAway
-					slices.Clone(slice00[slicedAwayIndex0:slicedAwayIndex1]),
-					// values
-					values...,
-				),
-				// zero-out
-				0,
-			),
-			// 5
-			slice00[slicedAwayIndex1:]...,
-		)
-		// 3 5
-		expSliceAway = expSlice0[:slicedAwayIndex1-slicedAwayIndex0+len(values)]
+		// slice00: [1, 2, 3]
+		//	- slice00 points to the original slice0 underlying array
+		slice00 = []int{1, 2, 3}
+		// slice0 before: [1, 2, 3]
+		//	- slice0 after: [3, 4, 0]
+		slice0 = slice00
+		// value to append: 4
+		value = 4
+		// slicedAway before: last index of slice0: [3] length 1
+		slicedAway = slice0[2:3]
+		// slice0 after: [3, 4, 0]
+		expSlice0 = []int{slicedAway[0], value, 0}
+		// slicedAway after: [3 4] length 2
+		expSliceAway = []int{slicedAway[0], value}
 	)
 
 	var (
@@ -163,24 +145,28 @@ func TestSliceAwayAppend_Copy(t *testing.T) {
 		isValid bool
 	)
 
-	// re-use slice should work
-	var slice0 = slice00
-	var slicedAway = slice0[slicedAwayIndex0:slicedAwayIndex1]
-	// before: slice0: [1 2 3 4 5] slicedAway: [4] values: [6 7]
-	t.Logf("before: slice0: %v slicedAway: %v values: %v", slice0, slicedAway, values)
-	SliceAwayAppend(&slicedAway, &slice0, values)
-	// after: slice0: [4 6 7 0 5] slicedAway: [4 6 7]
+	// before: slice0: [1 2 3] slicedAway: [3] value: 4
+	t.Logf("before: slice0: %v slicedAway: %v value: %v", slice0, slicedAway, value)
+
+	SliceAwayAppend1(&slicedAway, &slice0, value)
+
+	// after: slice0: [3 4 0] slicedAway: [3 4]
 	t.Logf("after: slice0: %v slicedAway: %v", slice0, slicedAway)
 
 	// slicedAway should match
 	if !slices.Equal(slicedAway, expSliceAway) {
-		t.Errorf("FAIL slicedAway %v exp %v", slicedAway, expSliceAway)
+		t.Errorf("FAIL slicedAway\n%v exp\n%v",
+			slicedAway, expSliceAway,
+		)
 	}
 
 	// slice0 should match
 	if !slices.Equal(slice0, expSlice0) {
-		t.Errorf("FAIL slice0 %v exp %v", slice0, expSlice0)
+		t.Errorf("FAIL slice0\n%v exp\n%v",
+			slice0, expSlice0,
+		)
 	}
+
 	// slice0 and slicedAway should share underlying array
 	offset, isValid = Offset(slice0, slicedAway)
 	_ = offset
@@ -189,6 +175,7 @@ func TestSliceAwayAppend_Copy(t *testing.T) {
 	}
 
 	// slice0 and slice00 should share underlying array
+	//	- otherwise, there has been allocation
 	offset, isValid = Offset(slice0, slice00)
 	_ = offset
 	if !isValid {

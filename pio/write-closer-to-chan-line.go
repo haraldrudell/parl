@@ -73,7 +73,7 @@ func (wc *WriteCloserToChanLine) Close() (err error) {
 		wc.ch.Send(wc.s)
 	}
 
-	wc.ch.EmptyCh()
+	wc.ch.Close()
 	return
 }
 

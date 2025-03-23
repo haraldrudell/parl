@@ -544,7 +544,7 @@ func (g *GoGroup) Internals() (
 	isAggregateThreads = &g.isAggregateThreads
 	setCancelListener = g.goContext.setCancelListener
 	if g.hasErrorChannel {
-		endCh = g.goErrorStream.EmptyCh(parl.CloseAwaiter)
+		endCh = g.goErrorStream.EmptyCh()
 	} else {
 		endCh = g.endCh.Ch()
 	}
@@ -708,7 +708,7 @@ func (g *GoGroup) endGoGroup() {
 
 	// close error channel for GoGroup abnd SubGroup
 	if g.hasErrorChannel {
-		g.goErrorStream.EmptyCh() // close local error channel
+		g.goErrorStream.Close() // close local error channel
 	}
 
 	// mark GoGroup terminated

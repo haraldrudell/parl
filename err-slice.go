@@ -53,20 +53,20 @@ var _ ErrorSink = &ErrSlice{}
 // Error returns the next error value
 //   - hasValue true: err is valid
 //   - hasValue false: the error source is empty
-func (e *ErrSlice) Error() (error, bool) { return e.errs.Get() }
+func (e *ErrSlice) Error() (err error, hasValue bool) { return e.errs.Get() }
 
 // Errors returns a slice of errors or nil
 func (e *ErrSlice) Errors() (errs []error) { return e.errs.GetAll() }
 
 // WaitCh waits for the next error, possibly indefinitely
-//   - a received channel closes on errors available
-//   - the next invocation may return a different channel object
+//   - a received channel that closes whenever errors becoming available
+//   - subsequent invocations may return different channel values
 func (e *ErrSlice) WaitCh() (ch AwaitableCh) { return e.errs.DataWaitCh() }
 
 // EndCh awaits the error source closing:
 //   - the error source must be read to empty
 //   - the error source must be closed by the error-source providing entity
-func (e *ErrSlice) EndCh() (ch AwaitableCh) { return e.errs.EmptyCh(CloseAwaiter) }
+func (e *ErrSlice) EndCh() (ch AwaitableCh) { return e.errs.EmptyCh() }
 
 // AddError is a function to submit non-fatal errors
 func (e *ErrSlice) AddError(err error) { e.errs.Send(err) }
@@ -74,9 +74,11 @@ func (e *ErrSlice) AddError(err error) { e.errs.Send(err) }
 // EndCh awaits the error source closing:
 //   - the error source must be read to empty
 //   - the error source must be closed by the error-source providing entity
-func (e *ErrSlice) EndErrors() { e.errs.EmptyCh() }
+func (e *ErrSlice) EndErrors() { e.errs.Close() }
 
-// AppendErrors collects any errors contained and appends them to errp
+// AppendErrors collects any errors contained in ErrSlice and
+// appends them to errp
+//   - errp: where errors are aggregated to
 func (e *ErrSlice) AppendErrors(errp *error) {
 	for _, err := range e.errs.GetAll() {
 		*errp = perrors.AppendError(*errp, err)

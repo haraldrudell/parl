@@ -108,7 +108,7 @@ func (r *ReadWriteCloserSlice) Write(p []byte) (n int, err error) {
 	}
 
 	// append the rest to data
-	pslices.SliceAwayAppend(&r.data, &r.data0, p, pslices.NoZeroOut)
+	pslices.SliceAwayAppend(&r.data, &r.data0, p, parl.NoZeroOut)
 	n += len(p)
 
 	return // good write return

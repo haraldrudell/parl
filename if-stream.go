@@ -5,7 +5,10 @@ ISC License
 
 package parl
 
-import "iter"
+import (
+	"io"
+	"iter"
+)
 
 //	- sink for values and slices
 //	- closable sink for values and slices
@@ -13,17 +16,6 @@ import "iter"
 //	- source for values and slices with all
 //	- closable source for values and slices
 //	- closable source for values and slices with all
-
-const (
-	// [EmptyCh]: return a channel closing on empty
-	// but do not mark the source as closed
-	CloseAwaiter CloseStrategy = false
-)
-
-// [EmptyCh] doNotInitialize is [NoClose]:
-// return a channel closing on empty
-// but do not mark the source as closed
-type CloseStrategy bool
 
 // Sink is a stream-object receiving values
 //   - no concept of close or drain
@@ -300,9 +292,7 @@ type ClosableSourceSink[T any] interface {
 type Closable[T any] interface {
 	// EmptyCh returns a channel that is closed or closes
 	// upon the stream becoming empty
-	//	- doNotClose missing: the stream is marked as closed
-	//	- doNotClose [CloseAwaiter]: the stream’s close state
-	//		is unaffected. ch is used to await close and drain
+	//	- ch: used to await close and drain
 	//	- EmptyCh always returns the same channel value
 	//	- close state is separate from value flow:
 	//		a closed sink will still receive values.
@@ -310,8 +300,9 @@ type Closable[T any] interface {
 	//	- after a close invocation when the stream is empty,
 	//		the stream is marked as closed.
 	//		Once closed, close-state does not change
-	EmptyCh(doNotClose ...CloseStrategy) (ch AwaitableCh)
+	EmptyCh() (ch AwaitableCh)
 	// IsClosed returns true is EmptyCh was invoked without argument
 	// and the stream was or subsequently became empty
 	IsClosed() (isClosed bool)
+	io.Closer
 }

@@ -11,24 +11,30 @@ import (
 )
 
 // Epoch represents a time value in 64-bit integral type that
-// can be stored in atomic integer like [Atomic64[Epoch]]
-//   - allowable year range is 1678–2261 inclusive
-//   - 250308 defined as Unix epoch with nanosecond precision:
-//     nanoseconds elapsed since January 1, 1970 UTC
+// can be stored in atomic integer like [Atomic64][Epoch]
+//   - nanosecond precision
+//   - can hold [time.Time] values
+//   - — time.Time zero-value allowed
+//   - — allowable year range is 1678–2261 inclusive
+//   - 250322 modified nanosecond 64-bit Unix Epoch
+//   - — nanoseconds elapsed since January 1, 1970 UTC
+//   - — Epoch zero-value represents [time.Time] zero-value
 //   - time package does not have a defined type for Unixnano but uses int64
-//   - epoch is internally modified Unix Epoch with nanosecond precision
-//   - [time.Now] on macOS is μs precision
+//   - 250308 defined as Unix epoch with nanosecond precision
+//   - note: [time.Now] on macOS is μs precision
 type Epoch int64
 
-// EpochZeroValue is the zero-value for Epoch
-//   - the value of an unitialized Epoch field
-//   - corresponds to January 1, 1970 UTC
-var EpochZeroValue Epoch
-
-// EpochZeroValueTime is the [Epoch.Time] for Epoch zero-value
-//   - the Time value returned by an unitialized Epoch field
-//   - corresponds to January 1, 1970 UTC
-var EpochZeroValueTime = EpochZeroValue.Time()
+const (
+	// EpochZeroValue is the zero-value for Epoch
+	//   - the value of an unitialized Epoch field
+	//	- corresonds to [time.Time] zero-value
+	EpochZeroValue Epoch = 0
+	// epoch value representing Unixnano zero-value
+	//   - corresponds to January 1, 1970 UTC
+	epochJan1970UTC Epoch = math.MinInt64
+	// epoch value representing invalid
+	epochInvalid Epoch = math.MinInt64 + 1
+)
 
 // EpochNow translates a time value to a 64-bit integral value that can be
 // stored with atomic access in [Atomic64[Epoch]]
@@ -50,17 +56,26 @@ func EpochNow(t ...time.Time) (epoch Epoch) {
 		t0 = time.Now()
 	}
 
+	// [time.Time] zero value corresponds to EpochZeroValue
 	if t0.IsZero() {
-		epoch = epochZeroTime
+		epoch = EpochZeroValue
 		return // zero value return
 	}
 
+	// [time.Time] out of range becomes epochInvalid
 	if t0.Before(minTime) || t0.After(maxTime) {
 		epoch = epochInvalid
 		return
 	}
 
+	// translate as Unixnano
 	epoch = Epoch(t0.UnixNano())
+
+	// Handle Jan 1 1970 UTC
+	if epoch == 0 {
+		epoch = epochJan1970UTC
+	}
+
 	return
 }
 
@@ -71,8 +86,16 @@ func EpochNow(t ...time.Time) (epoch Epoch) {
 //   - —
 //   - epoch is stable across executable invocations
 func (epoch Epoch) Time() (t time.Time) {
-	if epoch == epochZeroTime || epoch == epochInvalid {
-		return // epoch zero means time.Time{} ie. time.IsZero()
+
+	// cases returning [time.Time] zero-value
+	if epoch == EpochZeroValue || epoch == epochInvalid {
+		return // time.Time{} ie. time.IsZero() return
+	}
+
+	// special case Jan 1 1970 UTC
+	if epoch == epochJan1970UTC {
+		t = time1970 // local time zone
+		return
 	}
 
 	var nsec = int64(epoch) % nanoPerSecond
@@ -83,13 +106,19 @@ func (epoch Epoch) Time() (t time.Time) {
 
 // IsValid returns true if epoch is not zero-time, ie. Epoch(0) corredsponding to time.TIME{} and Time.IsZero
 func (epoch Epoch) IsValid() (isValid bool) {
-	if epoch == epochZeroTime {
+
+	// special Jan 1 1970 is valid
+	if epoch == epochJan1970UTC {
 		isValid = true
 		return
-	} else if epoch == epochInvalid {
+	}
+
+	// special invalid value is not valid
+	if epoch == epochInvalid {
 		return
 	}
-	// get corresponding time value
+
+	// other time values within allowable range are valid
 	var t = epoch.Time()
 	isValid = t.After(minTime) && t.Before(maxTime)
 
@@ -99,10 +128,6 @@ func (epoch Epoch) IsValid() (isValid bool) {
 const (
 	// the number of nanosecond per second 1e9 int64
 	nanoPerSecond = int64(time.Second / time.Nanosecond)
-	// epoch value representing zero time
-	epochZeroTime = Epoch(math.MinInt64)
-	// epoch value representing invalid
-	epochInvalid = Epoch(math.MinInt64 + 1)
 )
 
 var (
@@ -110,6 +135,8 @@ var (
 	minTime = time.Date(1677, 12, 29, 0, 0, 0, 0, time.UTC)
 	// maxTime is the maximum allowed time
 	maxTime = time.Date(2262, 1, 3, 0, 0, 0, 0, time.UTC)
+	// Jan 1 1970 UTC in time.Time format
+	time1970 = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC).Local()
 )
 
 // func (t time.Time) UnixNano() int64

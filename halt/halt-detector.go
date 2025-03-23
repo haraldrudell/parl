@@ -122,7 +122,7 @@ func (h *HaltDetector) Thread(g parl.Go) {
 	var err error
 	defer g.Register().Done(&err)
 	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
-	defer h.ch.EmptyCh()
+	defer h.ch.Close()
 
 	// the currently active interval
 	// avoid panic

@@ -98,7 +98,7 @@ func TestHaltDetector(t *testing.T) {
 	// want to be able to wait with timeout
 	//	- therefore use the source directly
 	goErrorSource = goGroup.GoError()
-	endCh = goErrorSource.EmptyCh(parl.CloseAwaiter)
+	endCh = goErrorSource.EmptyCh()
 	timer = time.NewTimer(goErrorTimeout)
 	defer timer.Stop()
 	for {

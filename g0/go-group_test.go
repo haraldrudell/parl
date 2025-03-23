@@ -219,7 +219,7 @@ func TestGoGroup(t *testing.T) {
 	// AllowTermination for unused GoGroup causes it to terminate
 	goGroup.EnableTermination(parl.AllowTermination)
 	select {
-	case <-goGroupImpl.goErrorStream.EmptyCh(parl.CloseAwaiter):
+	case <-goGroupImpl.goErrorStream.EmptyCh():
 	default:
 		t.Error("Ch did not close on termination")
 	}
@@ -357,7 +357,7 @@ func TestSubGo(t *testing.T) {
 	// gogroup should end and closed its error channel
 	//	- its only thread did exit
 	select {
-	case <-goGroupImpl.goErrorStream.EmptyCh(parl.CloseAwaiter):
+	case <-goGroupImpl.goErrorStream.EmptyCh():
 	default:
 		t.Errorf("goGroup channel did not close: %s", goError2)
 	}
@@ -477,13 +477,13 @@ func TestSubGroup(t *testing.T) {
 	}
 	// subgroup should exit when it last thread exits
 	select {
-	case <-subGroupImpl.goErrorStream.EmptyCh(parl.CloseAwaiter):
+	case <-subGroupImpl.goErrorStream.EmptyCh():
 	default:
 		t.Error("subGroup did not terminate")
 	}
 	// gogroup should exit when its last thread exits
 	select {
-	case <-goGroupImpl.goErrorStream.EmptyCh(parl.CloseAwaiter):
+	case <-goGroupImpl.goErrorStream.EmptyCh():
 	default:
 		t.Errorf("goGroup did not terminate %s", goGroup)
 	}
