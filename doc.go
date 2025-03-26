@@ -52,12 +52,12 @@ parl.Recover() and parl.Recover2() thread recovery and mains.Executable.Recover(
 process recovery:
 
 Threads can provide their errors via the perrors.ParlError thread-safe error store,
-plain error channels, parl.NBChan[error] or parl.ClosableChan[error].
+plain error channels or parl.ClosableChan[error].
 parl.Recover and parl.Recover2 convert thread panic to error along with regular errors,
 annotating, retrieving and storing those errors and invoking error handling functions for them.
 mains.Recover is similar for the process.
 
-	func thread(errCh *parl.NBChan[error]) { // real-time non-blocking error channel
+	func thread(errCh parl.ErrorSink1) { // real-time non-blocking error channel
 	  defer errCh.Close() // non-blocking close effective on send complete
 	  var err error
 	  defer parl.Recover2("", &err, errCh.Send)
@@ -78,7 +78,6 @@ parl package features:
 	Closer — Deferrable, panic-free channel close
 	ClosableChan — Initialization-free channel with observable deferrable panic-free close
 	Moderator — A ticketing system for limited parallelism
-	NBChan — A non-blocking channel with trillion-size dynamic buffer
 	SerialDo — Serialization of invocations
 	WaitGroup —Observable WaitGroup
 	Debouncer — Invocation debouncer, pre-generics

@@ -15,7 +15,6 @@ package parl
 //   - the Send interface replaces a callback function value
 //   - — passing a method as function value in Go causes 18 ns allocation
 //   - — such function values may create difficult-to-follow stack traces
-//   - the Send interface is implemented by eg. [github.com/haraldrudell/parl.NBChan]
 type Send[T any] interface {
 	// Send is typically a thread-safe non-blocking panic-free error-free
 	// send hand-off of a single value to another thread implemented as a method

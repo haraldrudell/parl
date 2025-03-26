@@ -12,9 +12,9 @@ replace github.com/haraldrudell/parl/psql => ../psql
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/haraldrudell/parl v0.4.208
-	github.com/haraldrudell/parl/psql v0.4.208
-	modernc.org/sqlite v1.36.1
+	github.com/haraldrudell/parl v0.4.209
+	github.com/haraldrudell/parl/psql v0.4.209
+	modernc.org/sqlite v1.36.2
 )
 
 require (
