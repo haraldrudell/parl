@@ -66,7 +66,7 @@ func (e *ErrSlice) WaitCh() (ch AwaitableCh) { return e.errs.DataWaitCh() }
 // EndCh awaits the error source closing:
 //   - the error source must be read to empty
 //   - the error source must be closed by the error-source providing entity
-func (e *ErrSlice) EndCh() (ch AwaitableCh) { return e.errs.EmptyCh() }
+func (e *ErrSlice) EndCh() (ch AwaitableCh) { return e.errs.CloseCh() }
 
 // AddError is a function to submit non-fatal errors
 func (e *ErrSlice) AddError(err error) { e.errs.Send(err) }

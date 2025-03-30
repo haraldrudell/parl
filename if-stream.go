@@ -56,11 +56,11 @@ type Sink[T any] interface {
 //   - no panic or error: error handling is separate
 //   - flexible allocation strategy
 //   - implemented by [AwaitableSlice]
-//   - methods: Send SendSlice SendClone EmptyCh IsClosed
+//   - methods: Send SendSlice SendClone CloseCh IsClosed
 type ClosableSink[T any] interface {
 	// Send SendSlice SendClone
 	Sink[T]
-	// EmptyCh IsClosed
+	// CloseCh IsClosed
 	Closable[T]
 }
 
@@ -150,11 +150,11 @@ type AllSource[T any] interface {
 //     or thread-safe via atomic or lock
 //   - no panic or error: error handling is separate
 //   - implemented by [AwaitableSlice]
-//   - methods: Get DataWaitCh AwaitValue EmptyCh IsClosed
+//   - methods: Get DataWaitCh AwaitValue CloseCh IsClosed
 type ClosableSource1[T any] interface {
 	// Get DataWaitCh AwaitValue
 	Source1[T]
-	// EmptyCh IsClosed
+	// CloseCh IsClosed
 	Closable[T]
 }
 
@@ -169,9 +169,9 @@ type ClosableSource1[T any] interface {
 //     or thread-safe via atomic or lock
 //   - no panic or error: error handling is separate
 //   - implemented by [AwaitableSlice]
-//   - methods: Get DataWaitCh AwaitValue EmptyCh IsClosed Seq
+//   - methods: Get DataWaitCh AwaitValue CloseCh IsClosed Seq
 type IterableSource[T any] interface {
-	// Get DataWaitCh AwaitValue EmptyCh IsClosed
+	// Get DataWaitCh AwaitValue CloseCh IsClosed
 	ClosableSource1[T]
 	// Seq is an iterator over sequences of individual values.
 	// When called as seq(yield), seq calls yield(v) for
@@ -190,9 +190,9 @@ type IterableSource[T any] interface {
 //     or thread-safe via atomic or lock
 //   - no panic or error: error handling is separate
 //   - implemented by [AwaitableSlice]
-//   - methods: Get DataWaitCh AwaitValue GetSlice GetAll EmptyCh IsClosed Seq
+//   - methods: Get DataWaitCh AwaitValue GetSlice GetAll CloseCh IsClosed Seq
 type IterableAllSource[T any] interface {
-	// Get DataWaitCh AwaitValue GetSlice GetAll EmptyCh IsClosed
+	// Get DataWaitCh AwaitValue GetSlice GetAll CloseCh IsClosed
 	ClosableAllSource[T]
 	// Seq is an iterator over sequences of individual values.
 	// When called as seq(yield), seq calls yield(v) for
@@ -214,11 +214,11 @@ var _ = func(i IterableSource[int]) (s iter.Seq[int]) { return i.Seq }
 //     or thread-safe via atomic or lock
 //   - no panic or error: error handling is separate
 //   - implemented by [AwaitableSlice]
-//   - methods: Get DataWaitCh AwaitValue GetSlice EmptyCh IsClosed
+//   - methods: Get DataWaitCh AwaitValue GetSlice CloseCh IsClosed
 type ClosableSource[T any] interface {
 	// Get DataWaitCh AwaitValue GetSlice
 	Source[T]
-	// EmptyCh IsClosed
+	// CloseCh IsClosed
 	Closable[T]
 }
 
@@ -233,11 +233,11 @@ type ClosableSource[T any] interface {
 //     or thread-safe via atomic or lock
 //   - no panic or error: error handling is separate
 //   - implemented by [AwaitableSlice]
-//   - methods: Get DataWaitCh AwaitValue GetSlice GetAll EmptyCh IsClosed
+//   - methods: Get DataWaitCh AwaitValue GetSlice GetAll CloseCh IsClosed
 type ClosableAllSource[T any] interface {
 	// Get DataWaitCh AwaitValue GetSlice GetAll
 	AllSource[T]
-	// EmptyCh IsClosed
+	// CloseCh IsClosed
 	Closable[T]
 }
 
@@ -273,11 +273,11 @@ type SourceSink[T any] interface {
 //   - no panic or error: error handling is separate
 //   - flexible allocation strategy
 //   - implemented by [AwaitableSlice]
-//   - methods: Get DataWaitCh AwaitValue GetSlice GetAll Send SendSlice SendClone EmptyCh IsClosed
+//   - methods: Get DataWaitCh AwaitValue GetSlice GetAll Send SendSlice SendClone CloseCh IsClosed
 type ClosableSourceSink[T any] interface {
 	// Get DataWaitCh AwaitValue GetSlice GetAll Send SendSlice SendClone
 	SourceSink[T]
-	// EmptyCh IsClosed
+	// CloseCh IsClosed
 	Closable[T]
 }
 
@@ -288,20 +288,20 @@ type ClosableSourceSink[T any] interface {
 //     [ClosableSourceSink]
 //   - may be used to determine if a stream is closable
 //   - implemented by [AwaitableSlice]
-//   - methods: EmptyCh IsClosed
+//   - methods: CloseCh IsClosed
 type Closable[T any] interface {
-	// EmptyCh returns a channel that is closed or closes
+	// CloseCh returns a channel that is closed or closes
 	// upon the stream becoming empty
 	//	- ch: used to await close and drain
-	//	- EmptyCh always returns the same channel value
+	//	- CloseCh always returns the same channel value
 	//	- close state is separate from value flow:
 	//		a closed sink will still receive values.
 	//		A closed source that is emptied may become unempty again.
 	//	- after a close invocation when the stream is empty,
 	//		the stream is marked as closed.
 	//		Once closed, close-state does not change
-	EmptyCh() (ch AwaitableCh)
-	// IsClosed returns true is EmptyCh was invoked without argument
+	CloseCh() (ch AwaitableCh)
+	// IsClosed returns true is CloseCh was invoked without argument
 	// and the stream was or subsequently became empty
 	IsClosed() (isClosed bool)
 	io.Closer

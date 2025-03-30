@@ -10,7 +10,7 @@ package parl
 //     a nil interface value
 //   - hasValue: false: the stream is closable and closed
 //   - stream: an awaitable possibly closable source type like [Source1]
-//   - — stream’s DataWaitCh Get and if present EmptyCh methods are used
+//   - — stream’s DataWaitCh Get and if present CloseCh methods are used
 //   - — stream cannot be eg. [AtomicError] because it is not awaitable
 //   - AwaitValue wraps a 10-line read operation as a two-value expression
 func AwaitValue[T any](stream Source1[T]) (value T, hasValue bool) {
@@ -19,7 +19,7 @@ func AwaitValue[T any](stream Source1[T]) (value T, hasValue bool) {
 	//	- nil if not closable
 	var endCh AwaitableCh
 	if closable, isClosable := stream.(Closable[T]); isClosable {
-		endCh = closable.EmptyCh()
+		endCh = closable.CloseCh()
 	}
 
 	// loop until value or closed
@@ -42,7 +42,7 @@ func AwaitValue[T any](stream Source1[T]) (value T, hasValue bool) {
 //   - IsClosed wraps a 6-line read into a single-value boolean expression
 func IsClosed[T any](closable Closable[T]) (isClosed bool) {
 	select {
-	case <-closable.EmptyCh():
+	case <-closable.CloseCh():
 		isClosed = true
 	default:
 	}

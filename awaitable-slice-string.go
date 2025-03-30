@@ -13,8 +13,8 @@ import (
 )
 
 func AwaitableSliceString[T any](a *AwaitableSlice[T]) (s string) {
-	defer a.outputLock.Lock().Unlock()
-	defer a.queueLock.Lock().Unlock()
+	defer a.enterOutputCritical().outQ.lock.Unlock()
+	defer a.enterInputCritical().inQ.lock.Unlock()
 
 	var sL []string
 
@@ -22,22 +22,22 @@ func AwaitableSliceString[T any](a *AwaitableSlice[T]) (s string) {
 	sL = append(sL, Sprintf(
 		"hasData: %t q %s slices %s loc %t cached %d",
 		// “hasData: false”
-		a.hasDataBits.Load(),
+		a.hasDataBits.bits.Load(),
 		// queue: “q 0(10)”
-		printSlice(a.queue),
+		printSlice(a.inQ.primary),
 		// slices, slices0, isLocalSlice, cachedInput
 		// “slices 0(cap0/0 tot0 offs-1) loc false cached 10”
-		printSlice2Away(a.qSos, a.qSos0), a.isLocalSlice, cap(a.cachedInput),
+		printSlice2Away(a.outQ.sliceList, a.outQ.sliceList0), cap(a.inQ.cachedInput),
 	))
 
 	// behind outputLock
 	sL = append(sL, Sprintf(
 		"  out %s outs %s cached %d",
 		// output output0: “out 0(cap 9/10 offs 1)”
-		printSliceAway(a.output, a.output0),
+		printSliceAway(a.outQ.head, a.outQ.head0),
 		// outputs outputs0 cachedOutput
 		// “outs 0(cap0/0 tot0 offs-1) cached 10”
-		printSlice2Away(a.outputs, a.outputs0), cap(a.cachedOutput),
+		printSlice2Away(a.outQ.sliceList, a.outQ.sliceList0), cap(a.outQ.cachedOutput),
 	))
 
 	// data Wait

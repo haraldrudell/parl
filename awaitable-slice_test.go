@@ -6,6 +6,8 @@ ISC License
 package parl
 
 import (
+	"errors"
+	"io"
 	"slices"
 	"sync"
 	"testing"
@@ -16,94 +18,51 @@ func TestAwaitableSlice(t *testing.T) {
 		value1, value2, value3 = 1, 2, 3
 		size                   = 25
 	)
-	var (
-		values = []int{value1, value2, value3}
-	)
 
 	var (
-		actual           int
-		actuals          []int
-		hasValue, isOpen bool
-		ch               AwaitableCh
+		actuals []int
 	)
 
-	// DataWaitCh EmptyCh Get Get1 GetAll Send SendSlice SetSize
-	var slice *AwaitableSlice[int]
+	// Get() GetAll() GetSlice() GetSlices() Read() AwaitValue() Seq()
+	// Send() SendSlice() SendSlices() SendClone() Write()
+	// DataWaitCh() EmptyCh()
+	// Close() IsClosed()
+	// SetSize() State() String()
+	var queue *AwaitableSlice[int]
 	var reset = func() {
-		slice = &AwaitableSlice[int]{}
-	}
-
-	// Get1 should return one value at a a time
-	//	- Send SendSlice should work
-	reset()
-	slice.Send(value1)
-	slice.SendSlice([]int{value2})
-	slice.Send(value3)
-	// populated Slice: q: [1] slices: [[2] [3]]
-	t.Logf("populated Slice: q: %v slices: %v", slice.queue, slice.qSos)
-	for i, v := range values {
-		actual, hasValue = slice.Get()
-		if !hasValue {
-			t.Errorf("FAIL Get1#%d hasValue false", i)
-		}
-		if actual != v {
-			t.Errorf("FAIL Get1#%d %d exp %d", i, actual, v)
-		}
-	}
-	// Get1 empty should returns hasValue false
-	actual, hasValue = slice.Get()
-	_ = actual
-	if hasValue {
-		t.Error("FAIL Get1 hasValue true")
-	}
-
-	// Get should return one slice at a a time
-	reset()
-	slice.Send(value1)
-	slice.SendSlice([]int{value2})
-	slice.Send(value3)
-	for i, v := range values {
-		actuals = slice.GetSlice()
-		if len(actuals) != 1 {
-			t.Fatalf("FAIL Get#%d hasValue false", i)
-		}
-		if actuals[0] != v {
-			t.Errorf("FAIL Get#%d %d exp %d", i, actuals[0], v)
-		}
-	}
-	// Get empty returns nil
-	actuals = slice.GetSlice()
-	if actuals != nil {
-		t.Errorf("FAIL Get actuals not nil: %d%v", len(actuals), actuals)
-	}
-
-	// GetAll should return all values in a single slice
-	reset()
-	slice.Send(value1)
-	slice.SendSlice([]int{value2})
-	slice.Send(value3)
-	actuals = slice.GetAll()
-	if !slices.Equal(actuals, values) {
-		t.Errorf("FAIL GetAll %v exp %v", actuals, values)
-	}
-	actuals = slice.GetAll()
-	if actuals != nil {
-		t.Errorf("FAIL GetAll empty not nil: %d%v", len(actuals), actuals)
+		queue = &AwaitableSlice[int]{}
 	}
 
 	// SetSize should be effective
 	reset()
-	slice.SetSize(size)
-	slice.Send(value1)
-	actuals = slice.GetSlice()
+	queue.SetSize(size)
+	queue.Send(value1)
+	actuals = queue.GetSlice()
 	if cap(actuals) != size {
 		t.Errorf("FAIL SetSize %d exp %d", cap(actuals), size)
+	}
+}
+
+func TestAwaitableSliceDataWaitCh(t *testing.T) {
+	const (
+		value1, value2, value3 = 1, 2, 3
+		size                   = 25
+	)
+
+	var (
+		ch     AwaitableCh
+		isOpen bool
+	)
+
+	var queue *AwaitableSlice[int]
+	var reset = func() {
+		queue = &AwaitableSlice[int]{}
 	}
 
 	// DataWaitCh
 	reset()
 	// DataWaitCh on creation should return non-nil, open channel
-	ch = slice.DataWaitCh()
+	ch = queue.DataWaitCh()
 	if ch == nil {
 		t.Error("FAIL DataWaitCh nil")
 	}
@@ -117,7 +76,7 @@ func TestAwaitableSlice(t *testing.T) {
 		t.Error("FAIL DataWaitCh ch not open")
 	}
 	// hasData true should close the returned channel
-	slice.Send(value1)
+	queue.Send(value1)
 	select {
 	case <-ch:
 		isOpen = false
@@ -127,10 +86,28 @@ func TestAwaitableSlice(t *testing.T) {
 	if isOpen {
 		t.Error("FAIL DataWaitCh hasData ch not closed")
 	}
+}
 
-	// EndCh on creation should return non-nil open channel
+func TestAwaitableSliceCloseCh(t *testing.T) {
+	const (
+		value1, value2, value3 = 1, 2, 3
+		size                   = 25
+	)
+
+	var (
+		ch               AwaitableCh
+		hasValue, isOpen bool
+		actual           int
+	)
+
+	var queue *AwaitableSlice[int]
+	var reset = func() {
+		queue = &AwaitableSlice[int]{}
+	}
+
+	// CloseCh on creation should return non-nil open channel
 	reset()
-	ch = slice.EmptyCh()
+	ch = queue.CloseCh()
 	select {
 	case <-ch:
 		isOpen = false
@@ -141,7 +118,7 @@ func TestAwaitableSlice(t *testing.T) {
 		t.Error("FAIL EndCh empty ch closed")
 	}
 	// close should close the channel
-	slice.Close()
+	queue.Close()
 	select {
 	case <-ch:
 		isOpen = false
@@ -152,11 +129,11 @@ func TestAwaitableSlice(t *testing.T) {
 		t.Error("FAIL EndCh open after empty Close")
 	}
 
-	// EndCh for hasData true Closed returns open channel
+	// CloseCh for hasData true Closed returns open channel
 	reset()
-	slice.Send(value1)
-	slice.Close()
-	ch = slice.EmptyCh()
+	queue.Send(value1)
+	queue.Close()
+	ch = queue.CloseCh()
 	select {
 	case <-ch:
 		isOpen = false
@@ -167,7 +144,7 @@ func TestAwaitableSlice(t *testing.T) {
 		t.Error("FAIL EmptyCh hasData ch closed")
 	}
 	// hasData to false should close the returned channel
-	actual, hasValue = slice.Get()
+	actual, hasValue = queue.Get()
 	_ = actual
 	_ = hasValue
 	select {
@@ -180,9 +157,9 @@ func TestAwaitableSlice(t *testing.T) {
 		t.Error("FAIL EmptyCh empty ch not closed")
 	}
 
-	// EmptyCh should defer empty detection
+	// CloseCh should defer empty detection
 	reset()
-	ch = slice.EmptyCh()
+	ch = queue.CloseCh()
 	select {
 	case <-ch:
 		isOpen = false
@@ -193,7 +170,7 @@ func TestAwaitableSlice(t *testing.T) {
 		t.Error("FAIL EmptyCh does not defer empty detection")
 	}
 	// Close should close the returned channel
-	_ = slice.Close()
+	_ = queue.Close()
 	select {
 	case <-ch:
 		isOpen = false
@@ -265,7 +242,6 @@ func TestAwaitableSliceFor(t *testing.T) {
 	}
 }
 
-// cover 100% of Send
 func TestAwaitableSliceSend(t *testing.T) {
 	//t.Error("loggin on")
 	var value = 1
@@ -285,9 +261,9 @@ func TestAwaitableSliceSend(t *testing.T) {
 	slice.GetAll()
 	// len(s.slices): 0 s.queue: true s.cachedInput: true
 	t.Logf("len(s.slices): %d s.queue: %t s.cachedInput: %t",
-		len(slice.qSos), slice.queue != nil, slice.cachedInput != nil,
+		len(slice.outQ.sliceList), slice.inQ.primary != nil, slice.inQ.cachedInput != nil,
 	)
-	slice.queue = nil
+	slice.inQ.primary = nil
 	// Send should cover using cachedInput
 	slice.Send(value)
 
@@ -307,166 +283,292 @@ func TestAwaitableSliceSend(t *testing.T) {
 	slice.Send(value)
 }
 
-// edge cases for Get
 func TestAwaitableSliceGet(t *testing.T) {
+	const (
+		value1, value2, value3 = 1, 2, 3
+		size                   = 25
+	)
 	var (
-		value1, value2 = 1, 2
+		// values [1 2 3]
+		values = []int{value1, value2, value3}
 	)
 
 	var (
-		value    int
+		actual   int
 		hasValue bool
-		endCh    AwaitableCh
 	)
 
-	var slice *AwaitableSlice[int]
+	var queue *AwaitableSlice[int]
 	var reset = func() {
-		slice = &AwaitableSlice[int]{}
+		queue = &AwaitableSlice[int]{}
 	}
 
-	// test Get of last item in output in deferred close
+	// Get should return one value at a a time
+	//	- Send SendSlice should work
 	reset()
-	slice.Send(value1)
-	slice.Send(value2)
-	// close stream entering deferred close
-	endCh = slice.EmptyCh()
-	slice.Close()
-	// Get transfers both items to outputLock
-	// Get should return first item
-	value, hasValue = slice.Get()
-	if !hasValue {
-		t.Error("FAIL hasValue false")
+	queue.Send(value1)
+	queue.SendSlice([]int{value2})
+	queue.Send(value3)
+
+	// populated Slice: q: [1] slices: [[2] [3]]
+	t.Logf("Get: populated Slice: q: %v slices: %v hasData %t",
+		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+	)
+	for i, v := range values {
+
+		actual, hasValue = queue.Get()
+		t.Logf("Get#%d(0…%d) value %d hasValue: %t hasData: %t",
+			i, len(values)-1,
+			actual, hasValue, queue.hasDataBits.hasData(),
+		)
+
+		if !hasValue {
+			t.Errorf("FAIL Get#%d(0…%d) hasValue: %t hasData %t",
+				i, len(values)-1, hasValue, queue.hasDataBits.hasData(),
+			)
+		}
+		if actual != v {
+			t.Errorf("FAIL Get#%d(0…%d) %d exp %d  hasData %t",
+				i, len(values)-1, actual, v, queue.hasDataBits.hasData(),
+			)
+		}
 	}
-	if value != value1 {
-		t.Errorf("FAIL Get %d exp %d", value, value1)
-	}
-	// stream should not be closed
-	select {
-	case <-endCh:
-		t.Errorf("FAIL stream closed")
-	default:
-	}
-	// Get should return last item and close the stream
-	value, hasValue = slice.Get()
-	if !hasValue {
-		t.Error("FAIL hasValue false")
-	}
-	if value != value2 {
-		t.Errorf("FAIL Get %d exp %d", value, value2)
-	}
-	// stream should be closed
-	select {
-	case <-endCh:
-	default:
-		t.Errorf("FAIL stream not closed")
-	}
-	// Get should retrieve no items
-	value, hasValue = slice.Get()
-	_ = value
+	// Get empty should returns hasValue false
+	actual, hasValue = queue.Get()
+	_ = actual
 	if hasValue {
-		t.Error("FAIL hasValue true")
+		t.Error("FAIL Get hasValue true")
 	}
 }
 
-// 100% coverage GetSlice
 func TestAwaitableSliceGetSlice(t *testing.T) {
-	//t.Error("loggin on")
-	var value1, value2 = 1, 2
-	var value2Slice = []int{value2}
+	const (
+		value1, value2, value3 = 1, 2, 3
+		size                   = 25
+	)
+	var (
+		// values [1 2 3]
+		values = []int{value1, value2, value3}
+	)
 
-	var actual int
-	var hasValue bool
-	var actuals []int
+	var (
+		actuals []int
+	)
 
-	var slice *AwaitableSlice[int]
+	var queue *AwaitableSlice[int]
 	var reset = func() {
-		slice = &AwaitableSlice[int]{}
+		queue = &AwaitableSlice[int]{}
 	}
 
-	// use cachedInput in Send
+	// GetSlice should return one slice at a a time
+	// Sednd SendSlice SendSlices should work
 	reset()
-	// Send Send Get creates non-empty s.output
-	slice.Send(value1)
-	slice.Send(value2)
-	if actual, hasValue = slice.Get(); actual != value1 {
-		t.Errorf("FAIL Get %d exp %d", actual, value1)
+	queue.Send(value1)
+	queue.SendSlice([]int{value2})
+	queue.SendSlices([][]int{{value3}})
+	t.Logf("GetSlice: populated Slice: q: %v slices: %v hasData %t",
+		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+	)
+	for i, v := range values {
+
+		actuals = queue.GetSlice()
+		t.Logf("GetSlice#%d(0…%d) slice: %v hasData: %t",
+			i, len(values)-1,
+			actuals, queue.hasDataBits.hasData(),
+		)
+
+		if len(actuals) != 1 {
+			t.Fatalf("FAIL Get#%d hasValue false", i)
+		}
+		if actuals[0] != v {
+			t.Errorf("FAIL Get#%d %d exp %d", i, actuals[0], v)
+		}
 	}
-	_ = hasValue
-	// GetSlice should return s.output
-	if actuals = slice.GetSlice(); !slices.Equal(actuals, value2Slice) {
-		t.Errorf("FAIL GetSlice %v exp %v", actuals, value2Slice)
+	// Get empty returns nil
+	actuals = queue.GetSlice()
+	if actuals != nil {
+		t.Errorf("FAIL Get actuals not nil: %d%v", len(actuals), actuals)
 	}
 }
 
-// 100% coverage GetAll
 func TestAwaitableSliceGetAll(t *testing.T) {
 	//t.Error("loggin on")
-	// value1 1
-	var value1, value2, value3 = 1, 2, 3
-	// slice of value 1
-	var values1, values2, values3 = []int{value1}, []int{value2}, []int{value3}
-	var values23 = []int{value2, value3}
+	const (
+		value1, value2, value3 = 1, 2, 3
+		size                   = 25
+	)
+	var (
+		// values [1 2 3]
+		values = []int{value1, value2, value3}
+	)
 
-	var actual int
-	var actuals []int
-	var hasValue bool
+	var (
+		actuals []int
+	)
 
-	var slice *AwaitableSlice[int]
+	var queue *AwaitableSlice[int]
 	var reset = func() {
-		slice = &AwaitableSlice[int]{}
+		queue = &AwaitableSlice[int]{}
 	}
 
-	// aggregate outputs
+	// GetAll should return all values in a single slice
 	reset()
-	// SendSlice SendSlice Get creates non-empty s.outputs
-	slice.SendSlice(slices.Clone(values1))
-	slice.SendSlice(slices.Clone(values2))
-	if actual, hasValue = slice.Get(); actual != value1 {
-		t.Errorf("FAIL Get %d exp %d", actual, value1)
+	queue.Send(value1)
+	queue.SendSlice([]int{value2})
+	queue.Send(value3)
+	// populated Slice: q: [1] slices: [[2] [3]]
+	t.Logf("GetAll: populated Slice: q: %v slices: %v hasData %t",
+		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+	)
+
+	actuals = queue.GetAll()
+	t.Logf("GetAll actual: %v", actuals)
+
+	if !slices.Equal(actuals, values) {
+		t.Errorf("FAIL GetAll %v exp %v", actuals, values)
 	}
-	_ = hasValue
-	// GetAll should return s.outputs
-	if actuals = slice.GetAll(); !slices.Equal(actuals, values2) {
-		t.Errorf("FAIL GetAll %v exp %v", actuals, values2)
+	actuals = queue.GetAll()
+	if actuals != nil {
+		t.Errorf("FAIL GetAll empty not nil: %d%v", len(actuals), actuals)
+	}
+}
+
+func TestAwaitableSliceGetSlices(t *testing.T) {
+	//t.Error("loggin on")
+	const (
+		value1, value2, value3 = 1, 2, 3
+	)
+	var (
+		// expValueSlice [1]
+		expValueSlice = []int{value1}
+		// expSliceList [[2 3]]
+		expSliceList = [][]int{{value2, value3}}
+	)
+
+	var (
+		actuals  []int
+		actuals2 [][]int
+	)
+
+	var queue *AwaitableSlice[int]
+	var reset = func() {
+		queue = &AwaitableSlice[int]{}
 	}
 
-	// aggregate output and outputs
+	// GetSlices should return all values in value-slice and sliceList
 	reset()
-	// Send Send SendSlice Get creates non-empty s.output s.outputs
-	slice.Send(value1)
-	slice.Send(value2)
-	slice.SendSlice(slices.Clone(values3))
-	if actual, hasValue = slice.Get(); actual != value1 {
-		t.Errorf("FAIL Get %d exp %d", actual, value1)
+	queue.Send(value1)
+	queue.SendSlice([]int{value2})
+	queue.Send(value3)
+
+	// populated Slice: q: [1] slices: [[2] [3]]
+	t.Logf("GetSlices: populated Slice: q: %v slices: %v hasData %t",
+		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+	)
+
+	actuals, actuals2 = queue.GetSlices()
+	t.Logf("GetSlices actuals: %v actuals2: %v", actuals, actuals2)
+
+	if !slices.Equal(actuals, expValueSlice) {
+		t.Errorf("FAIL value-slice %v exp %v", actuals, expValueSlice)
 	}
-	_ = hasValue
-	// GetAll should aggregate output and outputs
-	if actuals = slice.GetAll(); !slices.Equal(actuals, values23) {
-		t.Errorf("FAIL GetAll %v exp %v", actuals, values23)
+	if !compareSliceLists(actuals2, expSliceList) {
+		t.Errorf("FAIL sliceList %v exp %v", actuals2, expSliceList)
+	}
+	actuals, actuals2 = queue.GetSlices()
+	if actuals != nil {
+		t.Errorf("FAIL GetSlices empty not nil: %d%v", len(actuals), actuals)
+	}
+	if actuals2 != nil {
+		t.Errorf("FAIL GetSlices empty not nil: %d%v", len(actuals2), actuals2)
+	}
+}
+
+func TestAwaitableSliceRead(t *testing.T) {
+	//t.Error("loggin on")
+	const (
+		size      = 25
+		bufSize   = 2
+		expNRead1 = 2
+		expNRead2 = 1
+	)
+	var (
+		value1, value2, value3 = 1, 2, 3
+		// expBufRead1 *int [1 2]
+		expBufRead1 = []*int{&value1, &value2}
+		// expBufRead2 *int [1 2]
+		expBufRead2 = []*int{&value3}
+	)
+
+	var (
+		// 2-element buffer
+		buffer    = make([]*int, bufSize)
+		n         int
+		err       error
+		actual    []*int
+		actualEOF bool
+	)
+
+	var queue *AwaitableSlice[*int]
+	var reset = func() {
+		queue = &AwaitableSlice[*int]{}
 	}
 
-	// GetAll only output
+	t.Logf("pointers: 1:0x%x 2:0x%x 3:0x%x",
+		&value1, &value2, &value3,
+	)
+
+	// GetAll should return all values in a single slice
 	reset()
-	// Send Send Get creates non-empty output
-	slice.Send(value1)
-	slice.Send(value2)
-	if actual, hasValue = slice.Get(); actual != value1 {
-		t.Errorf("FAIL Get %d exp %d", actual, value1)
+	queue.Send(&value1)
+	queue.SendSlice([]*int{&value2})
+	queue.Send(&value3)
+	// populated Slice: q: [1] slices: [[2] [3]]
+	t.Logf("Read: populated Slice: q: %v slices: %v hasData %t",
+		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+	)
+
+	// Read should return first two pointers
+	n, err = queue.Read(buffer)
+	t.Logf("Read n: %d err: %v", n, err)
+
+	if err != nil {
+		t.Errorf("FAIL Read err “%s”", err)
 	}
-	_ = hasValue
-	// GetAll should return output single-slice
-	if actuals = slice.GetAll(); !slices.Equal(actuals, values2) {
-		t.Errorf("FAIL GetAll %v exp %v", actuals, values2)
+	if n != expNRead1 {
+		t.Errorf("FAIL Read#1 n %d exp %d", n, expNRead1)
+	}
+	actual = buffer[:n]
+	if !slices.Equal(actual, expBufRead1) {
+		t.Errorf("FAIL Read#1 buf %v exp %v", actual, expBufRead1)
 	}
 
-	// only s.slices[0]
-	reset()
-	// SendSlice creates single-slice s.slices
-	slice.SendSlice(values1)
-	// GetAll should return s.slices[0] single-slice
-	if actuals = slice.GetAll(); !slices.Equal(actuals, values1) {
-		t.Errorf("FAIL GetAll %v exp %v", actuals, values1)
+	// close enyters drain phase
+	err = queue.Close()
+	if err != nil {
+		t.Errorf("FAIL Close err: “%s”", err)
 	}
+
+	// Read should return one more pointer
+	n, err = queue.Read(buffer)
+	t.Logf("Read n: %d err: %v", n, err)
+
+	actualEOF = errors.Is(err, io.EOF)
+	if !actualEOF {
+		if err == nil {
+			t.Error("FAIL Read#2 missing error")
+		} else {
+			t.Errorf("FAIL Read#2 bad error: “%s”", err)
+		}
+	}
+	if n != expNRead2 {
+		t.Errorf("FAIL Read#2 n %d exp %d", n, expNRead2)
+	}
+	actual = buffer[:n]
+	if !slices.Equal(actual, expBufRead2) {
+		t.Errorf("FAIL Read#2 buf %v exp %v", actual, expBufRead2)
+	}
+
 }
 
 type AwaitableForTester struct {
@@ -503,5 +605,23 @@ func (a *AwaitableForTester) Values() (values []int) {
 	defer a.valueLock.Unlock()
 
 	values = slices.Clone(a.values)
+	return
+}
+
+// compareSliceLists returns true if two sliceLists are equal
+func compareSliceLists[T comparable](a, b [][]T) (isEqual bool) {
+	var aNil, bNil = a == nil, b == nil
+	if aNil != bNil {
+		return
+	}
+	if len(a) != len(b) {
+		return
+	}
+	for i := range len(a) {
+		if !slices.Equal(a[i], b[i]) {
+			return
+		}
+	}
+	isEqual = true
 	return
 }

@@ -14,24 +14,33 @@ import (
 )
 
 func TestDebouncer(t *testing.T) {
-	var value1 = 3
-	var value2 = 5
-	var debouncePeriod = time.Millisecond
-	var noDebounce time.Duration
-	var noMaxDelay time.Duration
-	var maxDelay1ms = time.Millisecond
-	var expValues = []int{value1, value2}
-	var expValues1 = []int{value1}
+	const (
+		value1, value2 = 3, 5
+		debouncePeriod = time.Millisecond
+		maxDelay1ms    = time.Millisecond
+		valueCount     = 2
+	)
+	var (
+		expValues  = []int{value1, value2}
+		expValues1 = []int{value1}
+	)
 
-	var actValues []int
-	var t0, t1 time.Time
+	var (
+		inputCh    chan int
+		noDebounce time.Duration
+		noMaxDelay time.Duration
+		actValues  []int
+		t0, t1     time.Time
+		receiver   AwaitableSlice[[]int]
+		hasValue   bool
+	)
 
 	// create debouncer immediately receiving 2 values
-	var inputCh = make(chan int, 2)
+	inputCh = make(chan int, valueCount)
 	inputCh <- value1
 	inputCh <- value2
-	var receiver AwaitableSlice[[]int]
 	t0 = time.Now()
+
 	var debouncer = NewDebouncer(
 		debouncePeriod,
 		noMaxDelay,
@@ -43,11 +52,19 @@ func TestDebouncer(t *testing.T) {
 	// actValues should receive a slice of two values
 	//	- received because of debounce timer 1 ms
 	<-receiver.DataWaitCh()
-	actValues, _ = receiver.Get()
+	actValues, hasValue = receiver.Get()
 	t1 = time.Now()
-	t.Logf("elapsed debounce: %s", ptime.Duration(t1.Sub(t0)))
+
+	// elapsed debounce: 1.284ms
+	t.Logf("elapsed debounce: %s debouncePeriod: %s",
+		ptime.Duration(t1.Sub(t0)),
+		debouncePeriod,
+	)
+	if !hasValue {
+		t.Errorf("on dataWait hasValue false")
+	}
 	if !slices.Equal(actValues, expValues) {
-		t.Errorf("bad receive: %v exp %v", actValues, expValues)
+		t.Errorf("FAIL bad receive: %v exp %v", actValues, expValues)
 	}
 
 	// Shutdown should not panic or hang
@@ -70,6 +87,8 @@ func TestDebouncer(t *testing.T) {
 	t.Log("debouncer.Wait…")
 	debouncer.Wait()
 	t1 = time.Now()
+
+	// debouncer.Wait complete: 21µs
 	t.Logf("debouncer.Wait complete: %s", ptime.Duration(t1.Sub(t0)))
 
 	// create a debouncer with maxDelay
@@ -86,21 +105,29 @@ func TestDebouncer(t *testing.T) {
 
 	// maxDelay should release one value
 	<-receiver.DataWaitCh()
-	actValues, _ = receiver.Get()
+	actValues, hasValue = receiver.Get()
 	t1 = time.Now()
-	t.Logf("elapsed maxDelay: %s", ptime.Duration(t1.Sub(t0)))
+
+	// elapsed maxDelay: 1.216ms maxDelay: 1ms
+	t.Logf("elapsed maxDelay: %s maxDelay: %s",
+		ptime.Duration(t1.Sub(t0)),
+		maxDelay1ms,
+	)
+	if !hasValue {
+		t.Errorf("on dataWait hasValue false")
+	}
 	if !slices.Equal(actValues, expValues1) {
-		t.Errorf("bad receive: %v exp %v", actValues, expValues1)
+		t.Errorf("FAIL bad receive: %v exp %v", actValues, expValues1)
 	}
 
 	// shutdown should not panic or hang
 	debouncer.Shutdown()
-
-	//t.Fail()
 }
 
+// panicOnError is an errorSink that panics
 type panicOnError struct{}
 
+// newPanicOnError returns an errorSink that panics
 func newPanicOnError() (errorSink ErrorSink) { return NewErrorSinkEndable(&panicOnError{}) }
 
 // debouncerPanicErrFn is a debouncer errFN that panics

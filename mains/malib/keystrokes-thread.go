@@ -50,7 +50,7 @@ func KeystrokesThread(silent bool, errorSink parl.ErrorSink1, stdin parl.Closabl
 	var isStdinReaderError atomic.Bool
 	// scanner splits input into lines
 	var scanner = bufio.NewScanner(NewStdinReader(errorSink, &isStdinReaderError))
-	var stdinClosedCh = stdin.EmptyCh()
+	var stdinClosedCh = stdin.CloseCh()
 
 	// blocks here
 	for scanner.Scan() {

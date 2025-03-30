@@ -12,50 +12,53 @@ import (
 
 func TestHasReference(t *testing.T) {
 	//t.Error("Logging on")
-	const (
-		pointerYes = true
-		pointerNo  = false
-	)
+	// because HasReference is generic and
+	// must be able to detect interface,
+	// any-type argument cannot be used
+	//	- nil cannot be provided as generic type
 
 	var (
-		intp         *int
-		v            any
-		reflectValue reflect.Value
+		hasReference bool
 	)
 
-	// interface any, runtime-value nil:
-	// type: <nil> value <nil> valueOf: <invalid Value> kind: invalid
-	reflectValue = reflect.ValueOf(v)
-	t.Logf("type: %T value %v valueOf: %s kind: %s",
-		v, v,
-		reflectValue.String(), reflectValue.Kind().String(),
-	)
-
-	// interface any, runtime-value *int:
-	// type: *int value <nil> valueOf: <*int Value> kind: ptr
-	v = intp
-	reflectValue = reflect.ValueOf(v)
-	t.Logf("type: %T value %v valueOf: %s kind: %s",
-		v, v,
-		reflectValue.String(), reflectValue.Kind().String(),
-	)
-
-	type args struct {
-		v any
+	// byte should be false
+	var b byte
+	hasReference = HasReference(b)
+	if hasReference {
+		t.Errorf("hasReference true: %T", b)
 	}
-	tests := []struct {
-		name           string
-		args           args
-		wantHasPointer bool
-	}{
-		{"nil", args{nil}, pointerNo},
-		{"*int", args{intp}, pointerYes},
+
+	// int* should be true
+	var intp *int
+	hasReference = HasReference(intp)
+	if !hasReference {
+		t.Errorf("hasReference false: %T", intp)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if gotHasPointer := HasReference(tt.args.v); gotHasPointer != tt.wantHasPointer {
-				t.Errorf("HasPointer() = %v, want %v", gotHasPointer, tt.wantHasPointer)
-			}
-		})
+
+	// error should be true
+	var e error
+	hasReference = HasReference(e)
+	if !hasReference {
+		// get the interface type name
+		var typeName = reflect.TypeOf(&e).String()[1:]
+		t.Errorf("hasReference false: %s", typeName)
+	}
+
+	// any should be true
+	var a any = 3
+	hasReference = HasReference(a)
+	if !hasReference {
+		// get the interface type name
+		var typeName = reflect.TypeOf(&e).String()[1:]
+		t.Errorf("hasReference false: %s", typeName)
+	}
+
+	// structs should be scanned
+	var f = struct{ p any }{p: 1}
+	hasReference = HasReference(f)
+	if !hasReference {
+		// get the interface type name
+		var typeName = reflect.TypeOf(&e).String()[1:]
+		t.Errorf("hasReference false: %s", typeName)
 	}
 }
