@@ -114,7 +114,7 @@ func (o *outputQueue[T]) dequeueNFromOutput(dest *[]T, np *int) (isDone bool) {
 	}
 
 	// sliceList
-	return o.dequeueNFromList(dest, np)
+	return o.dequeueNFromList(dest, np, o.ZeroOut.Load())
 }
 
 // hasCachedOutput returns true if a slice has been cached

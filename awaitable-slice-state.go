@@ -16,7 +16,6 @@ type AwaitableSliceState struct {
 	IsClosed                     bool
 	Primary, CachedInput, InList Metrics
 	InQ                          []Metrics
-	IsAlloc                      bool
 	Head, CachedOutput, OutList  Metrics
 	OutQ                         []Metrics
 	ZeroOut                      pslib.ZeroOut

@@ -117,6 +117,7 @@ func (s *AwaitableSlice[T]) GetSlice() (values []T) {
 //   - if queue was empty: values nil, valueSlices nil
 //   - if queue was not empty, values is non-empty
 //   - if queue had more than one slice, valueSlices is non-empty, too
+//   - thread-safe
 func (s *AwaitableSlice[T]) GetSlices() (values []T, valueSlices [][]T) {
 
 	// fast check outside lock
@@ -215,10 +216,18 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 //   - err: possible [io.EOF] once closed and read to empty
 //   - — EOF may be returned along with read items
 //   - —
-//   - useful if a limited number of items is to be read
-//   - may be less efficient by discarding internal slices
-//   - combines data transfer with close which the slice otherwise treats separately
-//   - if further data is written to slice after EOF, Read provides additional data after returning EOF
+//   - useful when a limited number of items is to be read, say 100 elements
+//   - Read is non-blocking.
+//     To block use [AwaitableSlice.DataWaitCh] or [AwaitableSlice.AwaitValue]
+//   - non-blocking means that while the queue is empty, Read returns zero items
+//   - may be less efficient that [AwaitableSlice.Get] or [AwaitableSlice.GetSlice]
+//     by discarding internal slices
+//   - Read combines data transfer with close which the slice otherwise treats separately
+//   - if further data is written to slice after EOF using other than Write,
+//     Read provides additional data after returning EOF.
+//     This is because Send SendSlice SendSlices SendClone
+//     continue to work after Close
+//   - thread-safe
 func (s *AwaitableSlice[T]) Read(p []T) (n int, err error) {
 
 	// fast check outside lock
@@ -289,6 +298,7 @@ func (s *AwaitableSlice[T]) Read(p []T) (n int, err error) {
 //   - — stream’s DataWaitCh Get and if present EmptyCh methods are used
 //   - — stream cannot be eg. [AtomicError] because it is not awaitable
 //   - AwaitValue wraps a 10-line read operation as a two-value expression
+//   - thread-safe
 func (s *AwaitableSlice[T]) AwaitValue() (value T, hasValue bool) {
 
 	// loop until value or closed

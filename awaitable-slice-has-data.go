@@ -6,7 +6,10 @@ ISC License
 package parl
 
 // hasData is bitfield determining if
-// data exist begind inQ lock or outQ lock
+// data exists behind inQ lock or outQ lock
+//   - purpose is to provide hasData with integrity at all times and
+//   - to determine if data exists behind inQ
+//     requiring that lock to be acquired
 type hasData struct {
 	bits Atomic32[hasDataBitField]
 }
@@ -17,11 +20,13 @@ func (h *hasData) hasData() (dataYes bool) {
 	return h.bits.Load()&hasDataBit != 0
 }
 
-// setOutputLockEmpty clears hasDataBit if queueLockHasDataBit is
+// setOutputLockEmpty clears hasDataBit if inQ-hasdata is
 // still cleared
-//   - invoked while holding queueLock
+//   - purpose is to clear all bits when outQ is about to be emptied,
+//     but only if no new data has enetered inQ
+//   - invoked while holding outQ lock
 //   - invoked while hasDataBit is set
-func (h *hasData) setOutputLockEmpty() (isEmpty bool) {
+func (h *hasData) setOutputLockEmpty() {
 	for {
 
 		// read initial state to be able to do CompareAndSwap
@@ -32,31 +37,34 @@ func (h *hasData) setOutputLockEmpty() (isEmpty bool) {
 		} else if h.bits.CompareAndSwap(oldBits, emptyNoBits) {
 			return // set to empty return
 		}
-
 	}
 }
 
-// inQIsEmpty returns true if the AwaitableSlice is now empty
-//   - isEmpty true: the entire queue is empty,
-//     hasDataBit was reset using CompareAndSwap
-//   - isEmpty false: there is data in inQ to be retrieved.
+// isInQEmpty returns true if the AwaitableSlice is now empty
+//   - isEmpty true: inQ lock does not hacve to be acquired,
+//     there is no data behind it.
+//     hasDataBit was reset using CompareAndSwap.
+//     All bits were cleared
+//   - isEmpty false: there is data in inQ lock to be retrieved.
 //     hasDataBits was not changed
 //   - —
-//   - invoked when outQ confirmed empty
-//   - hasDataBit is known to be set
 //   - purpose is to determine whether inQ lock must be accessed
+//   - invoked when outQ confirmed empty (Get GetSlice Read)
+//     or known to become empty (GetSlices GetAll)
+//   - hasDataBit is known to be set
 //   - if inQ is also empty, the entire queue is empty
-//   - invoked while holding outQ lock
-func (h *hasData) inQIsEmpty() (isEmpty bool) {
+//   - must hold outQ lock
+func (h *hasData) isInQEmpty() (isEmpty bool) {
 	for {
 
 		// read initial state to be able to do CompareAndSwap
 		var oldBits = h.bits.Load()
-		// if queueLock has no data, the entire queue is empty: isEmpty true
+		// if inQ lock has no data, the entire queue is empty: isEmpty true
 		isEmpty = oldBits&inQHasDataBit == 0
-		// if the queue is not empty, return to access data behind qqueueLock
+		// not isEmpty means inQ lock has data
+		//	- if inQ is not empty, outQ lock holder must acquire inQ lock to retrieve its data
 		if !isEmpty {
-			return // data in queueLock return
+			return // data in queueLock return: isEmpty false
 		}
 		// if queueLockHasDataBit is still zero, set hasDataBit to zero, too
 		var newBits hasDataBitField = emptyNoBits // entire queue is empty
@@ -66,16 +74,17 @@ func (h *hasData) inQIsEmpty() (isEmpty bool) {
 	}
 }
 
-// resets while holding both locks
+// resetToHasDataBit sets hasData and clears inQ data
+//   - must hold both inQ lock and outQ lock
+//   - must know that inQ will be emptied
 func (h *hasData) resetToHasDataBit() {
 	h.bits.Store(hasDataBit)
 }
 
-func (h *hasData) resetToNoBits() {
-	h.bits.Store(emptyNoBits)
-}
-
-func (h *hasData) resetToAllBits() {
+// setAllBits sets hasData and inQ-has-data
+//   - must hold inQ lock
+//   - must know that inQ is not empty
+func (h *hasData) setAllBits() {
 	h.bits.Store(hasDataBit | inQHasDataBit)
 }
 

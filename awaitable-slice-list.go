@@ -6,9 +6,8 @@ ISC License
 package parl
 
 import (
-	"sync/atomic"
-
 	"github.com/haraldrudell/parl/pslices"
+	"github.com/haraldrudell/parl/pslices/pslib"
 )
 
 // list is a thread-safe structure fetauring:
@@ -28,8 +27,6 @@ type list[T any] struct {
 	//	- the purpose of sliceList0 is to return sliceList to
 	//		the beginning of the underlying array
 	sliceList0 [][]T
-	// isAlloc is true if sliceList0 is allocated
-	isAlloc atomic.Bool
 }
 
 // isEmptyList returns true if sliceList is empty
@@ -53,19 +50,26 @@ func (q *list[T]) getListElementCount() (count int) {
 	return
 }
 
-// swapList gets sliceList and its ownership
-//   - set may be nil
+// swapList swaps sliceList and its ownership
+//   - set nil: gets sliceList and its ownership
+//   - set non-empty: sets sliceList to set[0]
+//   - — set[0] may be nil
+//   - — set[0] may contain slices of elements
+//   - — a non-nil set[0] must have non-zero capacity
+//   - — no set[0] element of type []T may be nil or empty
+//   - slices: sliceList if set non-empty, otherwise nil
+//   - slices non-nil: a slice of non-zero capacity
+//   - — no slices eleement of type []T is nil or empty
 func (q *list[T]) swapList(set ...[][]T) (slices [][]T) {
 
 	// set case
 	if len(set) > 0 {
-		var setSlices = set[0]
-		q.isAlloc.Store(setSlices != nil)
-		q.sliceList = setSlices
-		if c := cap(setSlices); len(setSlices) < c {
-			setSlices = setSlices[:c]
+		var newSliceList = set[0]
+		q.sliceList = newSliceList
+		if c := cap(newSliceList); len(newSliceList) < c {
+			newSliceList = newSliceList[:c]
 		}
-		q.sliceList0 = setSlices
+		q.sliceList0 = newSliceList
 		return
 	}
 
@@ -73,7 +77,6 @@ func (q *list[T]) swapList(set ...[][]T) (slices [][]T) {
 	slices = q.sliceList
 	q.sliceList = nil
 	q.sliceList0 = nil
-	q.isAlloc.Store(false)
 
 	return
 }
@@ -90,7 +93,7 @@ func (q *list[T]) clearList() {
 	q.sliceList = q.sliceList0[:0]
 }
 
-// enqueueInList adds slice of value-slices to sliceList
+// enqueueInList adds value-slices to sliceList
 func (q *list[T]) enqueueInList(slices ...[]T) {
 	if len(slices) == 1 {
 		pslices.SliceAwayAppend1(&q.sliceList, &q.sliceList0, slices[0], DoZeroOut)
@@ -99,8 +102,9 @@ func (q *list[T]) enqueueInList(slices ...[]T) {
 	pslices.SliceAwayAppend(&q.sliceList, &q.sliceList0, slices, DoZeroOut)
 }
 
-// sliceAway retrieves a slice sliceList using slice-away
-//   - if sliceList empty: nil
+// sliceAway returns a value-slice from sliceList using slice-away
+//   - slice non-nil: a non-empty value-slice removed from sliceList
+//   - slice nil: sliceList is empty
 func (q *list[T]) dequeueFromList() (slice []T) {
 
 	// empty case
@@ -121,19 +125,24 @@ func (q *list[T]) dequeueFromList() (slice []T) {
 }
 
 // dequeueList moves all elements to dest
-//   - dest must be of sufficient size
+//   - dest: must be of sufficient size
+//   - — if dest is too short, elements are lost
+//   - n: number of elements copied to dest
 func (q *list[T]) dequeueList(dest []T) (n int) {
 
-	// copy slices,deleting each copied slice
+	// copy the elements of all slices in sliceList to dest
 	for i := range len(q.sliceList) {
-		// n0 is number of elements for this slice
+
+		// n0 is number of elements copied from this value-slice
 		var n0 = copy(dest, q.sliceList[i])
-		// because slice is set to nil, no clear is required
-		q.sliceList[i] = nil
+
 		n += n0
 		dest = dest[n0:]
 	}
-	pslices.SetLength(&q.sliceList, 0)
+
+	// set sliceList length to zero with zero-out
+	pslices.SetLength(&q.sliceList, 0, pslib.DoZeroOut)
+
 	return
 }
 
@@ -142,51 +151,85 @@ func (q *list[T]) dequeueList(dest []T) (n int) {
 //     Sliced away as elements are added
 //   - np: pointer where the number of moved elements are added
 //   - isDone: true if dest was filled completely
-func (q *list[T]) dequeueNFromList(dest *[]T, np *int) (isDone bool) {
-	for i := range len(q.sliceList) {
-		var slicep = &q.sliceList[i]
-		// copy with zero-out
-		isDone = CopyToSlice(slicep, dest, np)
+func (q *list[T]) dequeueNFromList(dest *[]T, np *int, zeroOut pslib.ZeroOut) (isDone bool) {
+
+	// process each slice in sliceList in order
+	//	- sliceList is [][]T
+	//	- each value-slice from sliceList:
+	//	- — type []T
+	//	- — non-nil with non-zero length and capacity
+	for len(q.sliceList) > 0 {
+		// slicep *[]T is non-zero length
+		var slicep = &q.sliceList[0]
+		// sliceBefore is source slice before slice-away operation
+		var sliceBefore = *slicep
+
+		// copy slicep to dest without zero-out
+		isDone = CopyToSlice(slicep, dest, np, pslib.NoZeroOut)
+
 		// if the value-slice was copied empty, remove it
-		if len(*slicep) == 0 {
+		if slicepLength := len(*slicep); slicepLength == 0 {
+			// set to nil, zero-out not required
 			*slicep = nil
+			// slice-away
 			if len(q.sliceList) == 1 {
 				q.sliceList = q.sliceList0[:0]
 			} else {
 				q.sliceList = q.sliceList[1:]
 			}
+		} else if zeroOut == pslib.DoZeroOut {
+			if copyCount := len(sliceBefore) - slicepLength; copyCount > 0 {
+				clear(sliceBefore[:copyCount])
+			}
 		}
+
+		// isDone true means dest is now empty
 		if isDone {
 			return
 		}
 	}
+
 	return
 }
 
 // getLastSliceMetrics provides information on last slice of sliceList
+//   - length: non-zero length of last slice if it exists
+//   - capacity: non-zero capacity of last slice if it exists
 func (q *list[T]) getLastSliceMetrics() (length, capacity int) {
+
+	// empty sliceList case
 	if len(q.sliceList) == 0 {
 		return
 	}
+
 	var slice = q.sliceList[len(q.sliceList)-1]
 	length = len(slice)
 	capacity = cap(slice)
 	return
 }
 
+// getLastSliceSlice returns the last slice without ownership if it exists
+//   - lastSlice non-nil: a non-empty value-slice
+//   - lastSlice nil: sliceList is empty
 func (q *list[T]) getLastSliceSlice() (lastSlice []T) {
+
+	// sliceList empty case
 	if len(q.sliceList) == 0 {
 		return
 	}
+
 	lastSlice = q.sliceList[len(q.sliceList)-1]
 	return
 }
 
 // swapLastSlice gets or sets last slice
-//   - on get, lastSlice remains
+//   - slice empty: return last slice but not its ownership
+//   - slice[0] present: must be slice of non-zero length
+//   - — if last slice exists, it is overwritten by slice[0]
+//   - — if sliceList is empty, slice[0] is appended as new last slice
 func (q *list[T]) swapLastSlice(slice ...[]T) (lastSlice []T) {
 
-	// pointer to last slice
+	// slicep is pointer to last slice or nil if it does not exist
 	var slicep *[]T
 	if len(q.sliceList) > 0 {
 		slicep = &q.sliceList[len(q.sliceList)-1]
@@ -210,30 +253,36 @@ func (q *list[T]) swapLastSlice(slice ...[]T) (lastSlice []T) {
 	return
 }
 
-// enqueueInLastSlice appends value to the last slice in sliceList
-//   - value: non-empty value list
-//   - slice list must have been verified to not be empty
-func (q *list[T]) enqueueInLastSlice(value ...T) {
+// enqueueInLastSlice appends values to the last slice in sliceList
+//   - values: non-empty value list
+//   - sliceList must have been verified to not be empty
+//   - operation may be copy or re-allocating append
+func (q *list[T]) enqueueInLastSlice(values ...T) {
 
 	// index of last slice in sliceList
 	var index = len(q.sliceList) - 1
+	// pointer to last slice
 	var slicep = &q.sliceList[index]
-	// the last slice from sliceList
+	// the last slice in sliceList
 	var slice = *slicep
+	// initial length of last slice
 	var length = len(slice)
 
 	// if value fits, copy it into slice
-	if n := length + len(value); n <= cap(slice) {
+	if n := length + len(values); n <= cap(slice) {
+		// extend slice to new length
 		slice = slice[:n]
-		if len(value) == 1 {
-			slice[length] = value[0]
+		if len(values) == 1 {
+			slice[length] = values[0]
 		} else {
-			copy(slice[length:], value)
+			// copy values to last part of slice
+			copy(slice[length:], values)
 		}
+		// update last slice
 		*slicep = slice
 		return
 	}
 
 	// realloc
-	*slicep = append(slice, value...)
+	*slicep = append(slice, values...)
 }

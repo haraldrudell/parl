@@ -40,7 +40,7 @@ func traverseForReference(reflectType reflect.Type) (hasReference bool) {
 	// kind that reflects interface types
 	var kind = reflectType.Kind()
 
-	hasReference = kindHasReference(kind)
+	hasReference = KindHasReference(kind)
 
 	if hasReference || kind != reflect.Struct {
 		return
@@ -58,13 +58,13 @@ func traverseForReference(reflectType reflect.Type) (hasReference bool) {
 	return // struct no references
 }
 
-// kindHasReference returns true if kind may hold references
+// KindHasReference returns true if kind may hold references
 //   - kind [reflect.Struct]: returned as false, but needs to be iterated
-func kindHasReference(kind reflect.Kind) (hasReference bool) {
+func KindHasReference(kind reflect.Kind) (hasReference bool) {
 	switch kind {
 	case reflect.Ptr, reflect.Array, reflect.Chan,
 		reflect.Func, reflect.Interface, reflect.Map,
-		reflect.Slice, reflect.Uintptr, reflect.String,
+		reflect.Slice, reflect.String,
 		reflect.UnsafePointer:
 		return true
 	case reflect.Struct:

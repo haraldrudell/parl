@@ -291,7 +291,6 @@ func (s *AwaitableSlice[T]) State() (state AwaitableSliceState) {
 			Length:   len(s.inQ.list.sliceList),
 			Capacity: cap(s.inQ.list.sliceList),
 		},
-		IsAlloc: s.inQ.isAlloc.Load(),
 		Head: Metrics{
 			Length:   len(s.outQ.head),
 			Capacity: cap(s.outQ.head),
@@ -407,7 +406,7 @@ func (s *AwaitableSlice[T]) enterOutputCritical() (s2 *AwaitableSlice[T]) {
 func (s *AwaitableSlice[T]) transferToOutQ(action getAction, maxCount ...int) (slice []T, slices [][]T) {
 
 	// only access queueLock if there is data behind it
-	if s.hasDataBits.inQIsEmpty() {
+	if s.hasDataBits.isInQEmpty() {
 		// no data behind queueLock
 		if action != getNothing {
 			return // entire queue empty return
@@ -418,6 +417,61 @@ func (s *AwaitableSlice[T]) transferToOutQ(action getAction, maxCount ...int) (s
 		s.hasDataBits.setOutputLockEmpty()
 		return // only data in outQ return
 	}
+
+	slice = s.emptyInQ(action)
+
+	// now update hasData
+	//	- hasData is currently true
+
+	switch action {
+	case getValue:
+		// if fetching single value and more than one value in that slice,
+		// not end of data: hasData should remain true
+		if len(slice) > 1 || !s.outQ.isEmptyList() {
+			return // have more than one value: hasData true
+		}
+	case getNothing:
+		// getAll and getSlices will empty entire queue: hasData false
+
+	case getSlice:
+		// slice will be consumed entirely
+		if !s.outQ.isEmptyList() {
+			return // more slices exist: hasData true
+		}
+		//	- there are no more slices, so hasData is now false
+	case getMax:
+
+		// looking for specific number of items: n
+		var n int
+		if len(maxCount) > 0 {
+			n = maxCount[0]
+		}
+
+		var headLength, _ = s.outQ.getHeadMetrics()
+		// if n goes negative, hasData should be true
+		//	- return keeps hasData true
+		//	- if s.output, s.outputs contains more than n: hasData true
+		//	- if s.output, s.outputs contains less or equal to n: hasData false
+		if n -= headLength; n < 0 {
+			return // more items than n: hasData true
+		} else if n -= s.outQ.getListElementCount(); n < 0 {
+			return // more items than n: hasData true
+		}
+	default:
+		panic(perrors.ErrorfPF("Bad action: %d", action))
+	}
+	// hasData should be false
+
+	// there is not enough data for the queue to not become empty
+	// update hasDataBits while holding inQ lock
+	s.hasDataBits.setOutputLockEmpty()
+
+	return // hasData now false return
+}
+
+// emptyInQ acquires inQ lock and transfer all elements to outQ
+//   - outQ lock must be held
+func (s *AwaitableSlice[T]) emptyInQ(action getAction) (slice []T) {
 
 	// prealloc outside inQ lock
 	//	- because inQ has data, inQ primary is allocated and non-empty
@@ -513,55 +567,8 @@ func (s *AwaitableSlice[T]) transferToOutQ(action getAction, maxCount ...int) (s
 		// empty and zero-out s.slices
 		s.inQ.clearList()
 	}
-	// inQ is now empty
 
-	// hasData must be updated while holding queueLock
-	//	- hasData is currently true
-
-	switch action {
-	case getValue:
-		// if fetching single value and more than one value in that slice,
-		// not end of data: hasData should remain true
-		if len(slice) > 1 || !s.outQ.isEmptyList() {
-			return // have more than one value: hasData true
-		}
-	case getNothing:
-		// getAll and getSlices will empty entire queue: hasData false
-
-	case getSlice:
-		// slice will be consumed entirely
-		if !s.outQ.isEmptyList() {
-			return // more slices exist: hasData true
-		}
-		//	- there are no more slices, so hasData is now false
-	case getMax:
-
-		// looking for specific number of items: n
-		var n int
-		if len(maxCount) > 0 {
-			n = maxCount[0]
-		}
-
-		var headLength, _ = s.outQ.getHeadMetrics()
-		// if n goes negative, hasData should be true
-		//	- return keeps hasData true
-		//	- if s.output, s.outputs contains more than n: hasData true
-		//	- if s.output, s.outputs contains less or equal to n: hasData false
-		if n -= headLength; n < 0 {
-			return // more items than n: hasData true
-		} else if n -= s.outQ.getListElementCount(); n < 0 {
-			return // more items than n: hasData true
-		}
-	default:
-		panic(perrors.ErrorfPF("Bad action: %d", action))
-	}
-	// hasData should be false
-
-	// there is not enough data for the queue to not become empty
-	// update hasDataBits while holding inQ lock
-	s.hasDataBits.resetToNoBits() // sliceFromQueue
-
-	return // hasData now false return
+	return // inQ is now empty
 }
 
 // updateWait updates dataWaitCh if either DataWaitCh or AwaitValue were invoked
@@ -803,8 +810,8 @@ func (s *AwaitableSlice[T]) postOutput(gotValue, checkedQueue *bool) {
 //   - aggregates deferred actions to reduce latency
 //   - invoked while holding inQ Lock
 func (s *AwaitableSlice[T]) postInput() {
-	// set both data bits atomically
-	s.hasDataBits.resetToAllBits() // postSend
+	// overwrite both data bits atomically
+	s.hasDataBits.setAllBits() // postSend
 	s.inQ.lock.Unlock()
 	s.updateWait() // postSend
 }
