@@ -13,8 +13,8 @@ import (
 )
 
 func AwaitableSliceString[T any](a *AwaitableSlice[T]) (s string) {
-	defer a.enterOutputCritical().outQ.lock.Unlock()
-	defer a.enterInputCritical().inQ.lock.Unlock()
+	defer a.outQ.lock.Lock().Unlock()
+	defer a.outQ.InQ.lock.Lock().Unlock()
 
 	var sL []string
 
@@ -22,12 +22,12 @@ func AwaitableSliceString[T any](a *AwaitableSlice[T]) (s string) {
 	sL = append(sL, Sprintf(
 		"hasData: %t q %s slices %s loc %t cached %d",
 		// “hasData: false”
-		a.hasDataBits.bits.Load(),
+		a.outQ.HasDataBits.bits.Load(),
 		// queue: “q 0(10)”
-		printSlice(a.inQ.primary),
+		printSlice(a.outQ.InQ.primary),
 		// slices, slices0, isLocalSlice, cachedInput
 		// “slices 0(cap0/0 tot0 offs-1) loc false cached 10”
-		printSlice2Away(a.outQ.sliceList, a.outQ.sliceList0), cap(a.inQ.cachedInput),
+		printSlice2Away(a.outQ.sliceList, a.outQ.sliceList0), cap(a.outQ.InQ.cachedInput),
 	))
 
 	// behind outputLock

@@ -12,6 +12,7 @@ import (
 
 func TestHasReference(t *testing.T) {
 	//t.Error("Logging on")
+
 	// because HasReference is generic and
 	// must be able to detect interface,
 	// any-type argument cannot be used
@@ -25,14 +26,14 @@ func TestHasReference(t *testing.T) {
 	var b byte
 	hasReference = HasReference(b)
 	if hasReference {
-		t.Errorf("hasReference true: %T", b)
+		t.Errorf("FAIL hasReference true: %T", b)
 	}
 
 	// int* should be true
 	var intp *int
 	hasReference = HasReference(intp)
 	if !hasReference {
-		t.Errorf("hasReference false: %T", intp)
+		t.Errorf("FAIL hasReference false: %T", intp)
 	}
 
 	// error should be true
@@ -41,7 +42,7 @@ func TestHasReference(t *testing.T) {
 	if !hasReference {
 		// get the interface type name
 		var typeName = reflect.TypeOf(&e).String()[1:]
-		t.Errorf("hasReference false: %s", typeName)
+		t.Errorf("FAIL hasReference false: %s", typeName)
 	}
 
 	// any should be true
@@ -50,7 +51,7 @@ func TestHasReference(t *testing.T) {
 	if !hasReference {
 		// get the interface type name
 		var typeName = reflect.TypeOf(&e).String()[1:]
-		t.Errorf("hasReference false: %s", typeName)
+		t.Errorf("FAIL hasReference false: %s", typeName)
 	}
 
 	// structs should be scanned
@@ -59,6 +60,20 @@ func TestHasReference(t *testing.T) {
 	if !hasReference {
 		// get the interface type name
 		var typeName = reflect.TypeOf(&e).String()[1:]
-		t.Errorf("hasReference false: %s", typeName)
+		t.Errorf("FAIL hasReference false: %s", typeName)
+	}
+
+	// array of int should be false
+	var aInt [1]int
+	hasReference = HasReference(aInt)
+	if hasReference {
+		t.Errorf("FAIL hasReference true: %T", aInt)
+	}
+
+	// array of pointer should be true
+	var aPointer [1]*int
+	hasReference = HasReference(aPointer)
+	if !hasReference {
+		t.Errorf("FAIL hasReference false: %T", aPointer)
 	}
 }

@@ -18,7 +18,7 @@ import "io"
 func (s *AwaitableSlice[T]) Get() (value T, hasValue bool) {
 
 	// fast check outside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		return
 	}
 
@@ -30,40 +30,12 @@ func (s *AwaitableSlice[T]) Get() (value T, hasValue bool) {
 	defer s.enterOutputCritical().postOutput(&hasValue, &checkedQueue)
 
 	// check inside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		return
 	}
 	// there is at least one value in inQ or outQ
 
-	// if primary output queue is empty, try transfering a slice from output slice list
-	if s.outQ.isEmptyHead() && !s.outQ.isEmptyOutput() {
-		s.outQ.trySaveToCachedOutput(s.inQ.maxRetainSize.Load())
-		// write new primary output queue
-		s.outQ.swapHead(s.outQ.dequeueFromList())
-	}
-	// if s.outQ is not empty, head has items
-
-	// try outQ head
-	if hasValue = !s.outQ.isEmptyHead(); hasValue {
-		value = s.outQ.dequeueFromHead()
-		return // value from primary output queue return
-	}
-	// s.outQ is empty
-
-	// transfer slice from inQ
-	var slice, _ = s.transferToOutQ(getValue)
-	checkedQueue = true
-	if hasValue = len(slice) > 0; !hasValue {
-		return // no value available return
-	}
-	// slice is non-empty slice from inQ
-
-	// store slice as new output
-	s.outQ.swapHead(slice)
-	// fetch value using slice-away
-	value = s.outQ.dequeueFromHead()
-
-	return // value from inQ return
+	return s.outQ.get(&checkedQueue)
 }
 
 // GetSlice returns a slice of values from the queue
@@ -81,47 +53,34 @@ func (s *AwaitableSlice[T]) Get() (value T, hasValue bool) {
 func (s *AwaitableSlice[T]) GetSlice() (values []T) {
 
 	// fast check outside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
 	var hasValue, checkedQueue bool
 	defer s.enterOutputCritical().postOutput(&hasValue, &checkedQueue)
 
 	// check inside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
 	// there is at least one value in inQ or outQ
 	hasValue = true
 
-	// try output
-	if !s.outQ.isEmptyHead() {
-		values, _ = s.outQ.swapHead()
-		return // primary output slice return
-	}
-
-	// try outQ sliceList
-	if values = s.outQ.dequeueFromList(); values != nil {
-		return // slice from outQ sliceList return
-	}
-	// outQ is empty
-
-	// transfer from inQ
-	values, _ = s.transferToOutQ(getSlice)
-	checkedQueue = true
-
-	return
+	return s.outQ.getSlice(&checkedQueue)
 }
 
 // GetSlices empties the queue at near zero allocations
-//   - if queue was empty: values nil, valueSlices nil
-//   - if queue was not empty, values is non-empty
-//   - if queue had more than one slice, valueSlices is non-empty, too
+//   - buffer missing: slices is allocated to exact size
+//   - buffer: optional buffer to avoid allocation, typically length zero
+//   - — capacity 10 or 100 can be used
+//     Exact required size is not known prior to acquiring locks
+//   - slices: list of non-empty value slices
+//   - slices nil: the queue was empty
 //   - thread-safe
-func (s *AwaitableSlice[T]) GetSlices() (values []T, valueSlices [][]T) {
+func (s *AwaitableSlice[T]) GetSlices(buffer ...[][]T) (slices [][]T) {
 
 	// fast check outside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
 
@@ -131,27 +90,17 @@ func (s *AwaitableSlice[T]) GetSlices() (values []T, valueSlices [][]T) {
 	defer s.enterOutputCritical().postOutput(&checkedQueue, &checkedQueue)
 
 	// check inside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
 	// there is at least one value in inQ or outQ
 
-	// move any data from inQ to outQ
-	s.transferToOutQ(getNothing)
-	// inQ is empty, outQ is not empty
-
-	// first slice
-	if !s.outQ.isEmptyHead() {
-		values, _ = s.outQ.swapHead()
+	var b [][]T
+	if len(buffer) > 0 {
+		b = buffer[0]
 	}
 
-	// slice list
-	if !s.outQ.isEmptyList() {
-		valueSlices = s.outQ.swapList()
-		s.inQ.HasList.Store(false)
-	}
-
-	return
+	return s.outQ.getSlices(b)
 }
 
 // GetAll returns a single slice of all values in queue
@@ -160,7 +109,7 @@ func (s *AwaitableSlice[T]) GetSlices() (values []T, valueSlices [][]T) {
 func (s *AwaitableSlice[T]) GetAll() (values []T) {
 
 	// fast check outside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
 
@@ -170,44 +119,12 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 	defer s.enterOutputCritical().postOutput(&checkedQueue, &checkedQueue)
 
 	// check inside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
 	// there is at least one value in inQ or outQ
 
-	// move any data from inQ to outQ
-	//	- this way there is no slice alloc while holding inQ lock
-	s.transferToOutQ(getNothing)
-	// inQ is empty, outQ is not empty
-
-	// single-slice case
-	if s.outQ.isEmptyList() {
-		// slice list is empty, so output slice cannot be empty
-		values, _ = s.outQ.swapHead()
-		return // primary output slice return
-	}
-	// outQ contains more than one slice
-
-	var headLength, _ = s.outQ.getHeadMetrics()
-	// aggregate outQ
-	// allSize is length of the returned slice
-	var allSize = headLength + s.outQ.getListElementCount()
-
-	// make slice to return
-	values = make([]T, allSize)
-	// v is slice-away of values
-	var v = values
-
-	// primary output slice is not empty
-	var n = s.outQ.dequeueHead(v)
-	v = v[n:]
-
-	// any outQ sliceList
-	if !s.outQ.isEmptyList() {
-		s.outQ.dequeueList(v)
-	}
-
-	return
+	return s.outQ.getAll()
 }
 
 // Read makes AwaitableSlice [io.Reader]
@@ -231,7 +148,7 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 func (s *AwaitableSlice[T]) Read(p []T) (n int, err error) {
 
 	// fast check outside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		if s.isCloseInvoked.Load() {
 			err = io.EOF
 		}
@@ -246,7 +163,7 @@ func (s *AwaitableSlice[T]) Read(p []T) (n int, err error) {
 	defer s.enterOutputCritical().postOutput(&checkedQueue, &checkedQueue)
 
 	// check inside lock
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		if s.isCloseInvoked.Load() {
 			err = io.EOF
 		}
@@ -255,38 +172,12 @@ func (s *AwaitableSlice[T]) Read(p []T) (n int, err error) {
 	// there is data in inQ or outQ:
 	// at least one value will be returned
 
-	// whether p has been completely read
-	var isDone bool
+	n, err = s.outQ.read(p)
 
-	// iterate i: 0, 1
-	//	- i 0: consume from outQ
-	//	- — if more data requested and inQ not empty,
-	//	- i 1: fetch from inQ then consume outQ again
-	for i := range 2 {
-
-		// read outputLock data
-		if !isDone {
-			isDone = s.outQ.dequeueNFromOutput(&p, &n)
-		}
-		// after i == 1, do not read from inQ
-		if i != 0 {
-			continue
-		}
-
-		// case before accessing queueLock
-		if isDone && !s.outQ.isEmptyOutput() {
-			// read complete and hasData does not need update
-			return // Read complete return
-		}
-		// transfer data from queueLock and update hasData
-		s.transferToOutQ(getMax, len(p))
-	}
-	// read from outQ and inQ
-	// hasData was possibly updated
-
-	if !s.hasDataBits.hasData() && s.isCloseInvoked.Load() {
+	if !s.outQ.HasDataBits.hasData() && s.isCloseInvoked.Load() {
 		err = io.EOF
 	}
+
 	return
 }
 

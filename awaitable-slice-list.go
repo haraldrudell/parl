@@ -50,35 +50,17 @@ func (q *list[T]) getListElementCount() (count int) {
 	return
 }
 
-// swapList swaps sliceList and its ownership
-//   - set nil: gets sliceList and its ownership
-//   - set non-empty: sets sliceList to set[0]
-//   - — set[0] may be nil
-//   - — set[0] may contain slices of elements
-//   - — a non-nil set[0] must have non-zero capacity
-//   - — no set[0] element of type []T may be nil or empty
-//   - slices: sliceList if set non-empty, otherwise nil
-//   - slices non-nil: a slice of non-zero capacity
-//   - — no slices eleement of type []T is nil or empty
-func (q *list[T]) swapList(set ...[][]T) (slices [][]T) {
-
-	// set case
-	if len(set) > 0 {
-		var newSliceList = set[0]
-		q.sliceList = newSliceList
-		if c := cap(newSliceList); len(newSliceList) < c {
-			newSliceList = newSliceList[:c]
-		}
-		q.sliceList0 = newSliceList
-		return
+// setList sets sliceList, typically a one-time operation
+//   - sliceList non-nil: provides allocated capacity to the list instance
+//   - — if sliceList is not empty, it cannot contain nil or empty slice values
+//   - — sliceList must have non-zero capacity
+//   - sliceList nil: deallocates sliceList
+func (q *list[T]) setList(sliceList [][]T) {
+	q.sliceList = sliceList
+	if c := cap(sliceList); len(sliceList) < c {
+		sliceList = sliceList[:c]
 	}
-
-	// get q.sliceList and ownership
-	slices = q.sliceList
-	q.sliceList = nil
-	q.sliceList0 = nil
-
-	return
+	q.sliceList0 = sliceList
 }
 
 // getListSlice gets sliceList but not its ownership

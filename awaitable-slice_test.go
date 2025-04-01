@@ -11,6 +11,8 @@ import (
 	"slices"
 	"sync"
 	"testing"
+
+	"github.com/haraldrudell/parl/pslices/pslib"
 )
 
 func TestAwaitableSlice(t *testing.T) {
@@ -261,9 +263,9 @@ func TestAwaitableSliceSend(t *testing.T) {
 	slice.GetAll()
 	// len(s.slices): 0 s.queue: true s.cachedInput: true
 	t.Logf("len(s.slices): %d s.queue: %t s.cachedInput: %t",
-		len(slice.outQ.sliceList), slice.inQ.primary != nil, slice.inQ.cachedInput != nil,
+		len(slice.outQ.sliceList), slice.outQ.InQ.primary != nil, slice.outQ.InQ.cachedInput != nil,
 	)
-	slice.inQ.primary = nil
+	slice.outQ.InQ.primary = nil
 	// Send should cover using cachedInput
 	slice.Send(value)
 
@@ -312,24 +314,24 @@ func TestAwaitableSliceGet(t *testing.T) {
 
 	// populated Slice: q: [1] slices: [[2] [3]]
 	t.Logf("Get: populated Slice: q: %v slices: %v hasData %t",
-		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+		queue.outQ.InQ.primary, queue.outQ.InQ.sliceList, queue.outQ.HasDataBits.hasData(),
 	)
 	for i, v := range values {
 
 		actual, hasValue = queue.Get()
 		t.Logf("Get#%d(0…%d) value %d hasValue: %t hasData: %t",
 			i, len(values)-1,
-			actual, hasValue, queue.hasDataBits.hasData(),
+			actual, hasValue, queue.outQ.HasDataBits.hasData(),
 		)
 
 		if !hasValue {
 			t.Errorf("FAIL Get#%d(0…%d) hasValue: %t hasData %t",
-				i, len(values)-1, hasValue, queue.hasDataBits.hasData(),
+				i, len(values)-1, hasValue, queue.outQ.HasDataBits.hasData(),
 			)
 		}
 		if actual != v {
 			t.Errorf("FAIL Get#%d(0…%d) %d exp %d  hasData %t",
-				i, len(values)-1, actual, v, queue.hasDataBits.hasData(),
+				i, len(values)-1, actual, v, queue.outQ.HasDataBits.hasData(),
 			)
 		}
 	}
@@ -367,14 +369,14 @@ func TestAwaitableSliceGetSlice(t *testing.T) {
 	queue.SendSlice([]int{value2})
 	queue.SendSlices([][]int{{value3}})
 	t.Logf("GetSlice: populated Slice: q: %v slices: %v hasData %t",
-		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+		queue.outQ.InQ.primary, queue.outQ.InQ.sliceList, queue.outQ.HasDataBits.hasData(),
 	)
 	for i, v := range values {
 
 		actuals = queue.GetSlice()
 		t.Logf("GetSlice#%d(0…%d) slice: %v hasData: %t",
 			i, len(values)-1,
-			actuals, queue.hasDataBits.hasData(),
+			actuals, queue.outQ.HasDataBits.hasData(),
 		)
 
 		if len(actuals) != 1 {
@@ -418,7 +420,7 @@ func TestAwaitableSliceGetAll(t *testing.T) {
 	queue.Send(value3)
 	// populated Slice: q: [1] slices: [[2] [3]]
 	t.Logf("GetAll: populated Slice: q: %v slices: %v hasData %t",
-		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+		queue.outQ.InQ.primary, queue.outQ.InQ.sliceList, queue.outQ.HasDataBits.hasData(),
 	)
 
 	actuals = queue.GetAll()
@@ -439,15 +441,12 @@ func TestAwaitableSliceGetSlices(t *testing.T) {
 		value1, value2, value3 = 1, 2, 3
 	)
 	var (
-		// expValueSlice [1]
-		expValueSlice = []int{value1}
-		// expSliceList [[2 3]]
-		expSliceList = [][]int{{value2, value3}}
+		// expValueSlice [ [1] [2 3] ]
+		expValueSlice = [][]int{{value1}, {value2, value3}}
 	)
 
 	var (
-		actuals  []int
-		actuals2 [][]int
+		actuals [][]int
 	)
 
 	var queue *AwaitableSlice[int]
@@ -463,24 +462,18 @@ func TestAwaitableSliceGetSlices(t *testing.T) {
 
 	// populated Slice: q: [1] slices: [[2] [3]]
 	t.Logf("GetSlices: populated Slice: q: %v slices: %v hasData %t",
-		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+		queue.outQ.InQ.primary, queue.outQ.InQ.sliceList, queue.outQ.HasDataBits.hasData(),
 	)
 
-	actuals, actuals2 = queue.GetSlices()
-	t.Logf("GetSlices actuals: %v actuals2: %v", actuals, actuals2)
+	actuals = queue.GetSlices()
+	t.Logf("GetSlices actuals: %v", actuals)
 
-	if !slices.Equal(actuals, expValueSlice) {
+	if !compareSliceLists(actuals, expValueSlice) {
 		t.Errorf("FAIL value-slice %v exp %v", actuals, expValueSlice)
 	}
-	if !compareSliceLists(actuals2, expSliceList) {
-		t.Errorf("FAIL sliceList %v exp %v", actuals2, expSliceList)
-	}
-	actuals, actuals2 = queue.GetSlices()
+	actuals = queue.GetSlices()
 	if actuals != nil {
 		t.Errorf("FAIL GetSlices empty not nil: %d%v", len(actuals), actuals)
-	}
-	if actuals2 != nil {
-		t.Errorf("FAIL GetSlices empty not nil: %d%v", len(actuals2), actuals2)
 	}
 }
 
@@ -525,7 +518,7 @@ func TestAwaitableSliceRead(t *testing.T) {
 	queue.Send(&value3)
 	// populated Slice: q: [1] slices: [[2] [3]]
 	t.Logf("Read: populated Slice: q: %v slices: %v hasData %t",
-		queue.inQ.primary, queue.inQ.sliceList, queue.hasDataBits.hasData(),
+		queue.outQ.InQ.primary, queue.outQ.InQ.sliceList, queue.outQ.HasDataBits.hasData(),
 	)
 
 	// Read should return first two pointers
@@ -624,4 +617,85 @@ func compareSliceLists[T comparable](a, b [][]T) (isEqual bool) {
 	}
 	isEqual = true
 	return
+}
+
+func TestAwaitableSliceAlloc(t *testing.T) {
+	//t.Error("Logging on")
+	var (
+		state AwaitableSliceState
+		err   error
+	)
+
+	var intSlice AwaitableSlice[int]
+
+	intSlice.Send(1)
+	intSlice.Get()
+	state, _ = intSlice.State()
+	// intSlice: {
+	// Size:512 MaxRetainSize:512 HasData:0
+	// IsDataWaitActive:false IsDataWaitClosed:false
+	// IsCloseInvoked:false IsClosed:false
+	// Head:{Length:0 Capacity:512} CachedOutput:{Length:0 Capacity:0}
+	// OutList:{Length:0 Capacity:512} OutQ:[]
+	// Primary:{Length:0 Capacity:512} CachedInput:{Length:0 Capacity:0}
+	// InList:{Length:0 Capacity:512} InQ:[]
+	// HasInput:false HasList:true ZeroOut:NoZeroOut
+	// }
+	t.Logf("intSlice: %+v", state)
+
+	// int-queue should have outQ head 4 KiB
+	if state.Head.Capacity != sliceListSize {
+		t.Errorf("int queue head capacity %d exp %d",
+			state.Head.Capacity, sliceListSize,
+		)
+	}
+
+	// int-queue should have InQ cachedInput pre-alloccated
+	if state.CachedInput.Capacity == 0 {
+		t.Error("int queue cachedInput not pre-alloc")
+	}
+
+	// int-queue should be NoZeroOut
+	if state.ZeroOut != pslib.NoZeroOut {
+		t.Errorf("int queue bad zero-out: %s exp %s",
+			state.ZeroOut, pslib.NoZeroOut,
+		)
+	}
+
+	var errSlice AwaitableSlice[error]
+
+	// error-queue state should…
+	errSlice.Send(err)
+	errSlice.Get()
+	state, _ = errSlice.State()
+	// errSlice: {
+	// Size:10 MaxRetainSize:100
+	// HasData:0 IsDataWaitActive:false IsDataWaitClosed:false
+	// IsCloseInvoked:false IsClosed:false
+	// Head:{Length:0 Capacity:10} CachedOutput:{Length:0 Capacity:0}
+	// OutList:{Length:0 Capacity:512} OutQ:[]
+	// Primary:{Length:0 Capacity:10} CachedInput:{Length:0 Capacity:10}
+	// InList:{Length:0 Capacity:512} InQ:[]
+	// HasInput:true HasList:true ZeroOut:DoZeroOut
+	// }
+	t.Logf("errSlice: %+v", state)
+
+	// error-queue should have outQ head 10 errors
+	if state.Head.Capacity != minElements {
+		t.Errorf("error queue head capacity %d exp %d",
+			state.Head.Capacity, minElements,
+		)
+	}
+
+	// error-queue should have InQ cachedInput nil
+	if state.CachedInput.Capacity != 0 {
+		t.Error("error queue cachedInput pre-alloc")
+	}
+
+	// error-queue should be DoZeroOut
+	if state.ZeroOut != pslib.DoZeroOut {
+		t.Errorf("error queue bad zero-out: %s exp %s",
+			state.ZeroOut, pslib.DoZeroOut,
+		)
+	}
 }

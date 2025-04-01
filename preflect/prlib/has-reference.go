@@ -40,6 +40,11 @@ func traverseForReference(reflectType reflect.Type) (hasReference bool) {
 	// kind that reflects interface types
 	var kind = reflectType.Kind()
 
+	// array: determined by its element type
+	if kind == reflect.Array {
+		kind = reflectType.Elem().Kind()
+	}
+
 	hasReference = KindHasReference(kind)
 
 	if hasReference || kind != reflect.Struct {
@@ -59,14 +64,18 @@ func traverseForReference(reflectType reflect.Type) (hasReference bool) {
 }
 
 // KindHasReference returns true if kind may hold references
-//   - kind [reflect.Struct]: returned as false, but needs to be iterated
+//   - kind [reflect.Struct]: returned as false, but fields needs to be iterated
+//   - kind [reflect.Array]: returned as false, but element type needs to be examined
 func KindHasReference(kind reflect.Kind) (hasReference bool) {
+
 	switch kind {
-	case reflect.Ptr, reflect.Array, reflect.Chan,
+	case reflect.Ptr, reflect.Chan,
 		reflect.Func, reflect.Interface, reflect.Map,
 		reflect.Slice, reflect.String,
 		reflect.UnsafePointer:
 		return true
+	case reflect.Array:
+
 	case reflect.Struct:
 	}
 	// kind does not have reference

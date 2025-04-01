@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/preflect/prlib"
 	"github.com/haraldrudell/parl/pslices/pslib"
 )
@@ -90,34 +89,6 @@ import (
 //	  if value, hasValue = valueQueue.Get(); hasValue {
 //	    doSomething(value)
 type AwaitableSlice[T any] struct {
-	// hasDataBits is bit-field indicating whether there is data behind locks
-	//	- two bits are combined into an atomic providing data intergrity
-	//	- — hasDataBit is set when the overall AwaitableSlice has data
-	//	- — set behind queueLock
-	//	- — cleared behind outputLock using atomic operations
-	//	- queueLockHasDataBit is set when there is data behind queueLock
-	//	- — written behind queueLock
-	//	- this design means outputLock does not have to access
-	//		queueLock to determine if there is data behind queueLock
-	//	- because queueLock is not synchronized with outputLock,
-	//		there must be combined atomic or lock to ensure integrity
-	//	-— eg. an ongoing outputLock may overwrite queue bit after
-	//		a parallel queueLock sets it to true
-	//	- both bits are set to true by simple write in postGet behind queueLock
-	//		when data was just added to the queue. For as long as queueLock is held,
-	//		state cannot change
-	//	- queueLockHasDataBit is cleared while holding both locks when
-	//		all queueLock data is moved to outputLock
-	//	- later during in the same lock configuration, if it is concluded that
-	//		outputLock will be emptied, hasDataBit is cleared, too
-	//	- hasDataBit may be cleared during subsequent Get that empties outputLock
-	//		but only if queueLockHasDataBit has not been set again ensured by
-	//		CompareAndSwap
-	//	- value can be read at any time without holding any locks
-	hasDataBits hasData
-	// inQ contains lock and queues for input methods
-	//	- separate input and output locks reduces contention
-	inQ inputQueue[T]
 	// outQ contains lock and queues for output methods
 	//	- separate input and output locks reduces contention
 	outQ outputQueue[T]
@@ -205,7 +176,7 @@ func (s *AwaitableSlice[T]) Close() (err error) {
 	// set initial isEmpty state
 	//	- if queue is already empty, ie. hasData false,
 	//		isEmpty should be triggered
-	if !s.hasDataBits.hasData() {
+	if !s.outQ.HasDataBits.hasData() {
 		s.isEmpty.Close()
 	}
 
@@ -236,61 +207,90 @@ func (s *AwaitableSlice[T]) IsClosed() (isClosed bool) {
 func (s *AwaitableSlice[T]) SetSize(size int) {
 
 	var t T
-	if s.inQ.maxRetainSize.Load() == 0 {
+	var sizeofT = int(unsafe.Sizeof(t))
+	if s.outQ.InQ.MaxRetainSize.Load() == 0 {
 		var zeroOut pslib.ZeroOut
 		if !prlib.HasReference(t) {
 			zeroOut = pslib.NoZeroOut
 		}
-		s.outQ.ZeroOut.Store(zeroOut)
-		s.inQ.ZeroOut.Store(zeroOut)
+		s.outQ.InQ.ZeroOut.Store(zeroOut)
 	}
+
+	var isLowAlloc bool
 
 	// get size
 	// - effective size must be positive
 	//	- minimum defaultSize
 	if size < 1 {
-		var typeIsError = reflect.TypeFor[T]().Name() == "error"
+		var typeIsError = reflect.TypeFor[T]().Name() == errorTypeName
 		if typeIsError {
-			// TODO 250327 error no pre-alloc
 			size = minElements
+			isLowAlloc = true
 		} else {
 			// size is number of elements in 4 KiB rounded down
 			// or minimum 10
-			size = max(targetSliceByteSize4KiB/int(unsafe.Sizeof(t)), minElements)
+			size = max(targetSliceByteSize4KiB/sizeofT, minElements)
 		}
+	} else {
+		isLowAlloc = size <= minElements && size*sizeofT < targetSliceByteSize4KiB
 	}
-	s.inQ.size.Store(size)
+	s.outQ.InQ.Size.Store(size)
+	s.outQ.InQ.IsLowAlloc.Store(isLowAlloc)
+
+	var sizeBytes = size * sizeofT
+	s.outQ.sizeMax4KiB.Store(sizeBytes <= targetSliceByteSize4KiB)
 
 	// set retain-size to the larger of size and 100
 	//	- slices less or equal to this capacity are retained to reduce allocations
 	//	- slices larger than this are discarded to avoid temporary memory leaks
-	s.inQ.maxRetainSize.Store(max(size, maxForPrealloc))
+	s.outQ.InQ.MaxRetainSize.Store(max(size, maxForPrealloc))
+}
+
+// Length returns current and historic max length of the queue
+//   - length: current number of elements in the queue
+//   - maxLength: the highest number of elements that were in the queue
+//   - on first invocation of Length, queue begins to track length
+//   - using Length has a performance impact
+//   - maxLength can only be tracked inside locks
+//   - if maxLength is to be obtained, length must be tracked, too
+func (s *AwaitableSlice[T]) Length() (length, maxLength int) {
+
+	// ensure length tracking is initialized
+	if !s.outQ.InQ.IsLength.Load() {
+		s.outQ.initLength()
+	}
+
+	length = s.outQ.InQ.Length.Load()
+	maxLength = int(s.outQ.InQ.MaxLength.Max1())
+	return
 }
 
 // State returns internal state for debug purposes
+//   - populateValues missing: values are not retrieved
+//   - populateValues [ValuesYes]: every queue slice value is provided in values
 //   - holds both locks: not for frequent use
-func (s *AwaitableSlice[T]) State() (state AwaitableSliceState) {
+func (s *AwaitableSlice[T]) State(populateValues ...ValuesFlag) (state AwaitableSliceState, values AwaitableSliceValues[T]) {
 	defer s.outQ.lock.Lock().Unlock()
-	defer s.inQ.lock.Lock().Unlock()
+	defer s.outQ.InQ.lock.Lock().Unlock()
 
 	state = AwaitableSliceState{
-		Size:             s.inQ.size.Load(),
-		MaxRetainSize:    s.inQ.maxRetainSize.Load(),
-		HasData:          uint32(s.hasDataBits.bits.Load()),
+		Size:          s.outQ.InQ.Size.Load(),
+		MaxRetainSize: s.outQ.InQ.MaxRetainSize.Load(),
+		SizeMax4KiB:   s.outQ.sizeMax4KiB.Load(),
+		IsLowAlloc:    s.outQ.InQ.IsLowAlloc.Load(),
+		ZeroOut:       s.outQ.InQ.ZeroOut.Load(),
+
 		IsDataWaitActive: s.dataWait.IsActive.Load(),
 		IsCloseInvoked:   s.isCloseInvoked.Load(),
-		Primary: Metrics{
-			Length:   len(s.inQ.primary),
-			Capacity: cap(s.inQ.primary),
-		},
-		CachedInput: Metrics{
-			Length:   len(s.inQ.cachedInput),
-			Capacity: cap(s.inQ.cachedInput),
-		},
-		InList: Metrics{
-			Length:   len(s.inQ.list.sliceList),
-			Capacity: cap(s.inQ.list.sliceList),
-		},
+
+		HasInput:         s.outQ.InQ.HasInput.Load(),
+		HasList:          s.outQ.InQ.HasList.Load(),
+		HasData:          uint32(s.outQ.HasDataBits.bits.Load()),
+		IsLength:         s.outQ.InQ.IsLength.Load(),
+		Length:           s.outQ.InQ.Length.Load(),
+		MaxLength:        s.outQ.InQ.MaxLength.Max1(),
+		LastPrimaryLarge: s.outQ.lastPrimaryLarge,
+
 		Head: Metrics{
 			Length:   len(s.outQ.head),
 			Capacity: cap(s.outQ.head),
@@ -300,10 +300,22 @@ func (s *AwaitableSlice[T]) State() (state AwaitableSliceState) {
 			Capacity: cap(s.outQ.cachedOutput),
 		},
 		OutList: Metrics{
-			Length:   len(s.inQ.list.sliceList),
-			Capacity: cap(s.inQ.list.sliceList),
+			Length:   len(s.outQ.InQ.list.sliceList),
+			Capacity: cap(s.outQ.InQ.list.sliceList),
 		},
-		ZeroOut: s.outQ.ZeroOut.Load(),
+
+		Primary: Metrics{
+			Length:   len(s.outQ.InQ.primary),
+			Capacity: cap(s.outQ.InQ.primary),
+		},
+		CachedInput: Metrics{
+			Length:   len(s.outQ.InQ.cachedInput),
+			Capacity: cap(s.outQ.InQ.cachedInput),
+		},
+		InList: Metrics{
+			Length:   len(s.outQ.InQ.list.sliceList),
+			Capacity: cap(s.outQ.InQ.list.sliceList),
+		},
 	}
 	if state.IsDataWaitActive {
 		state.IsDataWaitClosed = s.dataWait.Cyclic.IsClosed()
@@ -311,14 +323,16 @@ func (s *AwaitableSlice[T]) State() (state AwaitableSliceState) {
 	if state.IsCloseInvoked {
 		state.IsClosed = s.isEmpty.IsClosed()
 	}
+
 	if x := state.InList.Length; x > 0 {
 		state.InQ = make([]Metrics, x)
 		for i := range x {
-			var slicep = &s.inQ.list.sliceList[i]
+			var slicep = &s.outQ.InQ.list.sliceList[i]
 			state.InQ[i].Length = len(*slicep)
 			state.InQ[i].Capacity = cap(*slicep)
 		}
 	}
+
 	if x := state.OutList.Length; x > 0 {
 		state.OutQ = make([]Metrics, x)
 		for i := range x {
@@ -328,20 +342,52 @@ func (s *AwaitableSlice[T]) State() (state AwaitableSliceState) {
 		}
 	}
 
+	if len(populateValues) == 0 || populateValues[0] != ValuesYes {
+		return
+	}
+
+	if x := len(s.outQ.head); x > 0 {
+		values.Head = make([]T, x)
+		copy(values.Head, s.outQ.head)
+	}
+	if x := len(s.outQ.sliceList); x > 0 {
+		values.Outputs = make([][]T, x)
+		for i, src := range s.outQ.sliceList {
+			var dest = &values.Outputs[i]
+			*dest = make([]T, len(src))
+			copy(*dest, src)
+		}
+	}
+
+	if x := len(s.outQ.InQ.primary); x > 0 {
+		values.Primary = make([]T, x)
+		copy(values.Primary, s.outQ.InQ.primary)
+	}
+	if x := len(s.outQ.InQ.sliceList); x > 0 {
+		values.Inputs = make([][]T, x)
+		for i, src := range s.outQ.InQ.sliceList {
+			var dest = &values.Inputs[i]
+			*dest = make([]T, len(src))
+			copy(*dest, src)
+		}
+	}
+
 	return
 }
 
-// “awaitableSlice:error_state:empty_0x14000090000”
-//   - error is the name of type T
+// “awaitableSlice:int_state:empty_0x14000090000”
+//   - int is the name of type T
 //   - state can be: uninit data empty drain closed
 //   - 0x… is unique identifier: the slice’s memory address
 //   - String does not access any lock
 func (s *AwaitableSlice[T]) String() (s2 string) {
+
+	// state is the queue’s current state “data”
 	var state string
-	if s.inQ.size.Load() == 0 {
+	if s.outQ.InQ.Size.Load() == 0 {
 		state = "uninit"
 	} else if !s.isCloseInvoked.Load() {
-		if s.hasDataBits.hasData() {
+		if s.outQ.HasDataBits.hasData() {
 			state = "data"
 		} else {
 			state = "empty"
@@ -351,9 +397,11 @@ func (s *AwaitableSlice[T]) String() (s2 string) {
 	} else {
 		state = "drain"
 	}
-	var typeName = reflect.TypeFor[T]()
+
+	var reflectType = reflect.TypeFor[T]()
+
 	s2 = fmt.Sprintf("awaitableSlice:%s_state:%s_0x%x",
-		typeName, state, Uintptr(s),
+		reflectType, state, Uintptr(s),
 	)
 	return
 }
@@ -363,10 +411,10 @@ func (s *AwaitableSlice[T]) String() (s2 string) {
 //   - may be invoked while in output critical section
 func (s *AwaitableSlice[T]) enterInputCritical() (s2 *AwaitableSlice[T]) {
 	s2 = s
-	if s.inQ.maxRetainSize.Load() == 0 {
+	if s.outQ.InQ.MaxRetainSize.Load() == 0 {
 		s.SetSize(0)
 	}
-	s.inQ.lock.Lock()
+	s.outQ.InQ.lock.Lock()
 	return
 }
 
@@ -374,201 +422,11 @@ func (s *AwaitableSlice[T]) enterInputCritical() (s2 *AwaitableSlice[T]) {
 //   - cannot be invoked while in input critical section or output critical section
 func (s *AwaitableSlice[T]) enterOutputCritical() (s2 *AwaitableSlice[T]) {
 	s2 = s
-	if s.inQ.maxRetainSize.Load() == 0 {
+	if s.outQ.InQ.MaxRetainSize.Load() == 0 {
 		s.SetSize(0)
 	}
 	s.outQ.lock.Lock()
 	return
-}
-
-// transferToOutQ moves all data to outQ.
-// Upon return, all data is with outQ and hasData is up-to-date
-//   - action getValue: seeking single value. If slice is longer, it should be saved to outQ head
-//   - action getSlice: seeking entire slice
-//   - action getNothing: returned slice is nil.
-//     outQ may not be empty.
-//     used by [AwaitableSlice.GetAll] and [AwaitableSlice.GetSlices] to aggregate all data in outQ.
-//   - action getMax: seeking maxCount number of items
-//     If slice is longer, it should be saved to s.output.
-//     Items should be fetched both from slice and s.outputs
-//   - maxCount: optional number of items for action getMax
-//   - slice: any non-empty slice from queueLock.
-//     slice is not stored in outputLock.
-//     Any additional data in queue is moved to outQ head
-//   - —
-//   - on invocation:
-//   - — output is empty unless action is getNothing
-//   - — outputLock is held
-//   - — hasData is true
-//   - to reduce queueLock contention, transferToOutQ:
-//   - — transfers all values to outQ and
-//   - — transfers pre-allocated slices to inQ
-func (s *AwaitableSlice[T]) transferToOutQ(action getAction, maxCount ...int) (slice []T, slices [][]T) {
-
-	// only access queueLock if there is data behind it
-	if s.hasDataBits.isInQEmpty() {
-		// no data behind queueLock
-		if action != getNothing {
-			return // entire queue empty return
-		}
-
-		// for GetAll GetSlices set hasData false
-		//      - if it is still zero, also reset hasDataBit using CompareAndSwap
-		s.hasDataBits.setOutputLockEmpty()
-		return // only data in outQ return
-	}
-
-	slice = s.emptyInQ(action)
-
-	// now update hasData
-	//	- hasData is currently true
-
-	switch action {
-	case getValue:
-		// if fetching single value and more than one value in that slice,
-		// not end of data: hasData should remain true
-		if len(slice) > 1 || !s.outQ.isEmptyList() {
-			return // have more than one value: hasData true
-		}
-	case getNothing:
-		// getAll and getSlices will empty entire queue: hasData false
-
-	case getSlice:
-		// slice will be consumed entirely
-		if !s.outQ.isEmptyList() {
-			return // more slices exist: hasData true
-		}
-		//	- there are no more slices, so hasData is now false
-	case getMax:
-
-		// looking for specific number of items: n
-		var n int
-		if len(maxCount) > 0 {
-			n = maxCount[0]
-		}
-
-		var headLength, _ = s.outQ.getHeadMetrics()
-		// if n goes negative, hasData should be true
-		//	- return keeps hasData true
-		//	- if s.output, s.outputs contains more than n: hasData true
-		//	- if s.output, s.outputs contains less or equal to n: hasData false
-		if n -= headLength; n < 0 {
-			return // more items than n: hasData true
-		} else if n -= s.outQ.getListElementCount(); n < 0 {
-			return // more items than n: hasData true
-		}
-	default:
-		panic(perrors.ErrorfPF("Bad action: %d", action))
-	}
-	// hasData should be false
-
-	// there is not enough data for the queue to not become empty
-	// update hasDataBits while holding inQ lock
-	s.hasDataBits.setOutputLockEmpty()
-
-	return // hasData now false return
-}
-
-// emptyInQ acquires inQ lock and transfer all elements to outQ
-//   - outQ lock must be held
-func (s *AwaitableSlice[T]) emptyInQ(action getAction) (slice []T) {
-
-	// prealloc outside inQ lock
-	//	- because inQ has data, inQ primary is allocated and non-empty
-
-	var headHasLength bool
-	if action == getNothing {
-		var length, _ = s.outQ.getHeadMetrics()
-		headHasLength = length > 0
-	}
-
-	// ensure outQ sliceList is present if required
-	if _, c := s.outQ.getListMetrics(); c == 0 {
-		// if inQ has slice, outQ likely need one too
-		//	- length cannot be checked outside lock
-		var needSliceList = s.inQ.HasList.Load()
-		if action == getNothing && !needSliceList && headHasLength {
-			needSliceList = true
-		}
-		if needSliceList {
-			s.outQ.swapList(s.inQ.makeSliceList())
-		}
-	}
-
-	// futureSliceList is prealloc for inQ SliceList
-	//	- check atomic inQ status if required
-	var futureSliceList [][]T
-	if !s.inQ.HasList.Load() {
-		futureSliceList = s.inQ.makeSliceList()
-	}
-
-	// if outQ head is empty, it will become inQ primary
-	// if outQ head is non-empty, futurePrimary will become inQ primary
-	var futurePrimary = s.preAlloc()
-	defer s.inQ.lock.Lock().Unlock()
-
-	// because both locks are held, hasDataBits can be written directly
-	//	- clear inQHasDataBit since inQ will be emptied now
-	//	- keep hasDataBit set for now
-	s.hasDataBits.resetToHasDataBit() // sliceFromQueue
-	s.transferCached(futureSliceList)
-
-	// three tasks while holding queueLock:
-	//	- find what slices to return
-	//	- transfer all other slices to outputLock
-	//	- update hasData
-
-	// output and outputLock is empty
-
-	var setPrimary bool
-
-	// try to get data to slice
-	switch action {
-	case getValue, getSlice:
-		slice = s.inQ.swapPrimary()
-		setPrimary = true
-
-	case getNothing, getMax:
-
-		// transfer primary to outQ head or
-		// outQ sliceList
-		var primary = s.inQ.swapPrimary()
-		if headHasLength {
-			s.outQ.enqueueInList(primary)
-			setPrimary = true
-
-		} else {
-			//	- instead swap empty allocated outQ head
-			//		with any non-empty inQ primary
-			// get the other
-			var head, _ = s.outQ.swapHead()
-			// put both
-			s.inQ.swapPrimary(head)
-			s.outQ.swapHead(primary)
-		}
-
-	default:
-		panic(perrors.ErrorfPF("Bad action: %d", action))
-	}
-
-	// possibly transfer pre-made head to inQ primary
-	if setPrimary {
-		if futurePrimary == nil {
-			// transfer output to inQ lock
-			futurePrimary, _ = s.outQ.swapHead()
-		}
-		s.inQ.swapPrimary(futurePrimary)
-	}
-
-	// transfer any remaining slices
-	if !s.inQ.isEmptyList() {
-		var slices = s.inQ.getListSlice()
-		s.outQ.enqueueInList(slices...)
-		// empty and zero-out s.slices
-		s.inQ.clearList()
-	}
-
-	return // inQ is now empty
 }
 
 // updateWait updates dataWaitCh if either DataWaitCh or AwaitValue were invoked
@@ -591,7 +449,7 @@ func (s *AwaitableSlice[T]) updateWait() {
 	//		single irreversible transitions, deterministic end-state
 	//		can be obtained without critical section
 	if s.isCloseInvoked.Load() && !s.isEmpty.IsClosed() {
-		if !s.hasDataBits.hasData() {
+		if !s.outQ.HasDataBits.hasData() {
 			// if EmptyCh was invoked, costs channel close.
 			// Otherwise, with the 2025 Awaitable: cheap atomics all the way
 			s.isEmpty.Close()
@@ -606,7 +464,7 @@ func (s *AwaitableSlice[T]) updateWait() {
 	// use atomics to try to avoid slower lock
 	//	- if atomics at any point are able to confirm correct state,
 	//		no further action is required
-	if s.hasDataBits.hasData() == s.dataWait.Cyclic.IsClosed() {
+	if s.outQ.HasDataBits.hasData() == s.dataWait.Cyclic.IsClosed() {
 		return // dataWait confirmed atomically return
 	}
 	// dataWait is active and incorrect state observed
@@ -619,7 +477,7 @@ func (s *AwaitableSlice[T]) updateWait() {
 	defer s.dataWait.Lock.Lock().Unlock()
 
 	// latest hasData value inside lock
-	var hasData = s.hasDataBits.hasData()
+	var hasData = s.outQ.HasDataBits.hasData()
 
 	// to close
 	if hasData {
@@ -637,138 +495,10 @@ func (s *AwaitableSlice[T]) updateWait() {
 	s.dataWait.Cyclic.Open()
 }
 
-// appendToValueSlice appends values to valueSlice imited by max
-//   - valueSlice was determine to not have enough capacity
-func (s *AwaitableSlice[T]) appendToValueSlice(valueSlice, values *[]T) (didChange bool) {
-	var v = *valueSlice
-	var vals = *values
-	var nv0 = len(v)
-
-	// if capacity too large, only copy
-	if cap(v) >= maxAppendValueSliceCapacity {
-		// n is number of elements available for copy
-		var n = cap(v) - nv0
-		if n == 0 {
-			return // no additional elements
-		}
-		didChange = true
-		n = min(n, len(vals))
-		// extend v
-		v = v[:nv0+n]
-		copy(v[nv0:], vals[:n])
-		*valueSlice = v
-		if n == len(vals) {
-			*values = nil
-			return // entire values via copy
-		}
-		*values = vals[n:]
-		return // some of values copied
-	}
-	// valueSlice can be extended
-	didChange = true
-
-	// n is initial allowed append length,
-	// depends on current length
-	var n = maxAppendValueSliceCapacity - len(v)
-	// adjust for vals length
-	var n0 = min(n, len(vals))
-	v = append(v, vals[:n0]...)
-	if len(vals) == n0 {
-		*valueSlice = v
-		*values = nil
-		return // all appended return
-	}
-	vals = vals[n0:]
-	// there are more in vals
-
-	// copy any extra from excessive realloc
-	n = cap(v) - len(v)
-	if n == 0 {
-		return
-	}
-	nv0 = len(v)
-	n0 = min(n, len(vals))
-	v = v[:nv0+n0]
-	copy(v[nv0:], vals[:n0])
-	*valueSlice = v
-	if n0 == len(vals) {
-		*values = nil
-		return
-	}
-	*values = vals[n0:]
-
-	return
-}
-
 // append to sliceList
 
 // preAlloc onlyCached
 //const onlyCachedTrue = true
-
-// preAlloc ensures that output0 and cachedOutput are allocated
-// to configured value-slice size
-//   - must hold outputLock
-//   - onlyCached missing or false: both output and cachedOutput are
-//     ensured to be allocate and reusable
-//   - onlyCached true: by former GetAll: only cachedOutput is ensured
-//     to be allocated and reusable
-//   - purpose is to reduce allocations while holding queueLock
-func (s *AwaitableSlice[T]) preAlloc() (futurePrimary []T) {
-
-	// when created inQ does not have q or sliceList allocated
-	//	- Send needs q
-	//	- SendClone SendSlice needs sliceList if q non-empty
-	//	- SendClone SendSlice discard q if sliceList empty
-
-	var length, capacity = s.outQ.getHeadMetrics()
-
-	if length > 0 {
-		futurePrimary = s.inQ.makeValueSlice()
-	} else {
-
-		// output0 first pre-allocation
-		//	- ensure output0 is a slice of good capacity
-		//	- may be transferred to queueLock
-		//	- avoids allocation while holding queueLock
-		// should output0 be allocated?
-		var makeOutput = capacity == 0
-		if !makeOutput {
-			// reuse for capacities defaultSize–maxRetainSize
-			makeOutput = capacity < minElements || capacity > s.inQ.maxRetainSize.Load()
-		}
-		if makeOutput {
-			s.outQ.swapHead(s.inQ.makeValueSlice())
-		}
-	}
-
-	// cachedOutput second pre-allocation
-	//	- possibly have ready for transfer
-	//	- configured size may be large so only for defaultSize
-	if !s.outQ.hasCachedOutput() && s.inQ.size.Load() == minElements {
-		s.outQ.swapCachedOutput(s.inQ.makeValueSlice())
-	}
-
-	return
-}
-
-// transferCached transfers cachedOutput from
-// outputLock to queueLock if possible
-//   - invoked while holding outputLock queueLock
-func (s *AwaitableSlice[T]) transferCached(sliceList [][]T) {
-
-	// transfer any pre-allocated sliceList
-	if sliceList != nil && !s.inQ.HasList.Load() {
-		s.inQ.swapList(sliceList)
-		s.inQ.HasList.Store(true)
-	}
-
-	// transfer cachedOutput to cachedInput
-	if !s.inQ.HasInput.Load() && s.outQ.hasCachedOutput() {
-		var slice = s.outQ.swapCachedOutput()
-		s.inQ.setCachedInput(slice)
-		s.outQ.swapCachedOutput(nil)
-	}
-}
 
 // postOutput relinquishes outQ lock and
 // initializes eventual update of DataWaitCh and EmptyCh
@@ -796,7 +526,7 @@ func (s *AwaitableSlice[T]) postOutput(gotValue, checkedQueue *bool) {
 		if s.outQ.isEmptyOutput() {
 			// if queueLockHasData is false,
 			// hasData should be false
-			s.hasDataBits.setOutputLockEmpty() //postGet
+			s.outQ.HasDataBits.setOutputLockEmpty() //postGet
 		}
 	}
 
@@ -811,8 +541,8 @@ func (s *AwaitableSlice[T]) postOutput(gotValue, checkedQueue *bool) {
 //   - invoked while holding inQ Lock
 func (s *AwaitableSlice[T]) postInput() {
 	// overwrite both data bits atomically
-	s.hasDataBits.setAllBits() // postSend
-	s.inQ.lock.Unlock()
+	s.outQ.HasDataBits.setAllBits() // postSend
+	s.outQ.InQ.lock.Unlock()
 	s.updateWait() // postSend
 }
 
@@ -837,6 +567,9 @@ const (
 	//	- used if [AwaitableSlice.SetSize] < 1
 	targetSliceByteSize4KiB = 4 * 1024
 	// minimum number of element for value-slice
+	//	- used as size when type T is error
+	//	- when size equal or less, triggers isLowAlloc behavior
+	//	- minium size for slice retaining
 	minElements = 10
 	// max appended size is 16 MiB
 	maxAppendValueSliceCapacity = 16 * 1024 * 1024
@@ -846,23 +579,10 @@ const (
 	IntSize = 4 * (1 + math.MaxUint>>63)
 	// sliceListSize is allocation-size for slice lists
 	sliceListSize = targetSliceByteSize4KiB / IntSize
+	// sliceListSize for low alloc
+	lowAllocListSize = 1
+	// when allocating sliceList, no minimum size
+	noMinSize = 0
+	// queue treats T type error special
+	errorTypeName = "error"
 )
-
-const (
-	// sliceFromQueue is invoked to get a single value
-	//	- [AwaitableSlice.Get]
-	getValue getAction = iota
-	// sliceFromQueue is invoked to get a non-empty slice of values
-	//	- [AwaitableSlice.GetSlice]
-	getSlice
-	// sliceFromQueue is invoked to move all elements to outQ
-	//	- [AwaitableSlice.GetSlices] [AwaitableSlice.GetAll]
-	getNothing
-	// sliceFromQueue is invoked to get maxCount elements
-	//	- [AwaitableSlice.Read]
-	getMax
-)
-
-// action for sliceFromQueue
-//   - getValue getSlice getNothing getMax
-type getAction uint8
