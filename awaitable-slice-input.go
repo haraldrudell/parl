@@ -72,6 +72,7 @@ type inputQueue[T any] struct {
 // send enqueues value
 func (i *inputQueue[T]) send(value T) {
 
+	// handle length
 	if i.IsLength.Load() {
 		var length = i.Length.Add(1)
 		i.MaxLength.Value(uint64(length))
@@ -133,6 +134,7 @@ func (i *inputQueue[T]) send(value T) {
 // values slice to the queue
 func (i *inputQueue[T]) sendSlice(values []T) {
 
+	// handle length
 	if i.IsLength.Load() {
 		var length = i.Length.Add(len(values))
 		i.MaxLength.Value(uint64(length))
@@ -161,6 +163,8 @@ func (i *inputQueue[T]) sendSlice(values []T) {
 // SendClone enqueues a value-slice without transferring values slice ownership
 // to the queue
 func (i *inputQueue[T]) sendClone(values []T) {
+
+	// handle length
 	if i.IsLength.Load() {
 		var length = i.Length.Add(len(values))
 		i.MaxLength.Value(uint64(length))
@@ -238,6 +242,7 @@ func (i *inputQueue[T]) sendClone(values []T) {
 // sendSlices enqueues by transferring ownership of a list of slices to the queue
 func (i *inputQueue[T]) sendSlices(valueSlices [][]T) {
 
+	// handle length
 	if i.IsLength.Load() {
 		var length int
 		for i := range valueSlices {
@@ -278,8 +283,9 @@ func (i *inputQueue[T]) sendSlices(valueSlices [][]T) {
 	i.enqueueInList(valueSlices[startIndex:]...)
 }
 
-// getPrimaryMetrics returns capacity of available inputQueue value-slice
-//   - 0: no allocation is available
+// getPrimaryMetrics returns length and capacity of
+// any available InQ value-slice
+//   - capacity 0: no allocation is available
 func (i *inputQueue[T]) getPrimaryMetrics() (length, capacity int) {
 
 	// try i.q
@@ -308,7 +314,10 @@ func (i *inputQueue[T]) getPrimary() (primary []T) {
 
 // createInputSlice creates a value slice possibly using cachedInput
 //   - values are copied
+//   - uses cachedInput or allocated slice
 func (i *inputQueue[T]) createInputSlice(values ...T) (valueSlice []T) {
+
+	// try cached input
 	if i.HasInput.Load() && len(values) <= cap(i.cachedInput) {
 		valueSlice = i.cachedInput[:len(values)]
 		i.cachedInput = nil
@@ -316,6 +325,8 @@ func (i *inputQueue[T]) createInputSlice(values ...T) (valueSlice []T) {
 		copy(valueSlice, values)
 		return
 	}
+
+	// make new slice
 	valueSlice = i.makeValueSlice(values...)
 	return // allocated primary input queue return
 }
@@ -324,14 +335,16 @@ func (i *inputQueue[T]) createInputSlice(values ...T) (valueSlice []T) {
 func (i *inputQueue[T]) enqueueInPrimary(values ...T) {
 
 	// use cached input if:
-	//	- q is not alocated
+	//	- primary is not allocated
 	//	- values fit cachedInput
 	if i.primary == nil && len(values) <= cap(i.cachedInput) {
 		i.primary = i.cachedInput
 		i.cachedInput = nil
+		i.HasInput.Store(false)
+		// fallthrough to copy
 	}
 
-	// if values fit q, copy
+	// if values fit primary, copy
 	if n := len(i.primary) + len(values); n <= cap(i.primary) {
 		var n0 = len(i.primary)
 		i.primary = i.primary[:n]
@@ -339,19 +352,16 @@ func (i *inputQueue[T]) enqueueInPrimary(values ...T) {
 		return // copy return
 	}
 
-	// realloc q
+	// realloc primary
 	i.primary = append(i.primary, values...)
 }
 
 // setCachedInput sets or gets cachedInput
 //   - used when transfering preallocated slices from outQ
-func (i *inputQueue[T]) setCachedInput(slice ...[]T) {
-
-	i.cachedInput = slice[0]
-	var has = i.cachedInput != nil
-	if has != i.HasInput.Load() {
-		i.HasInput.Store(has)
-	}
+//   - cachedInput must be empty with non-zero capacity
+func (i *inputQueue[T]) setCachedInput(cachedInput []T) {
+	i.cachedInput = cachedInput
+	i.HasInput.Store(true)
 }
 
 // setAndDiscardPrimary sets new primary and
@@ -359,17 +369,14 @@ func (i *inputQueue[T]) setCachedInput(slice ...[]T) {
 //   - on SendSlice or Send Slices when primary is empty,
 //     the primary slice may be saved to cachedInput
 func (i *inputQueue[T]) setAndDiscardPrimary(slice []T) {
+
+	// possibly save to cachedInput
+	//	- if no cahcedInput and primary is suitable
 	if i.cachedInput == nil && cap(i.primary) > 0 && cap(i.primary) <= i.MaxRetainSize.Load() {
-		if len(i.primary) > 0 {
-			if i.ZeroOut.Load() == DoZeroOut {
-				clear(i.primary)
-			}
-			i.cachedInput = i.primary[:0]
-			return
-		}
 		i.cachedInput = i.primary
 		i.HasInput.Store(true)
 	}
+
 	i.primary = slice
 }
 
@@ -405,10 +412,12 @@ func (i *inputQueue[T]) makeSliceList(minSize int, slice ...[]T) (newSliceList [
 	}
 
 	if i.IsLowAlloc.Load() {
+		// apply minimum during low alloc
 		if minSize < lowAllocListSize {
 			minSize = lowAllocListSize
 		}
 	} else if minSize < sliceListSize {
+		// regular minimum
 		minSize = sliceListSize
 	}
 

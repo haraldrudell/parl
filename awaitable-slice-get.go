@@ -21,13 +21,7 @@ func (s *AwaitableSlice[T]) Get() (value T, hasValue bool) {
 	if !s.outQ.HasDataBits.hasData() {
 		return
 	}
-
-	// checkedQueue is set to true if inQ was accessed
-	//	- hasValue is true if a value was obtained
-	//	- if a value was obtained without accessing inQ,
-	//		the queue must be checked for now being empty
-	var checkedQueue bool
-	defer s.enterOutputCritical().postOutput(&hasValue, &checkedQueue)
+	defer s.enterOutputCritical().postOutput()
 
 	// check inside lock
 	if !s.outQ.HasDataBits.hasData() {
@@ -35,7 +29,10 @@ func (s *AwaitableSlice[T]) Get() (value T, hasValue bool) {
 	}
 	// there is at least one value in inQ or outQ
 
-	return s.outQ.get(&checkedQueue)
+	hasValue = true
+	value = s.outQ.get()
+
+	return
 }
 
 // GetSlice returns a slice of values from the queue
@@ -56,17 +53,15 @@ func (s *AwaitableSlice[T]) GetSlice() (values []T) {
 	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
-	var hasValue, checkedQueue bool
-	defer s.enterOutputCritical().postOutput(&hasValue, &checkedQueue)
+	defer s.enterOutputCritical().postOutput()
 
 	// check inside lock
 	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
 	// there is at least one value in inQ or outQ
-	hasValue = true
 
-	return s.outQ.getSlice(&checkedQueue)
+	return s.outQ.getSlice()
 }
 
 // GetSlices empties the queue at near zero allocations
@@ -83,11 +78,7 @@ func (s *AwaitableSlice[T]) GetSlices(buffer ...[][]T) (slices [][]T) {
 	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
-
-	// GetSlices always sets hasData to false
-	//	- disable postGet action
-	var checkedQueue = true
-	defer s.enterOutputCritical().postOutput(&checkedQueue, &checkedQueue)
+	defer s.enterOutputCritical().postOutput()
 
 	// check inside lock
 	if !s.outQ.HasDataBits.hasData() {
@@ -112,11 +103,7 @@ func (s *AwaitableSlice[T]) GetAll() (values []T) {
 	if !s.outQ.HasDataBits.hasData() {
 		return // queue empty return
 	}
-
-	// GetAll always sets hasData to false
-	//	- disable postGet action
-	var checkedQueue = true
-	defer s.enterOutputCritical().postOutput(&checkedQueue, &checkedQueue)
+	defer s.enterOutputCritical().postOutput()
 
 	// check inside lock
 	if !s.outQ.HasDataBits.hasData() {
@@ -157,10 +144,7 @@ func (s *AwaitableSlice[T]) Read(p []T) (n int, err error) {
 		return // buffer zero-length return
 	}
 	// slice was observed to have data and buffer is of non-zero length
-
-	// Read will update hasData so disable postGet action
-	var checkedQueue = true
-	defer s.enterOutputCritical().postOutput(&checkedQueue, &checkedQueue)
+	defer s.enterOutputCritical().postOutput()
 
 	// check inside lock
 	if !s.outQ.HasDataBits.hasData() {

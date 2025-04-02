@@ -55,80 +55,94 @@ type outputQueue[T any] struct {
 	//		the beginning of the underlying array
 	head0 []T
 	// a pre-allocated value-slice transfered to outputQueue Lock
+	//	- either nil or zero-length with non-zero capacity
 	//	- allocated outside of outputQueue lock
 	cachedOutput []T
 	// lastPrimaryLarge is true if last emptyInQ encountered
-	// a primary slice larger than size
+	// a primary slice with length larger than allocation size
 	//	- behind outQ lock
+	//	- allows large slices to be transferred from outQ to InQ
 	lastPrimaryLarge bool
 	// sizeMax4KiB is true if Inq Size is max 4 KiB
 	sizeMax4KiB atomic.Bool
 }
 
-// get returns one value if the queue is not empty
-func (o *outputQueue[T]) get(checkedQueue *bool) (value T, hasValue bool) {
+// get returns one value
+//   - hasData must have been verified true
+func (o *outputQueue[T]) get() (value T) {
 
+	// handle length
 	if o.InQ.IsLength.Load() {
 		o.InQ.Length.Add(-1)
 	}
 
-	// if primary output queue is empty, try transfering a slice from output slice list
-	if len(o.head) == 0 && !o.isEmptyOutput() {
-		o.trySaveHeadToCachedOutput()
-		// write new primary output queue
-		o.setHead(o.dequeueFromList())
-	}
-	// if s.outQ is not empty, head has items
+	// check head
+	//	- at least one of outQ and InQ has data
+	var wasOutQEmpty = len(o.head) == 0
+	if wasOutQEmpty {
 
-	// try outQ head
-	if hasValue = len(o.head) != 0; hasValue {
-		value = o.dequeueFromHead()
-		return // value from primary output queue return
+		// outQ is empty, so InQ cannot be empty
+		//	- updates hasData
+		var slice, _ = o.transferToOutQ(getValue)
+		// for low-alloc, head could be allocated
+		//	- otherwise head is unretainable or nil
+		o.setHead(slice)
 	}
-	// s.outQ is empty
+	// head is not empty
 
-	// transfer slice from inQ
-	var slice, _ = o.transferToOutQ(getValue)
-	*checkedQueue = true
-	if hasValue = len(slice) > 0; !hasValue {
-		return // no value available return
-	}
-	// slice is non-empty slice from inQ
-
-	// store slice as new output
-	o.setHead(slice)
 	// fetch value using slice-away
-	value = o.dequeueFromHead()
+	var outQNowEmpty bool
+	value, outQNowEmpty = o.dequeueFromHead()
 
-	return // value from inQ return
+	// wasOutQEmpty true: hasData was already updated
+	// by transferToOutQ
+	//	- outQNowEmpty false: outQ is not empty
+	if wasOutQEmpty || !outQNowEmpty {
+		return // hasData was already updated
+	}
+
+	// outQ transitioned to empty, update hasData
+	o.HasDataBits.setOutputLockEmpty()
+
+	return
 }
 
-// getSlice returns a slice of values from the queue
-func (o *outputQueue[T]) getSlice(checkedQueue *bool) (values []T) {
+// getSlice returns a slice of values
+//   - hasData must have been verified true
+func (o *outputQueue[T]) getSlice() (values []T) {
 
-	// try output
-	if len(o.head) != 0 {
+	// try head
+	if len(o.head) > 0 {
+
+		// return the head slice
 		values, _ = o.getHead()
-		if o.InQ.IsLength.Load() {
-			o.InQ.Length.Add(-len(values))
-		}
 
-		return // primary output slice return
+		// try to get next head slice
+		var head = o.dequeueFromList()
+		// if read to empty, update hasData
+		if head == nil {
+			o.HasDataBits.setOutputLockEmpty()
+		} else {
+			// store new head slice
+			o.setHead(head)
+		}
+	} else {
+
+		// transfer from inQ
+		//	- updates hasData
+		values, _ = o.transferToOutQ(getSlice)
+
+		// if outQ is not empty, head must be set
+		var head = o.dequeueFromList()
+		if head != nil {
+			// for low-alloc, head could be allocated
+			//	- otherwise head is unretainable or nil
+			o.setHead(head)
+		}
 	}
 
-	// try outQ sliceList
-	if values = o.dequeueFromList(); values != nil {
-		if o.InQ.IsLength.Load() {
-			o.InQ.Length.Add(-len(values))
-		}
-		return // slice from outQ sliceList return
-	}
-	// outQ is empty
-
-	// transfer from inQ
-	values, _ = o.transferToOutQ(getSlice)
-	*checkedQueue = true
-	if o.InQ.IsLength.Load() && len(values) > 0 {
+	// handle length
+	if o.InQ.IsLength.Load() {
 		o.InQ.Length.Add(-len(values))
 	}
 
@@ -147,14 +161,16 @@ func (o *outputQueue[T]) getSlices(buffer [][]T) (slices [][]T) {
 	if buffer != nil {
 		slices = buffer
 	} else {
+		// add one for head
 		slices = make([][]T, 0, sliceListLength+1)
 	}
 
 	// retrieve head slice
+	//	- because outQ is not empty, head is not empty
 	var head, _ = o.getHead()
 	slices = append(slices, head)
 
-	// retrieve slice list
+	// retrieve any slices in sliceList
 	if sliceListLength > 0 {
 		var sliceList = o.getListSlice()
 		slices = append(slices, sliceList...)
@@ -178,6 +194,7 @@ func (o *outputQueue[T]) getSlices(buffer [][]T) (slices [][]T) {
 
 // getAll returns a single slice of all values in queue
 func (o *outputQueue[T]) getAll() (values []T) {
+
 	// move any data from inQ to outQ
 	//	- this way there is no slice alloc while holding inQ lock
 	o.transferToOutQ(getNothing)
@@ -192,75 +209,58 @@ func (o *outputQueue[T]) getAll() (values []T) {
 	// outQ contains more than one slice
 
 	// aggregate outQ
-	// allSize is length of the returned slice
+	// allSize is length of the returned slice >= 2
 	var allSize = len(o.head) + o.getListElementCount()
 
-	if o.InQ.IsLength.Load() && allSize > 0 {
+	// handle length
+	if o.InQ.IsLength.Load() {
 		o.InQ.Length.Add(-allSize)
 	}
 
 	// make slice to return
 	values = make([]T, allSize)
-	// v is slice-away of values
-	var v = values
 
 	// primary output slice is not empty
-	var n = o.dequeueHead(v)
-	v = v[n:]
+	var n = o.dequeueHead(values)
 
 	// any outQ sliceList
 	if !o.isEmptyList() {
-		o.dequeueList(v)
+		o.dequeueList(values[n:])
 	}
 
 	return
 }
 
 // read makes AwaitableSlice [io.Reader]
+//   - p cannot be empty
 func (o *outputQueue[T]) read(p []T) (n int, err error) {
 
-	// whether p has been completely read
-	var isDone bool
+	// read outQ head and sliceList
+	//	- either outQ or InQ is non-empty
+	if isDone, isOutQNowEmpty := o.dequeueNFromOutput(&p, &n); isDone {
 
-	// iterate i: 0, 1
-	//	- i 0: consume from outQ
-	//	- — if more data requested and inQ not empty,
-	//	- i 1: fetch from inQ then consume outQ again
-	for i := range 2 {
+		// if output now empty, must update hasData
+		if isOutQNowEmpty {
+			// possibly update hasData
+			o.HasDataBits.setOutputLockEmpty()
+		}
+	} else {
 
-		// read outputLock data
-		if !isDone {
-			isDone = o.dequeueNFromOutput(&p, &n)
-		}
-		// after i == 1, do not read from inQ
-		if i != 0 {
-			continue
-		}
-
-		// case before accessing queueLock
-		if isDone && !o.isEmptyOutput() {
-			if o.InQ.IsLength.Load() && n > 0 {
-				o.InQ.Length.Add(-n)
-			}
-			// read complete and hasData does not need update
-			return // Read complete return
-		}
-		// transfer data from queueLock and update hasData
+		// transfer data from InQ
+		//	- updates hasData
 		o.transferToOutQ(getMax, len(p))
-	}
-	// read from outQ and inQ
-	// hasData was possibly updated
+		// InQ empty, outQ possibly empty
 
+		// read outQ head and sliceList
+		o.dequeueNFromOutput(&p, &n)
+	}
+
+	// handle length
 	if o.InQ.IsLength.Load() && n > 0 {
 		o.InQ.Length.Add(-n)
 	}
 
 	return
-}
-
-// isEmptyOutput returns true if outputQueue is empty
-func (o *outputQueue[T]) isEmptyOutput() (isEmpty bool) {
-	return len(o.head) == 0 && len(o.sliceList) == 0
 }
 
 // setHead sets the head slice
@@ -281,20 +281,41 @@ func (o *outputQueue[T]) getHead() (head, head0 []T) {
 	return
 }
 
-// dequeueFromHead retrieves value from output using slice-away
-//   - output must have been verified to have non-zero length
-func (o *outputQueue[T]) dequeueFromHead() (value T) {
+// dequeueFromHead retrieves a value from head
+//   - outQNowEmpty true: outQ was read to empty
+//   - —
+//   - head must have been verified to not be empty
+//   - slice-away dequeue
+func (o *outputQueue[T]) dequeueFromHead() (value T, outQNowEmpty bool) {
 
+	// get value with possible zero-out
 	value = o.head[0]
 	if o.InQ.ZeroOut.Load() != pslib.NoZeroOut {
 		clear(o.head[0:1])
 	}
-	if len(o.head) == 1 {
-		o.head = o.head0[:0]
-	} else {
+
+	// if head did not become empty: done
+	if len(o.head) >= 2 {
+		// slice-away
 		o.head = o.head[1:]
+		return // value from head, head not empty return
 	}
-	return
+	// head was read to empty
+
+	// see if there is new head
+	var head = o.dequeueFromList()
+	if head != nil {
+		o.trySaveHeadToCachedOutput()
+		o.setHead(head)
+		return // value from head, new head not empty return
+	}
+	// outQ is now empty
+
+	// reset head slice
+	o.head = o.head0[:0]
+	outQNowEmpty = true
+
+	return // value from head, outQ empty return
 }
 
 // dequeueHead moves all elements from primary output
@@ -312,24 +333,37 @@ func (o *outputQueue[T]) dequeueHead(dest []T) (n int) {
 }
 
 // dequeueNFromOutput copies to dest from all slices
-//   - useful to [io.Read]-type funcctions
-func (o *outputQueue[T]) dequeueNFromOutput(dest *[]T, np *int) (isDone bool) {
+//   - dest cannot be empty
+//   - useful to [io.Read]-type functions
+func (o *outputQueue[T]) dequeueNFromOutput(dest *[]T, np *int) (isDone, isOutQNowEmpty bool) {
 
-	// o.output
-	if len(o.head) > 0 {
-		// copy with zero-out
-		var zeroOut = o.InQ.ZeroOut.Load()
-		isDone = CopyToSlice(&o.head, dest, np, zeroOut)
-		if len(o.head) == 0 {
-			o.head = o.head0[:0]
-		}
-		if isDone {
-			return
-		}
+	// empty case
+	if len(o.head) == 0 {
+		return // outQ was empty return
 	}
 
-	// sliceList
-	return o.dequeueNFromList(dest, np, o.InQ.ZeroOut.Load())
+	// copy from head with possible zero-out
+	var zeroOut = o.InQ.ZeroOut.Load()
+	// read from head and sliceList
+	isDone = CopyToSlice(&o.head, dest, np, zeroOut) ||
+		o.dequeueNFromList(dest, np, zeroOut)
+
+	// check new outQ state
+	if len(o.head) != 0 {
+		return // head not read to empty return
+	}
+
+	var head = o.dequeueFromList()
+	if head == nil {
+		isOutQNowEmpty = true
+		o.head = o.head0[:0]
+		return // OutQ read to empty return
+	}
+
+	o.trySaveHeadToCachedOutput()
+	o.setHead(head)
+
+	return
 }
 
 // trySaveHeadToCachedOutput saves the head slice as
@@ -343,7 +377,8 @@ func (o *outputQueue[T]) trySaveHeadToCachedOutput() {
 	} else if c := cap(o.head0); c == 0 || c > o.InQ.MaxRetainSize.Load() {
 		return // unsuitable slice
 	}
-	o.cachedOutput = o.head0
+	// cachedOutput: zero-length non-zero capacity
+	o.cachedOutput = o.head0[:0]
 }
 
 // initLength configures the queue to track length
@@ -396,7 +431,8 @@ func (o *outputQueue[T]) transferToOutQ(action getAction, maxCount ...int) (slic
 			return // entire queue empty return
 		}
 
-		// for GetAll GetSlices may cause hasData false
+		// GetAll GetSlices completely empties outQ
+		//	- if InQ still empty, hasData should be set to false
 		//	- if inQ-has-data is still cleared,
 		//		reset hasDataBit using CompareAndSwap
 		o.HasDataBits.setOutputLockEmpty()
@@ -600,6 +636,7 @@ func (o *outputQueue[T]) preAlloc() (futurePrimary []T, futureSliceList [][]T) {
 	if o.cachedOutput == nil && // there is no cachedOutput
 		!o.InQ.HasInput.Load() && // and there is no cachedInput
 		o.sizeMax4KiB.Load() { // size is max 4 KiB
+		// cachedOutput: zero-length non-zero capacity
 		o.cachedOutput = o.InQ.makeValueSlice()
 	}
 

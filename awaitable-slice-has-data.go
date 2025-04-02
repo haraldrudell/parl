@@ -85,6 +85,9 @@ func (h *hasData) resetToHasDataBit() {
 //   - must hold inQ lock
 //   - must know that inQ is not empty
 func (h *hasData) setAllBits() {
+	if h.bits.Load() == hasDataBit|inQHasDataBit {
+		return
+	}
 	h.bits.Store(hasDataBit | inQHasDataBit)
 }
 

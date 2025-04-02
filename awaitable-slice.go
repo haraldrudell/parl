@@ -137,14 +137,8 @@ func (s *AwaitableSlice[T]) DataWaitCh() (ch AwaitableCh) {
 	ch = s.dataWait.Cyclic.Ch() // DataWaitCh
 
 	// if previously invoked, no need for initialization
-	if s.dataWait.IsActive.Load() {
+	if s.dataWait.IsActive.Load() || !s.dataWait.IsActive.CompareAndSwap(false, true) {
 		return // not first invocation
-	}
-
-	// establish proper state
-	//	- data wait ch now in use
-	if !s.dataWait.IsActive.CompareAndSwap(false, true) {
-		return // another thread initialized dataWait
 	}
 
 	// set initial state of dataWait
@@ -205,9 +199,9 @@ func (s *AwaitableSlice[T]) IsClosed() (isClosed bool) {
 //   - maxRetainSize is set to the larger of size and 100
 //   - thread-safe
 func (s *AwaitableSlice[T]) SetSize(size int) {
-
 	var t T
-	var sizeofT = int(unsafe.Sizeof(t))
+
+	// one-off initialization of zero-out
 	if s.outQ.InQ.MaxRetainSize.Load() == 0 {
 		var zeroOut pslib.ZeroOut
 		if !prlib.HasReference(t) {
@@ -216,27 +210,33 @@ func (s *AwaitableSlice[T]) SetSize(size int) {
 		s.outQ.InQ.ZeroOut.Store(zeroOut)
 	}
 
-	var isLowAlloc bool
-
-	// get size
+	// get size and lowAlloc
 	// - effective size must be positive
 	//	- minimum defaultSize
+	var isLowAlloc bool
+	var sizeofT = int(unsafe.Sizeof(t))
 	if size < 1 {
 		var typeIsError = reflect.TypeFor[T]().Name() == errorTypeName
 		if typeIsError {
+
+			// special default handling of type T error
 			size = minElements
 			isLowAlloc = true
 		} else {
-			// size is number of elements in 4 KiB rounded down
+
+			// default size is number of elements in 4 KiB rounded down
 			// or minimum 10
 			size = max(targetSliceByteSize4KiB/sizeofT, minElements)
 		}
 	} else {
+
+		// specific size setting small causes low alloc
 		isLowAlloc = size <= minElements && size*sizeofT < targetSliceByteSize4KiB
 	}
 	s.outQ.InQ.Size.Store(size)
 	s.outQ.InQ.IsLowAlloc.Store(isLowAlloc)
 
+	// once size established, determine effective allocation size in bytes
 	var sizeBytes = size * sizeofT
 	s.outQ.sizeMax4KiB.Store(sizeBytes <= targetSliceByteSize4KiB)
 
@@ -262,116 +262,6 @@ func (s *AwaitableSlice[T]) Length() (length, maxLength int) {
 
 	length = s.outQ.InQ.Length.Load()
 	maxLength = int(s.outQ.InQ.MaxLength.Max1())
-	return
-}
-
-// State returns internal state for debug purposes
-//   - populateValues missing: values are not retrieved
-//   - populateValues [ValuesYes]: every queue slice value is provided in values
-//   - holds both locks: not for frequent use
-func (s *AwaitableSlice[T]) State(populateValues ...ValuesFlag) (state AwaitableSliceState, values AwaitableSliceValues[T]) {
-	defer s.outQ.lock.Lock().Unlock()
-	defer s.outQ.InQ.lock.Lock().Unlock()
-
-	state = AwaitableSliceState{
-		Size:          s.outQ.InQ.Size.Load(),
-		MaxRetainSize: s.outQ.InQ.MaxRetainSize.Load(),
-		SizeMax4KiB:   s.outQ.sizeMax4KiB.Load(),
-		IsLowAlloc:    s.outQ.InQ.IsLowAlloc.Load(),
-		ZeroOut:       s.outQ.InQ.ZeroOut.Load(),
-
-		IsDataWaitActive: s.dataWait.IsActive.Load(),
-		IsCloseInvoked:   s.isCloseInvoked.Load(),
-
-		HasInput:         s.outQ.InQ.HasInput.Load(),
-		HasList:          s.outQ.InQ.HasList.Load(),
-		HasData:          uint32(s.outQ.HasDataBits.bits.Load()),
-		IsLength:         s.outQ.InQ.IsLength.Load(),
-		Length:           s.outQ.InQ.Length.Load(),
-		MaxLength:        s.outQ.InQ.MaxLength.Max1(),
-		LastPrimaryLarge: s.outQ.lastPrimaryLarge,
-
-		Head: Metrics{
-			Length:   len(s.outQ.head),
-			Capacity: cap(s.outQ.head),
-		},
-		CachedOutput: Metrics{
-			Length:   len(s.outQ.cachedOutput),
-			Capacity: cap(s.outQ.cachedOutput),
-		},
-		OutList: Metrics{
-			Length:   len(s.outQ.InQ.list.sliceList),
-			Capacity: cap(s.outQ.InQ.list.sliceList),
-		},
-
-		Primary: Metrics{
-			Length:   len(s.outQ.InQ.primary),
-			Capacity: cap(s.outQ.InQ.primary),
-		},
-		CachedInput: Metrics{
-			Length:   len(s.outQ.InQ.cachedInput),
-			Capacity: cap(s.outQ.InQ.cachedInput),
-		},
-		InList: Metrics{
-			Length:   len(s.outQ.InQ.list.sliceList),
-			Capacity: cap(s.outQ.InQ.list.sliceList),
-		},
-	}
-	if state.IsDataWaitActive {
-		state.IsDataWaitClosed = s.dataWait.Cyclic.IsClosed()
-	}
-	if state.IsCloseInvoked {
-		state.IsClosed = s.isEmpty.IsClosed()
-	}
-
-	if x := state.InList.Length; x > 0 {
-		state.InQ = make([]Metrics, x)
-		for i := range x {
-			var slicep = &s.outQ.InQ.list.sliceList[i]
-			state.InQ[i].Length = len(*slicep)
-			state.InQ[i].Capacity = cap(*slicep)
-		}
-	}
-
-	if x := state.OutList.Length; x > 0 {
-		state.OutQ = make([]Metrics, x)
-		for i := range x {
-			var slicep = &s.outQ.list.sliceList[i]
-			state.OutQ[i].Length = len(*slicep)
-			state.OutQ[i].Capacity = cap(*slicep)
-		}
-	}
-
-	if len(populateValues) == 0 || populateValues[0] != ValuesYes {
-		return
-	}
-
-	if x := len(s.outQ.head); x > 0 {
-		values.Head = make([]T, x)
-		copy(values.Head, s.outQ.head)
-	}
-	if x := len(s.outQ.sliceList); x > 0 {
-		values.Outputs = make([][]T, x)
-		for i, src := range s.outQ.sliceList {
-			var dest = &values.Outputs[i]
-			*dest = make([]T, len(src))
-			copy(*dest, src)
-		}
-	}
-
-	if x := len(s.outQ.InQ.primary); x > 0 {
-		values.Primary = make([]T, x)
-		copy(values.Primary, s.outQ.InQ.primary)
-	}
-	if x := len(s.outQ.InQ.sliceList); x > 0 {
-		values.Inputs = make([][]T, x)
-		for i, src := range s.outQ.InQ.sliceList {
-			var dest = &values.Inputs[i]
-			*dest = make([]T, len(src))
-			copy(*dest, src)
-		}
-	}
-
 	return
 }
 
@@ -418,6 +308,17 @@ func (s *AwaitableSlice[T]) enterInputCritical() (s2 *AwaitableSlice[T]) {
 	return
 }
 
+// postInput sets hasData to true, relinquishes queueLock and
+// initializes eventual update of DataWaitCh and EmptyCh
+//   - aggregates deferred actions to reduce latency
+//   - invoked while holding inQ Lock
+func (s *AwaitableSlice[T]) postInput() {
+	// overwrite both data bits atomically
+	s.outQ.HasDataBits.setAllBits() // postSend
+	s.outQ.InQ.lock.Unlock()
+	s.updateWait() // postSend
+}
+
 // enterOutputCritical enters output critical section
 //   - cannot be invoked while in input critical section or output critical section
 func (s *AwaitableSlice[T]) enterOutputCritical() (s2 *AwaitableSlice[T]) {
@@ -427,6 +328,13 @@ func (s *AwaitableSlice[T]) enterOutputCritical() (s2 *AwaitableSlice[T]) {
 	}
 	s.outQ.lock.Lock()
 	return
+}
+
+// postOutput relinquishes outQ lock and
+// initializes eventual update of DataWaitCh and EmptyCh
+func (s *AwaitableSlice[T]) postOutput() {
+	s.outQ.lock.Unlock()
+	s.updateWait() // postGet
 }
 
 // updateWait updates dataWaitCh if either DataWaitCh or AwaitValue were invoked
@@ -493,57 +401,6 @@ func (s *AwaitableSlice[T]) updateWait() {
 	//	- because the channel has been retrieved,
 	//		open on closed is alloc expensive
 	s.dataWait.Cyclic.Open()
-}
-
-// append to sliceList
-
-// preAlloc onlyCached
-//const onlyCachedTrue = true
-
-// postOutput relinquishes outQ lock and
-// initializes eventual update of DataWaitCh and EmptyCh
-//   - gotValue: true if the Get GetSlice GetAll Read operation retrieved a value
-//   - checkedQueue: true if queueLock data was checked
-//   - —
-//   - The reason postOutput has goValue is that if outQ lock was emptied,
-//     inQ must be checked to update hasData
-//   - this check is carried out on gotValue true, checkedQueue false
-//   - postOutput aggregates deferred actions to reduce latency
-//   - postOutput is invoked while holding outQ lock
-func (s *AwaitableSlice[T]) postOutput(gotValue, checkedQueue *bool) {
-
-	// if a value was retrieved, hasData may need update
-	//	- if gotValue is true, hasData was true
-	//	- — if both outQ lock and queueLock are now empty
-	//	- — then hasData must be set to false
-	//	- if queueLock was checked, hasData was already updated
-	//	- used by Get GetSlice
-	if *gotValue && !*checkedQueue {
-		// hasData is true
-		// outQ may be empty
-
-		// check if there are any more values in outputLock
-		if s.outQ.isEmptyOutput() {
-			// if queueLockHasData is false,
-			// hasData should be false
-			s.outQ.HasDataBits.setOutputLockEmpty() //postGet
-		}
-	}
-
-	// reliquish outputLock and initiate eventually consistent data/close update
-	s.outQ.lock.Unlock()
-	s.updateWait() // postGet
-}
-
-// postInput sets hasData to true, relinquishes queueLock and
-// initializes eventual update of DataWaitCh and EmptyCh
-//   - aggregates deferred actions to reduce latency
-//   - invoked while holding inQ Lock
-func (s *AwaitableSlice[T]) postInput() {
-	// overwrite both data bits atomically
-	s.outQ.HasDataBits.setAllBits() // postSend
-	s.outQ.InQ.lock.Unlock()
-	s.updateWait() // postSend
 }
 
 // getAwait returns
