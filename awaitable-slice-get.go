@@ -158,7 +158,7 @@ func (s *AwaitableSlice[T]) Read(p []T) (n int, err error) {
 
 	n, err = s.outQ.read(p)
 
-	if !s.outQ.HasDataBits.hasData() && s.isCloseInvoked.Load() {
+	if s.isCloseInvoked.Load() && !s.outQ.HasDataBits.hasData() {
 		err = io.EOF
 	}
 

@@ -580,9 +580,8 @@ func (o *outputQueue[T]) emptyInQ(action getAction) (slice []T) {
 	}
 
 	// transfer any remaining slices
-	if !o.InQ.isEmptyList() {
-		var slices = o.InQ.getListSlice()
-		o.enqueueInList(slices...)
+	if slicelist := o.InQ.getListSlice(); len(slicelist) > 0 {
+		o.enqueueInList(slicelist...)
 		// empty and zero-out s.slices
 		o.InQ.clearList()
 	}

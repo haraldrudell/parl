@@ -88,10 +88,14 @@ func (i *inputQueue[T]) send(value T) {
 	// append single value to primary if sliceList is empty and value fits
 	if i.isEmptyList() {
 		if len(i.primary) < cap(i.primary) || cap(i.primary) < maxAppendValueSliceCapacity {
+			// add to primary possibly extending it
 			i.enqueueInPrimary(value)
 			return // appended value return
 		}
 	}
+	// sliceList is non-empty or primary too large for additional value
+	// primary is allocated, unknown whether sliceList is allocated
+
 	// add value to sliceList
 
 	// create new sliceList
@@ -109,22 +113,26 @@ func (i *inputQueue[T]) send(value T) {
 		i.HasList.Store(true)
 		return // created new sliceList return
 	}
+	// primary and sliceList are allocated
 
-	// last slice is known to be non-empty
+	// try appending to last slice
 	var length, capacity = i.getLastSliceMetrics()
-	if length < capacity || capacity < maxAppendValueSliceCapacity {
-		// append to ending local slice
+	if capacity > 0 && // last slice is allocated
+		// last slice has room or can be extended
+		(length < capacity || capacity < maxAppendValueSliceCapacity) {
+		// append to ending local slice, possibly extending it
 		i.enqueueInLastSlice(value)
 		return // appended to last slice return
 	}
 
-	// append new slice
+	// append new value-slice to sliceList
 	var valueSlice []T
 	if capacity >= maxAppendValueSliceCapacity {
-		// large slice
+		// last slice is large, allocate another equally large slice
 		valueSlice = make([]T, 1, capacity)
 		valueSlice[0] = value
 	} else {
+		// create regular value-slice
 		valueSlice = i.createInputSlice(value)
 	}
 	i.enqueueInList(valueSlice)
