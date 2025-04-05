@@ -6,81 +6,143 @@ ISC License
 package malib
 
 import (
-	"bufio"
+	"errors"
+	"fmt"
+	"os"
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
-	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/pruntime"
+	"github.com/haraldrudell/parl/pdebug"
 )
 
-// keystrokesThread reads blocking from [os.Stdin] therefore cannot be canceled
-//   - silent true: nothing is printed on os.Stdin closing
-//   - silent false: “mains.keystrokesThread standard input closed” may be printed to
-//     standard error on os.Stdin closing
-//   - errorSink present: receives any errors returned by or panic in [os.Stdin.Read]
-//   - errorSink nil: errors are printed to standard error
-//   - stdin receives text lines from standard input with line terminator removed
-//   - on [os.Stdin] closing, keystrokesThread closes the stdin line-input channel
-//   - — the close may be deferred until a key is pressed or the process exits
-//     -
-//   - Because [os.Stdin] cannot be closed and [os.Stdin.Read] is blocking:
-//   - — the thread may blockindfinitiely until process exit
-//   - — therefore, keystrokesThread is a top-level function not waited upon
-//   - — purpose is to minimize objects kept in memory until the thread exits
-//   - on [Keystrokes.CloseNow], keystrokesThread exits on the following keypress
-//   - [StdinReader] converts any error to [io.EOF]
-//   - [parl.Infallible] prints any errors to standard error, should not be any
+// D is hook to facilitate debug printing
+var D parl.PrintfFunc
+
+// KeystrokesThread is a minimal goroutine unable to exit due to read from [os.Stdin]
+//   - isActive: true while background is still monitoring standard input
+//   - — when set to false, thread will exit as soon as practical
+//   - errCh: errors and panics are sent on errCh, should be size 2
+//   - — errCh closes on thread exit making the thread awaitable
+//   - slicep: where slices of bytes are appended, behind sliceLock
+//   - sliceLock: makes slicep thread-safe
+//   - dataCh: if empty, thread sends a value when data becomes available
 //   - —
-//   - -verbose=mains.keystrokesThread
-func KeystrokesThread(silent bool, errorSink parl.ErrorSink1, stdin parl.ClosableSink[string]) {
+//   - events causing thread-exit: errCh closing
+//   - — stdin closing: ^D: StdinErr with io.EOF is sent on errCh
+//   - — panic: StdinErr with RecoverAny non-nil is sent on errCh
+//   - — error from os.Stdin: StdinErr is sent on errCh
+//   - — isActive being false
+//   - only takes Go types to reduce memory references
+func KeystrokesThread(isActive *atomic.Bool, errCh chan error, slicep *[][]byte, sliceLock *parl.Mutex, dataCh chan struct{}) {
+	defer close(errCh)
 	var err error
-	var isDebug = parl.IsThisDebug()
-	if isDebug {
-		defer parl.Debug("keystrokes.scannerThread exiting: err: %s", perrors.Short(err))
+	defer keyRecovery(isActive, errCh, &err)
+
+	var n int
+	var p = make([]byte, 1024)
+	if D != nil {
+		D("KeystrokesThread at for:\n%s\n—", pdebug.NewStack(0))
+		defer D("KeystrokesThread exiting…")
 	}
-	if errorSink == nil {
-		errorSink = parl.Infallible
-	}
-	// if a panic is recovered, or err holds an error, both are printed to standard error
-	defer parl.Recover(func() parl.DA { return parl.A() }, &err, errorSink)
-	// ensure string-channel closes on exit without discarding any input
-	defer stdin.Close()
+	for {
 
-	var isStdinReaderError atomic.Bool
-	// scanner splits input into lines
-	var scanner = bufio.NewScanner(NewStdinReader(errorSink, &isStdinReaderError))
-	var stdinClosedCh = stdin.CloseCh()
+		// read for os.Stdin
+		n, err = os.Stdin.Read(p)
 
-	// blocks here
-	for scanner.Scan() {
-
-		// check if consumer closed stdin output
-		select {
-		case <-stdinClosedCh:
-			return // terminated by Keystrokes.CloseNow
-		default:
+		// check if still active
+		if !isActive.Load() {
+			return // background no longer receiving data
 		}
-		if isDebug {
-			parl.Log("keystrokes.Send %q", scanner.Text())
+
+		// send any data
+		if n > 0 {
+			appendToSlice(p[:n], slicep, sliceLock)
+			if len(dataCh) == 0 {
+				dataCh <- struct{}{}
+			}
 		}
-		stdin.Send(scanner.Text())
+
+		// handle any errors
+		if err != nil {
+			if D != nil {
+				D("err: %s", err)
+			}
+			errCh <- &StdinErr{Err: err}
+			return
+		}
+	}
+}
+
+// keyRecovery recovers any panic
+//   - isActive: true if background is still monitoring the therad
+//   - errCh: error channel to background
+func keyRecovery(isActive *atomic.Bool, errCh chan error, errp *error) {
+
+	// recover any panic
+	var reccoverAny = recover()
+	var isPanic = reccoverAny != nil
+	var panicS string
+	if D != nil {
+		D("isPanic: %t err: %v isActive: %t", isPanic, *errp, isActive.Load())
+	}
+	if !isPanic && isActive.Load() {
+		return // no panic, background still monitoring
 	}
 
-	// scanner had end of input or error
-	//	- caused by a closing event like user pressing ^D or by
-	//	- error during os.Stdin.Read or
-	//	- error raised in Scanner
-	err = scanner.Err()
-	// do not print:
-	if silent || //	- if silent is configured or
-		err != nil || //	- the scanner had error or
-		isStdinReaderError.Load() { //	- close is caused by an error handled by StdinReader
-		return
+	// send any panic
+	if isPanic {
+		panicS = fmt.Sprintf("panic non-error value %T “%[1]v”", reccoverAny)
+		var s = &StdinErr{RecoverAny: reccoverAny}
+		if e, isError := reccoverAny.(error); isError {
+			s.Err = e
+		} else {
+			s.Err = errors.New(panicS)
+		}
+		errCh <- s
 	}
-	// echoed to standard error
-	//	- echoed if:
-	//	- stdin closed without error, eg. from user pressing ^D
-	//	- silent is false
-	parl.Log("%s standard input closed", pruntime.PackFunc())
+
+	// if monitoring still present: done
+	if isActive.Load() {
+		return // panic sent and monitored
+	}
+
+	// print to standard error
+	var eS string
+	if isPanic {
+		eS = panicS
+	} else if err := *errp; err != nil {
+		eS = fmt.Sprintf("stdin: error: “%s”", err)
+	} else {
+		eS = "stdin exits after monitoring stopped"
+	}
+	fmt.Fprintln(os.Stderr, eS)
+}
+
+// appendToSlice appends using lock
+//   - slice: a slice to append
+//   - *slicep: pointer to slice
+//   - sliceLock: lock for slice
+func appendToSlice(slice []byte, slicep *[][]byte, sliceLock *parl.Mutex) {
+	defer sliceLock.Lock().Unlock()
+
+	*slicep = append(*slicep, slice)
+}
+
+// KeyStrokes stack trace 250404:
+// ID: 17 status: ‘running’
+// github.com/haraldrudell/parl/mains/malib.KeystrokesThread(0x140000a8074, 0x140000a2000, 0x140000a8088, 0x140000a8080, 0x140000a6000)
+//   /opt/sw/parl/mains/malib/keystrokes-thread.go:41
+// Parent-ID: 7 go: github.com/haraldrudell/parl/mains/malib.(*StdinReader).createThread
+//   /opt/sw/parl/mains/malib/stdin-reader.go:171
+
+// Err is type-name for error,
+// enabling error as promoted public field
+type Err error
+
+// StdinErr is an error value wrapping an error or panic
+//   - RecoverAny non-nil: any value from recover of panic
+//   - Err: error from os.Stdin.Read including io.EOF
+type StdinErr struct {
+	RecoverAny any
+	Err
 }

@@ -33,18 +33,22 @@ import (
 //   - — both are less performant for the managing thread
 type Awaitable struct {
 	// isGet is true if a channel-read operation was initiated
-	//	- the channel is or will be created
+	//	- a channel is or may soon be available or created
 	isGet atomic.Bool
-	// ch is lazy atomic-shielded-lock creation of channel
+	// ch is lazily initialized, atomic access-performance
+	// singleton channel value
 	ch AtomicLockArg[chan struct{}, Awaitable]
-	// wg is lazy atomic-shielded-lock creation of wait-group
+	// wg ensures no close invocation returns prior to
+	// channel close complete
+	//	- wg is lazily initialized, atomic access-performance
+	//		singleton wait-group
 	//	- wg wait is separate from ch, reducing contention
-	//	- wg ensures no close invocation returns before channel close
 	wg AtomicLock[sync.WaitGroup]
 	// closeWinner selects the thread to close the channel
 	//	- non-zero when close is in progress or completed
+	//	- zero means Close has not been invoked
 	closeWinner atomic.Uint32
-	// isClosed is close-complete flag
+	// isClosed is set to true upon close-complete
 	//	- atomic-performance shield around the slower channel
 	isClosed atomic.Bool
 }
@@ -100,10 +104,20 @@ func (a *Awaitable) IsClosed() (isClosed bool) {
 //   - eventuallyConsistent missing: upon return, the channel is
 //     guaranteed to be closed
 //   - eventuallyConsistent [EvCon]: Close may return before the channel
-//     is atcually closed for higher performance. The close operation is
+//     is actually closed for higher performance. The close operation is
 //     guaranteed to complete in the near future
 //   - didClose true: this thread executed close
+//   - —
 //   - idempotent, deferrable, panic-free, thread-safe
+//   - eventual consistency has lost its performance significance
+//     due to extensive use of atomics
+//   - — close on awaitable prior to Ch invocation is 1 ns from
+//     deferred channel creation and use of fake channel
+//   - — close of closed is 1 ns
+//   - — eventual consistency is only effective in the unlikely hit of a
+//     34 ns window for the case when a real channel is being closed
+//   - — designing a benchmark exhibiting any benefit is impractical
+//   - — prior to 2025 refactor, eventual consistency was significant
 func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClose bool) {
 
 	// already closed case
@@ -117,6 +131,9 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 	//	- winner thread is 8.9 ns (read 0.4955 ns + successful CAS 8.419 ns)
 	//	- losing thread is 21.5 ns (read 0.4955 ns + failing CAS 21 ns)
 	//	- subsequent thread is 0.4955 ns
+	//	- —
+	//	- note that subsequent threads proceed 8–20 ns faster than
+	//		initial threads
 	var isWinner = a.closeWinner.Load() == 0 && // if already incremented, this thread is not winner
 		a.closeWinner.Add(1) == 1 // the first thread to increment obtaining 1 is winner
 
@@ -124,7 +141,7 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 
 		// eventually consistent case does not wait
 		//	- this makes eventually consistent Close a blazing 8.655 ns parallel!
-		if len(eventuallyConsistent) > 0 && bool(eventuallyConsistent[0]) {
+		if len(eventuallyConsistent) > 0 && eventuallyConsistent[0] == EventuallyConsistency {
 			// eventually consistent: another thread is closing the channel
 			return // eventually consistent return: didClose false
 		}
@@ -138,6 +155,24 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 	// this thread should close the channel
 
 	// execute close
+	//	- there is atomic race between this [Awaitable.Close] and
+	//		Awaitable.getCh
+	//	- getCh is invoked via [Awaitable.Ch] or [Awaitable.IsClosed]
+
+	// getCh:
+	//	- at top, sets isGet true: a channel is or may be about to be created
+	//	- prior to creating the channel, inspects closeWinner
+	//	- non-zero closeWinner: returns fake channel: static, closed value
+	//	- zero closeWinner: creates a channel value ~30 ns
+
+	// Close:
+	//	- at top, sets closeWinner non-zero: the awaitable is about to close
+	//	- if isGet is observed false, no channel is required: done
+	//	- — once getCh is invoked, it will return fake channel
+	//	- if isGet is observed true, the channel must be obtained
+	//	- — if returned channel is fake: done
+	//	- — if returned channel is real, it has to be closed ~35 ns
+
 	//	- if the channel wasn’t read, its close can be deferred
 	//	- isGet checks closeWinner which is already set
 	if a.isGet.Load() {
@@ -150,11 +185,14 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 			close(ch)
 		}
 	}
-	// close completed
+	// close complete or channel creation deferred
 
 	// on close complete, store atomic performance flag
+	//	- cannot be written prior to close complete
 	a.isClosed.Store(true)
+
 	// release any waiting loser threads
+	//	- cannot be done prior to close complete
 	var wg = a.wg.GetFunc(makeWaitGroup)
 	// [sync.WaitGroup.Done] Pike’s best invention:
 	//	- no inversion of control
@@ -169,17 +207,26 @@ func (a *Awaitable) Close(eventuallyConsistent ...EventuallyConsistent) (didClos
 //   - sets indicator that channel is about to be created
 //   - lazy-initialized atomic-shielded-lock
 func (a *Awaitable) getCh() (ch chan struct{}) {
+
+	// parallel atomic: avoid Store
 	if !a.isGet.Load() {
 		a.isGet.Store(true)
 	}
+	// isGet is true
+
+	// Get retrieves pointer to singleton channel value,
+	// possibly invoking makeCh to initialize it
+	//	- makeCh delegates to lazyCh method
 	ch = *a.ch.Get(makeCh, a)
 
 	return
 }
 
-// lazyCh creates the channel
-//   - *chp is zero-value
-//   - invoked maximum once per Awaitable
+// lazyCh initializes the Awaitable’s channel value
+//   - chp: points to unreferenced zero-value
+//   - —
+//   - lazyCh is invoked maximum once per Awaitable
+//   - inside critical section, thread-safe
 //   - a.ch.Get delegates to lazyCh
 func (a *Awaitable) lazyCh(chp *chan struct{}) {
 
@@ -189,8 +236,10 @@ func (a *Awaitable) lazyCh(chp *chan struct{}) {
 		*chp = fakeCh
 		return
 	}
+
 	// create new channel
-	//	- invoker is Ch or IsClosed while close in progress
+	//	- invoker is Ch prior to Close or
+	//	- IsClosed while Close in progress
 	*chp = make(chan struct{})
 }
 
@@ -201,17 +250,25 @@ var fakeCh = func() (ch chan struct{}) {
 	return
 }()
 
-// makeCh is channel creator function. Thread-safe
-//   - Awaitable.ch.Get delegates to makeCh
-//   - *chp: zero-value
+// makeCh is channel initializer function provided to
+// [AtomicLock.Get]
+//   - chp: points to unreferenced channel zero-value
+//   - a: argument, ie. the Awaitable object
+//   - —
+//   - inside critical section, thread-safe
 //   - invoked maximum once per Awaitable
 func makeCh(chp *chan struct{}, a *Awaitable) {
+
+	// panic if a is nil
 	NilPanic("makeCh argument", a)
+
 	a.lazyCh(chp)
 }
 
-// makeWaitGroup is wait-group creator function. Thread-safe
+// makeWaitGroup is wait-group initializer function
+//   - wgp: pointer to unreferenced [sync.WaitGroup] zero-value
+//   - —
+//   - inside critical section, thread-safe
 //   - Awaitable.wg.GetFunc delegates to makeWaitGroup
-//   - *wgp: zero-value
-//   - invoked maximum once per Awaitable
+//   - makeWaitGroup is invoked maximum once per Awaitable
 func makeWaitGroup(wgp *sync.WaitGroup) { wgp.Add(1) }

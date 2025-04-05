@@ -7,34 +7,45 @@ package parl
 
 // AtomicLockArg provides a lazy-initialized singleton value
 // behind atomics-shielded lock
-//   - T is type created
-//   - P is argument to creator function
-//   - AtomicLockArg is used when creating T requires a parameter
+//   - type parameter T: the type provided
+//   - type parameter P: argument to creator function
+//   - AtomicLockArg is AtomicLock with an argument for initialization
 type AtomicLockArg[T any, P any] struct {
+	// wrapped atomic lock providing hasT, lockT and t fields
 	aLock AtomicLock[T]
 }
 
-// TMakerArg is creator function that is provided argument
-//   - tp: where to create T, *tp is zero-value
-//   - arg: argument provided to [AtomicLockArg.Get].
-//     arg allows for invoking method on struct value
-//   - invoked once per AtomicLockArg
+// TMakerArg is a function initializing a T value pointed to
+// that is provided a P-type argument
+//   - tp: pointer to T field to initialize.
+//   - — *tp is unreferenced zero-value
+//   - arg: is an argument that was provided to [AtomicLockArg.Get].
+//     arg allows TMakerArg to invoke methods on type P.
+//     If arg was not provided to [AtomicLockArg.Get], arg is nil
+//   - TMakerArg is invoked maximum once per AtomicLockArg
 type TMakerArg[T any, P any] func(tp *T, arg *P)
 
-// Get returns T possibly creating it using tMaker
-//   - tMaker: creator function
-//   - arg: argument to tMaker
-//   - tp: pointer to created singleton T
+// Get returns pointer to initialized T
+//   - tMaker: function initializing a T value pointed to
+//   - arg: optional argument to tMaker
+//   - tp: pointer to initialized singleton T value
+//   - —
 //   - T can hold lock or atomic
+//   - set hasT to true
+//   - tMaker is invoked maximum once per AtomicLockArg
 func (a *AtomicLockArg[T, P]) Get(tMaker TMakerArg[T, P], arg ...*P) (tp *T) {
 
-	// T already created case
+	// tp’s pointer-value is known
+	tp = &a.aLock.t
+
+	// T already initialized case
 	if a.aLock.hasT.Load() {
-		tp = &a.aLock.t
 		return
 	}
 
+	// initialize T
 	NilPanic("tMaker", tMaker)
+	// get arg
 	var p *P
 	if len(arg) > 0 {
 		p = arg[0]
@@ -44,13 +55,11 @@ func (a *AtomicLockArg[T, P]) Get(tMaker TMakerArg[T, P], arg ...*P) (tp *T) {
 
 	// check inside lock
 	if a.aLock.hasT.Load() {
-		tp = &a.aLock.t
 		return
 	}
-	tMaker(&a.aLock.t, p)
+	tMaker(tp, p)
 	// t was created
 
-	tp = &a.aLock.t
 	a.aLock.hasT.Store(true)
 
 	return

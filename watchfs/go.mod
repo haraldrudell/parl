@@ -9,9 +9,9 @@ toolchain go1.24.0
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/fsnotify/fsnotify v1.8.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
-	github.com/haraldrudell/parl v0.4.214
+	github.com/haraldrudell/parl v0.4.215
 )
 
 require (

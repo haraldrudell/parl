@@ -3,14 +3,13 @@
 ISC License
 */
 
-// ReadWriteCloserSlice is a read-writer with a slice as intermediate storage. thread-safe.
 package pio
 
 import (
+	"bufio"
 	"io"
 	"io/fs"
 	"slices"
-	"sync"
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
@@ -18,29 +17,42 @@ import (
 	"github.com/haraldrudell/parl/pslices"
 )
 
+var _ bufio.ReadWriter
+
 // ReadWriteCloserSlice is a read-writer with
-// slice as intermediate storage. thread-safe.
+// slice as intermediate storage
+//   - may copy directly between write and read threads
+//   - closable [bufio.ReadWriter]
+//   - initialization free, thread-safe
 type ReadWriteCloserSlice struct {
-	// makes Write critical section
-	writeLock sync.Mutex
-	// true when readwriter is closed
-	//	- read may be in deferred close
-	//	- written behind dataLock
+	// writeLock makes Write Close critical sections
+	//	- makes readerWait thread-safe
+	writeLock parl.Mutex
+	// isClosed is true when readwriter is closed
+	//	- read may be in deferred close, ie. still readable
+	//	- written behind writeLock
 	isClosed atomic.Bool
 	// makes Read critical section
-	readLock sync.Mutex
-	// allows reader threads to wait when no data is available
+	readLock parl.Mutex
+	// readerWait allows a reader-thread to wait
+	// for Write or Close when the slice is empty
+	//	- opened by Read behind dataLock
+	//	- read-close atomized by Write behind dataLock and writeLock
+	//	- closed by Close behind writeLock
 	readerWait parl.CyclicAwaitable
-	// makes data thread-safe
-	dataLock sync.Mutex
-	// written data not yet read
+	// dataLock makes data readerP readerN readerWait thread-safe
+	dataLock parl.Mutex
+	// data contains buffered data written by Write
+	// not yet read by Read
 	//	- slice-away slice
 	//	- behind dataLock
 	data, data0 []byte
-	// buffer from a reader
+	// readerP is available buffer from a reader
 	//	- behind dataLock
+	//	- Write writes to it if non-nil
 	readerP []byte
-	// bytes in readerP from a reader
+	// readerN is number of bytes written to readerP
+	// by Write
 	//	- written behind dataLock
 	readerN parl.Atomic64[int]
 }
@@ -49,49 +61,58 @@ type ReadWriteCloserSlice struct {
 var _ io.ReadWriteCloser = &ReadWriteCloserSlice{}
 
 // NewReadWriteCloserSlice returns an object that copies from Write to Read
-// and has Close
+// and is closable
 func NewReadWriteCloserSlice(fieldp ...*ReadWriteCloserSlice) (readWriteCloser *ReadWriteCloserSlice) {
 
+	// get readWriteCloser
 	if len(fieldp) > 0 {
 		readWriteCloser = fieldp[0]
 	}
 	if readWriteCloser == nil {
 		readWriteCloser = &ReadWriteCloserSlice{}
-	} else {
-		*readWriteCloser = ReadWriteCloserSlice{}
 	}
 
 	return
 }
 
 // Write copies data directly to Reader buffer or to intermediate data slice
-//   - if after Close, returns ErrFileAlreadyClosed
-//   - check using: errors.Is(err, fs.ErrClosed)
-//   - this implementation returns no other errors
+//   - p: buffer to write
+//   - n: number of bytes written.
+//     If err is nil, n == len(p)
+//   - err: if after Close, returns ErrFileAlreadyClosed
+//   - — check using: errors.Is(err, fs.ErrClosed)
+//   - — no other errors
 //   - thread-safe
 func (r *ReadWriteCloserSlice) Write(p []byte) (n int, err error) {
-	r.writeLock.Lock()
-	defer r.writeLock.Unlock()
 
-	// Write to closed writer is error
+	// fast check outside lock
 	if r.isClosed.Load() {
 		err = perrors.ErrorfPF("%w", fs.ErrClosed)
-		return // closed return
+		return // closed error-return
 	}
-
-	// remaining bytes to write
 	var remaining = len(p)
+	// remaining bytes to write
 	if remaining == 0 {
-		return // nothing to write return
+		return
+	}
+	// enter Write Close critical section
+	defer r.writeLock.Lock().Unlock()
+
+	// Write to closed writer is error
+	//	- inside lock check
+	if r.isClosed.Load() {
+		err = perrors.ErrorfPF("%w", fs.ErrClosed)
+		return // closed error-return
 	}
 
 	// hand off:
 	//	- by direct copy to reader buffer or
 	//	- to r.data
-	r.dataLock.Lock()
-	defer r.dataLock.Unlock()
+	defer r.dataLock.Lock().Unlock()
 
 	// copy directly to any reader buffer
+	//	- if readerWait open, a Read invocation is waiting
+	//	- ecause writeLock is held, Close cannot happen
 	if !r.readerWait.IsClosed() && r.readerP != nil {
 		var nr = min(len(p), len(r.readerP))
 		// transfer to reader
@@ -106,6 +127,7 @@ func (r *ReadWriteCloserSlice) Write(p []byte) (n int, err error) {
 			return // all written return
 		}
 	}
+	// there is data for buffer
 
 	// append the rest to data
 	pslices.SliceAwayAppend(&r.data, &r.data0, p, parl.NoZeroOut)
@@ -115,6 +137,12 @@ func (r *ReadWriteCloserSlice) Write(p []byte) (n int, err error) {
 }
 
 // Read returns at most len(p) bytes read in n and possibly io.EOF
+//   - p: buffrer to read to
+//   - n: number of bytes read
+//   - err: only [io.EOF]
+//   - —
+//   - if one or more buffered bytes are available, those are returned
+//   - if the slice is empty and closed: EOF
 //   - Read blocks if no data is available and Close has not occurred
 //   - Read blocks until Write of any data or Close
 //   - Read returns io.EOF once buffer is empty and Close has occurred
@@ -123,11 +151,12 @@ func (r *ReadWriteCloserSlice) Write(p []byte) (n int, err error) {
 //   - n may be less than len(p)
 //   - thread-safe
 func (r *ReadWriteCloserSlice) Read(p []byte) (n int, err error) {
+
+	// check for empty buffer
 	if len(p) == 0 {
-		return // empty read
+		return // empty read return
 	}
-	r.readLock.Lock()
-	defer r.readLock.Unlock()
+	defer r.readLock.Lock().Unlock()
 
 	// read from data or announce reader buffer
 	if n, err = r.readerEvent(p); n > 0 || err != nil {
@@ -154,17 +183,18 @@ func (r *ReadWriteCloserSlice) Read(p []byte) (n int, err error) {
 }
 
 // Close prevents further Writes and causes Read to evetually return io.EOF
+//   - err: nil on first invocation, then ErrClosed
+//   - —
 //   - subsequent Close returns ErrFileAlreadyClosed
 //   - check using: errors.Is(err, fs.ErrClosed)
 //   - thread-safe
 func (r *ReadWriteCloserSlice) Close() (err error) {
-	r.writeLock.Lock()
-	defer r.writeLock.Unlock()
+	defer r.writeLock.Lock().Unlock()
 
 	// filter for already closed
 	if r.isClosed.Load() || !r.isClosed.CompareAndSwap(false, true) {
 		err = perrors.ErrorfPF("%w", fs.ErrClosed)
-		return // closed return
+		return // already closed error return
 	}
 
 	// signal close to any waiting reader
@@ -173,40 +203,43 @@ func (r *ReadWriteCloserSlice) Close() (err error) {
 	return
 }
 
+// Buffer returns a clone of current data
 func (r *ReadWriteCloserSlice) Buffer() (buffer []byte) {
-	r.dataLock.Lock()
-	defer r.dataLock.Unlock()
+	defer r.dataLock.Lock().Unlock()
 
 	buffer = slices.Clone(r.data)
 	return
 }
 
 // readerEvent reads fom data slice or announce a buffer for Write invocations
-//   - n: non-zero if data was not empty
-//   - err: non-zero if no data and Close was invoked
+//   - p: buffer to read to, cannot be zero-length
+//   - n: non-zero if buffer data was not empty and bytes read from it
+//   - err: non-zero if no buffered data and Close had been invoked
+//   - —
+//   - — if any buffered data is available, that is returned
 //   - otherwise, readerWait is armed and Write can access p
 func (r *ReadWriteCloserSlice) readerEvent(p []byte) (n int, err error) {
-	r.dataLock.Lock()
-	defer r.dataLock.Unlock()
+	defer r.dataLock.Lock().Unlock()
 
 	// collect any buffered data
 	if len(r.data) > 0 {
 		n = min(len(r.data), len(p))
 		copy(p[:n], r.data)
 		r.data = r.data[n:]
-		return
+		return // buffered data was read return: n > 0
 	}
 
 	// check for EOF
 	if r.isClosed.Load() {
 		err = io.EOF
-		return
+		return // empty and EOF return: err io.EOF
 	}
 
 	// flag buffer available
+	//	- written behind dataLock
 	r.readerP = p
 	r.readerN.Store(0)
 	r.readerWait.Open()
 
-	return
+	return // empty, not closed slice return: n 0, err nil
 }

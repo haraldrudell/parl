@@ -6,24 +6,15 @@ ISC License
 package mains
 
 import (
+	"bufio"
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/mains/malib"
 	"github.com/haraldrudell/parl/perrors"
+	"github.com/haraldrudell/parl/plog/plogt"
+	"github.com/haraldrudell/parl/pruntime"
 )
-
-const (
-	// do not echo to standard error on [os.Stdin] closing
-	// optional argument to [Keystrokes.Launch]
-	SilentClose SilentType = true
-)
-
-// optional flag for no stdin-cose echo [SilentClose]
-type SilentType bool
-
-// didLaunch ensures multiple keystrokesThread are not running
-var didLaunch atomic.Bool
 
 // Keystrokes reads line-wise from standard input
 //   - [os.File.Read] from [os.Stdin] cannot be aborted because
@@ -38,8 +29,10 @@ var didLaunch atomic.Bool
 //   - those items along with [KeyStrokesThread] and [StdinReader] are released
 //     on process exit or next keypress
 type Keystrokes struct {
-	// unbound locked thread-safe slice with closing-channel wait mechanic
+	// unbound thread-safe queue using lock and closing-channel wait-mechanic
 	stdin parl.AwaitableSlice[string]
+	// stdinReader is fail-free reader of standard input
+	stdinReader *malib.StdinReader
 }
 
 // NewKeystrokes returns an object reading lines from standard input
@@ -56,18 +49,22 @@ type Keystrokes struct {
 //	defer keystrokes.Launch().CloseNow(&err)
 //	for line := range keystrokes.Ch() {
 func NewKeystrokes(fieldp ...*Keystrokes) (keystrokes *Keystrokes) {
+
+	// get keystrokes
 	if len(fieldp) > 0 {
 		keystrokes = fieldp[0]
 	}
-	if keystrokes != nil {
-		*keystrokes = Keystrokes{}
-	} else {
+	if keystrokes == nil {
 		keystrokes = &Keystrokes{}
 	}
+
+	*keystrokes = Keystrokes{}
 	return
 }
 
 // Launch starts reading stdin for keystrokes
+//   - errorSink:
+//   - silent missing:
 //   - can only be invoked once per process or panic
 //   - supports functional chaining
 //   - silent [SilentClose] does not echo anything on [os.Stdin] closing
@@ -87,7 +84,7 @@ func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...SilentType) (ke
 		isSilent = silent[0] == SilentClose
 	}
 
-	go malib.KeystrokesThread(isSilent, errorSink, &k.stdin)
+	go k.stdinReaderThread(isSilent, errorSink)
 
 	return
 }
@@ -104,3 +101,83 @@ func (k *Keystrokes) StringSource() (stringSource parl.ClosableSource1[string]) 
 
 // CloseNow closes the string-sending channel discarding any pending characters
 func (k *Keystrokes) CloseNow(errp *error) { k.stdin.Close() }
+
+// keystrokesThread reads blocking from [os.Stdin] therefore cannot be canceled
+//   - silent true: nothing is printed on os.Stdin closing
+//   - silent false: “mains.keystrokesThread standard input closed” may be printed to
+//     standard error on os.Stdin closing
+//   - errorSink present: receives any errors returned by or panic in [os.Stdin.Read]
+//   - errorSink nil: errors are printed to standard error
+//   - stdin receives text lines from standard input with line terminator removed
+//   - on [os.Stdin] closing, keystrokesThread closes the stdin line-input channel
+//   - — the close may be deferred until a key is pressed or the process exits
+//     -
+//   - Because [os.Stdin] cannot be closed and [os.Stdin.Read] is blocking:
+//   - — the thread may blockindfinitiely until process exit
+//   - — therefore, keystrokesThread is a top-level function not waited upon
+//   - — purpose is to minimize objects kept in memory until the thread exits
+//   - on [Keystrokes.CloseNow], keystrokesThread exits on the following keypress
+//   - [StdinReader] converts any error to [io.EOF]
+//   - [parl.Infallible] prints any errors to standard error, should not be any
+//   - —
+//   - -verbose=Keystrokes..stdinReaderThread
+func (k *Keystrokes) stdinReaderThread(silent bool, errorSink parl.ErrorSink1) {
+	var err error
+	var isDebug = parl.IsThisDebug()
+	if isDebug {
+		defer plogt.D("keystrokes.stdinReaderThread exiting: err: “%s”", perrors.Short(err))
+	}
+	if errorSink == nil {
+		errorSink = parl.Infallible
+	}
+	// if a panic is recovered, or err holds an error, both are printed to standard error
+	defer parl.Recover(func() parl.DA { return parl.A() }, &err, errorSink)
+	// ensure string-channel closes on exit without discarding any input
+	defer k.stdin.Close()
+
+	var isStdinReaderError atomic.Bool
+	var s = malib.NewStdinReader(errorSink, &isStdinReaderError)
+	k.stdinReader = s
+	// scanner splits input into lines
+	var scanner = bufio.NewScanner(s)
+	var stdinClosedCh = k.stdin.CloseCh()
+
+	if isDebug {
+		plogt.D("keystrokes.stdinReaderThread at for")
+	}
+
+	// blocks here
+	for scanner.Scan() {
+
+		// check if consumer closed stdin output
+		select {
+		case <-stdinClosedCh:
+			return // terminated by Keystrokes.CloseNow
+		default:
+		}
+		if isDebug {
+			plogt.D("keystrokes.Send %q", scanner.Text())
+		}
+		k.stdin.Send(scanner.Text())
+	}
+
+	// scanner had end of input or error
+	//	- caused by a closing event like user pressing ^D or by
+	//	- error during os.Stdin.Read or
+	//	- error raised in Scanner
+	err = scanner.Err()
+	// do not print:
+	if silent || //	- if silent is configured or
+		err != nil || //	- the scanner had error or
+		isStdinReaderError.Load() { //	- close is caused by an error handled by StdinReader
+		return
+	}
+	// echoed to standard error
+	//	- echoed if:
+	//	- stdin closed without error, eg. from user pressing ^D
+	//	- silent is false
+	parl.Log("[%s standard input closed]", pruntime.PackFunc())
+}
+
+// didLaunch ensures multiple keystrokesThread are not running
+var didLaunch atomic.Bool

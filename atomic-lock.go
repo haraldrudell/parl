@@ -11,7 +11,7 @@ import (
 
 // AtomicLock provides a lazy-initialized singleton value
 // behind atomics-shielded lock
-//   - T is type created
+//   - type parameter T: the type of the value being lazily created
 //   - AtomicLock is used when T is created without state
 type AtomicLock[T any] struct {
 	// hasT is true once T is available
@@ -19,7 +19,7 @@ type AtomicLock[T any] struct {
 	//		at atomic performance
 	hasT atomic.Bool
 	// lock protects T write
-	//	- lock is only used for the initial write
+	//	- lock is only used for initial write while hasT is false
 	lockT Mutex
 	// T singleton value
 	//	- directly readable whenever hasT observed true
@@ -30,67 +30,90 @@ type AtomicLock[T any] struct {
 
 // TCreator is object creating T value
 type TCreator[T any] interface {
-	// MakeT creates T value at tp
-	//	- *tp: zero-value
-	//	- invoked maximum once per AtomicLock
+	// MakeT initializes T value at *tp
+	//   - *tp: uninitialized T zero-value
+	//   - —
+	//   - tp points to a T field that has not been referenced
+	//   - MakeT is invoked maximum once per T field
 	MakeT(tp *T)
 }
 
-// TMaker is a function creating T value at tp
-//   - *tp: zero-value
-//   - invoked maximum once per AtomicLock
+// TMaker is function initializing T value at *tp
+//   - *tp: uninitialized T zero-value
+//   - —
+//   - tp points to a T field that has not been referenced
+//   - TMaker is invoked maximum once per T field
 type TMaker[T any] func(tp *T)
 
-// Get returns T value possibly creating it using tCreator
-//   - tCreator: invoked maximum once per AtomicLock
+// Get returns T value possibly initializing it using [tCreator.MakeT]
+//   - tCreator: object able to initialize T values
 //   - tp: points to singleton value
+//   - —
 //   - T can hold lock or atomic
+//   - MakeT is invoked maximum once per AtomicLock
 func (a *AtomicLock[T]) Get(tCreator TCreator[T]) (tp *T) {
+
+	// tp value is known
+	tp = &a.t
 
 	// T already created case
 	if a.hasT.Load() {
-		tp = &a.t
 		return
 	}
 
 	NilPanic("tCreator", tCreator)
-	return a.get(nil, tCreator)
+	a.get(nil, tCreator)
+
+	return
 }
 
-// Get returns T value possibly creating it using tMaker
-//   - tp: points to singleton value
+// GetFunc returns T value possibly initializing it using tMaker function
+//   - tMaker: function initializing a T value pointed to
+//   - tp: points to initialized singleton value
+//   - —
 //   - T can hold lock or atomic
+//   - tMaker is invoked maximum once per AtomicLock
 func (a *AtomicLock[T]) GetFunc(tMaker TMaker[T]) (tp *T) {
 
+	// tp value is known
+	tp = &a.t
+
 	// T already created case
+	//	- atomic performance
 	if a.hasT.Load() {
-		tp = &a.t
 		return
 	}
 
+	// initialize a.t
 	NilPanic("tMaker", tMaker)
-	return a.get(tMaker, nil)
+	a.get(tMaker, nil)
+
+	return
 }
 
 // get enters critical section to get or create T
-//   - tMaker or tCreator: one must be non-nil
+//   - tMaker: function initializing a T value pointed to
+//   - tCreator.MakeT: method initializing a T value pointed to
+//   - tp: pointer to initialized T value
+//     -
+//   - sets a.hasT to true
+//   - tMaker or tCreator: one must be non-nil, tMaker is checked first
 //   - tp: pointer to T
-func (a *AtomicLock[T]) get(tMaker TMaker[T], tCreator TCreator[T]) (tp *T) {
+func (a *AtomicLock[T]) get(tMaker TMaker[T], tCreator TCreator[T]) {
 	defer a.lockT.Lock().Unlock()
 
 	// check inside lock
 	if a.hasT.Load() {
-		tp = &a.t
 		return
-	} else if tMaker != nil {
+	}
+
+	// initialize a.t
+	if tMaker != nil {
 		tMaker(&a.t)
 	} else {
 		tCreator.MakeT(&a.t)
 	}
-	// t was created
+	// t was initialized
 
-	tp = &a.t
 	a.hasT.Store(true)
-
-	return
 }

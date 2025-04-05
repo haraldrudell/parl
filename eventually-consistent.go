@@ -10,11 +10,11 @@ const (
 	//   - eventual consistency increase parallel performance
 	//     significantly for situations where an event must
 	//     be initiated but not guaranteed to have completed
-	EventuallyConsistency EventuallyConsistent = true
+	EventuallyConsistency EventuallyConsistent = 1
 )
 
 // [Awaitable.Close]: optional eventually-consistent indicator
 //   - eventual consistency increase parallel performance
 //     significantly for situations where an event must
 //     be initiated but not guaranteed to have completed
-type EventuallyConsistent bool
+type EventuallyConsistent uint8
