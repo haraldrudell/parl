@@ -8,6 +8,7 @@ package malib
 import (
 	"errors"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
@@ -17,19 +18,15 @@ import (
 
 // StdinReader is a reader wrapping the unclosable [os.Stdin.Read]
 type StdinReader struct {
-	// option error submitting function
+	// errorSink is error submitting function
 	errorSink parl.ErrorSink1
 	// whether error or close has occured in [StdinReader.Read]
 	isClosed parl.Awaitable
 	// isEOF is true when StdinReader has been closed and read to end
 	isEOF atomic.Bool
-	// optional value set to true on error or close
-	// TODO 250404 not used
+	// isError is set to true on thread error or panic
+	//	- may be nil
 	isError *atomic.Bool
-	// true when the thread has been created
-	isCreatedThread atomic.Bool
-	// createLock makes thread-creation critical section
-	createLock parl.Mutex
 	// isActive indicates to thread stdinReader is still operating
 	isActive atomic.Bool
 	// errCh is error channel from thread
@@ -37,29 +34,32 @@ type StdinReader struct {
 	//	- closes on thread exit
 	errCh atomic.Pointer[chan error]
 	// bufferLock makes stdinBuffer thread-safe
-	bufferLock parl.Mutex
+	bufferLock sync.Mutex
 	// stdinBuffer receives byte slices from os.Stdin as they are read
 	//	- list of non-empty slices
 	//	- behind bufferLock
 	stdinBuffer [][]byte
 	// dataCh becomes non-emprty when data is added to stdinBuffer
-	//	- enables waiting for thread
+	//	- enables awaiting data from thread
 	dataCh chan struct{}
 	// readLock makes Read Close critical section
+	//	- make sliceList thread-safe
 	readLock parl.Mutex
 	// sliceList is slice away of local data read from stdinBuffer
 	//	- behind readLock
 	sliceList, sliceList0 [][]byte
+	// isCreatedThread is true when the thread has been created
+	//	- written behind readLock
+	isCreatedThread atomic.Bool
 }
 
 // StdinReader is [io.ReadCloser]
 var _ io.ReadCloser = &StdinReader{}
 
 // NewStdinReader returns a error-free reader of standard input that closes on error
-//   - errorSink pressent: receives any errors returned by [os.Stdin.Read] or
+//   - errorSink: receives any errors returned by [os.Stdin.Read] or
 //     runtime panic in this method.
-//   - errorSink nil: errors are printed to standard error
-//   - isError: optional atomic set to true on first error or standard input closing
+//   - isError: optional atomic set to true on first error or panic
 //     -
 //   - [StdinReader.Read] returns bytes read from [os.Stdin] standard input until close or error
 //   - [os.Stdin.Read] is blocking and os.Stdin cannot be closed
@@ -172,6 +172,11 @@ func (r *StdinReader) Close() (err error) {
 
 	// read errors from thread
 	if !r.threadState() {
+		// thread is still running
+		//	- order thread to exit
+		if r.isActive.Load() {
+			r.isActive.Store(false)
+		}
 		return // thread is running return
 	}
 	// thread is exited
@@ -188,8 +193,8 @@ func (r *StdinReader) Close() (err error) {
 }
 
 // createThread creates the thread reading from os.Stdin
+//   - must be in critical section
 func (r *StdinReader) createThread() {
-	defer r.createLock.Lock().Unlock()
 
 	if r.isCreatedThread.Load() {
 		return
@@ -201,8 +206,15 @@ func (r *StdinReader) createThread() {
 
 // readStdinBuffer moves any slices from stdinBuffer to sliceList
 //   - sliceCount number of moved slices
+//   - —
+//   - sliceList is slice-away slice
+//   - by emptying stdinBuffer every time,
+//     lock contention is reduced and
+//     thread does not have to implement slice-away logic.
+//     ie. pslices.SliceAwayAppend
 func (r *StdinReader) readStdinBuffer() (sliceCount int) {
-	defer r.bufferLock.Lock().Unlock()
+	r.bufferLock.Lock()
+	defer r.bufferLock.Unlock()
 
 	sliceCount = len(r.stdinBuffer)
 	if sliceCount == 0 {
@@ -215,6 +227,9 @@ func (r *StdinReader) readStdinBuffer() (sliceCount int) {
 	return
 }
 
+// copyToP moves bytes from sliceList to p
+//   - p: buffer to fill
+//   - n: number of bytes written to p
 func (r *StdinReader) copyToP(p []byte) (n int) {
 
 	// while p has room and sliceList has data
@@ -249,18 +264,22 @@ func (r *StdinReader) copyToP(p []byte) (n int) {
 // threadState reads and closes thread error channel
 //   - isExit true: thread has exited and its errors have been consumed
 //
-// there is no thread continuously monitoring
+// there is no thread that is continuously monitoring
 // the reader thread
 //   - if there was, that would be memory references
 //     by the thread
 //   - on Read Close invocation,
-//     events can be checked
+//     queued-up events can be checked
 //
 // this thread can set isActive to false
-// events with thread to check
-//   - EOF from os.Stderr
-//   - error from os.Stderr
+//   - this will cause reader thread to exit on
+//     next return press
+//
+// events from thread to check:
+//   - EOF from os.Stdin
+//   - error other than EOF from os.Stdin
 //   - thread panic
+//   - thread exit
 func (r *StdinReader) threadState() (isExit bool) {
 
 	// check if thread already exited
@@ -286,7 +305,7 @@ func (r *StdinReader) threadState() (isExit bool) {
 			}
 		default:
 			// there are no queued up errors
-			//	- thread is up not sending error or
+			//	- thread is up but not sending error or
 			//	- thread is exit and errCh is nil
 			return // no queued-up errors return
 		}
@@ -302,16 +321,24 @@ func (r *StdinReader) submitThreadError(err error) {
 	// all errors from thread are StdinErr
 	var e = err.(*StdinErr)
 	if e.RecoverAny != nil {
+
 		// thread had panic
-		if e.Err != nil {
-			err = perrors.ErrorfPF("stdin-thread panic: %w", e.Err)
-		}
+		//	- make recover valu an error with stack trace
+		err = parl.EnsureError(e.RecoverAny)
 	} else if errors.Is(e.Err, io.EOF) {
-		// close will become EOF once reader is empty
+
+		// os.Stdin.Read returned EOF
+		//	- close will become EOF once reader is empty
 		r.isClosed.Close()
 		return // do not submit EOF return
 	} else {
+
+		// os.Stdin.Read returned error other than EOF
 		err = perrors.ErrorfPF("stdin-thread error: %w", e.Err)
+	}
+	// note than stdin had panic or error other than io.EOF
+	if r.isError != nil && !r.isError.Load() {
+		r.isError.Store(true)
 	}
 	r.errorSink.AddError(err)
 }

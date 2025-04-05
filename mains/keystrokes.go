@@ -93,14 +93,23 @@ func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...SilentType) (ke
 // sending lines from the keyboard on each return press
 //   - closing-channel wait mechanic
 //   - Ch sends strings with return character removed
-//   - the channel closes upon:
+//   - stringSource closes upon:
 //   - — [Keystrokes.CloseNow] or
-//   - — [os.Stdin] closing or
+//   - — [os.Stdin] closing or error or
 //   - — thread runtime error
 func (k *Keystrokes) StringSource() (stringSource parl.ClosableSource1[string]) { return &k.stdin }
 
 // CloseNow closes the string-sending channel discarding any pending characters
-func (k *Keystrokes) CloseNow(errp *error) { k.stdin.Close() }
+func (k *Keystrokes) CloseNow(errp *error) {
+
+	// [malib.StdinReader.Close] orders thread to exit
+	//	- effective on next return key-press
+	parl.Close(k.stdinReader, errp)
+
+	// [parl.AwaitableSlice.Close] orders stdinReaderThread
+	// to exit immediately
+	k.stdin.Close()
+}
 
 // keystrokesThread reads blocking from [os.Stdin] therefore cannot be canceled
 //   - silent true: nothing is printed on os.Stdin closing
@@ -135,6 +144,9 @@ func (k *Keystrokes) stdinReaderThread(silent bool, errorSink parl.ErrorSink1) {
 	// ensure string-channel closes on exit without discarding any input
 	defer k.stdin.Close()
 
+	// thread sets isStdinReaderError to true on panic or
+	// error other than EOF
+	//	- prevents close message from printing
 	var isStdinReaderError atomic.Bool
 	var s = malib.NewStdinReader(errorSink, &isStdinReaderError)
 	k.stdinReader = s

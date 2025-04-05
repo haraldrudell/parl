@@ -87,7 +87,7 @@ func (s *SlowDetectorInvocation) Label() (label string) { return s.invoLabel }
 // Time returns the last non-return report timestamp
 //   - t zero-value: retrieve any previous timestamp
 //   - t: new timestamp to set
-//   - previousT: retrievd or previous timestamp, zero-time for none
+//   - previousT: retrieved or previous timestamp, zero-time for none
 func (s *SlowDetectorInvocation) Time(t time.Time) (previousT time.Time) {
 	if t.IsZero() {
 		// t zero-value means retrieve current value

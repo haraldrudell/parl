@@ -9,10 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
+	"sync"
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/pdebug"
+	"github.com/haraldrudell/parl/pruntime"
 )
 
 // D is hook to facilitate debug printing
@@ -33,20 +36,23 @@ var D parl.PrintfFunc
 //   - — error from os.Stdin: StdinErr is sent on errCh
 //   - — isActive being false
 //   - only takes Go types to reduce memory references
-func KeystrokesThread(isActive *atomic.Bool, errCh chan error, slicep *[][]byte, sliceLock *parl.Mutex, dataCh chan struct{}) {
+func KeystrokesThread(isActive *atomic.Bool, errCh chan error, slicep *[][]byte, sliceLock *sync.Mutex, dataCh chan struct{}) {
 	defer close(errCh)
 	var err error
 	defer keyRecovery(isActive, errCh, &err)
 
 	var n int
-	var p = make([]byte, 1024)
+	var p = make([]byte, stdinBufSize)
 	if D != nil {
-		D("KeystrokesThread at for:\n%s\n—", pdebug.NewStack(0))
-		defer D("KeystrokesThread exiting…")
+		D("%s at for:\n%s\n—",
+			codeLine.FuncName(),
+			pdebug.NewStack(0),
+		)
 	}
 	for {
 
-		// read for os.Stdin
+		// read from os.Stdin
+		//	- blocks here
 		n, err = os.Stdin.Read(p)
 
 		// check if still active
@@ -56,7 +62,10 @@ func KeystrokesThread(isActive *atomic.Bool, errCh chan error, slicep *[][]byte,
 
 		// send any data
 		if n > 0 {
-			appendToSlice(p[:n], slicep, sliceLock)
+			// clone buffer bytes
+			var sliceClone = slices.Clone(p[:n])
+			appendToSlice(sliceClone, slicep, sliceLock)
+			// trigger data-wait on dataCh
 			if len(dataCh) == 0 {
 				dataCh <- struct{}{}
 			}
@@ -65,7 +74,9 @@ func KeystrokesThread(isActive *atomic.Bool, errCh chan error, slicep *[][]byte,
 		// handle any errors
 		if err != nil {
 			if D != nil {
-				D("err: %s", err)
+				D("%s err: %s",
+					codeLine.FuncName(), err,
+				)
 			}
 			errCh <- &StdinErr{Err: err}
 			return
@@ -74,7 +85,7 @@ func KeystrokesThread(isActive *atomic.Bool, errCh chan error, slicep *[][]byte,
 }
 
 // keyRecovery recovers any panic
-//   - isActive: true if background is still monitoring the therad
+//   - isActive: true if background is still monitoring the thread
 //   - errCh: error channel to background
 func keyRecovery(isActive *atomic.Bool, errCh chan error, errp *error) {
 
@@ -83,7 +94,10 @@ func keyRecovery(isActive *atomic.Bool, errCh chan error, errp *error) {
 	var isPanic = reccoverAny != nil
 	var panicS string
 	if D != nil {
-		D("isPanic: %t err: %v isActive: %t", isPanic, *errp, isActive.Load())
+		D("%s exiting: isPanic: %t err: %v isActive: %t",
+			codeLine.FuncName(),
+			isPanic, *errp, isActive.Load(),
+		)
 	}
 	if !isPanic && isActive.Load() {
 		return // no panic, background still monitoring
@@ -120,10 +134,11 @@ func keyRecovery(isActive *atomic.Bool, errCh chan error, errp *error) {
 
 // appendToSlice appends using lock
 //   - slice: a slice to append
-//   - *slicep: pointer to slice
-//   - sliceLock: lock for slice
-func appendToSlice(slice []byte, slicep *[][]byte, sliceLock *parl.Mutex) {
-	defer sliceLock.Lock().Unlock()
+//   - *slicep: pointer to slice list
+//   - sliceLock: lock for slicep
+func appendToSlice(slice []byte, slicep *[][]byte, sliceLock *sync.Mutex) {
+	sliceLock.Lock()
+	defer sliceLock.Unlock()
 
 	*slicep = append(*slicep, slice)
 }
@@ -135,14 +150,10 @@ func appendToSlice(slice []byte, slicep *[][]byte, sliceLock *parl.Mutex) {
 // Parent-ID: 7 go: github.com/haraldrudell/parl/mains/malib.(*StdinReader).createThread
 //   /opt/sw/parl/mains/malib/stdin-reader.go:171
 
-// Err is type-name for error,
-// enabling error as promoted public field
-type Err error
+const (
+	// size of Stdin Read buffer
+	stdinBufSize = 1024
+)
 
-// StdinErr is an error value wrapping an error or panic
-//   - RecoverAny non-nil: any value from recover of panic
-//   - Err: error from os.Stdin.Read including io.EOF
-type StdinErr struct {
-	RecoverAny any
-	Err
-}
+// codeLine caches KeystrokesThread function identifier
+var codeLine pruntime.CachedLocation

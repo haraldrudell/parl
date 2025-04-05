@@ -125,7 +125,9 @@ func (s *SlowDetectorCore) Values() (
 	return
 }
 
-// reportDuration reports an invocation duration
+// reportDuration returns true if this is a progressive max
+//   - isNewMax true: this invocation is a new progressive max for this slow-detector
+//   - also records all-time max
 func (s *SlowDetectorCore) reportDuration(duration time.Duration) (isNewMax bool) {
 	s.alwaysMax.Value(duration)
 	isNewMax = s.max.Value(duration)
@@ -159,7 +161,7 @@ func (s *SlowDetectorCore) stop(invocation *SlowDetectorInvocation, timestamp ..
 
 	// check against max
 	if s.max.Value(duration) {
-		s.reportReceiver.Report(invocation, true, duration)
+		s.reportReceiver.Report(invocation, DidReturnYes, duration)
 	}
 }
 
@@ -191,10 +193,19 @@ func (e *ender) Stop(invocation *SlowDetectorInvocation, timestamp ...time.Time)
 	e.sdc.stop(invocation, timestamp...)
 }
 
+// Duration returns true if this is a progressive max
+//   - isNewMax true: this invocation is a new progressive max for this slow-detector
+//   - also records all-time max
 func (e *ender) Duration(duration time.Duration) (isNewMax bool) {
 	return e.sdc.reportDuration(duration)
 }
 
-func (e *ender) Report(invocation *SlowDetectorInvocation, didReturn bool, duration time.Duration) {
+// Report receives reports for the slowest-to-date invocation
+// and non-return reports every minute
+//   - invocation: the invocation created by [SlowDetectorCode.Start]
+//   - didReturn true: the invocation has ended
+//   - didReturn false: the invocation is still in progress, ie. a non-return report
+//   - duration: the latency causing report
+func (e *ender) Report(invocation *SlowDetectorInvocation, didReturn DidReturn, duration time.Duration) {
 	e.sdc.reportReceiver.Report(invocation, didReturn, duration)
 }

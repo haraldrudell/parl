@@ -143,10 +143,11 @@ func (s *SlowDetectorThread) thread(g Go) {
 	for {
 		select {
 		case <-done:
-			return // context cancelled return
+			return // context cancel return
 		case <-C:
 			t = time.Now()
 		}
+		// ticker triggered scan of non-returns
 
 		// check all invocations for non-return
 		for _, invocation := range s.invocations.List() {
@@ -154,17 +155,33 @@ func (s *SlowDetectorThread) thread(g Go) {
 			// duration is how long the invocation has been in progress
 			var duration = t.Sub(invocation.t0)
 
-			// sdc is slow-detector-core for the invocation
-			var sdc = invocation.If()
-			if sdc.Duration(duration) {
-				// it is a new max, check whether nonReturnPeriod has elapsed
-				if tLast := invocation.Time(time.Time{}); tLast.IsZero() || t.Sub(tLast) >= s.nonReturnPeriod {
-
-					// store new nonReturnPeriod start
-					invocation.Time(t)
-					sdc.Report(invocation, false, duration)
-				}
+			//	- invocations may be added to s.invocations
+			//		after t timestamp resulting in negative times
+			//	- it is a scan for max, so less than zero can
+			//		be skipped
+			if duration < 0 {
+				continue
 			}
+
+			// get slow-detector-core for this invocation
+			var sdc = invocation.If()
+
+			// check if this duration a new max
+			if !sdc.Duration(duration) {
+				// this duration is not a new progressive max for this slow-detector
+				continue
+			}
+
+			// it is a new max, check whether nonReturnPeriod has elapsed
+			var tLastNonReturnReport = invocation.Time(time.Time{})
+			if !tLastNonReturnReport.IsZero() &&
+				t.Sub(tLastNonReturnReport) < s.nonReturnPeriod {
+				continue // a previous non-return report is too recent
+			}
+
+			// store new nonReturnPeriod start
+			invocation.Time(t)
+			sdc.Report(invocation, DidReturnNo, duration)
 		}
 	}
 }

@@ -123,10 +123,10 @@ func (s *SlowDetector) Status0() (s2 string) {
 //   - Thread-safe
 func (s *SlowDetector) Status() (s2 string) { return s.label + ": " + s.Status0() }
 
-func (s *SlowDetector) Report(sdi *SlowDetectorInvocation, didReturn bool, duration time.Duration) {
+func (s *SlowDetector) Report(sdi *SlowDetectorInvocation, didReturn DidReturn, duration time.Duration) {
 
 	var inProgressStr string
-	if !didReturn {
+	if didReturn != DidReturnYes {
 		inProgressStr = " in progress…"
 	}
 
