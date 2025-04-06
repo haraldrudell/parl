@@ -19,28 +19,47 @@ type SlowDetectorInvocation struct {
 	//	- used as map key
 	sID slowID
 	// threadID is the Go goroutine identifier integer that
-	// invoked [SlowDetectorCore.Start] creeating this invocation
+	// invoked [SlowDetectorCore.Start] creating this invocation
+	//	- typically a numeric string
 	threadID ThreadID
 	// invoLabel is printable identifier for the invocation, often short code location:
-	// “mains.(*Executable).AddErr-executable.go:25”
+	//	- “build”
+	//	- “mains.(*Executable).AddErr-executable.go:25”
 	invoLabel string
-	// t0 is the timestamp for when the invocation was made,
+	// t0 is the timestamp for when the invocation started,
 	// default [time.Now] of [SlowDetectorCore.Start] invocation
 	t0 time.Time
 	// ender handles [SlowDetectorInvocation.Stop] invocations
-	ender SlowDetectorIf3
-	// timestamp for last non-return report. [ptime.Epoch] is time fitting an integral atomic
+	//	- Duration() Report() Stop()
+	ender SlowDetectorInvoActionsStop
+	// timestamp for last non-return report.
+	//	- [ptime.Epoch] fits timestamp into integral atomic
 	lastNonReturnReportTimestamp Atomic64[ptime.Epoch]
-	// lock makes intervals thread-safe
-	lock Mutex
-	// accessed behind lock
+	// intervalsLock makes intervals slice thread-safe
+	intervalsLock Mutex
+	// intervals is labeled progress timestamps during
+	// the life of an invocation
+	//	- accessed behind lock
 	intervals []interval
 }
 
 // SlowDetectorInvocation is SlowInvocation
 var _ SlowInvocation = &SlowDetectorInvocation{}
 
-func NewSlowDetectorInvocation(ID slowID, invoLabel string, threadID ThreadID, t0 time.Time, ender SlowDetectorIf3) (invocation *SlowDetectorInvocation) {
+// NewSlowDetectorInvocation retruns a data container and
+// invocation-action provider for an invocation
+//   - slowID: unique opaque identifier [constraints.Ordered] typically integral
+//   - — used as map key
+//   - invoLabel: printable identifier for the invocation, often short code location:
+//   - — “build”
+//   - — “mains.(*Executable).AddErr-executable.go:25”
+//   - threadID: Go goroutine identifier created this invocation
+//   - t0: the timestamp for when the invocation started,
+//     default [time.Now] of [SlowDetectorCore.Start] invocation
+//   - ender: provides invocation actions: Duration() Report() Stop()
+//   - —
+//   - heap allocation to be put in maps
+func NewSlowDetectorInvocation(ID slowID, invoLabel string, threadID ThreadID, t0 time.Time, ender SlowDetectorInvoActionsStop) (invocation *SlowDetectorInvocation) {
 	return &SlowDetectorInvocation{
 		sID:       ID,
 		invoLabel: invoLabel,
@@ -53,7 +72,7 @@ func NewSlowDetectorInvocation(ID slowID, invoLabel string, threadID ThreadID, t
 // Stop ends an invocation created by SlowDetectorCore
 func (s *SlowDetectorInvocation) Stop(value ...time.Time) { s.ender.Stop(s, value...) }
 
-// Interval adds a timestamped label to an ongoing invocation
+// Interval adds a labelled timestamp to an ongoing invocation
 //   - label: printable timestamp identifier “lsofComplete”
 //   - t: optional timestamp, default now
 func (s *SlowDetectorInvocation) Interval(label string, t ...time.Time) {
@@ -66,7 +85,7 @@ func (s *SlowDetectorInvocation) Interval(label string, t ...time.Time) {
 	if t0.IsZero() {
 		t0 = time.Now()
 	}
-	defer s.lock.Lock().Unlock()
+	defer s.intervalsLock.Lock().Unlock()
 
 	// append label and timestamp to intervals
 	if label == "" {
@@ -101,7 +120,7 @@ func (s *SlowDetectorInvocation) Time(t time.Time) (previousT time.Time) {
 // Intervals returns printable space-separated string of intervals
 //   - printable label “lsofComplete” and a time relative to initial Start
 func (s *SlowDetectorInvocation) Intervals() (intervalStr string) {
-	defer s.lock.Lock().Unlock()
+	defer s.intervalsLock.Lock().Unlock()
 
 	if len(s.intervals) > 0 {
 		var sList = make([]string, len(s.intervals))
@@ -117,7 +136,9 @@ func (s *SlowDetectorInvocation) Intervals() (intervalStr string) {
 	return
 }
 
-func (s *SlowDetectorInvocation) If() (sdcIf SlowDetectorIf) {
+// InvoActions returns an action object for this invocation
+//   - Duration() Report() Stop()
+func (s *SlowDetectorInvocation) InvoActions() (sdcIf SlowDetectorInvoActions) {
 	return s.ender
 }
 

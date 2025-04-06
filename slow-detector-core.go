@@ -41,19 +41,23 @@ type SlowDetectorCore struct {
 	average ptime.Averager[time.Duration]
 }
 
-// NewSlowDetectorCore returns an object tracking nonm-returning or slow function invocations
-//   - callback: receives offending slow-detector invocations
-//   - slowTyp configures whether the support-thread is shared
-//   - goGen is used for a possible deferred thread-launch
-//   - nonReturnPeriod is one or two values
+// NewSlowDetectorCore returns an object tracking non-returning or slow function invocations
+//   - reportReceiver: receives offending slow-detector invocations [SlowReporter.Report]
+//   - slowTyp SlowDefault: shared thread: recommended
+//   - — the thread scans a map for non-returning invocations
+//   - slowTyp SlowOwnThread: dedicated thread that never exits
+//   - slowTyp SlowShutdownThread: dedicated thread that exits whenever all invocations ends
+//   - goGen: used to start shared or dedicated thread
+//   - nonReturnPeriod is one or two timing values:
 //   - — nonReturnPeriod: how often non-returning invocations are reported, default once per minute
-//   - — minimum slowness duration that is being reported, default 100 ms
+//   - — minReportedDuration: minimum slowness duration that is being reported, default 100 ms
 func NewSlowDetectorCore(
 	fieldp *SlowDetectorCore, reportReceiver SlowReporter, slowTyp SlowType,
 	goGen GoGen, nonReturnPeriod ...time.Duration,
 ) (slowDetector *SlowDetectorCore) {
 	NilPanic("reportReceiver", reportReceiver)
 
+	// get slowDetector
 	if fieldp != nil {
 		slowDetector = fieldp
 	} else {
@@ -166,8 +170,12 @@ func (s *SlowDetectorCore) stop(invocation *SlowDetectorInvocation, timestamp ..
 }
 
 const (
+	// minReportedDuration: minimum slowness duration that is
+	// being reported, default 100 ms
 	defaultMinReportDuration = 100 * time.Millisecond
-	defaultNonReturnPeriod   = time.Minute
+	// default how often non-returning invocations are reported,
+	// once per minute
+	defaultNonReturnPeriod = time.Minute
 )
 
 // slowID is a unique identifier for slow-detector entities
@@ -181,10 +189,7 @@ var slowIDGenerator UniqueIDTypedUint64[slowID]
 type ender struct{ sdc *SlowDetectorCore }
 
 // ender is SlowDetectorInvocationEnder
-var _ SlowDetectorInvocationEnder = &ender{}
-
-// ender is SlowDetectorIf
-var _ SlowDetectorIf = &ender{}
+var _ SlowDetectorInvoActionsStop = &ender{}
 
 // Stop ends an invocation created by SlowDetectorCore
 //   - invocation: th einvocation object

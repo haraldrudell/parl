@@ -7,27 +7,30 @@ package parl
 
 import "iter"
 
-// AnyCount is a value type that may contain
+// AnyCount is a tuple: an initialization-free value-type container of
 // zero, one or many values
+//   - purpose is a non-thread-safe function parameter or result
+//   - — zero-allocation for zero or one values
+//   - — easy one-go iteration over zero/one/many values: [AnyCount.Seq]
+//   - thread-safe heap-allocated alternative usable as
+//     map value: [Values] and [NewValues]
+//   - —
 //   - allows a single value to represent any number of values
-//   - zero or one value requires no allocation
-//   - — taking address of AnyCount causes allocation
-//   - slice allocation is only required for more than one value
-//   - allocation-free iteration [AnyCount.Init] [AnyCount.Cond]
+//   - taking address of AnyCount may cause allocation
 //   - [AnyCount.Count] counts contained values
 //   - Count, iteration, or update are not thread-safe
-//   - if the contained value includes non-pointer locks or atomics, T must be pointer to value
-//   - has no new function
-//   - a similar type with pointer receiver is [Values] and [NewValues]
+//   - if contained type includes non-pointer locks or atomics,
+//     T must be pointer to value
 //
 // Iteration, allocation-free:
 //
 //	var a AnyCount[T]
-//	for i, v := a.Init(); a.Cond(&i, &v); {
+//	for v := range a.Seq {
 //		v…
 type AnyCount[T any] struct {
 	// value recognized when hasValue is true
 	//	- precedes Values during iteration
+	//	- in iteration order, the first value if present
 	Value T
 	// Values are present regardless of HasValue
 	Values []T
@@ -35,6 +38,7 @@ type AnyCount[T any] struct {
 	HasValue bool
 }
 
+// AnyCount is [iter.Seq]
 var _ iter.Seq[int] = (&AnyCount[int]{}).Seq
 
 // Count returns number of values
@@ -49,23 +53,17 @@ func (a AnyCount[T]) Count() (count int) {
 // Seq allows for-range iteration over container values
 //   - for v := range values.Seq {
 func (a AnyCount[T]) Seq(yield func(value T) (keepGoing bool)) {
-	var i int
-	for {
-		if i == 0 && a.HasValue {
-			i++
-			if !yield(a.Value) {
-				return
-			}
+
+	// Value first
+	if a.HasValue {
+		if !yield(a.Value) {
+			return
 		}
-		var sliceIndex = i
-		if a.HasValue {
-			sliceIndex--
-		}
-		if sliceIndex >= len(a.Values) {
-			break
-		}
-		i++
-		if !yield(a.Values[sliceIndex]) {
+	}
+
+	// Values
+	for _, v := range a.Values {
+		if !yield(v) {
 			return
 		}
 	}

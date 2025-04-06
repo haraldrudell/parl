@@ -16,10 +16,11 @@ import (
 
 // SlowDetectorThread is a thread that monitors invocations for non-return
 type SlowDetectorThread struct {
-	// thread type identifier: [SlowDefault] [SlowOwnThread]
+	// thread type identifier: [SlowDefault] [SlowOwnThread] [SlowShutdownThread]
 	//	- default is thread shared across multiple slow detectors
 	slowTyp SlowType
-	// nonReturnPeriod is time after reporting as non-return, common default 1 minute
+	// nonReturnPeriod is time after reporting as non-return,
+	// common default 1 minute
 	nonReturnPeriod time.Duration
 	// active invocations being monitored
 	//	- key: unique ID
@@ -43,9 +44,7 @@ type SlowDetectorThread struct {
 //   - goGen: used for creating the thread: shared or dedicated
 //   - must be pointer because a shared value may be returned
 func NewSlowDetectorThread(slowTyp SlowType, nonReturnPeriod time.Duration, goGen GoGen) (sdt *SlowDetectorThread) {
-	if goGen == nil {
-		panic(perrors.NewPF("goGen cannot be nil"))
-	}
+	NilPanic("goGen", goGen)
 
 	// dedicated thread case
 	if slowTyp != SlowDefault {
@@ -57,8 +56,11 @@ func NewSlowDetectorThread(slowTyp SlowType, nonReturnPeriod time.Duration, goGe
 		pmaps.NewRWMap2(&sdt.invocations)
 		return
 	}
+	// it is shared thread
 
+	// sdt is shared instance
 	sdt = &slowDetectorThread
+	// critical section shared instance initialization
 	defer sdt.slowLock.Lock().Unlock()
 
 	if sdt.goGen != nil {
@@ -74,6 +76,7 @@ func NewSlowDetectorThread(slowTyp SlowType, nonReturnPeriod time.Duration, goGe
 	return
 }
 
+// Start adds an invocation to monitoring
 func (s *SlowDetectorThread) Start(sdi *SlowDetectorInvocation) {
 
 	// store in map
@@ -91,11 +94,13 @@ func (s *SlowDetectorThread) Start(sdi *SlowDetectorInvocation) {
 	go s.thread(g)
 }
 
-func (s *SlowDetectorThread) Stop(sdi *SlowDetectorInvocation) {
+// Stop removes an invocation from being monitored
+func (s *SlowDetectorThread) Stop(invo *SlowDetectorInvocation) {
 
 	// remove from map
-	s.invocations.Delete(sdi.sID, parli.MapDeleteWithZeroValue)
+	s.invocations.Delete(invo.sID, parli.MapDeleteWithZeroValue)
 
+	// check wheether thread may be shut down
 	if s.slowTyp != SlowShutdownThread || s.invocations.Length() > 0 {
 		return // not to be shutdown or not to be shutdown now return
 	}
@@ -164,10 +169,10 @@ func (s *SlowDetectorThread) thread(g Go) {
 			}
 
 			// get slow-detector-core for this invocation
-			var sdc = invocation.If()
+			var invoActions = invocation.InvoActions()
 
 			// check if this duration a new max
-			if !sdc.Duration(duration) {
+			if !invoActions.Duration(duration) {
 				// this duration is not a new progressive max for this slow-detector
 				continue
 			}
@@ -179,9 +184,9 @@ func (s *SlowDetectorThread) thread(g Go) {
 				continue // a previous non-return report is too recent
 			}
 
-			// store new nonReturnPeriod start
+			// store new nonReturnPeriod start and Report
 			invocation.Time(t)
-			sdc.Report(invocation, DidReturnNo, duration)
+			invoActions.Report(invocation, DidReturnNo, duration)
 		}
 	}
 }

@@ -34,6 +34,7 @@ type StdinReader struct {
 	//	- closes on thread exit
 	errCh atomic.Pointer[chan error]
 	// bufferLock makes stdinBuffer thread-safe
+	//	- critical section for StdinReader and KeystrokesThread
 	bufferLock sync.Mutex
 	// stdinBuffer receives byte slices from os.Stdin as they are read
 	//	- list of non-empty slices
@@ -43,6 +44,8 @@ type StdinReader struct {
 	//	- enables awaiting data from thread
 	dataCh chan struct{}
 	// readLock makes Read Close critical section
+	//	- parallel Read requires readLock for critical section
+	//	- Close must be allowed while Read so lock must be separate
 	//	- make sliceList thread-safe
 	readLock parl.Mutex
 	// sliceList is slice away of local data read from stdinBuffer
@@ -165,7 +168,6 @@ func (r *StdinReader) Read(p []byte) (n int, err error) {
 //   - always reads thread errors
 //   - if stdinBuffer not empty, it is not EOF yet
 func (r *StdinReader) Close() (err error) {
-	defer r.readLock.Lock().Unlock()
 
 	// mark StdinReader as closed
 	r.isClosed.Close()
@@ -212,6 +214,7 @@ func (r *StdinReader) createThread() {
 //     lock contention is reduced and
 //     thread does not have to implement slice-away logic.
 //     ie. pslices.SliceAwayAppend
+//   - thread-safe
 func (r *StdinReader) readStdinBuffer() (sliceCount int) {
 	r.bufferLock.Lock()
 	defer r.bufferLock.Unlock()
@@ -263,6 +266,7 @@ func (r *StdinReader) copyToP(p []byte) (n int) {
 
 // threadState reads and closes thread error channel
 //   - isExit true: thread has exited and its errors have been consumed
+//   - thread-safe
 //
 // there is no thread that is continuously monitoring
 // the reader thread
@@ -316,6 +320,7 @@ func (r *StdinReader) threadState() (isExit bool) {
 }
 
 // submitThreadError sends thread error to errorSink
+//   - thread-safe
 func (r *StdinReader) submitThreadError(err error) {
 
 	// all errors from thread are StdinErr

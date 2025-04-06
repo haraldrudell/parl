@@ -58,3 +58,11 @@ func ExitError(err error) (hasStatusCode bool, statusCode int, signal unix.Signa
 
 	return
 }
+
+// IsSigKill returns true if err contains SIGKILL
+//   - err should be result from command execution [exec.Cmd]
+func IsSigKill(err error) (isSIGKILL bool) {
+	var _, statusCode, signal, _ = ExitError(err)
+	isSIGKILL = statusCode == TerminatedBySignal && signal == unix.SIGKILL
+	return
+}

@@ -9,10 +9,10 @@ import "iter"
 
 // Values is a container for one or more values of type T
 //   - used as the value for a map: map[int]parl.Values[string]
-//   - implementation may be thread-safe by using atomics, lock or being read-only
 //   - an implementation is [NewValues]
-//   - a similar value-type is [AnyCount]
-//   - the map values copies the implicit pointer of the interface value
+//   - thread-safe implementation: [NewValuesThreadSafe]
+//   - a similar value-type is [AnyCount] used as function parameter or result
+//   - the Go map copies the implicit pointer of the interface value
 //   - the value pointed to is allocated on the heap
 //
 // iteration:
@@ -30,12 +30,27 @@ import "iter"
 //     is deferred until the second value
 //   - for values containing non-pointer atomics or locks, T must be pointer
 type Values[T any] interface {
-	// Add adds a value to the container
-	Add(value T)
+	// Add adds values to the container
+	//	- pre-alloc 10 elements
+	//	- Add does not receive values-slice ownership,
+	//		slice allocation may result
+	Add(values ...T)
+	// AddPreAlloc adds values to the container with pre-allocation
+	//	- size is number of elements pre-allocation
+	//	- size [PreAllocYes]: 4 KiB or 10 elements pre-allocation, efficient size
+	//	- size [PreAllocLow]: 10 elements pre-allocation for few elements usage
+	//	- size [NoPreAlloc]: no pre-allocation
+	//	- efficient handling of many values
+	AddPreAlloc(size int, values ...T)
+	// SetValues discard present values
+	//	- container takes ownership of values slice
+	//	- allocation-free assignment of many values
+	//	- values nil: de-allocates
+	SetValues(values []T)
 	// Count returns the number of values held in the container
 	Count() (count int)
 	// Seq allows for-range iteration over container values
-	//	- for v := range values.Seq {
+	//	for v := range values.Seq {
 	Seq(yield func(value T) (keepGoing bool))
 }
 
