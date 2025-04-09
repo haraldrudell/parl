@@ -33,7 +33,6 @@ type ReadWriteCloserSlice struct {
 	// stateLock makes data readerP readerN readerWait thread-safe
 	//	- no thread blocks while holding stateLock
 	//	- accessed by readEvent Write Buffer
-	//	- makes slices data data0 readerP thread-safe
 	//	- atomizes isClosed and readerWait in readEvent
 	//	- atomizes isClosed and readerWait in Close
 	//	- atomized readerWait operations in Write

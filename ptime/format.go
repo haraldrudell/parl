@@ -11,6 +11,7 @@ import (
 
 const (
 	Date6      = "060102"
+	Date12     = "060102-150405Z"
 	rfc3339sz  = "2006-01-02T15:04:05Z"
 	rfc3339msz = "2006-01-02T15:04:05.000Z"
 	rfc3339usz = "2006-01-02T15:04:05.000000Z"
@@ -54,5 +55,21 @@ func Rfc3339sz(t time.Time) (s string) {
 //	"2022-01-01T08:00:00.000000000Z"
 func ParseRfc3339nsz(timeString string) (t time.Time, err error) {
 	t, err = time.Parse(rfc3339nsz, timeString)
+	return
+}
+
+// Date66Z returns a time-based leding filename at second precision time zone UTC
+//   - “250330-171534Z”
+func Date66Z(t ...time.Time) (s string) {
+
+	var t0 time.Time
+	if len(t) > 0 {
+		t0 = t[0]
+	}
+	if t0.IsZero() {
+		t0 = time.Now()
+	}
+	s = t0.UTC().Format(Date12)
+
 	return
 }

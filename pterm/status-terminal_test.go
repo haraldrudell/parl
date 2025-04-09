@@ -9,6 +9,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/haraldrudell/parl/ptermx"
 )
 
 func TestStatusTerminal(t *testing.T) {
@@ -61,7 +63,7 @@ func TestStatusTerminal(t *testing.T) {
 	// enable ANSI override to have status during test
 	//	- SetTerminal()
 	//	- when tests are run, standard error is not a terminal
-	isAnsi = st.SetTerminal(IsTerminalYes, widthToUse)
+	isAnsi = st.SetTerminal(ptermx.IsTerminalYes, widthToUse)
 	if isAnsi {
 		t.Error("isAnsi true")
 	}
@@ -84,7 +86,7 @@ func TestStatusTerminal(t *testing.T) {
 	st.LogStdout(stdoutValue)
 	st.CopyLog(&copyLogBuffer)
 	st.Log(copyLogValue)
-	st.CopyLog(&copyLogBuffer, CopyLogRemove)
+	st.CopyLog(&copyLogBuffer, ptermx.CopyLogRemove)
 
 	st.EndStatus()
 

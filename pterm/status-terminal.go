@@ -9,12 +9,12 @@ import (
 	"io"
 	"os"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pos"
+	"github.com/haraldrudell/parl/ptermx"
 	"golang.org/x/term"
 )
 
@@ -23,21 +23,7 @@ const (
 	STDefaultFd int = 0
 	// [StatusTerminal.SetTerminal] width for reset to default
 	DisableSetTerminal int = -1
-	// [StatusTerminal.SetTerminal] default isTerminal value
-	NoIsTerminal IsTerminal = false
-	// [StatusTerminal.SetTerminal] activate isTerminal override
-	IsTerminalYes IsTerminal = true
-	// [StatusTerminal.CopyLog] remove writer
-	CopyLogRemove CopyLogRemover = true
 )
-
-// determines status output override for [StatusTerminal.SetTerminal]
-//   - [IsTerminalYes] [NoIsTerminal]
-type IsTerminal bool
-
-// argument type for [StatusTerminal.CopyLog]
-//   - [CopyLogRemove]
-type CopyLogRemover bool
 
 var (
 	// [pterm.StatusTerminalFd] no write function
@@ -93,7 +79,7 @@ type StatusTerminal struct {
 
 	// make certain values thread-safe
 	//	- atomizes multiple [StatusTerminal.print] invocations
-	lock sync.Mutex
+	lock parl.Mutex
 	// behind lock: number of terminal lines occupied by the current status
 	displayLineCount int
 	// behind lock: the current status
@@ -265,7 +251,7 @@ func (s *StatusTerminal) Status(statusLines string) {
 	var output = ""
 	var lastIndex = len(lines) - 1
 	for i, line := range lines {
-		printablesLine := TrimANSIEscapes(line)
+		var printablesLine = ptermx.TrimANSIEscapes(line)
 		length := len([]rune(printablesLine)) // length in unicode code points
 		var cursorAtEndOfLine bool
 		// if length exactly matches width, cursor is still on the same line
@@ -295,9 +281,7 @@ func (s *StatusTerminal) Status(statusLines string) {
 	if d.n {
 		output = d.UpdateOutput(output, displayLineCount)
 	}
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	defer s.lock.Lock().Unlock()
 
 	s.logPrinter.Print(s.clearStatus() + output + EraseEndOfDisplay)
 
@@ -340,7 +324,7 @@ func (s *StatusTerminal) LogStdout(format string, a ...any) { s.doLog(pos.Stdout
 //   - width: width to use if fd is not ANSI terminal
 //   - width DisableSetTerminal -1: disable SetTerminal override
 //   - thread-safe
-func (s *StatusTerminal) SetTerminal(isTerminal IsTerminal, width int) (isAnsi bool) {
+func (s *StatusTerminal) SetTerminal(isTerminal ptermx.IsTerminal, width int) (isAnsi bool) {
 	isAnsi = s.isTermTerminal
 
 	// handle reset case
@@ -354,7 +338,7 @@ func (s *StatusTerminal) SetTerminal(isTerminal IsTerminal, width int) (isAnsi b
 	}
 
 	// set fake width
-	if isTerminal {
+	if isTerminal == ptermx.IsTerminalYes {
 		if width < 1 {
 			width = 1
 		}
@@ -362,7 +346,7 @@ func (s *StatusTerminal) SetTerminal(isTerminal IsTerminal, width int) (isAnsi b
 	}
 
 	// set SetTerminal override
-	s.isTerminal.Store(isTerminal == IsTerminalYes)
+	s.isTerminal.Store(isTerminal == ptermx.IsTerminalYes)
 
 	return
 }
@@ -391,7 +375,7 @@ func (s *StatusTerminal) Width() (width int) {
 //   - writer: an [io.Writer] receiving log output
 //   - remove: present and CopyLogRemove true: stop output to a previous writer
 //   - thread-safe
-func (s *StatusTerminal) CopyLog(writer io.Writer, remove ...CopyLogRemover) {
+func (s *StatusTerminal) CopyLog(writer io.Writer, remove ...ptermx.CopyLogRemover) {
 
 	// ensure writer present
 	if writer == nil {
@@ -399,15 +383,14 @@ func (s *StatusTerminal) CopyLog(writer io.Writer, remove ...CopyLogRemover) {
 	}
 
 	// deteremine if delete case
-	var isDeleteWriter CopyLogRemover
+	var isDeleteWriter ptermx.CopyLogRemover
 	if len(remove) > 0 {
 		isDeleteWriter = remove[0]
 	}
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	defer s.lock.Lock().Unlock()
 
 	// handle add case
-	if isDeleteWriter != CopyLogRemove {
+	if isDeleteWriter != ptermx.CopyLogRemove {
 		if s.copyLog == nil {
 			s.copyLog = map[io.Writer]bool{}
 		}
@@ -428,8 +411,7 @@ func (s *StatusTerminal) EndStatus() {
 	if s.statusEnded.Load() {
 		return //already end
 	}
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	defer s.lock.Lock().Unlock()
 
 	if !s.statusEnded.CompareAndSwap(false, true) {
 		return // did not win shutdown return
@@ -476,8 +458,7 @@ func (s *StatusTerminal) doLog(standardStream pos.StandardStream, format string,
 
 // doPrint outputs the non-status case
 func (s *StatusTerminal) doPrint(standardStream pos.StandardStream, logLines string) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	defer s.lock.Lock().Unlock()
 
 	// if not a terminal, regular logging
 	if standardStream == pos.Stderr {
@@ -490,8 +471,7 @@ func (s *StatusTerminal) doPrint(standardStream pos.StandardStream, logLines str
 // doStatus implements LogTimestamp Log LogStdout display output
 // while status output is active
 func (s *StatusTerminal) doStatus(standardStream pos.StandardStream, logLines string) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	defer s.lock.Lock().Unlock()
 
 	// simple stderr case
 	if standardStream == pos.Stderr {

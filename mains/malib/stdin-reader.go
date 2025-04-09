@@ -25,6 +25,7 @@ type StdinReader struct {
 	// isEOF is true when StdinReader has been closed and read to end
 	isEOF atomic.Bool
 	// isError is set to true on thread error or panic
+	//	- such errors are sent to errorSink
 	//	- may be nil
 	isError *atomic.Bool
 	// isActive indicates to thread stdinReader is still operating
@@ -328,7 +329,7 @@ func (r *StdinReader) submitThreadError(err error) {
 	if e.RecoverAny != nil {
 
 		// thread had panic
-		//	- make recover valu an error with stack trace
+		//	- make recover value an error with stack trace
 		err = parl.EnsureError(e.RecoverAny)
 	} else if errors.Is(e.Err, io.EOF) {
 

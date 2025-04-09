@@ -167,5 +167,12 @@ func SetDebug(debug bool) {
 //   - D is meant for temporary output intended to be removed
 //     prior to check-in
 func D(format string, a ...interface{}) {
+
+	// check for intercept
+	if plog.SwapD() != nil {
+		plog.D2(format, a...)
+		return
+	}
+
 	stderrLogger.D(format, a...)
 }

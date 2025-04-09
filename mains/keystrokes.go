@@ -12,7 +12,7 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/mains/malib"
 	"github.com/haraldrudell/parl/perrors"
-	"github.com/haraldrudell/parl/plog/plogt"
+	"github.com/haraldrudell/parl/plog"
 	"github.com/haraldrudell/parl/pruntime"
 )
 
@@ -134,7 +134,7 @@ func (k *Keystrokes) stdinReaderThread(silent bool, errorSink parl.ErrorSink1) {
 	var err error
 	var isDebug = parl.IsThisDebug()
 	if isDebug {
-		defer plogt.D("keystrokes.stdinReaderThread exiting: err: “%s”", perrors.Short(err))
+		defer plog.D("keystrokes.stdinReaderThread exiting: err: “%s”", perrors.Short(err))
 	}
 	if errorSink == nil {
 		errorSink = parl.Infallible
@@ -155,7 +155,7 @@ func (k *Keystrokes) stdinReaderThread(silent bool, errorSink parl.ErrorSink1) {
 	var stdinClosedCh = k.stdin.CloseCh()
 
 	if isDebug {
-		plogt.D("keystrokes.stdinReaderThread at for")
+		plog.D("keystrokes.stdinReaderThread at for")
 	}
 
 	// blocks here
@@ -168,7 +168,7 @@ func (k *Keystrokes) stdinReaderThread(silent bool, errorSink parl.ErrorSink1) {
 		default:
 		}
 		if isDebug {
-			plogt.D("keystrokes.Send %q", scanner.Text())
+			plog.D("keystrokes.Send %q", scanner.Text())
 		}
 		k.stdin.Send(scanner.Text())
 	}
@@ -181,7 +181,9 @@ func (k *Keystrokes) stdinReaderThread(silent bool, errorSink parl.ErrorSink1) {
 	// do not print:
 	if silent || //	- if silent is configured or
 		err != nil || //	- the scanner had error or
-		isStdinReaderError.Load() { //	- close is caused by an error handled by StdinReader
+		//	- close is caused by an error sent to errorSink by StdinReader
+		isStdinReaderError.Load() ||
+		k.stdin.IsClosed() { // k.Close was invoked
 		return
 	}
 	// echoed to standard error

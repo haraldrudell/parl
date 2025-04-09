@@ -3,7 +3,7 @@
 ISC License
 */
 
-package pterm
+package ptermx
 
 import (
 	"regexp"
