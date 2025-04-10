@@ -61,3 +61,22 @@ type DSNrFactory interface {
 	//	- provide data sources from a data source name
 	DataSourceNamer(appName string) (dsnr DataSourceNamer, err error)
 }
+
+// IsRODsnr is an optional interface a data source namer can
+// impleement to provide a read-only flag
+type IsRoDsnr interface {
+	// IsRO returns true if this data source is read-only
+	//	- SQLite3 will not create database files
+	//	- ORM will not write schema for new database files
+	IsRO() (isRO ROtype)
+}
+
+const (
+	// the datasource is read-only
+	ROyes = iota
+	// the data source is read-write
+	ROno
+)
+
+// ROtype indicates read-only: [ROno] [ROyes]
+type ROtype uint8

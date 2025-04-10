@@ -77,6 +77,6 @@ func (n *DataSourceNamerRO) DataSource(dataSourceName parl.DataSourceName) (data
 		return // isNotExist or some error
 	}
 
-	//th edatabase file exists: open it
+	// the database file exists: open it
 	return n.DataSourceNamer.DataSource(dataSourceName)
 }
