@@ -7,30 +7,31 @@ package psql
 
 import (
 	"database/sql"
-	"database/sql/driver"
 	"errors"
-	"fmt"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/haraldrudell/parl/iters"
 	"github.com/haraldrudell/parl/perrors"
 )
 
 func TestResultSetIterator(t *testing.T) {
-	var expValue = 1
+	const (
+		expValue = 1
+	)
 
-	var value, zeroValue int
-	var hasValue bool
-	var err error
-
-	// mock SQL database
-	//	- m does not have to be closed
-	var m = newMockDB()
+	var (
+		value, zeroValue int
+		hasValue         bool
+		err              error
+		// mock SQL database
+		//	- m does not have to be closed
+		m *mockSQL
+	)
 
 	var iterator iters.Iterator[int]
 	var reset = func() {
-		var sqlRows = m.sqlRows(expValue)
+		m = newMockSQL(expValue)
+		var sqlRows = m.sqlRows()
 		var scanFunc = newIteratorConverter(sqlRows, expValue).scanFunc
 		iterator = NewResultSetIterator(sqlRows, scanFunc)
 	}
@@ -100,41 +101,3 @@ func (i *iteratorConverter) scanFunc(sqlRows *sql.Rows) (value int, err error) {
 
 // mockSQL query name
 const queryName = "x"
-
-// mockDB provides sql.Rows with mocked content
-type mockDB struct {
-	mockDb  *sql.DB
-	sqlMock sqlmock.Sqlmock
-}
-
-// newMockDB returns generator of sql.Rows with mocked content
-func newMockDB() (m *mockDB) {
-	m = &mockDB{}
-	var err error
-	if m.mockDb, m.sqlMock, err = sqlmock.New(); perrors.Is(&err, "sqlmock.New %w", err) {
-		panic(err)
-	}
-	return
-}
-
-// sqlRows returns sql.Rows with single-row values content
-func (m *mockDB) sqlRows(values ...any) (sqlRows *sql.Rows) {
-	var colNames = make([]string, len(values))
-	for i := range colNames {
-		colNames[i] = fmt.Sprintf("col%d", i+1)
-	}
-	var driverValues = make([]driver.Value, len(values))
-	for i, anyValue := range values {
-		driverValues[i] = anyValue
-	}
-	var expectedQuery = m.sqlMock.ExpectQuery(queryName).WillReturnRows(
-		m.sqlMock.NewRows(colNames).
-			AddRow(driverValues...),
-	)
-	_ = expectedQuery
-	var err error
-	if sqlRows, err = m.mockDb.Query(queryName); perrors.Is(&err, "mockDb.Query %w", err) {
-		panic(err)
-	}
-	return
-}

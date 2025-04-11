@@ -19,8 +19,16 @@ type ScanFunc[T any] func(sqlRows *sql.Rows) (t T, err error)
 
 // ResultSetIterator is an iterator for a sql result-set
 type ResultSetIterator[T any] struct {
-	sqlRows  *sql.Rows
+	// sqlRows is the result of a multiple-row query like SELECT
+	sqlRows *sql.Rows
+	// scan: scans a record into type T
+	//
+	// Deprecated: use [NewResultSetIterator123]
 	scanFunc ScanFunc[T]
+	// scanner is a row-scanner object returning speicific type T
+	scanner parl.RowScanner[T]
+	// errp is error receiver during iteration
+	errp *error
 }
 
 // NewResultSetIterator returns a result-set iterator for type T
@@ -30,6 +38,8 @@ type ResultSetIterator[T any] struct {
 //   - note that scanFunc is self-contained.
 //     Providing a method value as scanFunc causes allocation 20 ns M1 Max.
 //     Providing a top-level function is allocation-free.
+//
+// Deprecated: use [NewResultSetIterator123]
 //
 // Usage:
 //
@@ -66,3 +76,5 @@ func (i *ResultSetIterator[T]) iteratorFunction(isCancel bool) (t T, err error) 
 	}
 	return i.scanFunc(i.sqlRows)
 }
+
+var _ sql.Rows

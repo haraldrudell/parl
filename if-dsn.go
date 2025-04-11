@@ -80,3 +80,17 @@ const (
 
 // ROtype indicates read-only: [ROno] [ROyes]
 type ROtype uint8
+
+// RowScanner is used for SQL row iteration
+type RowScanner[T any] interface {
+	// Scan scans a row from a SQL result-set into type t
+	//	- sqlRows: the result of a multiple-row query like SELECT
+	//	- t: scanned value
+	//	- err: any error during scanning
+	//	- —
+	//	- upon Scan invocation, [sql.Rows.Next] has returned true
+	//		confirming that another row does exist
+	//   - Scan invokes [sql.Rows.Scan] to convert the column values
+	//		of an SQL row into specific type T
+	Scan(sqlRows *sql.Rows) (t T, err error)
+}

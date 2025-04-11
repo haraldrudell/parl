@@ -52,3 +52,11 @@ func ToUUID(IDString string) (ID uuid.UUID, err error) {
 
 	return // bad legth return: UUID zero-value, err non-nil
 }
+
+// EnsureID ensures that the uuid pointed to by idp is not empty
+func EnsureID(idp *uuid.UUID) {
+	if *idp != uuid.Nil {
+		return
+	}
+	*idp = uuid.New()
+}
