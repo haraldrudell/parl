@@ -168,20 +168,33 @@ type DatapointValue interface {
 type CountersFactory interface {
 	// NewCounters returns a counter container.
 	// is useCounters is false, the container does not actually do any counting.
-	NewCounters(useCounters bool, g0 GoGen) (counters Counters)
+	NewCounters(useCounters bool, g GoGen) (counters Counters)
 }
 
 const (
-	ValueRate        RateType = iota // current rate of increase in value
-	ValueMaxRate                     // max seen rate of increase in value
-	ValueRateAverage                 // average rate of increase in value during last 10 periods
+	// current rate of increase in value
+	ValueRate RateType = iota
+	// max seen rate of increase in value
+	ValueMaxRate
+	// average rate of increase in value during last 10 periods
+	ValueRateAverage
 	RunningRate
 	RunningMaxRate
 	RunningMaxDecRate
 	// accumulated change in running over several intervals
 	//	- running value goes up and down
 	RunningAverage
-	NotAValue // NotAValue is an internal stand-in value indicating a value not in use
+	// NotAValue is an internal stand-in value indicating a value not in use
+	NotAValue
 )
 
 type RateType int
+
+const (
+	// [counter.CountersFactoryNewCounters] counters are active
+	CountersYes CounterType = iota + 1
+	// [counter.CountersFactoryNewCounters] counters do nothing
+	CountersNo
+)
+
+type CounterType uint8

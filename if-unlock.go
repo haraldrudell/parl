@@ -24,3 +24,11 @@ type RUnlocker interface {
 	// on entry to RUnlock.
 	RUnlock()
 }
+
+// LockUnLock can lock and unlock resources
+type LockUnlock interface {
+	// Lock locks m.
+	// If the lock is already in use, the calling goroutine
+	// blocks until the mutex is available.
+	Lock() (unlocker Unlocker)
+}

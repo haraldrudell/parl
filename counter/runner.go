@@ -6,25 +6,26 @@ ISC License
 package counter
 
 import (
-	"sync"
+	"math"
 	"time"
+
+	"github.com/haraldrudell/parl"
 )
 
 // runner is a container executing rate-counters for a particular interval
 type runner struct {
-	lock  sync.RWMutex
-	tasks []RateRunnerTask // behind lock
+	// lock makes tasks thread-safe
+	lock parl.RWMutex
+	// behind lock
+	tasks []RateRunnerTask
 }
 
 // runner returns a container for rate-counters of a particular interval
-func NewRunner() (run *runner) {
-	return &runner{}
-}
+func NewRunner() (run *runner) { return &runner{} }
 
 // Add adds an additional rate-counter to this container
 func (r *runner) Add(task RateRunnerTask) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	defer r.lock.Lock().Unlock()
 
 	r.tasks = append(r.tasks, task)
 }
@@ -32,9 +33,12 @@ func (r *runner) Add(task RateRunnerTask) {
 // Do is invoked by a timer with an intended at time
 func (r *runner) Do(at time.Time) {
 	_ = at
-	at = time.Now() // obtain accurate time-stamp
-	for i := 0; ; i++ {
-		task := r.task(i)
+
+	// obtain accurate time-stamp
+	at = time.Now()
+
+	for i := range math.MaxInt {
+		var task = r.task(i)
 		if task == nil {
 			return
 		}
@@ -44,12 +48,13 @@ func (r *runner) Do(at time.Time) {
 
 // task returns task n 0…, nil if no such task exists
 func (r *runner) task(i int) (task RateRunnerTask) {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
+	defer r.lock.RLock().RUnlock()
 
+	// bad task ID
 	if i < 0 || i >= len(r.tasks) {
-		return
+		return // bad task ID return
 	}
+
 	task = r.tasks[i]
 	return
 }

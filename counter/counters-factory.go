@@ -15,11 +15,12 @@ var CountersFactory parl.CountersFactory = &countersFactory{}
 
 type countersFactory struct{}
 
-func (ff *countersFactory) NewCounters(useCounters bool, g0 parl.GoGen) (counters parl.Counters) {
+// useCounters true:
+func (f *countersFactory) NewCounters(useCounters bool, g parl.GoGen) (counters parl.Counters) {
 	if !useCounters {
 		return &countersNil{}
 	}
-	return newCounters(g0)
+	return newCounters(g)
 }
 
 type countersNil struct{}

@@ -66,7 +66,7 @@ type WaitGroupCh struct {
 	isWaiting atomic.Bool
 }
 
-// WaitGroupCh implements Waiter
+// WaitGroupCh implements [Waiter]
 var _ Waiter = &WaitGroupCh{}
 
 // WaitGroupCh is [DoneLegacy], ie. [sync.WaitGroup] compatible

@@ -12,15 +12,20 @@ import (
 
 // CachedCounters reduces counter map contention by only looking up the counterID once
 type CachedCounters struct {
-	counterStore      parl.CounterStore                         // uncached counters accessible by ID
-	counterValues     map[parl.CounterID]parl.CounterValues     // cached regular counters
-	rateCounterValues map[parl.CounterID]parl.RateCounterValues // cached rate counters
-	datapointValue    map[parl.CounterID]parl.DatapointValue    // cached datapoints
+	// uncached counters accessible by ID
+	counterStore parl.CounterStore
+	// cached regular counters
+	counterValues map[parl.CounterID]parl.CounterValues
+	// cached rate counters
+	rateCounterValues map[parl.CounterID]parl.RateCounterValues
+	// cached datapoints
+	datapointValue map[parl.CounterID]parl.DatapointValue
 }
 
 // NewCachedCounters returns a cache of parl.CounterID reducing map contention
 func NewCachedCounters(counterStore parl.CounterStore, fieldp ...*CachedCounters) (cachedCounters *CachedCounters) {
 
+	// get cachedCounters
 	if len(fieldp) > 0 {
 		cachedCounters = fieldp[0]
 	}

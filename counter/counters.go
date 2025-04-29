@@ -6,7 +6,6 @@ ISC License
 package counter
 
 import (
-	"sync"
 	"time"
 
 	"github.com/haraldrudell/parl"
@@ -21,55 +20,61 @@ import (
 //   - — value: rate of increase: current/max/average
 //   - — running: rate up or down, max increase/decrease rate,
 type Counters struct {
-	lock    sync.RWMutex
-	ordered []parl.CounterID       // behind lock: ordered list of counters and datapoints
-	m       map[parl.CounterID]any // behind lock
+	lock parl.RWMutex
+	// behind lock: ordered list of counters and datapoints
+	ordered []parl.CounterID
+	// behind lock
+	m map[parl.CounterID]any
 	RateRunner
 }
 
-var _ parl.CounterSet = &Counters{}     // Counters is a parl.CounterSet
-var _ parl.CounterSetData = &Counters{} // Counters is a parl.CounterSet
-var _ parl.CounterStore = &Counters{}   // Counters is a parl.CounterStore
+// Counters is a parl.CounterSet
+var _ parl.CounterSet = &Counters{}
 
+// Counters is a parl.CounterSet
+var _ parl.CounterSetData = &Counters{}
+
+// Counters is a parl.CounterStore
+var _ parl.CounterStore = &Counters{}
+
+// newCounters returns a counter container.
 func newCounters(g parl.GoGen) (counters parl.Counters) {
-	c := &Counters{
+	var cImpl = &Counters{
 		m: map[parl.CounterID]any{},
 	}
-	NewRateRunner(g, &c.RateRunner)
-	counters = c
+	NewRateRunner(g, &cImpl.RateRunner)
+	counters = cImpl
 	return
 }
 
-func (cs *Counters) GetOrCreateCounter(name parl.CounterID, period ...time.Duration) (counter parl.Counter) {
-	counter = cs.getOrCreate(false, name, period...).(parl.Counter)
+func (c *Counters) GetOrCreateCounter(name parl.CounterID, period ...time.Duration) (counter parl.Counter) {
+	counter = c.getOrCreate(false, name, period...).(parl.Counter)
 	return
 }
 
-func (cs *Counters) GetCounter(name parl.CounterID) (counter parl.Counter) {
-	counter = cs.getOrCreate(false, name).(parl.Counter)
+func (c *Counters) GetCounter(name parl.CounterID) (counter parl.Counter) {
+	counter = c.getOrCreate(false, name).(parl.Counter)
 	return
 }
 
-func (cs *Counters) GetOrCreateDatapoint(name parl.CounterID, period time.Duration) (datapoint parl.Datapoint) {
-	datapoint = cs.getOrCreate(true, name, period).(parl.Datapoint)
+func (c *Counters) GetOrCreateDatapoint(name parl.CounterID, period time.Duration) (datapoint parl.Datapoint) {
+	datapoint = c.getOrCreate(true, name, period).(parl.Datapoint)
 	return
 }
 
-func (cs *Counters) GetCounters() (list []parl.CounterID, m map[parl.CounterID]any) {
-	cs.lock.RLock()
-	defer cs.lock.RUnlock()
+func (c *Counters) GetCounters() (list []parl.CounterID, m map[parl.CounterID]any) {
+	defer c.lock.RLock().RUnlock()
 
-	list = slices.Clone(cs.ordered)
-	m = maps.Clone(cs.m)
+	list = slices.Clone(c.ordered)
+	m = maps.Clone(c.m)
 
 	return
 }
 
-func (cs *Counters) ResetCounters(stopRateCounters bool) {
-	cs.lock.Lock()
-	defer cs.lock.Unlock()
+func (c *Counters) ResetCounters(stopRateCounters bool) {
+	defer c.lock.Lock().Unlock()
 
-	_, m := cs.GetCounters()
+	_, m := c.GetCounters()
 	for _, item := range m {
 		if counter, ok := item.(parl.CounterValues); ok {
 			counter.GetReset()
@@ -81,20 +86,20 @@ func (cs *Counters) ResetCounters(stopRateCounters bool) {
 	}
 }
 
-func (cs *Counters) Exists(name parl.CounterID) (exists bool) {
-	exists = cs.GetNamedCounter(name) != nil
+func (c *Counters) Exists(name parl.CounterID) (exists bool) {
+	exists = c.GetNamedCounter(name) != nil
 	return
 }
 
-func (cs *Counters) Value(name parl.CounterID) (value uint64) {
-	if counter, ok := cs.GetNamedCounter(name).(interface{ Value() (value uint64) }); ok {
+func (c *Counters) Value(name parl.CounterID) (value uint64) {
+	if counter, ok := c.GetNamedCounter(name).(interface{ Value() (value uint64) }); ok {
 		value = counter.Value()
 	}
 	return
 }
 
-func (cs *Counters) Get(name parl.CounterID) (value, running, max uint64) {
-	if counter, ok := cs.GetNamedCounter(name).(interface {
+func (c *Counters) Get(name parl.CounterID) (value, running, max uint64) {
+	if counter, ok := c.GetNamedCounter(name).(interface {
 		Get() (value, running, max uint64)
 	}); ok {
 		value, running, max = counter.Get()
@@ -102,8 +107,8 @@ func (cs *Counters) Get(name parl.CounterID) (value, running, max uint64) {
 	return
 }
 
-func (cs *Counters) Rates(name parl.CounterID) (rates map[parl.RateType]float64) {
-	if counter, ok := cs.GetNamedCounter(name).(interface {
+func (c *Counters) Rates(name parl.CounterID) (rates map[parl.RateType]float64) {
+	if counter, ok := c.GetNamedCounter(name).(interface {
 		Rates() (rates map[parl.RateType]float64)
 	}); ok {
 		rates = counter.Rates()
@@ -111,8 +116,8 @@ func (cs *Counters) Rates(name parl.CounterID) (rates map[parl.RateType]float64)
 	return
 }
 
-func (cs *Counters) DatapointValue(name parl.CounterID) (datapointValue uint64) {
-	if counter, ok := cs.GetNamedCounter(name).(interface {
+func (c *Counters) DatapointValue(name parl.CounterID) (datapointValue uint64) {
+	if counter, ok := c.GetNamedCounter(name).(interface {
 		DatapointValue() (datapointValue uint64)
 	}); ok {
 		datapointValue = counter.DatapointValue()
@@ -120,8 +125,8 @@ func (cs *Counters) DatapointValue(name parl.CounterID) (datapointValue uint64) 
 	return
 }
 
-func (cs *Counters) DatapointMax(name parl.CounterID) (datapointMax uint64) {
-	if counter, ok := cs.GetNamedCounter(name).(interface {
+func (c *Counters) DatapointMax(name parl.CounterID) (datapointMax uint64) {
+	if counter, ok := c.GetNamedCounter(name).(interface {
 		DatapointMax() (datapointMax uint64)
 	}); ok {
 		datapointMax = counter.DatapointMax()
@@ -129,8 +134,8 @@ func (cs *Counters) DatapointMax(name parl.CounterID) (datapointMax uint64) {
 	return
 }
 
-func (cs *Counters) DatapointMin(name parl.CounterID) (datapointMin uint64) {
-	if counter, ok := cs.GetNamedCounter(name).(interface {
+func (c *Counters) DatapointMin(name parl.CounterID) (datapointMin uint64) {
+	if counter, ok := c.GetNamedCounter(name).(interface {
 		DatapointMin() (datapointMin uint64)
 	}); ok {
 		datapointMin = counter.DatapointMin()
@@ -138,8 +143,8 @@ func (cs *Counters) DatapointMin(name parl.CounterID) (datapointMin uint64) {
 	return
 }
 
-func (cs *Counters) GetDatapoint(name parl.CounterID) (value, max, min uint64, isValid bool, average float64, n uint64) {
-	if counter, ok := cs.GetNamedCounter(name).(interface {
+func (c *Counters) GetDatapoint(name parl.CounterID) (value, max, min uint64, isValid bool, average float64, n uint64) {
+	if counter, ok := c.GetNamedCounter(name).(interface {
 		GetDatapoint() (value, max, min uint64, isValid bool, average float64, n uint64)
 	}); ok {
 		value, max, min, isValid, average, n = counter.GetDatapoint()
@@ -147,21 +152,19 @@ func (cs *Counters) GetDatapoint(name parl.CounterID) (value, max, min uint64, i
 	return
 }
 
-func (cs *Counters) GetNamedCounter(name parl.CounterID) (counter any) {
-	cs.lock.RLock()
-	defer cs.lock.RUnlock()
+func (c *Counters) GetNamedCounter(name parl.CounterID) (counter any) {
+	defer c.lock.RLock().RUnlock()
 
-	counter = cs.m[name]
+	counter = c.m[name]
 	return
 }
 
-func (cs *Counters) getOrCreate(isDatapoint bool, name parl.CounterID, period ...time.Duration) (item any) {
-	cs.lock.Lock()
-	defer cs.lock.Unlock()
+func (c *Counters) getOrCreate(isDatapoint bool, name parl.CounterID, period ...time.Duration) (item any) {
+	defer c.lock.Lock().Unlock()
 
 	// check for existing counter or datapoint
 	var ok bool
-	if item, ok = cs.m[name]; ok {
+	if item, ok = c.m[name]; ok {
 		return // counter exists return
 	}
 
@@ -176,15 +179,15 @@ func (cs *Counters) getOrCreate(isDatapoint bool, name parl.CounterID, period ..
 		} else {
 			var r = newRateCounter()
 			item = r
-			cs.AddTask(period0, r)
+			c.AddTask(period0, r)
 		}
 	} else {
 		item = newDatapoint(period0)
 	}
 
 	// store the new counter or datapoint
-	cs.ordered = append(cs.ordered, name)
-	cs.m[name] = item
+	c.ordered = append(c.ordered, name)
+	c.m[name] = item
 
 	return
 }

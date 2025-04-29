@@ -102,13 +102,18 @@ func (k *Keystrokes) StringSource() (stringSource parl.ClosableSource1[string]) 
 // CloseNow closes the string-sending channel discarding any pending characters
 func (k *Keystrokes) CloseNow(errp *error) {
 
-	// [malib.StdinReader.Close] orders thread to exit
-	//	- effective on next return key-press
-	parl.Close(k.stdinReader, errp)
-
 	// [parl.AwaitableSlice.Close] orders stdinReaderThread
 	// to exit immediately
 	k.stdin.Close()
+
+	// if thread didn’t start yet
+	if k.stdinReader == nil {
+		return
+	}
+
+	// [malib.StdinReader.Close] orders thread to exit
+	//	- effective on next return key-press
+	parl.Close(k.stdinReader, errp)
 }
 
 // keystrokesThread reads blocking from [os.Stdin] therefore cannot be canceled

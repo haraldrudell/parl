@@ -67,14 +67,14 @@ func ExecBlocking(stdin []byte, wantStdout Stdouts, wantStderr Stderrs, ctx cont
 
 const (
 	// [ExecBlocking] system command’s standard output is discarded
-	NoExecBlockingStdout Stdouts = false
+	NoExecBlockingStdout Stdouts = iota + 1
 	// [ExecBlocking] system command’s standard output is be captured
-	WantStdout Stdouts = true
+	WantStdout
 )
 
 // Stdouts are the possible values for [ExecBlocking] stdout
 //   - NoExecBlockingStdout WantStdout
-type Stdouts bool
+type Stdouts uint8
 
 const (
 	// [ExecBlocking] system command’s standard error is discarded

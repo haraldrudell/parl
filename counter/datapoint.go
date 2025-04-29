@@ -6,7 +6,6 @@ ISC License
 package counter
 
 import (
-	"sync"
 	"time"
 
 	"github.com/haraldrudell/parl"
@@ -18,7 +17,7 @@ import (
 type Datapoint struct {
 	period time.Duration
 
-	lock  sync.Mutex
+	lock  parl.Mutex
 	value uint64
 	max   uint64
 	min   uint64
@@ -42,46 +41,48 @@ func newDatapoint(period time.Duration) (datapoint parl.Datapoint) {
 }
 
 // SetValue records a new datapoint value
-func (dt *Datapoint) SetValue(value uint64) (datapoint parl.Datapoint) {
-	tNow := time.Now() // best possible tNow
-	datapoint = dt
-	dt.lock.Lock()
-	defer dt.lock.Unlock()
+func (d *Datapoint) SetValue(value uint64) (datapoint parl.Datapoint) {
+
+	// best possible tNow
+	var tNow = time.Now()
+
+	datapoint = d
+	defer d.lock.Lock().Unlock()
 
 	// update value max min
-	dt.value = value
-	isFirst := dt.periodStart.IsZero()
-	if isFirst || value > dt.max {
-		dt.max = value
+	d.value = value
+	isFirst := d.periodStart.IsZero()
+	if isFirst || value > d.max {
+		d.max = value
 	}
-	if isFirst || value < dt.min {
-		dt.min = value
+	if isFirst || value < d.min {
+		d.min = value
 	}
 
 	// determine period
-	thisPeriodStart, isEnd := dt.isEnd(tNow)
+	thisPeriodStart, isEnd := d.isEnd(tNow)
 
 	// first SetValue invocation: initialize periodStart
 	if isFirst {
-		dt.periodStart = thisPeriodStart
+		d.periodStart = thisPeriodStart
 		return // first period started return
 	}
 
 	// check for end of a period
 	if !isEnd {
-		if !dt.isFullPeriod {
+		if !d.isFullPeriod {
 			// not at end of a period and current period is the first, partial, period
 			return // in the first, non-full, period return: no averaging data updates
 		}
 		// not at end of a full period
 	} else {
 		// beyond the end of the recording period: handle period change
-		dt.updatePeriod(thisPeriodStart)
+		d.updatePeriod(thisPeriodStart)
 	}
 
 	// update aggregate
-	dt.nPeriod++
-	dt.aggregate += float64(value)
+	d.nPeriod++
+	d.aggregate += float64(value)
 
 	return
 }
@@ -93,9 +94,8 @@ func (dt *Datapoint) CloneDatapointReset() (datapoint parl.Datapoint) {
 	return dt.cloneDatapoint(true)
 }
 func (dt *Datapoint) cloneDatapoint(reset bool) (datapoint parl.Datapoint) {
-	tNow := time.Now()
-	dt.lock.Lock()
-	defer dt.lock.Unlock()
+	var tNow = time.Now()
+	defer dt.lock.Lock().Unlock()
 
 	// handle period end
 	if thisPeriodStart, isEnd := dt.isEnd(tNow); isEnd {
@@ -133,9 +133,9 @@ func (dt *Datapoint) cloneDatapoint(reset bool) (datapoint parl.Datapoint) {
 }
 
 func (dt *Datapoint) GetDatapoint() (value, max, min uint64, isValid bool, average float64, n uint64) {
-	tNow := time.Now() // best possible tNow
-	dt.lock.Lock()
-	defer dt.lock.Unlock()
+	// best possible tNow
+	var tNow = time.Now()
+	defer dt.lock.Lock().Unlock()
 
 	// handle period end
 	if thisPeriodStart, isEnd := dt.isEnd(tNow); isEnd {

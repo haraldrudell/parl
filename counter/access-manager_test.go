@@ -12,7 +12,9 @@ import (
 	"time"
 )
 
-const shortTime = time.Millisecond
+const (
+	shortTime = time.Millisecond
+)
 
 func TestAccessManagerAtomic(t *testing.T) {
 	var exp1 = ticketDelta

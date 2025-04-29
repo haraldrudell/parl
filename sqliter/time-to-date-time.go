@@ -52,7 +52,7 @@ func DATETIMEtoTime(sqliteText string) (t time.Time, err error) {
 
 	// check length “2019-01-01 21:30:42.000 +00:00”
 	if len(sqliteText) != msTimeStringLength {
-		err = perrors.ErrorfPF("bad length: %d exp %d", len(sqliteText), msTimeStringLength)
+		err = perrors.ErrorfPF("bad length: %d exp %d %q", len(sqliteText), msTimeStringLength, sqliteText)
 		return // bad length: t: zero value err: non-nil
 	}
 

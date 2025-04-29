@@ -12,12 +12,14 @@ import (
 )
 
 type Rate struct {
-	RateType // String()
+	// String()
+	RateType
 	delta    uint64
 	duration time.Duration
 	hasValue bool
 }
 
+// Rate is [parl.Rate]
 var _ parl.Rate = &Rate{}
 
 func (rt *Rate) Clone() (rate parl.Rate) {

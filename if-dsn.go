@@ -11,23 +11,32 @@ import (
 )
 
 // DataSourceNamer provides data source names for SQL
-// based on possibly appplication name and partition year
+// used with [psql.DBFactory.NewDB]
 //   - a data source represents a set of SQL tables,
 //     possibly partitioned,
 //     against which queries can be prepared and executed
+//   - applications execute text queries against
+//     the return-value from [psql.DBFactory.NewDB]
 //   - DataSourceNamer applies to any database implementation
-//   - sqliter provides implementations for SQLite3
+//   - sqliter provides database implementations for SQLite3
 //   - the data source namer can map an application name and
 //     partition indentifier to the data source to be used
 type DataSourceNamer interface {
 	// DSN returns the data source name based on a partition selector
+	//	- partition: partition key that determine database name
+	//	- dataSourceName: identifies the database
+	//	- —
+	//	- DSN is typically used internally by [psql.DBFactory.NewDB]
 	//	- upon creation, the data source namer was provided with
 	//		information on data source naming for a particular application program
 	DSN(partition ...DBPartition) (dataSourceName DataSourceName)
 	// DataSource returns a usable data source based on a data source name
-	//	- with parl, all statements are prepared statements.
-	//		The function provided by a data source is to create prepared statements.
-	//		Those prepared statements are later executed efficiently
+	//	- dsn: a partition-keyed data source name retrieved using [DataSourceNamer.DNS]
+	//	- dataSource: a database that can prepare statements
+	//	- —
+	//	- DataSource and dataSource are typically used internally by [psql.DBFactory.NewDB]
+	//	- with [psql.DBFactory.NewDB], all statements are cached prepared statements
+	//		for maximum performance.
 	DataSource(dsn DataSourceName) (dataSource DataSource, err error)
 }
 
@@ -63,7 +72,7 @@ type DSNrFactory interface {
 }
 
 // IsRODsnr is an optional interface a data source namer can
-// impleement to provide a read-only flag
+// implement to provide a read-only flag
 type IsRoDsnr interface {
 	// IsRO returns true if this data source is read-only
 	//	- SQLite3 will not create database files
