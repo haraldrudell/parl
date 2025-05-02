@@ -49,6 +49,11 @@ type ErrorSink1 interface {
 	AddError(err error)
 }
 
+type ErrorDoner interface {
+	ErrorSink1
+	Doner
+}
+
 // ErrorSource1 is an error source that is not awaitable
 //   - implemented by [ErrSlice]
 //   - implemented by [AtomicError]
