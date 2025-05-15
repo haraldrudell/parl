@@ -13,7 +13,7 @@ go 1.23.1
 
 require (
 	github.com/google/uuid v1.6.0
-	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
-	golang.org/x/sys v0.32.0
-	golang.org/x/text v0.24.0
+	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
+	golang.org/x/sys v0.33.0
+	golang.org/x/text v0.25.0
 )
