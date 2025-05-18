@@ -24,16 +24,16 @@ import (
 type OnTicker struct {
 	// C is the channel on which the ticks are delivered
 	//	- must be a field named C
-	//	- delegated to ticker channel
+	//	- delegated to ticker channel: no allocation
 	C <-chan time.Time
 	// period is the set period, 1 ns or greater
 	period time.Duration
 	// timeLocation handles time zone issues
-	//	- typically pointer to static variable
+	//	- typically pointer to static variable: no allocation
 	timeLocation *time.Location
 	// ticker runs subsequent ticks after on-period attained
 	//	- ticker should not be copied: pointer to heap
-	//	- [time.NewTicker] costs channel and heap-struct allocation
+	//	- [time.NewTicker] costs channel and on-heap allocation
 	ticker *time.Ticker
 	// orderThreadToExit exits the thread
 	//	- must be closing channel
@@ -149,12 +149,14 @@ func (o *OnTicker) onTickerThread() {
 	// start the ticker
 	o.ticker.Reset(o.period)
 	// convert read channel o.ticker.C to a send channel
-	var Cout = *(*chan<- time.Time)(unsafe.Pointer(&o.ticker.C))
+	//	- C <-chan time.Time
+	//	- Csend chan<- time.Time
+	var Csend = *(*chan<- time.Time)(unsafe.Pointer(&o.ticker.C))
 
 	// send fake initial tick
 	select {
 	// may block here
-	case Cout <- t: // sent fake tick
+	case Csend <- t: // send fake tick
 	case <-a: // cancel from Stop invocation
 	}
 }
