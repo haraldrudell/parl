@@ -61,10 +61,10 @@ func (a *Atomic32[T]) CompareAndSwap(old, new T) (swapped bool) {
 }
 
 // Or atomically performs a bitwise OR operation on x using the bitmask provided as mask and returns the old value.
-func (a *Atomic32[T]) Or(val T) { a.u32.Or(uint32(val)) }
+func (a *Atomic32[T]) Or(val T) (old T) { return T(a.u32.Or(uint32(val))) }
 
 // And atomically performs a bitwise AND operation on x using the bitmask provided as mask and returns the old value.
-func (a *Atomic32[T]) And(val T) { a.u32.And(uint32(val)) }
+func (a *Atomic32[T]) And(val T) (old T) { return T(a.u32.And(uint32(val))) }
 
 // Add atomically adds delta to a and returns the new value.
 func (a *Atomic32[T]) Add(delta T) (new T) { return T(a.u32.Add(uint32(delta))) }
