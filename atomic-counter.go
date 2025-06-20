@@ -11,11 +11,13 @@ import (
 )
 
 // AtomicCounter is a uint64 thread-safe counter
-//   - [atomic.Uint64] added:
-//   - Inc Dec delegating to Add
-//   - Inc2 Dec2: preventing wrap-around CompareAndSwap mechanic
-//   - Set sets particular value
-//   - Value returns current value
+//   - [atomic.Uint64] exists for simplified increment semantics and
+//     non-wrap-around counter
+//   - [AtomicCounter.Inc] [AtomicCounter.Dec] delegating to Add
+//   - [AtomicCounter.Inc2] [AtomicCounter.Dec2]: preventing wrap-around
+//     using CompareAndSwap mechanic
+//   - [AtomicCounter.Set] sets particular value
+//   - [AtomicCounter.Value] returns current value
 type AtomicCounter atomic.Uint64
 
 // Inc increments with wrap-around. Thread-Safe

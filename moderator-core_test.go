@@ -26,16 +26,13 @@ func TestModeratorCore(t *testing.T) {
 			parallelism: parallelism,
 			active:      1,
 			waiting:     1,
-			didFirst:    true,
 		}
 		exp3_1Returned = moderatorState{
 			parallelism: parallelism,
 			active:      1,
-			didFirst:    true,
 		}
 		exp4_2returned = moderatorState{
 			parallelism: parallelism,
-			didFirst:    true,
 		}
 	)
 
@@ -109,7 +106,6 @@ func TestModeratorCore(t *testing.T) {
 // moderatorStatus holds moderator state during testing
 type moderatorState struct {
 	parallelism, active, seekers, waiting, heldTickets int
-	didFirst                                           bool
 }
 
 // moderatorStatus returns snapshot of moderator state
@@ -119,7 +115,7 @@ func moderatorStatus(m *ModeratorCore) (s moderatorState) {
 	s.seekers = m.seekers.Load()
 	defer m.lock.Lock().Unlock()
 
-	s.heldTickets, s.didFirst = m.heldTickets, m.didFirst
+	s.heldTickets = m.heldTickets
 	return
 }
 

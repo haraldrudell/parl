@@ -49,14 +49,17 @@ type ErrorSink1 interface {
 	AddError(err error)
 }
 
+// ErrorDoner is used as a go function argument that
+// both receives non-fatal errors and thread-exit result
 type ErrorDoner interface {
+	// AddError(err error)
 	ErrorSink1
+	// Done(errp *error)
 	Doner
 }
 
 // ErrorSource1 is an error source that is not awaitable
-//   - implemented by [ErrSlice]
-//   - implemented by [AtomicError]
+//   - ErrorSource1 is implemented by [ErrSlice] [AtomicError]
 //   - [ErrorSource] is awaitable interface
 //   - [Errs] interface can also provide slice
 //   - [ErrsIter] is iterable and awaitable
@@ -77,6 +80,7 @@ type ErrorSource1 interface {
 //   - [DeferredErrorSource] collects errors from ErrorSource1
 //   - [ErrorSink] provides error values
 type ErrorSource interface {
+	// Error() (err error, hasValue bool)
 	ErrorSource1
 	// WaitCh waits for the next error, possibly indefinitely
 	//	- each invocation returns a channel that closes on errors available
@@ -132,7 +136,8 @@ type ErrorsSource interface {
 }
 
 // DeferredErrorSink adds a possible error in errp to errorSink
-//   - errorSink: any type of error sink: atomic or endable
+//   - errorSink: any type of error sink: atomic or endable.
+//     Implemented by [ErrSlice] [AtomicError]
 //   - errp: may be nil
 //   - deferrable, thread-safe if errorSink is thread-safe
 func DeferredErrorSink(errorSink ErrorSink1, errp *error) {
@@ -147,8 +152,13 @@ func DeferredErrorSink(errorSink ErrorSink1, errp *error) {
 
 // DeferredErrorSource is a deferrable function that appends
 // all errors in errorSource to errp
-//   - empties an error source but does not wait for it to close
-//   - if errorSource is thread-safem it may be shared by multiple threads
+//   - errorSource: where errors are copied from
+//   - errp: where errors are stored using append.
+//     Any stored nil error values are copied, too
+//   - —
+//   - DeferredErrorSource empties an error source but does not wait for it to close
+//   - if errorSource is thread-safe, it may be shared by multiple threads
+//   - [ErrorSource1] implementations: [ErrSlice] [AtomicError]
 func DeferredErrorSource(errorSource ErrorSource1, errp *error) {
 
 	// errorSink may be [AtomicError] that does not empty
@@ -171,21 +181,4 @@ func DeferredErrorSource(errorSource ErrorSource1, errp *error) {
 		return
 	}
 	*errp = perrors.AppendError(*errp, e)
-}
-
-// privateErrorSink allows a type with a private addError method to be used as [ErrorSink]
-type privateErrorSink struct{ ErrorSink1 }
-
-// NewErrorSinkEndable wraps an [ErrorSink1] to be a closable and awaitable [ErrorSink]
-//   - if the implementation does not support EndErrors, EndErrors does nothing
-func NewErrorSinkEndable(errorSink1 ErrorSink1) (errorSink ErrorSink) {
-	return &privateErrorSink{ErrorSink1: errorSink1}
-}
-
-// EndErrors is a close-like function noting that AddError will no longer be invoked
-//   - if the underlying object does not have endErrors, EndErrors does nothing
-func (p *privateErrorSink) EndErrors() {
-	if endable, ok := p.ErrorSink1.(ErrorSink); ok {
-		endable.EndErrors()
-	}
 }

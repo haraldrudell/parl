@@ -17,7 +17,7 @@ var _ parl.ErrorSink = &e{}
 //   - privateErrorSink must implement addError(err error)
 //   - privateErrorSink may implement endErrors()
 func newErrorSink(privateErrorSink eSink) (errorSink parl.ErrorSink) {
-	return parl.NewErrorSinkEndable(&e{privateErrorSink: privateErrorSink})
+	return &e{privateErrorSink: privateErrorSink}
 }
 
 func (e *e) AddError(err error) { e.privateErrorSink.addError(err) }

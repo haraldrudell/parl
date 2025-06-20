@@ -25,32 +25,40 @@ type ModeratorCore struct {
 	// parallelism is the maximum number of tickets issued > 0
 	parallelism int
 	// active is number of currently issued tickets
-	//	- less than parallelism: tickets are obtained via atomics.
+	//	- atomic to facilitate lock-free ticket acquisition
+	//	- when value less than parallelism: tickets are obtained via atomics.
 	//		Moderator in atomic mode.
-	//	- equal to parallelism: tickets are awaited and returned via lock.
+	//	- when equal to parallelism: tickets are awaited and returned via lock.
 	//		Moderator in lock-state.
 	active Atomic64[int]
 	// number of ticket-seeking threads attempting to enter critical section
+	//	- used by ticket returners in critical section to hold
+	//		tickets for threads holding or seeking the lock
+	//	- ticket holding keeps the moderator in lock state and
+	//		provides fairness in ticket distribution
 	//	- incremented prior to entering critical section
-	//	- decremented inside critical section
+	//	- decremented once in critical section
+	//	- value is number of threads blocked at or trying to acquire lock
 	seekers Atomic64[int]
 	// lock forms critical section while in moderator lock-state
 	//	- parl.[Mutex] one-liner
 	lock Mutex
-	// didFirst is false if ticketQueue has not been locked
-	// 	- behind lock
-	didFirst bool
 	// heldTickets holds tickets for threads that did increment seekers
 	// but have yet to enter critical section
 	//	- behind lock
 	heldTickets int
 	// number of threads that are awaiting ticket from ticketQueue
 	//	- written behind lock
+	//	- atomic to be accessed by status
 	waiting Atomic64[int]
-	// ticketQueue forming ticket queue when moderator in lock-state:
+	// ticketQueue forms a ticket queue when moderator in lock-state:
+	//	- waiting threads initiate read operation symbolizing receiving a ticket
+	//	- ticket returners use write operation to provide tickets
 	//	- orderly first-come-first-served
+	//	- separate from lock as to not block lock access
+	//	- sized to parallelism as to never block ticket returners
 	//	- parl.[Mutex] one-liner
-	ticketQueue Mutex
+	ticketQueue chan struct{}
 }
 
 // NewModerator returns a parallelism limiter
@@ -74,23 +82,18 @@ func NewModeratorCore(parallelism int) (m *ModeratorCore) {
 
 // NewModeratorp returns a parallelism limiter
 func NewModeratorCorep(fieldp *ModeratorCore, parallelism int) (m *ModeratorCore) {
+	if parallelism <= 0 {
+		parallelism = defaultParallelism
+	}
 	if fieldp != nil {
 		m = fieldp
 	} else {
-		m = &ModeratorCore{}
-	}
-	if parallelism > 0 {
-		m.parallelism = parallelism
-	} else {
-		m.parallelism = defaultParallelism
+		m = &ModeratorCore{
+			parallelism: parallelism,
+			ticketQueue: make(chan struct{}, parallelism),
+		}
 	}
 	return
-}
-
-// TicketReturner is functional interface returned by [ModeratorCore.Ticket]
-type TicketReturner interface {
-	// returnTicket returns a ticket obtained from [ModeratorCore.Ticket]
-	ReturnTicket()
 }
 
 // Ticket awaits and returns ticket
@@ -116,13 +119,14 @@ func (m *ModeratorCore) Ticket() (tickerReturner TicketReturner) {
 	}
 	// thread encountered moderator in lock-state
 
-	// seek ticket source: held ticket, atomic or ticketQueue
+	// seek ticket in critical section: held ticket or atomic
 	if m.enterQueue() {
 		return // got ticket in critical section return
 	}
+	// thread should wait in ticket queue
 
 	// await ticket: blocks here for ticket from ticketQueue
-	m.ticketQueue.Lock()
+	<-m.ticketQueue
 
 	return // ticket from ticketQueue return
 }
@@ -133,28 +137,36 @@ func (m *ModeratorCore) ReturnTicket() {
 
 	// current number of outstanding tickets
 	var active = m.active.Load()
+
 	// check for spurious ticket return
 	if active == 0 {
-		panic(perrors.NewPF("returning ticket without obtaining ticket"))
+		panic(perrors.NewPF("returning ticket when no issued tickets"))
 	}
-	// attempt atomic ticket-return
+
+	// attempt atomic ticket-return while
+	// Moderator not in locked state
 	for active < m.parallelism {
 		if m.active.CompareAndSwap(active, active-1) {
 			return // ticket returned atomically return
 		}
 		active = m.active.Load()
+		if active == 0 {
+			panic(perrors.NewPF("ticket count went to zero while returning ticket"))
+		}
 	}
 	// moderator in lock-state: active == parallelism
-	//	- enter critical section
+
+	//enter critical section
 	defer m.lock.Lock().Unlock()
 
 	// if there is a queue: give ticket to queue
 	if m.waiting.Load() > 0 {
-		m.ticketQueue.Unlock()
+		m.ticketQueue <- struct{}{}
 		m.waiting.Add(-1)
 		return // ticket released to first thread in ticketQueue
 	}
 
+	// loop to make ticket held or exit lock state
 	for {
 
 		// if a thread is progressing towards critical section,
@@ -189,9 +201,20 @@ func (m *ModeratorCore) Status() (parallelism, active, waiting int) {
 //   - gotTicket false: no ticket obtained, moderator is in lock mode
 func (m *ModeratorCore) tryAtomicTicket() (gotTicket bool) {
 	for {
-		if tickets := m.active.Load(); tickets == m.parallelism {
+
+		// tickets is current number of issued tickets: 0…parallelism
+		var tickets = m.active.Load()
+
+		// if no tickets are available, lock must be used
+		//	- Moderator in lock-state
+		if tickets == m.parallelism {
 			return // lock mode return: gotTicket false
-		} else if gotTicket = m.active.CompareAndSwap(tickets, tickets+1); gotTicket {
+		}
+
+		// if able to increment issued tickets,
+		// a ticket was obtained using atomics
+		//	- new active is 1…parallelism
+		if gotTicket = m.active.CompareAndSwap(tickets, tickets+1); gotTicket {
 			return // got atomic ticket return: gotTicket true
 		}
 	}
@@ -199,7 +222,7 @@ func (m *ModeratorCore) tryAtomicTicket() (gotTicket bool) {
 
 // enterQueue prepares thread to wait for ticket-queue lock
 //   - gotTicket true: atomic ticket was obtained
-//   - gotTicket false: enter the ticket queue
+//   - gotTicket false: thread should enter the ticket queue
 //   - —
 //   - seekers must be non-zero
 func (m *ModeratorCore) enterQueue() (gotTicket bool) {
@@ -217,25 +240,20 @@ func (m *ModeratorCore) enterQueue() (gotTicket bool) {
 		return // held ticket obtained return: gotTicket true
 	}
 
-	// if the moderator exited lock-state, get atomic ticket
+	// for the case that the moderator exited lock-state since
+	// it was in lock state before acquiring the lock,
+	// try to get atomic ticket
 	if gotTicket = m.tryAtomicTicket(); gotTicket {
 		return // atomic ticket in critical section return: gotTicket true
 	}
-
 	// thread must enter ticketQueue
-	var waiting = m.waiting.Add(1)
+	//	- could not get held ticket
+	//	- could not get atomic ticket
 
-	// check for being first thread entering ticket queue
-	if waiting > 1 || m.didFirst {
-		return // other threads were already waiting: just join the queue
-	}
+	// count this thread as another waiting thread
+	m.waiting.Add(1)
 
-	// first thread to wait
-	m.didFirst = true
-	// first thread to wait: lock the queue
-	m.ticketQueue.Lock()
-
-	return
+	return // use ticketQueue return : gotTicket false
 }
 
 // when tickets available: “available: 2(10)”

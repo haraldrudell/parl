@@ -35,7 +35,7 @@ import (
 //	func someFunc() (err error) {
 //	  defer parl.Recover(func() parl.DA { return parl.A() }, &err, parl.NoOnError)
 func Recover(deferredLocation func() DA, errp *error, errorSink ...ErrorSink1) {
-	doRecovery(noAnnotation, deferredLocation, errp, recoverOnErrrorOnce, noIsPanic, recover(), errorSink...)
+	doRecovery(noAnnotation, deferredLocation, errp, recoverOnErrrorOnce, NoIsPanic, recover(), errorSink...)
 }
 
 // Recover2 recovers panic using deferred annotation
@@ -59,7 +59,7 @@ func Recover(deferredLocation func() DA, errp *error, errorSink ...ErrorSink1) {
 //	func someFunc() (err error) {
 //	  defer parl.Recover2(func() parl.DA { return parl.A() }, &err, parl.NoOnError)
 func Recover2(deferredLocation func() DA, errp *error, errorSink ...ErrorSink1) {
-	doRecovery(noAnnotation, deferredLocation, errp, recoverOnErrrorMultiple, noIsPanic, recover(), errorSink...)
+	doRecovery(noAnnotation, deferredLocation, errp, recoverOnErrrorMultiple, NoIsPanic, recover(), errorSink...)
 }
 
 // RecoverAnnotation is like Recover but with fixed-string annotation
@@ -79,7 +79,7 @@ func Recover2(deferredLocation func() DA, errp *error, errorSink ...ErrorSink1) 
 //	func someFunc() (err error) {
 //	  defer parl.RecoverAnnotation("property " + property, func() parl.DA { return parl.A() }, &err, parl.NoOnError)
 func RecoverAnnotation(annotation string, deferredLocation func() DA, errp *error, errorSink ...ErrorSink1) {
-	doRecovery(annotation, deferredLocation, errp, recoverOnErrrorOnce, noIsPanic, recover(), errorSink...)
+	doRecovery(annotation, deferredLocation, errp, recoverOnErrrorOnce, NoIsPanic, recover(), errorSink...)
 }
 
 // argument to Recover: no error aggregation
@@ -130,8 +130,8 @@ type annotationLiteral func() DA
 // A is a thunk returning a deferred code location
 func A() DA { return pruntime.NewCodeLocation(parlAFrames) }
 
-// noIsPanic is a stand-in nil value when noPanic is not present
-var noIsPanic *bool
+// NoIsPanic is a stand-in nil value when noPanic is not present
+var NoIsPanic *bool
 
 // doRecovery implements recovery for Recovery andd Recovery2
 //   - annotation: typically empty, can be string of some distinguishing property

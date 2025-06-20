@@ -13,12 +13,13 @@ import (
 
 // AtomicError is a thread-safe container for a single error value
 //   - [AtomicError.AddError] sets or appends to the error value
-//   - [AtomicError.AddErrorSwap] conditionally updates the error value
-//   - [AtomicError.Error] returns the current error value
+//   - [AtomicError.AddErrorSwap] conditionally updates the error value.
+//     Used when an existing error value needs to be updated
+//   - [AtomicError.Error] returns the current error value and hasValue flag
 //   - AtomicError is not closable and holds only one updatable value
-//   - AtomicError is not awaitable or readable to empty
-//   - consecutive Get returns the same error value
-//   - initialization-free, not awaitable
+//   - AtomicError is not awaitable or readable to empty or iterable
+//   - consecutive Error returns the same error value
+//   - initialization-free, thread-safe, not awaitable
 type AtomicError struct{ err atomic.Pointer[error] }
 
 // AtomicError is an [ErrorSink1] for one error at a time
@@ -88,12 +89,11 @@ func (a *AtomicError) AddErrorSwap(oldErr, newErr error) (didSwap bool, otherErr
 }
 
 // Error returns the error value
-//   - hasValue true: err is non-nil
-//   - hasValue false: the error source is currently empty
+//   - hasValue true: an error was stored
 func (a *AtomicError) Error() (err error, hasValue bool) {
 	if ep := a.err.Load(); ep != nil {
 		err = *ep
-		hasValue = err != nil
+		hasValue = true
 	}
 	return
 }

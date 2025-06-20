@@ -141,9 +141,14 @@ func (w *WaitGroup1) initialize() (isWinner bool) {
 	//	- typically none at all
 
 	// spin-lock up to 5.6 ns
+	//	- because waiting only nanoseconds,
+	//		[runtime.Gosched] [time.Sleep] [time.NewTimer]
+	//		cannot be used
+	//	- Load is 0.6272 ns
+	//	- for range 2 is 1.3 ns on 2021 M1 Max
 	for w.isReady.Load() == u32False {
-		var uint64 = 0
-		_ = uint64
+		for range 2 {
+		}
 	}
 
 	return // wait complete return: isWinner false

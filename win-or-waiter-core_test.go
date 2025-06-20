@@ -22,7 +22,7 @@ func TestNewWinOrWaiterCore(t *testing.T) {
 		return
 	}
 	var calculationReference *Future[time.Time]
-	var result time.Time
+	var result *time.Time
 	var isValid bool
 
 	var winOrWaiter *WinOrWaiterCore = NewWinOrWaiterCore(NoWinOrWaiterCore, winOrWaiterStrategy, calculator)

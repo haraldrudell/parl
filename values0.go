@@ -157,7 +157,7 @@ func (v *Values0[T]) Seq(yield func(value T) (keepGoing bool)) {
 	}
 }
 
-// GetN retrives value sby index
+// GetN retrives values by index
 func (v *Values0[T]) GetN(index int) (value T, hasValue bool) {
 
 	// invalid index

@@ -154,8 +154,8 @@ func (ww *WinOrWaiterCore) winnerFunc() (err error) {
 	defer ww.winnerPicker.Store(false)
 
 	// get calculation
-	var calculation = NewFuture[time.Time]()
-	ww.calculation.Store(calculation)
+	var calculation Future[time.Time]
+	ww.calculation.Store(&calculation)
 	ww.isCalculationPut.Store(true)
 
 	// calculate

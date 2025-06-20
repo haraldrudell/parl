@@ -128,10 +128,14 @@ func TestDebouncer(t *testing.T) {
 type panicOnError struct{}
 
 // newPanicOnError returns an errorSink that panics
-func newPanicOnError() (errorSink ErrorSink) { return NewErrorSinkEndable(&panicOnError{}) }
+func newPanicOnError() (errorSink ErrorSink) { return &panicOnError{} }
 
 // debouncerPanicErrFn is a debouncer errFN that panics
 //   - debuncer does not have any errors
 func (p *panicOnError) AddError(err error) {
 	panic(err)
 }
+
+// EndErrors is a close-like function noting that AddError will no longer be invoked
+//   - if the underlying object does not have endErrors, EndErrors does nothing
+func (p *panicOnError) EndErrors() {}

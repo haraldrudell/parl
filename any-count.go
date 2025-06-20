@@ -12,8 +12,8 @@ import "iter"
 //   - purpose is a non-thread-safe function parameter or result
 //   - — zero-allocation for zero or one values
 //   - — easy one-go iteration over zero/one/many values: [AnyCount.Seq]
-//   - thread-safe heap-allocated alternative usable as
-//     map value: [Values] and [NewValues]
+//   - thread-safe heap-allocated alternative usable for heap entities like
+//     map value, slice element or atomic pointer: [Values] and [NewValues]
 //   - —
 //   - allows a single value to represent any number of values
 //   - taking address of AnyCount may cause allocation

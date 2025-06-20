@@ -18,20 +18,36 @@ type TResult[T any] struct {
 // NewTResult3 creates a TResult from pointers at the time values are available
 //   - value is considered valid if errp is nil or *errp is nil
 //   - any arguments may be nil
-func NewTResult3[T any](value *T, isPanic *bool, errp *error) (tResult *TResult[T]) {
-	var result TResult[T]
-	tResult = &result
+func NewTResult3[T any](value *T, isPanic *bool, errp *error, fieldp ...*TResult[T]) (tResult *TResult[T]) {
+
+	// get tResult
+	if len(fieldp) > 0 {
+		tResult = fieldp[0]
+	}
+	if tResult == nil {
+		tResult = &TResult[T]{}
+	}
+
+	// determine error
+	var err error
 	if errp != nil {
-		if err := *errp; err != nil {
-			result.Err = err
-			if isPanic != nil {
-				result.IsPanic = *isPanic
-			}
+		err = *errp
+	}
+	if err == nil {
+
+		// success case
+		if value != nil {
+			tResult.Value = *value
+		}
+	} else {
+
+		// failure case
+		tResult.Err = err
+		if isPanic != nil && *isPanic {
+			tResult.IsPanic = true
 		}
 	}
-	if result.Err == nil && value != nil {
-		result.Value = *value
-	}
+
 	return
 }
 

@@ -12,24 +12,26 @@ import (
 
 // Awaitable is a semaphore allowing any number of threads to observe
 // and await any number of events in parallel: wait-free-locked
+//   - performance: the only allocation is a channel on:
+//   - — Ch prior to Close
+//   - — rare IsClose events that will no happen
+//   - — other than that one-to-low-ns everything
 //   - [Awaitable.Ch] returns an awaitable channel closing on trig of awaitable.
 //     The initial channel state is open
 //   - [Awaitable.Close] triggers the awaitable, ie. closes the channel.
 //     Upon return, the channel is guaranteed to be closed
-//   - — with optional [EvCon] argument, Close is eventually consistent, ie.
-//     Close may return prior to channel actually closed
-//     for higher performance
+//   - — obsolete, still present: with optional [EvCon] argument,
+//     Close is eventually consistent
 //   - [Awaitable.IsClosed] returns whether the awaitable is triggered, ie. if the channel is closed
-//   - initialization-free, one-to-many wait mechanic, synchronizes-before, observable
+//   - initialization-free, one-to-many wait mechanic, synchronizes-before, inspectable
 //   - use of channel as mechanic allows consumers to await multiple events: wait-free-locked
 //   - Awaitable costs lazy channel allocation
 //   - note: [parl.CyclicAwaitable] is re-armable, cyclic version
 //   - —
 //   - alternative low-blocking inter-thread mechanics are [sync.WaitGroup] and [sync.RWMutex]
-//   - — neither is observable and the consumer cannot await multiple events
+//   - — neither is inspectable and the consumer cannot await multiple events
 //   - — RWMutex cyclic use has inversion of control issues
-//   - — WaitGroup lacks control over waiting threads requiring cyclic use to
-//     employ a re-created pointer and value
+//   - — WaitGroup requires synchronization of Add/Done and Wait invocations or panic
 //   - — both are less performant for the managing thread
 type Awaitable struct {
 	// isGet is true if a channel-read operation was initiated
