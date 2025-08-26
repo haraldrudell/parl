@@ -230,6 +230,7 @@ func TestGetPut(t *testing.T) {
 	// Delete()
 	// Get()
 	// Put()
+	// Contains()
 	const (
 		key1, key2, key3       = 1, 2, 3
 		value1, value2, value3 = 11, 12, 13
@@ -243,6 +244,7 @@ func TestGetPut(t *testing.T) {
 		hasValue   bool
 		m2         OrderedMap[int, int]
 		didClear   bool
+		contains   bool
 	)
 
 	// Put()
@@ -282,6 +284,16 @@ func TestGetPut(t *testing.T) {
 	}
 	if hasValue {
 		t.Error("FAIL hasValue true")
+	}
+
+	// Contains()
+	contains = m.Contains(key2)
+	if !contains {
+		t.Error("FAIL contains false")
+	}
+	contains = m.Contains(key3)
+	if contains {
+		t.Error("FAIL contains true")
 	}
 
 	// Delete()

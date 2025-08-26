@@ -22,6 +22,8 @@ package omap1
 //   - — easier api and
 //   - — less memory consumption
 //   - not thread-safe
+//   - because OrderedMap does not contain non-pointer
+//     atomics or locks, it can use make and be copied
 type OrderedMap[K comparable, V any] struct {
 	// swissMap map is pointer internally
 	//	- map value is pointer to reduce copying on Get
@@ -63,6 +65,9 @@ func MakeOrderedMap[K comparable, V any](size ...int) (m OrderedMap[K, V]) {
 }
 
 // MakeOrderedMapFromKeys creates an ordered map from a set of keys
+//   - creates an ordered set with:
+//   - — O(1) access
+//   - — ordered traversal
 //   - values is the zero-value for V
 //
 // Usage:
@@ -194,6 +199,12 @@ func (o *OrderedMap[K, V]) TraverseBackwards(key ...K) (iterator func(yield func
 	}
 	var traverser = newTraverser(pair, backwards)
 	iterator = traverser.traverse
+	return
+}
+
+// Contains returns true if a mapping for key exists
+func (o *OrderedMap[K, V]) Contains(key K) (contains bool) {
+	_, contains = o.swissMap[key]
 	return
 }
 
