@@ -460,7 +460,7 @@ func (e *eventStore) eventFunc(watchEvent *WatchEvent) {
 
 // errFn is the error receiver
 func (e *eventStore) AddError(err error) {
-	e.t.Fatalf("FAIL Watcher err: " + perrors.Long(err))
+	e.t.Fatalf("FAIL Watcher err: %s", perrors.Long(err))
 }
 
 var _ WatchEvent

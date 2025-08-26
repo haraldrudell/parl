@@ -91,7 +91,7 @@ func TestStack(t *testing.T) {
 		t.Errorf("stack.Frames[0]: %s exp %s", frames[0].Loc().Short(), cL.Short())
 	}
 	// File: "/opt/homebrew/Cellar/go/1.20.4/libexec/src/testing/testing.go" Line: 1576 FuncName: "testing.tRunner"
-	t.Logf(stack.GoFunction().Dump())
+	t.Log(stack.GoFunction().Dump())
 	// expGoFunctionFuncName "testing.tRunner"
 	t.Logf("expGoFunctionFuncName %q", expGoFunctionFuncName)
 	// "/opt/homebrew/Cellar/go/1.20.4/libexec/src/testing/testing.go:1576"
