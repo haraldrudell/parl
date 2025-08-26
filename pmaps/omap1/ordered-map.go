@@ -5,15 +5,25 @@ ISC License
 
 package omap1
 
+import (
+	"fmt"
+	"maps"
+)
+
 // OrderedMap is minimal high-performance insertion-ordered map
-//   - can be used as:
-//   - LRU/MRU cache, circular processing or
-//   - O(1) access or lookup with ordered traversal
+//   - using OrderedMap as O(1) ordered set:
+//   - — create set using [MakeOrderedMapFromKeys] with zero-sized value-type struct{}
+//   - — check for element using [OrderedMap.Contains]
+//   - — add to set using key-only [OrderedMap.Put]
+//   - — iterate set using [OrderedMap.Traverse] and [OrderedMap.TraverseBackwards]
+//   - using OrderedMap as O(1) LRU/MRU cache or circular processing:
+//   - — use [OrderedMap.GetAndMakeNewest] or
+//   - — [OrderedMap.GetAndMakeOldest]
 //   - implementation is Go map with ordering by doubly-linked list
-//   - provides the five native Go map functions: Get Put Delete Length Range
-//   - additionally Clear Clone and order-manipulation methods
-//   - forward and backwards Go iterators
-//   - convenient initializers
+//   - — provides the five native Go map functions: Get Put Delete Length Range
+//   - — additionally Clear Clone and order-manipulation methods
+//   - — forward and backwards Go iterators
+//   - — convenient initializers
 //   - no dependencies, minimal allocations, simplest api
 //   - more lighweight than the b-tree-based maps of
 //     github.com/haraldrudell/parl/omaps
@@ -22,8 +32,9 @@ package omap1
 //   - — easier api and
 //   - — less memory consumption
 //   - not thread-safe
-//   - because OrderedMap does not contain non-pointer
-//     atomics or locks, it can use make and be copied
+//   - because OrderedMap, similar to Go map and slice, does not contain non-pointer
+//     atomics or locks:
+//   - OrderedMap can be passed-by-value, copied and use make
 type OrderedMap[K comparable, V any] struct {
 	// swissMap map is pointer internally
 	//	- map value is pointer to reduce copying on Get
@@ -36,7 +47,8 @@ type OrderedMap[K comparable, V any] struct {
 	// tail points to the last node of a doubly-linked list
 	//	- nil when list is empty
 	//	- each node has Prev and Next pointers and key-value fields
-	tail *mappingNode[K, V]
+	tail              *mappingNode[K, V]
+	noDeleteZeroValue bool
 }
 
 // MakeOrderedMap makes an ordered map of optional pre-allocated size
@@ -72,7 +84,10 @@ func MakeOrderedMap[K comparable, V any](size ...int) (m OrderedMap[K, V]) {
 //
 // Usage:
 //
-//	var m = omap1.MakeOrderedMapFromKeys[int, struct{}]([]int{1, 2})
+//	var m = omap1.MakeOrderedMapFromKeys[string, struct{}]([]string{
+//	  "key1",
+//	  "key2",
+//	})
 func MakeOrderedMapFromKeys[K comparable, V any](keys []K) (m OrderedMap[K, V]) {
 	m = MakeOrderedMap[K, V](len(keys))
 	var value V
@@ -83,14 +98,15 @@ func MakeOrderedMapFromKeys[K comparable, V any](keys []K) (m OrderedMap[K, V]) 
 	return
 }
 
-// MakeOrderedMapFromKeys creates an ordered map from a list of mappings
+// MakeOrderedMapFromMappings is initializer creating an
+// ordered map from a list of mappings
 //
 // Usage:
 //
-//	var m = omap1.MakeOrderedMapFromKeys[int, int]([]omap1.Mappings{{
-//	  Key: 1, Value: 2,
+//	var m = omap1.MakeOrderedMapFromKeys[string, int]([]omap1.Mappings{{
+//	  Key: "key1", Value: 1,
 //	},{
-//	  Key: 3, Value: 4,
+//	  Key: "key2", Value: 2,
 //	}})
 func MakeOrderedMapFromMappings[K comparable, V any](mappings []Mapping[K, V]) (m OrderedMap[K, V]) {
 	m = MakeOrderedMap[K, V](len(mappings))
@@ -118,21 +134,26 @@ func (o *OrderedMap[K, V]) Get(key K) (value V, hasValue bool) {
 // Put creates or replaces a mapping
 //   - key: a new or existing key
 //   - value: the value to write to the map
+//   - — if value missing, the V zero-value is used
 //   - old: any replaced value or the zero-value
 //   - hadMapping true: the mapping already existed and was updated
 //   - hadMapping false: a new mapping wwas created
-func (o *OrderedMap[K, V]) Put(key K, value V) (old V, hadMapping bool) {
+func (o *OrderedMap[K, V]) Put(key K, value ...V) (old V, hadMapping bool) {
+	var v V
+	if len(value) > 0 {
+		v = value[0]
+	}
 	var mapping *mappingNode[K, V]
 	if mapping, hadMapping = o.swissMap[key]; hadMapping {
 		old = mapping.Value
-		mapping.Value = value
+		mapping.Value = v
 		return
 	}
 
 	// insert new value into map
 	mapping = &mappingNode[K, V]{
 		Key:   key,
-		Value: value,
+		Value: v,
 	}
 	o.swissMap[key] = mapping
 
@@ -157,6 +178,13 @@ func (o *OrderedMap[K, V]) Delete(key K) (old V, hadMapping bool) {
 	old = mapping.Value
 
 	// remove from map
+
+	if !o.noDeleteZeroValue {
+		// write null pointer to prevent temporary memory leak
+		// and reduce garbage-collector time
+		var zeroValue *mappingNode[K, V]
+		o.swissMap[key] = zeroValue
+	}
 	delete(o.swissMap, key)
 
 	// remove pair from list
@@ -227,6 +255,11 @@ func (o *OrderedMap[K, V]) Clone() (oMap OrderedMap[K, V]) {
 	return
 }
 
+// Compact re-allocates internal structures to avoid temporary memory leaks
+//   - if the map has been large, say 1M elements, Compact releases
+//     temporary memory leaks
+func (o *OrderedMap[K, V]) Compact() { o.swissMap = maps.Clone(o.swissMap) }
+
 // Keys returns all keys in order
 //   - can be used with [OrderedMap.GoMap] to exported ordered mappings
 func (o *OrderedMap[K, V]) Keys() (keys []K) {
@@ -234,6 +267,18 @@ func (o *OrderedMap[K, V]) Keys() (keys []K) {
 	var i int
 	for m := o.head; m != nil; m = m.Next {
 		keys[i] = m.Key
+		i++
+	}
+	return
+}
+
+// KeyStrings returns all keys as %v strings in order
+//   - can be used with [strings.Join]
+func (o *OrderedMap[K, V]) KeyStrings() (keyStrings []string) {
+	keyStrings = make([]string, len(o.swissMap))
+	var i int
+	for m := o.head; m != nil; m = m.Next {
+		keyStrings[i] = fmt.Sprintf("%v", m.Key)
 		i++
 	}
 	return
@@ -253,7 +298,7 @@ func (o *OrderedMap[K, V]) Clear() (didClear bool) {
 	return
 }
 
-// GetAndMakeNewest returns the key mapping and reorders it to be the oldest
+// GetAndMakeNewest returns the key mapping and reorders it to be the newest
 //   - key: key for a sought mapping
 //   - value: present if hasValue true
 //   - hasValue true: the mapping did exist
@@ -265,21 +310,21 @@ func (o *OrderedMap[K, V]) GetAndMakeNewest(key K) (value V, hasValue bool) {
 	}
 	value = mapping.Value
 
-	// move pair to end of list
+	// move mapping to end of list
 
-	// check if pair already tail
+	// check if mapping already tail
 	if mapping.Next == nil {
 		return
 	}
 
-	// move pair to end of list
+	// move mapping to end of list
 	o.removeNode(mapping)
 	o.appendNode(mapping)
 
 	return
 }
 
-// GetAndMakeOldest returns the key mapping and reorders it to be the newest
+// GetAndMakeOldest returns the key mapping and reorders it to be the oldest
 //   - key: key for a sought mapping
 //   - value: present if hasValue true
 //   - hasValue true: the mapping did exist
@@ -291,12 +336,12 @@ func (o *OrderedMap[K, V]) GetAndMakeOldest(key K) (value V, hasValue bool) {
 	}
 	value = mapping.Value
 
-	// check if pair already first item
+	// check if mapping already first item
 	if mapping.Prev == nil {
 		return
 	}
 
-	// move pair to head of list
+	// move mapping to head of list
 	o.removeNode(mapping)
 	o.insertNode(mapping)
 
@@ -385,6 +430,18 @@ func (o *OrderedMap[K, V]) Newest() (key K, value V, hasValue bool) {
 	value = mapping.Value
 
 	return
+}
+
+// SetDeleteZeroValue controls whether Delete writes zero-value prior to delete
+//   - default is yes
+//   - doZero missing: sets to no
+//   - doZero true: sets to yes
+func (o *OrderedMap[K, V]) SetDeleteZeroValue(doZero ...bool) {
+	var noZero = false
+	if len(doZero) == 0 {
+		noZero = !doZero[0]
+	}
+	o.noDeleteZeroValue = noZero
 }
 
 // appendNode appends a value not in the list
