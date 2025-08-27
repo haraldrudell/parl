@@ -16,6 +16,7 @@ import (
 //   - — check for element using [OrderedMap.Contains]
 //   - — add to set using key-only [OrderedMap.Put]
 //   - — iterate set using [OrderedMap.Traverse] and [OrderedMap.TraverseBackwards]
+//   - — printable set-element list from [OrderedMap.KeyStrings]
 //   - using OrderedMap as O(1) LRU/MRU cache or circular processing:
 //   - — use [OrderedMap.GetAndMakeNewest] or
 //   - — [OrderedMap.GetAndMakeOldest]
@@ -47,8 +48,7 @@ type OrderedMap[K comparable, V any] struct {
 	// tail points to the last node of a doubly-linked list
 	//	- nil when list is empty
 	//	- each node has Prev and Next pointers and key-value fields
-	tail              *mappingNode[K, V]
-	noDeleteZeroValue bool
+	tail *mappingNode[K, V]
 }
 
 // MakeOrderedMap makes an ordered map of optional pre-allocated size
@@ -81,6 +81,7 @@ func MakeOrderedMap[K comparable, V any](size ...int) (m OrderedMap[K, V]) {
 //   - — O(1) access
 //   - — ordered traversal
 //   - values is the zero-value for V
+//   - V can be zero-sized type struct{}
 //
 // Usage:
 //
@@ -103,7 +104,7 @@ func MakeOrderedMapFromKeys[K comparable, V any](keys []K) (m OrderedMap[K, V]) 
 //
 // Usage:
 //
-//	var m = omap1.MakeOrderedMapFromKeys[string, int]([]omap1.Mappings{{
+//	var m = omap1.MakeOrderedMapFromMappings([]omap1.Mappings[string, int]{{
 //	  Key: "key1", Value: 1,
 //	},{
 //	  Key: "key2", Value: 2,
@@ -137,7 +138,7 @@ func (o *OrderedMap[K, V]) Get(key K) (value V, hasValue bool) {
 //   - — if value missing, the V zero-value is used
 //   - old: any replaced value or the zero-value
 //   - hadMapping true: the mapping already existed and was updated
-//   - hadMapping false: a new mapping wwas created
+//   - hadMapping false: a new mapping was created
 func (o *OrderedMap[K, V]) Put(key K, value ...V) (old V, hadMapping bool) {
 	var v V
 	if len(value) > 0 {
@@ -178,16 +179,13 @@ func (o *OrderedMap[K, V]) Delete(key K) (old V, hadMapping bool) {
 	old = mapping.Value
 
 	// remove from map
-
-	if !o.noDeleteZeroValue {
-		// write null pointer to prevent temporary memory leak
-		// and reduce garbage-collector time
-		var zeroValue *mappingNode[K, V]
-		o.swissMap[key] = zeroValue
-	}
+	//	-After deletion, the map no longer refers to the key or the value,
+	// so any pointers in the value become unreachable from the map,
+	// allowing garbage collection.
+	// https://stackoverflow.com/posts/39395345/revisions
 	delete(o.swissMap, key)
 
-	// remove pair from list
+	// remove node from list
 	o.removeNode(mapping)
 
 	return
@@ -201,14 +199,14 @@ func (o *OrderedMap[K, V]) Length() (length int) { return len(o.swissMap) }
 //   - key present and found: traversal over key and subsequent mappings
 func (o *OrderedMap[K, V]) Traverse(key ...K) (iterator func(yield func(key K, value V) (keepGoing bool))) {
 
-	var pair *mappingNode[K, V]
+	var mapping *mappingNode[K, V]
 	if len(key) > 0 {
-		pair = o.swissMap[key[0]]
+		mapping = o.swissMap[key[0]]
 	}
-	if pair == nil {
-		pair = o.head
+	if mapping == nil {
+		mapping = o.head
 	}
-	var traverser = newTraverser(pair)
+	var traverser = newTraverser(mapping)
 	iterator = traverser.traverse
 	return
 }
@@ -218,14 +216,14 @@ func (o *OrderedMap[K, V]) Traverse(key ...K) (iterator func(yield func(key K, v
 //   - key present and found: traversal over key and preceding mappings
 func (o *OrderedMap[K, V]) TraverseBackwards(key ...K) (iterator func(yield func(key K, value V) (keepGoing bool))) {
 
-	var pair *mappingNode[K, V]
+	var mapping *mappingNode[K, V]
 	if len(key) > 0 {
-		pair = o.swissMap[key[0]]
+		mapping = o.swissMap[key[0]]
 	}
-	if pair == nil {
-		pair = o.tail
+	if mapping == nil {
+		mapping = o.tail
 	}
-	var traverser = newTraverser(pair, backwards)
+	var traverser = newTraverser(mapping, backwards)
 	iterator = traverser.traverse
 	return
 }
@@ -246,7 +244,7 @@ func (o *OrderedMap[K, V]) GoMap() (goMap map[K]V) {
 }
 
 // Clone returns a clone of the ordered map
-//   - data structures are separate but contains the same key and values
+//   - data structures are separate but contains the same keys and values
 func (o *OrderedMap[K, V]) Clone() (oMap OrderedMap[K, V]) {
 	oMap = MakeOrderedMap[K, V](len(o.swissMap))
 	for m := o.head; m != nil; m = m.Next {
@@ -278,9 +276,10 @@ func (o *OrderedMap[K, V]) KeyStrings() (keyStrings []string) {
 	keyStrings = make([]string, len(o.swissMap))
 	var i int
 	for m := o.head; m != nil; m = m.Next {
-		keyStrings[i] = fmt.Sprintf("%v", m.Key)
+		keyStrings[i] = fmt.Sprint(m.Key)
 		i++
 	}
+
 	return
 }
 
@@ -432,20 +431,8 @@ func (o *OrderedMap[K, V]) Newest() (key K, value V, hasValue bool) {
 	return
 }
 
-// SetDeleteZeroValue controls whether Delete writes zero-value prior to delete
-//   - default is yes
-//   - doZero missing: sets to no
-//   - doZero true: sets to yes
-func (o *OrderedMap[K, V]) SetDeleteZeroValue(doZero ...bool) {
-	var noZero = false
-	if len(doZero) == 0 {
-		noZero = !doZero[0]
-	}
-	o.noDeleteZeroValue = noZero
-}
-
-// appendNode appends a value not in the list
-// to the end of the doubly-linked list
+// appendNode appends a node not in the list
+// to the end/newest of the doubly-linked list
 func (o *OrderedMap[K, V]) appendNode(node *mappingNode[K, V]) {
 
 	// node Next link is nil
@@ -467,8 +454,8 @@ func (o *OrderedMap[K, V]) appendNode(node *mappingNode[K, V]) {
 	o.tail = node
 }
 
-// insertNode inserts a value not in the list
-// first in the doubly-linked list
+// insertNode inserts a node not in the list
+// to be first/oldest in the doubly-linked list
 func (o *OrderedMap[K, V]) insertNode(node *mappingNode[K, V]) {
 
 	// node Next link: current head is after node
@@ -489,7 +476,7 @@ func (o *OrderedMap[K, V]) insertNode(node *mappingNode[K, V]) {
 	}
 }
 
-// removeNode removes a pair in the list
+// removeNode removes a node
 // from the doubly-linked list
 func (o *OrderedMap[K, V]) removeNode(node *mappingNode[K, V]) {
 
@@ -520,7 +507,7 @@ func (o *OrderedMap[K, V]) removeNode(node *mappingNode[K, V]) {
 	}
 }
 
-// insertNodeAfter inserts a node not in the list after node mark
+// insertNodeAfter inserts a node not in the list after node precedingNode
 func (o *OrderedMap[K, V]) insertNodeAfter(node, precedingNode *mappingNode[K, V]) {
 
 	// node Next link: node is before the node after precedingNode
@@ -567,6 +554,8 @@ func (o *OrderedMap[K, V]) insertNodeBefore(node, succeedingNode *mappingNode[K,
 //   - doubles as node of a doubly-linked list
 //   - contains key for [OrderedMap.Newest] [OrderedMap.Oldest] and
 //     cloning [OrderedMap.GoMap] [OrderedMap.Clone] [OrderedMap.Keys]
+//   - the first node has Prev nil and is pointed-to by OrderedMap.head
+//   - the last node has Next nil and is pointed-to by OrderedMap.tail
 type mappingNode[K comparable, V any] struct {
 	Prev  *mappingNode[K, V]
 	Next  *mappingNode[K, V]

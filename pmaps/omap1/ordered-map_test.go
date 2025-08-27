@@ -8,12 +8,14 @@ package omap1
 import (
 	"maps"
 	"slices"
+	"strconv"
 	"testing"
 )
 
 func TestOrderedMapMove(t *testing.T) {
 	// MoveAfter()
 	// MoveBefore()
+	// KeyStrings()
 	const (
 		key1, key2, key3, key4 = 1, 2, 3, 4
 		value1, value2, value3 = 11, 12, 13
@@ -28,8 +30,11 @@ func TestOrderedMapMove(t *testing.T) {
 			}
 			return
 		}()
+		// 2, 1, 3
 		expKeys       = []int{key2, key1, key3}
 		expKeysBefore = []int{key1, key3, key2}
+		// 2, 1, 3
+		expKeysStrings = []string{strconv.Itoa(key2), strconv.Itoa(key1), strconv.Itoa(key3)}
 	)
 
 	var (
@@ -37,7 +42,8 @@ func TestOrderedMapMove(t *testing.T) {
 		reset = func() {
 			m = MakeOrderedMapFromMappings(mappings)
 		}
-		didMove bool
+		didMove   bool
+		keyStings []string
 	)
 
 	// MoveAfter()
@@ -61,6 +67,10 @@ func TestOrderedMapMove(t *testing.T) {
 	keys = m.Keys()
 	if !slices.Equal(keys, expKeys) {
 		t.Errorf("FAIL keys %v exp %v", keys, expKeys)
+	}
+	keyStings = m.KeyStrings()
+	if !slices.Equal(keyStings, expKeysStrings) {
+		t.Errorf("FAIL keys %v exp %v", keys, expKeysStrings)
 	}
 
 	// MoveBefore()

@@ -4,5 +4,5 @@ ISC License
 */
 
 // Package omap1 provides a simple, high-performance insertion-ordered map
-// implemented by Go map and order from doubly-linked list.
+// implemented by Go map with ordering by doubly-linked list.
 package omap1

@@ -5,14 +5,16 @@ ISC License
 
 package omap1
 
+// traverser iterates over the doubly-linked list of [OrderedMap]
 type traverser[K comparable, V any] struct {
 	isBackward bool
-	pair       *mappingNode[K, V]
+	node       *mappingNode[K, V]
 }
 
-func newTraverser[K comparable, V any](pair *mappingNode[K, V], back ...bool) (t *traverser[K, V]) {
+// newTraverser returns an iterator over the doubly-linked list of [OrderedMap]
+func newTraverser[K comparable, V any](node *mappingNode[K, V], back ...bool) (t *traverser[K, V]) {
 	t = &traverser[K, V]{
-		pair: pair,
+		node: node,
 	}
 	if len(back) > 0 && back[0] {
 		t.isBackward = true
@@ -21,16 +23,16 @@ func newTraverser[K comparable, V any](pair *mappingNode[K, V], back ...bool) (t
 }
 
 func (t *traverser[K, V]) traverse(yield func(key K, value V) (keepGoing bool)) {
-	var p = t.pair
-	t.pair = nil
-	for p != nil {
-		if !yield(p.Key, p.Value) {
+	var mapping = t.node
+	t.node = nil
+	for mapping != nil {
+		if !yield(mapping.Key, mapping.Value) {
 			return
 		}
 		if !t.isBackward {
-			p = p.Next
+			mapping = mapping.Next
 		} else {
-			p = p.Prev
+			mapping = mapping.Prev
 		}
 	}
 }
