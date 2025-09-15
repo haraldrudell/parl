@@ -5,7 +5,12 @@ ISC License
 
 package errorglue
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/haraldrudell/parl/pfmt"
+)
 
 const (
 	// DefaultFormat is like printf %v, printf %s and error.Error() “message”
@@ -45,8 +50,25 @@ const (
 )
 
 // CSFormat describes string conversion of an error chain
-//   - DefaultFormat ShortFormat LongFormat ShortSuffix LongSuffix
+//   - [DefaultFormat] [ShortFormat] [LongFormat]
+//     [ShortSuffix] [LongSuffix]
 type CSFormat uint8
+
+// PrintfFormat gets the ErrorFormat to use when executing
+// the Printf value verb 'v'
+//   - %+v: [LongFormat]
+//   - %-v: [ShortFormat]
+//   - %v: [DefaultFormat]
+func PrintfFormat(s fmt.State) (csFormat CSFormat) {
+	if pfmt.IsPlusFlag(s) {
+		csFormat = LongFormat
+	} else if pfmt.IsMinusFlag(s) {
+		csFormat = ShortFormat
+	} else {
+		csFormat = DefaultFormat
+	}
+	return
+}
 
 func (csFormat CSFormat) String() (s string) {
 	var ok bool

@@ -18,25 +18,32 @@ import (
 // tests a chain of errors
 func TestChainString(t *testing.T) {
 	//t.Error("logging on")
-	// errF is a fixture with a complex error graph
-	var errF = errFixture{
-		errorMessage:    "error-message",
-		errorMsg2:       "associated-error-message",
-		wrapText:        "Prefix: '%w'",
-		expectedMessage: "Prefix: 'error-message'",
-		key1:            "key1",
-		value1:          "value1",
-		// key2 is empty string
-		key2:   "",
-		value2: "value2",
-	}
-	const errorsWithStackCount = 2
-	const err1FrameLength = 1
+	const (
+		errorsWithStackCount = 2
+		err1FrameLength      = 1
+	)
+	var (
+		// errF is a fixture with a complex error graph
+		errF = errFixture{
+			errorMessage:    "error-message",
+			errorMsg2:       "associated-error-message",
+			wrapText:        "Prefix: '%w'",
+			expectedMessage: "Prefix: 'error-message'",
+			key1:            "key1",
+			value1:          "value1",
+			// key2 is empty string
+			key2:   "",
+			value2: "value2",
+		}
+		expected string
+	)
 
-	var err, err1 error
-	var messageAct, actualString string
-	var errsWithStack []error
-	var stack pruntime.Stack
+	var (
+		err, err1                error
+		messageAct, actualString string
+		errsWithStack            []error
+		stack                    pruntime.Stack
+	)
 
 	// err is errorStack written by FuncName goroutine
 	//	- error 1 is errorStack “Prefix…”
@@ -51,19 +58,24 @@ func TestChainString(t *testing.T) {
 
 	// err should not be nil
 	if err == nil {
-		t.Fatal("FuncName did not update err")
+		t.Fatalf("FAIL FuncName did not update err")
 	}
 
 	// err.Error() should match
 	messageAct = err.Error()
 	if messageAct != errF.expectedMessage {
-		t.Errorf("bad error message %q expected: %q", messageAct, errF.expectedMessage)
+		t.Errorf("FAIL bad error message %q expected: %q",
+			messageAct, errF.expectedMessage,
+		)
 	}
 
 	// stack error count should match
-	errsWithStack = ErrorsWithStack(err) // error instances with stack in this error chain
+	// error instances with stack in this error chain
+	errsWithStack = ErrorsWithStack(err)
 	if len(errsWithStack) != errorsWithStackCount {
-		t.Fatalf("FuncName did not add %d stack traces: %d", errorsWithStackCount, len(errsWithStack))
+		t.Fatalf("FAIL FuncName did not add %d stack traces: %d",
+			errorsWithStackCount, len(errsWithStack),
+		)
 	}
 
 	// LongFormat:
@@ -78,7 +90,9 @@ func TestChainString(t *testing.T) {
 	// first error stack depth should match
 	stack = err1.(*errorStack).StackTrace()
 	if len(stack.Frames()) != err1FrameLength {
-		t.Errorf("Stack length not %d: %d", err1FrameLength, len(stack.Frames()))
+		t.Errorf("FAIL stack length not %d: %d",
+			err1FrameLength, len(stack.Frames()),
+		)
 	}
 
 	// err: ‘Prefix: 'error-message'’
@@ -101,7 +115,9 @@ func TestChainString(t *testing.T) {
 
 	// DefaultFormat should be same as Error()
 	if actualString != errF.expectedMessage {
-		t.Errorf("FAIL DefaultFormat: %q expected: %q", actualString, errF.expectedMessage)
+		t.Errorf("FAIL DefaultFormat: %q expected: %q",
+			actualString, errF.expectedMessage,
+		)
 	}
 
 	actualString = ChainString(err, ShortFormat)
@@ -112,9 +128,12 @@ func TestChainString(t *testing.T) {
 	t.Logf("ShortFormat: ‘%s’", actualString)
 
 	// ShortFormat should be Error() and location
-	var expected = errF.expectedMessage + " at " + errF.stack2.Frames()[0].Loc().Short()
+	expected = errF.expectedMessage + " at " +
+		errF.stack2.Frames()[0].Loc().Short()
 	if !strings.HasPrefix(actualString, expected) {
-		t.Errorf("FAIL ShortFormat:\n%q expected:\n%q", actualString, expected)
+		t.Errorf("FAIL ShortFormat:\n%q expected:\n%q",
+			actualString, expected,
+		)
 	}
 
 	actualString = ChainString(err, LongFormat)
@@ -130,13 +149,27 @@ func TestChainString(t *testing.T) {
 // tests [perrrors.AppendError]
 func TestAppended(t *testing.T) {
 	//t.Error("logging on")
-	var message1, message2 = "error1", "error2"
-	var err = NewErrorStack(errors.New(message1), pruntime.NewStack(0))
-	var err2 = NewRelatedError(err, NewErrorStack(errors.New(message2), pruntime.NewStack(0)))
-	var prefix1 = message1 + " at errorglue."
-	var contains2 = " 1[" + message2 + " at errorglue."
+	var (
+		message1, message2 = "error1", "error2"
+		err                = NewErrorStack(
+			errors.New(message1),
+			pruntime.NewStack(0),
+		)
+		err2 = NewRelatedError(
+			err,
+			NewErrorStack(
+				errors.New(message2),
+				pruntime.NewStack(0),
+			))
+		// “error1 at errorglue.”
+		prefix1 = message1 + " at errorglue."
+		// “ 1[error2 at errorglue.”
+		contains2 = " 1[" + message2 + " at errorglue."
+	)
 
-	var stringAct string
+	var (
+		stringAct string
+	)
 	_ = 1
 
 	stringAct = ChainString(err2, ShortFormat)
@@ -147,13 +180,15 @@ func TestAppended(t *testing.T) {
 	t.Logf("stringAct: %s", stringAct)
 
 	// err2 shortFormat should begin with prefix1
+	//	- “error1 at errorglue.”
 	if !strings.HasPrefix(stringAct, prefix1) {
-		t.Errorf("does not start with: %q: %q", prefix1, stringAct)
+		t.Errorf("FAIL does not start with: %q: %q", prefix1, stringAct)
 	}
 
-	// err2 shortFormat should contain message2
+	// err2 shortFormat should contain contains2
+	//	- “ 1[error2 at errorglue.”
 	if !strings.Contains(stringAct, contains2) {
-		t.Errorf("does not contain: %q: %q", contains2, stringAct)
+		t.Errorf("FAIL does not contain: %q: %q", contains2, stringAct)
 	}
 }
 
@@ -265,14 +300,14 @@ func (n *errFixture) createError() (err error) {
 
 	// execute goroutine FuncName to end
 	var ch = make(chan struct{})
-	go n.FuncName(ch, &err)
+	go n.funcName(ch, &err)
 	<-ch
 
 	return
 }
 
 // goroutine that build n.err fixture
-func (n *errFixture) FuncName(ch chan struct{}, errp *error) {
+func (n *errFixture) funcName(ch chan struct{}, errp *error) {
 	defer close(ch)
 	n.stack0 = pruntime.NewStack(0)
 	n.stack1 = pruntime.NewStack(0)

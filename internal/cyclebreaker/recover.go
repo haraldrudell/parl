@@ -121,9 +121,6 @@ const (
 // how OnError is handled: recoverOnErrrorOnce recoverOnErrrorMultiple recoverOnErrrorNone
 type OnErrorStrategy uint8
 
-// indicates deferred annotation is not present
-var noDeferredAnnotation func() DA
-
 // DA is the value returned by a deferred code location function
 type DA *pruntime.CodeLocation
 
@@ -276,7 +273,7 @@ func processRecoverValue(annotation string, panicValue interface{}, frames int) 
 	// that innermost stack does not include panic recovery
 	var hadPreRecoverStack bool
 	if e, ok := panicValue.(error); ok {
-		hadPreRecoverStack = errorglue.GetInnerMostStack(e) != nil
+		hadPreRecoverStack = errorglue.GetInnermostStack(e) != nil
 	}
 	// ensure an error value is derived from panicValue
 	err = perrors.Errorf("%s “%w”",

@@ -89,7 +89,7 @@ func (e *GoError) Go() (g0 parl.Go) {
 
 func (e *GoError) String() (s string) {
 	var err = e.err
-	var stack = errorglue.GetInnerMostStack(err)
+	var stack = errorglue.GetInnermostStack(err)
 	if stack != nil {
 		s = "-at:" + stack.Frames()[0].String()
 	}

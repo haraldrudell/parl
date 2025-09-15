@@ -12,8 +12,6 @@ import (
 	"github.com/haraldrudell/parl/pruntime"
 )
 
-const errorStackAtString = "\x20at\x20"
-
 // errorStack provides a stack trace to an error chain.
 //   - errorStack has publics Error() Unwrap() Format() ChainString() StackTrace()
 type errorStack struct {
@@ -34,8 +32,8 @@ var _ ChainStringer = &errorStack{}
 // errorStack implements [fmt.Formatter]: has features for [fmt.Printf]: [fmt.Formatter.Format]
 var _ fmt.Formatter = &errorStack{}
 
-// errorStack implements [Wrapper]: has an error chain [Wrapper.Unwrap]
-var _ Wrapper = &errorStack{}
+// errorStack implements [Wrapper]: has an error chain [Unwrapper.Unwrap]
+var _ Unwrapper = &errorStack{}
 
 // NewErrorStack attaches a stack to err
 func NewErrorStack(err error, st pruntime.Stack) (e2 error) {
@@ -122,3 +120,7 @@ func (errorStackValue *errorStack) shortCodeLocationString() (isPanic bool, shor
 
 	return
 }
+
+const (
+	errorStackAtString = "\x20at\x20"
+)

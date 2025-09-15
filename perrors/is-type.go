@@ -6,8 +6,9 @@ ISC License
 package perrors
 
 import (
-	"errors"
 	"reflect"
+
+	"github.com/haraldrudell/parl/perrors/errorglue"
 )
 
 // IsType determines if the chain of err contains an error of type target.
@@ -39,7 +40,7 @@ func IsType(err error, pointerToErrorValue interface{}) (hadErrpType bool) {
 	targetType := pointerType.Elem()
 
 	// traverse err’s error chain
-	for ; err != nil; err = errors.Unwrap(err) {
+	for ; err != nil; err, _, _ = errorglue.Unwrap(err) {
 
 		// get the type assigned to err interface
 		errType := reflect.TypeOf(err)

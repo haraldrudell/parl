@@ -6,8 +6,6 @@ ISC License
 package perrors
 
 import (
-	"errors"
-
 	"github.com/haraldrudell/parl/perrors/errorglue"
 	"github.com/haraldrudell/parl/pruntime"
 )
@@ -36,18 +34,5 @@ func Stackn(err error, framesToSkip int) (err2 error) {
 		err,
 		pruntime.NewStack(e116StacknFramesToSkip+framesToSkip),
 	)
-	return
-}
-
-// HasStack detects if the error chain already contains a stack trace
-//   - hasStack: true if err is non-nil and contains a stack trace
-func HasStack(err error) (hasStack bool) {
-	if err == nil {
-		return
-	}
-	var e errorglue.ErrorCallStacker
-	// if an error of type ErrorCallStacker is found in err’s error chain,
-	// hasStack is true
-	hasStack = errors.As(err, &e)
 	return
 }

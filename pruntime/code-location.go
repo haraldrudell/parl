@@ -15,11 +15,6 @@ import (
 	"github.com/haraldrudell/parl/pruntime/pruntimelib"
 )
 
-const (
-	// counts [pruntime.NewCodeLocation]
-	newCodeLocationStackFrames = 1
-)
-
 // CodeLocation represents an executing code location, ie. a code line in source code
 //   - CodeLocation is similar to the location in [runtime.Frame], but
 //     contains only basic types string and int
@@ -39,21 +34,21 @@ type CodeLocation struct {
 }
 
 // NewCodeLocation gets data for a single stack frame
-//   - for stackFramesToSkip 0, NewCodeLocation returns data for
+//   - stackFramesToSkip 0: NewCodeLocation returns data for
 //     its immediate caller
-func NewCodeLocation(stackFramesToSkip int) (cl *CodeLocation) {
+func NewCodeLocation(stackFramesToSkip int) (c *CodeLocation) {
 	if stackFramesToSkip < 0 {
 		stackFramesToSkip = 0
 	}
-	var c = CodeLocation{}
+	var cValue = CodeLocation{}
 
-	// obtain code-location ifnrormation using [runtime.Caller]
+	// obtain code-location information using [runtime.Caller]
 	var pc uintptr
 	var ok bool
 	// pc: opaque
 	// file: basename.go
 	// line: int 25
-	if pc, c.File, c.Line, ok = runtime.Caller(newCodeLocationStackFrames + stackFramesToSkip); !ok {
+	if pc, cValue.File, cValue.Line, ok = runtime.Caller(newCodeLocationStackFrames + stackFramesToSkip); !ok {
 		panic(errors.New("runtime.Caller failed"))
 	}
 
@@ -63,10 +58,11 @@ func NewCodeLocation(stackFramesToSkip int) (cl *CodeLocation) {
 	// FileLine(uintptr) (line string, line int) "/opt/foxyboy/sw/privates/parl/mains/executable.go"
 	// Name(): github.com/haraldrudell/parl/mains.(*Executable).AddErr
 	if rFunc := runtime.FuncForPC(pc); rFunc != nil {
-		c.FuncName = rFunc.Name()
+		cValue.FuncName = rFunc.Name()
 	}
+	c = &cValue
 
-	return &c
+	return
 }
 
 // CodeLocationFromFunc returns a code location value from a
@@ -78,70 +74,67 @@ func CodeLocationFromFunc(runtimeFunc *runtime.Func) (cl *CodeLocation) {
 	return
 }
 
-// FuncName returns function name, characters no space:
+// Name returns function name, characters no space:
 // “AddErr”
-func (cl *CodeLocation) Name() (funcName string) {
-	_, _, _, funcName = pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
+func (c *CodeLocation) Name() (funcName string) {
+	_, _, _, funcName = pruntimelib.SplitAbsoluteFunctionName(c.FuncName)
 	return
 }
 
 // Package return base package name, a single word of characters with no space:
 // “mains”
-func (cl *CodeLocation) Package() (packageName string) {
-	_, packageName, _, _ = pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
+func (c *CodeLocation) Package() (packageName string) {
+	_, packageName, _, _ = pruntimelib.SplitAbsoluteFunctionName(c.FuncName)
 	return
 }
 
 // PackFunc return base package name and function
 // “mains.AddErr”
-func (cl *CodeLocation) PackFunc() (packageDotFunction string) {
-	var _, packageName, _, funcName = pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
-	return packageName + "." + funcName
+func (c *CodeLocation) PackFunc() (packageDotFunction string) {
+	var _, packageName, _, funcName = pruntimelib.SplitAbsoluteFunctionName(c.FuncName)
+	packageDotFunction = packageName + "." + funcName
+	return
 }
 
 // FuncIdentifier return the function name identifier
 // “AddErr”
 //   - anonymous function like “SomeFunc.func1”
-func (cl *CodeLocation) FuncIdentifier() (funcIdentifier string) {
-	_, _, _, funcIdentifier = pruntimelib.SplitAbsoluteFunctionName(cl.FuncName)
+func (c *CodeLocation) FuncIdentifier() (funcIdentifier string) {
+	_, _, _, funcIdentifier = pruntimelib.SplitAbsoluteFunctionName(c.FuncName)
 	return
 }
 
 // Base returns base package name, an optional type name and the function name:
 // “mains.(*Executable).AddErr”
-func (cl *CodeLocation) Base() (baseName string) {
-	return filepath.Base(cl.FuncName)
-}
+func (c *CodeLocation) Base() (baseName string) { return filepath.Base(c.FuncName) }
 
 // FuncLine retuns the fully qualified function name and its line number:
 // “github.com/haraldrudell/parl/mains.(*Executable).AddErr:43”
-func (cl *CodeLocation) FuncLine() (funcLine string) {
-	return cl.FuncName + ":" + strconv.Itoa(cl.Line)
-}
+func (c *CodeLocation) FuncLine() (funcLine string) { return c.FuncName + ":" + strconv.Itoa(c.Line) }
 
 // Short returns base package name, an optional type name and
 // the function name, base filename and line number:
 // “mains.(*Executable).AddErr-executable.go:25”
-func (cl *CodeLocation) Short() (funcName string) {
-	return fmt.Sprintf("%s()-%s:%d", filepath.Base(cl.FuncName), filepath.Base(cl.File), cl.Line)
+func (c *CodeLocation) Short() (funcName string) {
+	return fmt.Sprintf("%s()-%s:%d", filepath.Base(c.FuncName), filepath.Base(c.File), c.Line)
 }
 
 // Long returns full package path, an optional type name and
 // the function name, base filename and line number:
 // “github.com/haraldrudell/parl/mains.(*Executable).AddErr-executable.go:25”
-func (cl *CodeLocation) Long() (funcName string) {
-	return fmt.Sprintf("%s-%s:%d", cl.FuncName, cl.File, cl.Line)
+func (c *CodeLocation) Long() (funcName string) {
+	return fmt.Sprintf("%s-%s:%d", c.FuncName, c.File, c.Line)
 }
 
 // IsSet returns true if this CodeLocation has a value, ie. is not zero-value
-func (cl *CodeLocation) IsSet() (isSet bool) { return cl.File != "" || cl.FuncName != "" }
+func (c *CodeLocation) IsSet() (isSet bool) { return c.File != "" || c.FuncName != "" }
 
 // Dump outputs all values quoted for debug purposes:
 //   - File: "/opt/homebrew/Cellar/go/1.20.4/libexec/src/testing/testing.go"
 //   - Line: 1576
 //   - FuncName: "github.com/haraldrudell/parl/mains.(*Executable).AddErr"
-func (cl *CodeLocation) Dump() (s string) {
-	return fmt.Sprintf("File: %q Line: %d FuncName: %q", cl.File, cl.Line, cl.FuncName)
+func (c *CodeLocation) Dump() (s string) {
+	return fmt.Sprintf("File: %q Line: %d FuncName: %q", c.File, c.Line, c.FuncName)
 }
 
 // String returns a two-line string representation suitable for a multi-line stack trace.
@@ -149,6 +142,11 @@ func (cl *CodeLocation) Dump() (s string) {
 //   - “github.com/haraldrudell/parl/error116.(*TypeName).FuncName␤
 //     ␠␠/opt/sw/privates/parl/error116/codelocation_test.go:20”
 //   - indentation is two spaces, not tab characters
-func (cl CodeLocation) String() string {
-	return fmt.Sprintf("%s\n\x20\x20%s:%d", cl.FuncName, cl.File, cl.Line)
+func (c CodeLocation) String() string {
+	return fmt.Sprintf("%s\n\x20\x20%s:%d", c.FuncName, c.File, c.Line)
 }
+
+const (
+	// counts [pruntime.NewCodeLocation]
+	newCodeLocationStackFrames = 1
+)

@@ -9,12 +9,12 @@ toolchain go1.24.5
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.232
-	golang.org/x/term v0.34.0
+	github.com/haraldrudell/parl v0.4.233
+	golang.org/x/term v0.35.0
 )
 
 require (
-	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/exp v0.0.0-20250911091902-df9299821621 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 )

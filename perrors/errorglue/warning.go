@@ -5,17 +5,18 @@ ISC License
 
 package errorglue
 
-const warningString = "warning: "
-
 // warningType is an error with lesser impact
 type WarningType struct {
 	ErrorChain
 }
 
-var _ error = &WarningType{}   // WarningType behaves like an error
-var _ Wrapper = &WarningType{} // WarningType has an error chain
+// WarningType behaves like an error
+var _ error = &WarningType{}
 
-func NewWarning(err error) error {
+// WarningType has an error chain
+var _ Unwrapper = &WarningType{}
+
+func NewWarning(err error) (warning error) {
 	return &WarningType{*newErrorChain(err)}
 }
 
@@ -23,3 +24,7 @@ func NewWarning(err error) error {
 func (w *WarningType) Error() (s string) {
 	return warningString + w.ErrorChain.Error()
 }
+
+const (
+	warningString = "warning: "
+)

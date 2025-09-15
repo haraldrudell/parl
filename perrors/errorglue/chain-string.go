@@ -6,52 +6,58 @@ ISC License
 package errorglue
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/haraldrudell/parl/pruntime"
 )
 
-const (
-	// string prepended to code location: “ at ”
-	atStringChain = "\x20at\x20"
-	// the string error value for error nil “OK”
-	errorIsNilString = "OK"
-)
-
 // ChainString() gets a string representation of a single error chain
-// TODO 220319 finish comment
+//   - err: the error chain
+//   - err nil: prints “OK”
+//   - format: how error is printed
+//   - — DefaultFormat: err.Error()
+//   - — CodeLocation: one error: “message at runtime/panic.go:914”
+//   - — ShortFormat: error and associated errors with code-location
+//   - — ShortSuffix: no message “runtime/panic.go:914”
+//   - s: printable string
 func ChainString(err error, format CSFormat) (s string) {
 
 	// no error case
 	if err == nil {
-		return errorIsNilString // no error return "OK"
+		// no error return "OK"
+		s = errorIsNilString
+		return
 	}
 
 	switch format {
-	case DefaultFormat: // like printf %v, printf %s and error.Error()
-		s = err.Error() // the first error in the chain has our error message
+	case DefaultFormat:
+		// like printf %v, printf %s and error.Error()
+		//	- the first error in the chain has our error message
+		s = err.Error()
 		return
-	case CodeLocation: // only one errror, with code location
+	case CodeLocation:
+		// only one errror, with code location
 		s = shortFormat(err)
 		return
-	case ShortFormat: // one-liner with code location and associated errors
+	case ShortFormat:
+		// one-liner with code location and associated errors
 		s = shortFormat(err)
 
-		//add appended errors at the end 2[…]
+		// add appended errors at the end 2[…]
 		var list = ErrorList(err)
 		if len(list) > 1 {
-			list = list[1:] // skip err itself
+			// skip err itself
+			list = list[1:]
 			var sList = make([]string, len(list))
 			for i, e := range list {
 				sList[i] = shortFormat(e)
 			}
 			s += fmt.Sprintf(" %d[%s]", len(list), strings.Join(sList, ", "))
 		}
-
 		return
-	case ShortSuffix: // for stackError, this provide the code-location without leading “ at ”
+	case ShortSuffix:
+		// for stackError, this provide the code-location without leading “ at ”
 		s = codeLocation(err)
 		return
 	case LongFormat:
@@ -87,17 +93,23 @@ func ChainString(err error, format CSFormat) (s string) {
 		// every error is an error chain
 		//	- traverse error chain
 		var isFirstInChain = true
-		for err = errorsToPrint[i]; err != nil; err = errors.Unwrap(err) {
+		for err = errorsToPrint[i]; err != nil; {
 
-			// look for associated errors
-			if relatedHolder, ok := err.(RelatedError); ok {
-				if relatedErr := relatedHolder.AssociatedError(); relatedErr != nil {
-					// add any new errors to errorsToPrint
-					if !errorMap[relatedErr] {
-						errorMap[relatedErr] = true
-						errorsToPrint = append(errorsToPrint, relatedErr)
-					}
+			// traverse the next node of the error chain
+			var nextErr, joinedErrors, associatedError = Unwrap(err)
+
+			// store associated errors
+			if associatedError != nil {
+				// add any new errors to errorsToPrint
+				if !errorMap[associatedError] {
+					errorMap[associatedError] = true
+					errorsToPrint = append(errorsToPrint, associatedError)
 				}
+			}
+
+			// store joinedErrors
+			if len(joinedErrors) > 0 {
+				errorsToPrint = append(errorsToPrint, joinedErrors...)
 			}
 
 			// ChainStringer errors produce their own representations
@@ -125,68 +137,16 @@ func ChainString(err error, format CSFormat) (s string) {
 					s = errorAsString
 				}
 			}
+
 			isFirstInChain = false
+			err = nextErr
 		}
 	}
 
 	return
 }
 
-// shortFormat: “message at runtime/panic.go:914”
-//   - if err or its error-chain does not have location: “message” like [error.Error]
-//   - if err or its error-chain has panic, location is the code line
-//     that caused the first panic
-//   - if err or its error-chain has location but no panic,
-//     location is where the oldest error with stack was created
-//   - err is non-nil
-func shortFormat(err error) (s string) {
-
-	// append the top frame of the oldest, innermost stack trace code location
-	s = codeLocation(err)
-	if s != "" {
-		s = err.Error() + atStringChain + s
-	} else {
-		s = err.Error()
-	}
-
-	return
-}
-
-// codeLocation: “runtime/panic.go:914”
-//   - if err or its error-chain does not have location: empty string
-//   - if err or its error-chain has panic, location is the code line
-//     that caused the first panic
-//   - if err or its error-chain has location but no panic,
-//     location is where the oldest error with stack was created
-//   - err is non-nil, no “ at ” prefix
-func codeLocation(err error) (message string) {
-
-	// err or err’s error-chain may contain stacks
-	//	- any of the stacks may contain a panic
-	//	- an error with stack is able to locate any panic it or its chain has
-	//	- therefore scan for any error with stack and ask the first one for location
-	for e := err; e != nil; e = errors.Unwrap(e) {
-		if _, ok := e.(ErrorCallStacker); !ok {
-			continue // e does not have stack
-		}
-		var _ = (&errorStack{}).ChainString
-		message = e.(ChainStringer).ChainString(ShortSuffix)
-		return // found location return
-	}
-
-	return // no location return
-}
-
-// PrintfFormat gets the ErrorFormat to use when executing
-// the Printf value verb 'v'
-//   - %+v: [LongFormat]
-//   - %-v: [ShortFormat]
-//   - %v: [DefaultFormat]
-func PrintfFormat(s fmt.State) CSFormat {
-	if IsPlusFlag(s) {
-		return LongFormat
-	} else if IsMinusFlag(s) {
-		return ShortFormat
-	}
-	return DefaultFormat
-}
+const (
+	// the string error value for error nil “OK”
+	errorIsNilString = "OK"
+)

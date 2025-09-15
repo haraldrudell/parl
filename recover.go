@@ -273,7 +273,7 @@ func processRecoverValue(annotation string, panicValue interface{}, frames int) 
 	// that innermost stack does not include panic recovery
 	var hadPreRecoverStack bool
 	if e, ok := panicValue.(error); ok {
-		hadPreRecoverStack = errorglue.GetInnerMostStack(e) != nil
+		hadPreRecoverStack = errorglue.GetInnermostStack(e) != nil
 	}
 	// ensure an error value is derived from panicValue
 	err = perrors.Errorf("%s “%w”",

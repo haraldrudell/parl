@@ -16,8 +16,11 @@ type ErrorChain struct {
 	error // the wrapped error
 }
 
-var _ error = &ErrorChain{}   // ErrorChain behaves like an error
-var _ Wrapper = &ErrorChain{} // ErrorChain has an error chain
+// ErrorChain behaves like an error
+var _ error = &ErrorChain{}
+
+// ErrorChain has an error chain
+var _ Unwrapper = &ErrorChain{}
 
 func newErrorChain(err error) (e2 *ErrorChain) {
 	return &ErrorChain{err}
@@ -25,9 +28,11 @@ func newErrorChain(err error) (e2 *ErrorChain) {
 
 // Unwrap is a method required to make ErrorChain an error chain
 // ErrorChain.Unwrap() is used by errors.Unwrap() and ErrorChainSlice
-func (ec *ErrorChain) Unwrap() error {
-	if ec == nil {
-		return nil
+func (e *ErrorChain) Unwrap() (err error) {
+	if e == nil {
+		return
 	}
-	return ec.error
+	err = e.error
+
+	return
 }

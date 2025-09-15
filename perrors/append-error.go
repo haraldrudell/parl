@@ -6,7 +6,6 @@ ISC License
 package perrors
 
 import (
-	"github.com/haraldrudell/parl/internal/cyclebreaker2"
 	"github.com/haraldrudell/parl/perrors/errorglue"
 )
 
@@ -28,30 +27,4 @@ func AppendError(err error, err2 error) (e error) {
 		e = errorglue.NewRelatedError(err, err2) // both non-nil
 	}
 	return
-}
-
-// ErrorList returns all error instances from a possible error chain.
-// — If err is nil an empty slice is returned.
-// — If err does not have associated errors, a slice of err, length 1, is returned.
-// — otherwise, the first error of the returned slice is err followed by
-//
-//		other errors oldest first.
-//	- Cyclic error values are dropped
-func ErrorList(err error) (errs []error) {
-	return errorglue.ErrorList(err)
-}
-
-// DeferredAppendError copies any error in errSource
-// to errDest
-//   - deferrable version of [AppendError]
-//   - use case: single-threaded, deferred function
-//     aggregating function-local error value to errp
-func DeferredAppendError(errSource, errDest *error) {
-	cyclebreaker2.NilPanic("errSource", errSource)
-	cyclebreaker2.NilPanic("errDest", errDest)
-	var err = *errSource
-	if err == nil {
-		return // no error
-	}
-	*errDest = AppendError(*errDest, err)
 }

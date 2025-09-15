@@ -24,11 +24,20 @@ type errorData struct {
 	value string
 }
 
-var _ error = &errorData{}         // errorData behaves like an error
-var _ ErrorHasData = &errorData{}  // errorData implements the error116.ErrorHasData interface
-var _ Wrapper = &errorData{}       // errorData has an error chain
-var _ fmt.Formatter = &errorData{} // errorData can be used with fmt.Printf %v
-var _ ChainStringer = &errorData{} // errorData can be used by error116.ChainStringer()
+// errorData behaves like an error
+var _ error = &errorData{}
+
+// errorData implements the error116.ErrorHasData interface
+var _ ErrorHasData = &errorData{}
+
+// errorData has an error chain
+var _ Unwrapper = &errorData{}
+
+// errorData can be used with fmt.Printf %v
+var _ fmt.Formatter = &errorData{}
+
+// errorData can be used by error116.ChainStringer()
+var _ ChainStringer = &errorData{}
 
 // NewErrorData returns an error containg a key/value pair
 func NewErrorData(err error, key, value string) (e2 error) {

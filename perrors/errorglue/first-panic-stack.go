@@ -6,7 +6,6 @@ ISC License
 package errorglue
 
 import (
-	"errors"
 	"slices"
 
 	"github.com/haraldrudell/parl/perrors/panicdetector"
@@ -66,7 +65,7 @@ func FirstPanicStack(err error) (
 	// errs is the expanded error chain
 	//	- err first that is newest, then older errrors
 	var errs []error
-	for e := err; e != nil; e = errors.Unwrap(e) {
+	for e := err; e != nil; e, _, _ = Unwrap(e) {
 		errs = append(errs, e)
 	}
 	// errs now begin with oldest error, ending with err
