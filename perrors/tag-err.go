@@ -13,9 +13,8 @@ import (
 
 // TagErr prepends err’s error message with tags
 //   - “perrors NewPF tag1 tag2: s cannot be empty”
-//   - err2 is enrued to have a stack trace from caller of TagErr
+//   - err2 is ensured to have a stack trace from caller of TagErr
 func TagErr(err error, tags ...string) (err2 error) {
-	var frames = 1 // count TagErr frame
 
 	// ensure error has stack
 	if !HasStack(err) {
@@ -27,7 +26,12 @@ func TagErr(err error, tags ...string) (err2 error) {
 	if tagString := strings.Join(tags, "\x20"); tagString != "" {
 		s += "\x20" + tagString
 	}
-
 	err2 = Errorf("%s: %w", s, err)
+
 	return
 }
+
+const (
+	// count TagErr frame
+	frames = 1
+)

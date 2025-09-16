@@ -7,13 +7,18 @@ package perrors
 
 import "github.com/haraldrudell/parl/perrors/errorglue"
 
-// ErrorList returns all error instances from a possible error chain.
-// — If err is nil an empty slice is returned.
-// — If err does not have associated errors, a slice of err, length 1, is returned.
-// — otherwise, the first error of the returned slice is err followed by
+// ErrorList returns all error-chains contained in err
+//   - err: the error to traverse. If err is nil an empty slice is returned.
+//     Otherwise, err is the first error of the returned slice followed by
+//     other error-chains oldest first.
+//   - — If err does not have associated errors, a slice of error length 1 is returned
+//   - —
+//   - error chains are created by [errors.Join] or [perrors.AppendError]
+//   - like errors.Is but supports [perrors.AppendError]
+//   - Cyclic error values are dropped
 //
-//		other errors oldest first.
-//	- Cyclic error values are dropped
-func ErrorList(err error) (errs []error) {
-	return errorglue.ErrorList(err)
-}
+// Usage:
+//
+//	for _, anError := range perrors.ErrorList(err) {
+//	  if errors.Is(anError, context.Canceled) {
+func ErrorList(err error) (errs []error) { return errorglue.ErrorList(err) }

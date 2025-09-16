@@ -5,6 +5,8 @@ ISC License
 
 package errorglue
 
+import "errors"
+
 // Unwrap unwraps one step of an error-chain,
 // returning a node from a directed graph of error values
 //   - err: error to follow, may be nil
@@ -36,3 +38,7 @@ func Unwrap(err error) (nextError error, joinedErrors []error, associatedError e
 
 	return
 }
+
+// errors.Join is the only source of JoinUnwrapper and always
+// returns pointer implementation
+var _ = errors.Join

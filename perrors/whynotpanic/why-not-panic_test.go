@@ -29,7 +29,7 @@ func TestWhyNotPanic(t *testing.T) {
 	var errorPanicWithStack = recoverPanic2()
 
 	t.Logf("errorStackNoPanic chain: %d[%s] ErrorCallStacker: %t",
-		len(errorglue.ErrorChainSlice(errorStackNoPanic)),
+		len(errorChainSlice(errorStackNoPanic)),
 		errorglue.DumpChain(errorStackNoPanic),
 		isErrorCallStacker,
 	)
@@ -77,4 +77,18 @@ func recoverPanic2() (err error) {
 
 	var errorWithStack = errorglue.NewErrorStack(errors.New("errorStackNoPanic"), pruntime.NewStack(0))
 	panic(errorWithStack)
+}
+
+// errorChainSlice returns a slice of errors from following
+// the main error chain
+//   - err: an error to traverse
+//   - errs: all errors in the main error chain beginning with err itself
+//   - — nil if err was nil
+//   - — otherwise of length 1 or more
+func errorChainSlice(err error) (errs []error) {
+	for err != nil {
+		errs = append(errs, err)
+		err, _, _ = errorglue.Unwrap(err)
+	}
+	return
 }

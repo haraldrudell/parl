@@ -21,7 +21,7 @@ import (
 // pointerToErrorValue argument is a pointer to an error implementation value, ie:
 //   - if the target struct has pointer reciever, the argument type *targetStruct
 //   - if the target struct has value receiver, the argument type targetStruct
-func IsType(err error, pointerToErrorValue interface{}) (hadErrpType bool) {
+func IsType(err error, pointerToErrorValue any) (hadErrpType bool) {
 
 	// ensure pointerToErrorValue is non-nil pointer
 	// reflection returns nil for nil pointer
@@ -43,7 +43,7 @@ func IsType(err error, pointerToErrorValue interface{}) (hadErrpType bool) {
 	for ; err != nil; err, _, _ = errorglue.Unwrap(err) {
 
 		// get the type assigned to err interface
-		errType := reflect.TypeOf(err)
+		var errType = reflect.TypeOf(err)
 
 		// check if the err type is the one we are looking for
 		if errType == targetType {
@@ -52,7 +52,7 @@ func IsType(err error, pointerToErrorValue interface{}) (hadErrpType bool) {
 		}
 
 		// also check for what err points to
-		if errType.Kind() == reflect.Ptr {
+		if errType.Kind() == reflect.Pointer {
 			errPointsToType := errType.Elem()
 			if errPointsToType == targetType {
 				reflect.Indirect(reflect.ValueOf(pointerToErrorValue)).Set(reflect.Indirect(reflect.ValueOf(err)))

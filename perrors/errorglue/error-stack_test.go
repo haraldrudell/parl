@@ -166,7 +166,7 @@ func TestErrorStackPanicWithStack(t *testing.T) {
 
 	// errorRecovered should have two stacks
 	//	- oldest first
-	stacks = GetStacks(errorRecovered)
+	stacks = getStacks(errorRecovered)
 	if len(stacks) != 2 {
 		panic(errors.New("stacks not 2"))
 	}
@@ -212,4 +212,21 @@ func getErrorStackPanicRecover(errp *error) {
 	var stack = pruntime.NewStack(0)
 	var e = recover().(error)
 	*errp = NewErrorStack(e, stack)
+}
+
+// getStacks gets a slice of all stack traces, oldest first
+func getStacks(err error) (stacks []pruntime.Stack) {
+	for err != nil {
+		if e, hasStack := err.(ErrorCallStacker); hasStack {
+			var stack = e.StackTrace()
+			// each stack encountered is older than the previous
+			// store newest first
+			stacks = append(stacks, stack)
+		}
+		err, _, _ = Unwrap(err)
+	}
+	// oldest first
+	slices.Reverse(stacks)
+
+	return
 }

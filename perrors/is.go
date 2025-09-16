@@ -16,41 +16,6 @@ const (
 	isStackFrames = 1
 )
 
-// Is2 is similar to [Is] but receives it error in e
-//   - if errp and e both non-nil, e is appended to *errp
-func Is2(errp *error, e error, format string, a ...interface{}) (isBad bool) {
-	if e == nil {
-		return // no error exit
-	} else if !HasStack(e) {
-		e = Stackn(e, isStackFrames)
-	}
-	Is(&e, format, a...)
-	if errp != nil {
-		*errp = AppendError(*errp, e)
-	}
-	return true
-}
-
-// Is2PF is similar to [IsPF] but receives it error in e
-//   - if errp and e both non-nil, e is appended to *errp
-func Is2PF(errp *error, e error, format string, a ...interface{}) (isBad bool) {
-	if e == nil {
-		return // no error exit
-	} else if !HasStack(e) {
-		e = Stackn(e, isStackFrames)
-	}
-	var PF = pruntime.PackFunc(isStackFrames)
-	if format == "" {
-		e = fmt.Errorf("%s %w", PF, e)
-	} else {
-		e = fmt.Errorf("%s "+format, append([]interface{}{PF}, a...)...)
-	}
-	if errp != nil {
-		*errp = AppendError(*errp, e)
-	}
-	return true
-}
-
 // Is returns true if *errp contains a non-nil error
 //   - if return value is true and format is not empty string, *errp is updated with
 //     fmt.Errorf using format and a, typically including “%w” and an error

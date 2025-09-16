@@ -8,6 +8,9 @@ package perrors
 import "reflect"
 
 // IsError determines if err represents error condition for all error implementations
+//   - isError true: err is non-nil pointer implementation meaning error condition or
+//     err is non-zero-value value-implementation meaning error condition
+//   - —
 //   - eg. unix.Errno that is uintptr
 func IsError[T error](err T) (isError bool) {
 
@@ -17,7 +20,7 @@ func IsError[T error](err T) (isError bool) {
 		return // err interface has nil runtime-value return: false
 	}
 
-	// if err is not a zero-value, it is eror condition
+	// if err is not a zero-value, it is error condition
 	isError = !reflectValue.IsZero()
 
 	return

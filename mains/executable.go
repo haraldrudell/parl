@@ -363,7 +363,7 @@ func (x *Executable) processPanicValue(panicValue any) (wasPanic bool) {
 		if !recoverValueIsError {
 			valueString = parl.Sprintf(" “%+v”", panicValue)
 		} else {
-			error0 = perrors.Error0(err)
+			error0 = errorglue.Error0(err)
 			error0type = parl.Sprintf(" panic error type: %T", error0)
 			hasStack = perrors.HasStack(err)
 			error0value := fmt.Sprintf("error0: %+v", error0)

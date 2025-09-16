@@ -71,7 +71,7 @@ func TestChainString(t *testing.T) {
 
 	// stack error count should match
 	// error instances with stack in this error chain
-	errsWithStack = ErrorsWithStack(err)
+	errsWithStack = errorsWithStack(err)
 	if len(errsWithStack) != errorsWithStackCount {
 		t.Fatalf("FAIL FuncName did not add %d stack traces: %d",
 			errorsWithStackCount, len(errsWithStack),
@@ -327,4 +327,18 @@ func (n *errFixture) funcName(ch chan struct{}, errp *error) {
 					NewErrorStack(errors.New(n.errorMsg2), n.stack1),
 				)),
 			n.stack2)
+}
+
+// errorsWithStack gets all errors in the err error chain
+// that has a stack trace.
+// Oldest innermost stack trace is returned first.
+// if not stack trace is present, the slice is empty
+func errorsWithStack(err error) (errs []error) {
+	for err != nil {
+		if _, ok := err.(ErrorCallStacker); ok {
+			errs = append([]error{err}, errs...)
+		}
+		err, _, _ = Unwrap(err)
+	}
+	return
 }
