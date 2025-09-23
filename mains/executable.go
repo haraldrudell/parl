@@ -27,7 +27,8 @@ import (
 )
 
 const (
-	// if [Executable.OKtext] is assigned NoOK there ir no successful message on app exit
+	// if [Executable.OKtext] is assigned NoOK there should be
+	// no successful message on app exit
 	NoOK = "-"
 	// always output error stack traces
 	//	- [Executable.LongErrors] isLongErrors
@@ -126,22 +127,24 @@ type Executable struct {
 // Executable is an error sink
 var _ parl.ErrorSink = &Executable{}
 
-// Init initializes a created [mains.Executable] value
-//   - the value should have relevant fields populates such as exeuctable name and more
+// Init initializes a created ex [mains.Executable] value
+//   - populates launch time, hostname and sets silence if first
+//     [os.Args] command-line option is “-silent”
+//   - the Executable value should have relevant fields
+//     statically populates such as exeuctable name and more
 //   - — Program Version Comment Copyright License Arguments
-//   - populates launch time and sets silence if first os.Args argument is “-silent.”
-//   - Init supports function chaining like:
+//   - Init supports function chaining
 //
-// typical code:
+// Usage:
 //
 //	ex.Init().
 //	  PrintBannerAndParseOptions(optionData).
-//	  LongErrors(options.Debug, options.Verbosity != "").
-//	  ConfigureLog()
-//	applyYaml(options.YamlFile, options.YamlKey, applyYaml, optionData)
-//	…
-func (x *Executable) Init() (ex2 *Executable) {
-	ex2 = x
+//	  LongErrors(options.Debug)
+//	if err = yamlo.ApplyYaml(ex.Program, options.YamlFile, options.YamlKey, options.DoYaml, yamler.NewUnmarshaler(&y), optionData); err != nil {
+//	  return
+//	}
+func (x *Executable) Init() (ex *Executable) {
+	ex = x
 	var now = malib.ProcessStartTime()
 	x.Launch = now
 	x.LaunchString = now.Format(rfcTimeFormat)
@@ -149,28 +152,32 @@ func (x *Executable) Init() (ex2 *Executable) {
 	if len(os.Args) > 1 && os.Args[1] == SilentString {
 		parl.SetSilent(true)
 	}
+
 	return
 }
 
 // LongErrors configures error output
 // sets if errors are printed with stack trace and values. LongErrors
-//   - isLongErrors true: prints full stack traces, related errors and error data in string
+//   - isLongErrors [AlwaysStackTrace] true: prints full stack traces, related errors and error data in string
 //     lists and string maps
-//   - isLongErrors false: prints one-liner error messages
+//   - isLongErrors [NoStackTrace] false: prints one-liner error messages
 //   - isErrorLocation missing: error location is output for errors printed without stack trace
-//   - isErrorLocation NoLocation: error location is not output
-//   - functional chaining
+//   - isErrorLocation [NoLocation]: error location is not output
+//   - —
+//   - LongErrors supports functional chaining
 //
 // Usage:
 //
-//	exe.Init().
-//	…
-//	LongErrors(options.Debug, options.Verbosity != "").
-//	ConfigureLog()…
+//	ex.Init().
+//	  PrintBannerAndParseOptions(optionData).
+//	  LongErrors(options.Debug)
+//	if err = yamlo.ApplyYaml(ex.Program, options.YamlFile, options.YamlKey, options.DoYaml, yamler.NewUnmarshaler(&y), optionData); err != nil {
+//	  return
+//	}
 func (x *Executable) LongErrors(isLongErrors bool, isErrorLocation ...ErrLoc) (x2 *Executable) {
 	x2 = x
 
-	parl.Debug("exe.LongErrors long: %t location: %t", isLongErrors, isErrorLocation)
+	parl.Debug("ex.LongErrors long: %t location: %t", isLongErrors, isErrorLocation)
 	x.IsLongErrors = isLongErrors
 	x.IsErrorLocation = len(isErrorLocation) == 0 ||
 		isErrorLocation[0] != NoLocation
@@ -178,29 +185,46 @@ func (x *Executable) LongErrors(isLongErrors bool, isErrorLocation ...ErrLoc) (x
 	return
 }
 
-// PrintBannerAndParseOptions prints greeting like:
+// PrintBannerAndParseOptions:
+//   - prints greeting “parl 0.1.0 parlca https server/client udp server”
+//   - parses options described by []OptionData storing the values at [OptionData.P]
+//   - If options fail to parse, a proper message is printed to stderr and the process exits
+//     with status code 2
+//   - PrintBannerAndParseOptions supports functional chaining
 //
-//	parl 0.1.0 parlca https server/client udp server
+// Greeting:
 //
-// It then parses options described by []OptionData stroing the values at OptionData.P.
-// If options fail to parse, a proper message is printed to stderr and the process exits
-// with status code 2. PrintBannerAndParseOptions supports functional chaining like:
+//	gontacts version: 0.0.94 comment: 250921 fsThread refactor
+//	© 2022–present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell)
+//	time: 2025-09-21 23:30:51-07:00
+//	host: c68z
 //
-//	exe.Init().
-//	  PrintBannerAndParseOptions(…).
-//	  LongErrors(…
+// PrintBannerAndParseOptions Usage:
+//
+//	ex.Init().
+//	  PrintBannerAndParseOptions(optionData).
+//	  LongErrors(options.Debug)
+//	if err = yamlo.ApplyYaml(ex.Program, options.YamlFile, options.YamlKey, options.DoYaml, yamler.NewUnmarshaler(&y), optionData); err != nil {
+//	  return
+//	}
 //
 // Options and yaml is configured likeso:
 //
 //	var options = &struct {
+//	  // -no-stdin sets to false: Linux service: do not use standard input
 //	  noStdin bool
+//	  // -yamlFile -yamlKey -verbose -debug -silent -version -no-yaml
 //	  *mains.BaseOptionsType
 //	}{BaseOptionsType: &mains.BaseOptions}
-//	var optionData = append(mains.BaseOptionData(exe.Program, mains.YamlYes), []mains.OptionData{
-//	  {P: &options.noStdin, Name: "no-stdin", Value: false, Usage: "Service: do not use standard input", Y: mains.NewYamlValue(&y, &y.NoStdin)},
-//	}...)
+//	var optionData = mains.OptionsList(
+//	  // -verbose -debug -silent -version -yamlFile -yamlKey
+//	  mains.BaseOptionData(ex.Program),
+//	  []pflags.OptionData{
+//		{P: &options.stdin, Name: "no-stdin", Value: true, Usage: "Service: do not use standard input", Y: &y.Stdin},
+//	   })
 //	type YamlData struct {
-//	  NoStdin bool // nostdin: true
+//	  // nostdin: true
+//	  NoStdin bool
 //	}
 //	var y YamlData
 func (x *Executable) PrintBannerAndParseOptions(optionsList []pflags.OptionData) (ex1 *Executable) {
@@ -268,7 +292,7 @@ func (x *Executable) PrintBannerAndParseOptions(optionsList []pflags.OptionData)
 //
 // ConfigureLog supports functional chaining like:
 //
-//	exe.Init().
+//	ex.Init().
 //	  …
 //	  ConfigureLog().
 //	  ApplyYaml(…)
@@ -286,7 +310,7 @@ func (x *Executable) ConfigureLog() (ex1 *Executable) {
 			pos.Exit(pos.StatusCodeUsage, err)
 		}
 	}
-	parl.Debug("exe.ConfigureLog silent: %t debug: %t verbosity: %q\n",
+	parl.Debug("ex.ConfigureLog silent: %t debug: %t verbosity: %q\n",
 		BaseOptions.Silent, BaseOptions.Debug, BaseOptions.Verbosity)
 
 	return
@@ -296,12 +320,23 @@ func (x *Executable) ConfigureLog() (ex1 *Executable) {
 var errEarlyPanicError = errors.New("mains stored a panic")
 
 // EarlyPanic is a deferred function that recovers panic prior to all other deferred functions
+//   - if other deferred functions hang, the panic is never returned
+//   - if other deferred functions panic, the initial panic is lost
 //   - EarlyPanic ensures that a panic is displayed immediately and
 //     that the panic is stored as the first occurring error
+//   - —
 //   - the first deferred function should be [Executable.Recover]
 //   - the last deferred function should be [Executable.EarlyPanic]
-//   - EarlyPanic avoids confusion from other deferred functions quietly hanging
-//     or storing a first error that is actually subsequent to the panic
+//
+// Usage:
+//
+//	func main() {
+//	  var err error
+//	  defer ex.Recover(&err)
+//	  … other deferred functions here
+//	  // print possible panic prior to deferred functions
+//	  defer ex.EarlyPanic(&err)
+//	  … code that may panic here
 func (x *Executable) EarlyPanic(errp ...*error) {
 
 	// print and store any panic returned by recover()
@@ -518,11 +553,11 @@ func (x *Executable) Recover(errp ...*error) {
 
 	// printouts when IsDebug
 	if errCount == 0 {
-		parl.Debug("\nexe.Exit: no error")
+		parl.Debug("\nex.Exit: no error")
 	} else {
-		parl.Debug("\nexe.Exit: err: %T '%[1]v'", x.err.GetN())
+		parl.Debug("\nex.Exit: err: %T '%[1]v'", x.err.GetN())
 	}
-	parl.Debug("\nexe.Exit invocation:\n%s\n", pruntime.NewStack(0))
+	parl.Debug("\nex.Exit invocation:\n%s\n", pruntime.NewStack(0))
 	if parl.IsThisDebug() { // add newline during debug without location
 		plog.GetLog(os.Stderr).Output(0, "") // newline after debug location. No location appended to this printout
 	}

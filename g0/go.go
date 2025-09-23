@@ -96,19 +96,20 @@ func (g *Go) AddError(err error) {
 //   - *errp contains possible fatal thread error
 //   - errp can be nil
 func (g *Go) Done(errp *error) {
+	var err error
+	if errp != nil {
+		err = *errp
+	}
+	g.Donerr(err)
+}
+
+func (g *Go) Donerr(err error) {
 	if !g.ensureThreadData().endCh.Close() {
-		var err error
-		if errp != nil {
-			err = *errp
-		}
 		panic(perrors.ErrorfPF("Go received multiple Done: “%s”", perrors.Short(err)))
 	}
 
 	// obtain fatal error and ensure it has stack
-	var err error
-	if errp != nil {
-		err = perrors.Stack(*errp)
-	}
+	err = perrors.Stack(err)
 
 	// notify parent of exit
 	g.goParent.GoDone(g, err)

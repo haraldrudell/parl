@@ -86,6 +86,9 @@ type Go interface {
 	//		submit non-fatal errors
 	//	- Done(errp *error)
 	Doner
+	// Donerr(err error) provide Go exit result as a deferred function
+	//	- this may allow err to be stack-allocated
+	Donerr
 	// Wait awaits exit of this Go thread
 	Wait()
 	// ch closes upon exit of this Go thread
@@ -475,6 +478,10 @@ const (
 	// the go-group internally collects extended thread information
 	AggregateThread
 )
+
+type Donerr interface {
+	Donerr(err error)
+}
 
 // Iterator is an for range iterator over T
 type GoErrorIterator interface {

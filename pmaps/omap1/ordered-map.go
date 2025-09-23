@@ -91,9 +91,8 @@ func MakeOrderedMap[K comparable, V any](size ...int) (m OrderedMap[K, V]) {
 //	})
 func MakeOrderedMapFromKeys[K comparable, V any](keys []K) (m OrderedMap[K, V]) {
 	m = MakeOrderedMap[K, V](len(keys))
-	var value V
 	for i := range len(keys) {
-		m.Put(keys[i], value)
+		m.Put(keys[i])
 	}
 
 	return
