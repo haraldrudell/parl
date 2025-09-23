@@ -24,7 +24,7 @@ import (
 //     index-finding operations are expensive and that large IndexedMaps may be less efficient
 //   - efficient for small maps of up to 1,000 elements
 //   - iteration is by:
-//   - — the Values iterator for values, keys and indices: allocation-free, ascending or decsding, full or partial
+//   - — the Values iterator for values, keys and indices: allocation-free, ascending or descending, full or partial
 //   - — consumer using integer for-range with Length/GetByIndex/GetKeyByIndex: allocation-free
 //   - — the map itself implementing iterators would cost heap-allocation to hold state
 //   - — indexed access is what enables external iteration
