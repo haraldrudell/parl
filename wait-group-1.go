@@ -13,11 +13,17 @@ import (
 
 // WaitGroup1 is a [sync.WaitGroup] that starts at value 1
 //   - purpose is lazy-initialization
-//   - [WaitGroup1.IsDone] checks for value available
+//   - WaitGroup + 3 atomics, 32-bit: 3 methods
+//   - [WaitGroup1.IsDone] is true if Done was invoked on the wait-group
 //   - [WaitGroup1.AddWin] picks winner
-//   - winner resolves using [WaitGroup1.Done]
+//   - — returns true for the one first thread that will invoke Done on the wait-group
+//   - — blocks all other threads until the wait-group is triggered
+//   - — (optional NoOnceWait argument)
+//   - winner triggers the wait-group using [WaitGroup1.Done]
 //   - —
 //   - initialization-free lock-free thread-safe
+//   - WaitGroup + 3 atomics
+//   - —
 //   - alternatives are:
 //     [sync.Once] 20.27 ns: sync.Mutex wrapped by atomic.Uint32
 //     [sync.Mutex] 14 ns per thread

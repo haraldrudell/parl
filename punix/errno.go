@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package punix examines unix.Errno errors and identifies Unix-like platforms.
 package punix
 
 import (

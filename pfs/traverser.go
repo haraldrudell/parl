@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pfs provides a symlink-following file-systemtraverser and other file-system functions.
 package pfs
 
 import (

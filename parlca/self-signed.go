@@ -32,7 +32,7 @@ type SelfSigned struct {
 	PrivateKey       parl.PrivateKey
 }
 
-// NewSelfSigned creates a self-ssigned certificate authority
+// NewSelfSigned creates a self-signed certificate authority
 //   - ca: a certificate with embedded private key
 //   - — implementation is parlca.Certificate, ie. binary der format
 //   - canonicalName: 240623 not used

@@ -22,7 +22,7 @@ func TestLogCapturer_Write(t *testing.T) {
 	)
 
 	// Printf is the method to test
-	var logCapturer *log.Logger = NewLogCapturer(printfer.log)
+	var logCapturer *log.Logger = NewErrorLog(printfer.log)
 
 	// Printf should log transparently
 	logCapturer.Printf("%s", value)

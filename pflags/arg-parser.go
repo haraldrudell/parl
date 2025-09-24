@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pflags provides declarative options and a string-slice option type.
 package pflags
 
 import (

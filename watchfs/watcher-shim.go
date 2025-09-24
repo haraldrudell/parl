@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package watchfs provides a file-system watcher for Linux and macOS.
 package watchfs
 
 import (

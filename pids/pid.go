@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pids provides a typed process identifier.
 package pids
 
 import (

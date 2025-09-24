@@ -8,9 +8,7 @@ package phttp
 import (
 	"context"
 	"crypto"
-	"crypto/tls"
 	"errors"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/netip"
@@ -19,7 +17,6 @@ import (
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pnet"
-	"github.com/haraldrudell/parl/pstrings"
 )
 
 const (
@@ -108,7 +105,7 @@ func NewHttps(certDER parl.CertificateDer, signer crypto.Signer, log ...parl.Pri
 	httpsServer.Server.Handler = httpsServer.serveMux
 	if len(log) > 0 {
 		if f := log[0]; f != nil {
-			httpsServer.Server.ErrorLog = NewLogCapturer(f)
+			httpsServer.Server.ErrorLog = NewErrorLog(f)
 		}
 	}
 	return
@@ -176,52 +173,12 @@ func (s *Https) Listen(socketAddress pnet.SocketAddress) (
 //   - — if network is NetworkDefault: ephemeral port
 //   - — otherwise port 443 “:https” is used
 func (s *Https) TLS(socketAddress pnet.SocketAddress) (tlsListener net.Listener, err error) {
-	var httpServer = &s.Server
-
-	// make ServeTLS execute srv.setupHTTP2_ServeTLS go 1.16.6
-	var badPath = "%"
-	if err = httpServer.ServeTLS(nil, badPath, badPath); err == nil {
-		err = perrors.New("missing error from srv.ServeTLS")
-		return
-	}
-
-	// ignore the error if expected badPath
-	if pathError, ok := err.(*fs.PathError); ok {
-		if pathError.Path == badPath {
-			err = nil
-		}
-	}
-
-	// failure on other errors
-	if err != nil {
-		err = perrors.Errorf("srv.ServeTLS: '%w'", err)
-		return
-	}
-
-	// get *net.TCPListener from srv.ListenAndServeTLS
-
-	// underlying tcp listener from pnet
-	var listener net.Listener
-	if listener, err = pnet.Listen(socketAddress); err != nil {
-		return
-	}
-	var _ = net.Listen
-
-	// create a TLS listener from srv.ServeTLS
-	var tlsConfig *tls.Config
-	if httpServer.TLSConfig == nil {
-		tlsConfig = &tls.Config{}
-	} else {
-		tlsConfig = httpServer.TLSConfig.Clone()
-	}
-	if !pstrings.StrSliceContains(tlsConfig.NextProtos, http11) {
-		tlsConfig.NextProtos = append(tlsConfig.NextProtos, http11)
-	}
-	tlsConfig.Certificates = make([]tls.Certificate, 1)
-	tlsCertificate := &tlsConfig.Certificates[0]
-	tlsCertificate.Certificate = append(tlsCertificate.Certificate, s.cert) // certificate not from file system
-	tlsCertificate.PrivateKey = s.private                                   // private key not from file system
-	tlsListener = tls.NewListener(listener, tlsConfig)
+	tlsListener, err = ListenTLS(
+		socketAddress,
+		&s.Server,
+		s.cert,
+		s.private,
+	)
 
 	return
 }

@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package ints provide manipulation of integer types.
 package ints
 
 import (

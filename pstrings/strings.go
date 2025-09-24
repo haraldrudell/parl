@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pstrings provides string fitting, filtered join and quoting of a string slice.
 package pstrings
 
 import (

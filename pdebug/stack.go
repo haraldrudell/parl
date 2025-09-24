@@ -3,7 +3,6 @@
 ISC License
 */
 
-// Package pdebug provides a portable, parsed stack trace.
 package pdebug
 
 import (
