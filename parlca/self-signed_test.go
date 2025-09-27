@@ -3,7 +3,7 @@
 ISC License
 */
 
-package parlca
+package parlca_test
 
 import (
 	"crypto/x509"
@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parlca"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pos"
 )
@@ -21,9 +22,10 @@ import (
 // /usr/local/opt/openssl/bin/openssl x509 -in cert.der -inform der -noout -text
 // openssl x509 -in /etc/ssl/certs/VeriSign_Universal_Root_Certification_Authority.pem -inform pem -noout -text
 
-func TestNewSelfSigned(t *testing.T) {
+func TestSelfSigned(t *testing.T) {
 	// doWriteFiles writes keys and certificates to user’s home directory
 	const doWriteFiles = false
+
 	if doWriteFiles {
 		defer t.Errorf("Logging on for write-files")
 	}
@@ -59,7 +61,7 @@ func TestNewSelfSigned(t *testing.T) {
 	for _, algo := range algoList {
 
 		// create private and public key
-		if privateKey, err = NewPrivateKey(algo); err != nil {
+		if privateKey, err = parlca.NewPrivateKey(algo); err != nil {
 			t.Fatalf("NewPrivateKey %s %s", algo.String(), perrors.Short(err))
 		}
 
@@ -90,7 +92,7 @@ func TestNewSelfSigned(t *testing.T) {
 
 		// create certificate authority
 		var ca parl.CertificateAuthority
-		if ca, err = NewSelfSigned(canonicalName, algo); err != nil {
+		if ca, err = parlca.NewSelfSigned(canonicalName, algo); err != nil {
 			t.Errorf("NewSelfSigned %s %s ", algo.String(), perrors.Short(err))
 		}
 
@@ -107,7 +109,7 @@ func TestNewSelfSigned(t *testing.T) {
 		}
 
 		// CertificateAuthority.Check
-		if x509Certificate, err = ca.Check(); err != nil {
+		if x509Certificate, err = ca.Validate(); err != nil {
 			t.Fatalf("ca.Check: %s", perrors.Short(err))
 		}
 		_ = x509Certificate

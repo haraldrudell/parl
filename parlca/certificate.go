@@ -33,6 +33,9 @@ type Certificate struct {
 	der parl.CertificateDer
 }
 
+// Certificate is [parl.Certificate]
+var _ parl.Certificate = &Certificate{}
+
 // NewCertificate returns an object that can produce:
 //   - textual pem format and
 //   - expanded [x509.Certificate] format
@@ -40,12 +43,21 @@ type Certificate struct {
 //   - [Certificate.DER] binary data
 //   - [Certificate.PEM] textual block
 //   - [Certificate.ParseCertificate] [x509.Certificate] data structure
-func NewCertificate(certificateDer parl.CertificateDer) (certificate parl.Certificate) {
-	return &Certificate{der: certificateDer}
-}
+func NewCertificate(certificateDer parl.CertificateDer, fieldp ...*Certificate) (certificate *Certificate) {
 
-// 221121 don’t know what this is. Make it compile
-func LoadCertificate(filename string) {}
+	// get certificate
+	if len(fieldp) > 0 {
+		certificate = fieldp[0]
+	}
+	if certificate == nil {
+		// allocation here
+		certificate = &Certificate{}
+	}
+
+	certificate.der = certificateDer
+
+	return
+}
 
 /*
 	func (c *Certificate) IsValid() (isValid bool) {

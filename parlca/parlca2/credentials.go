@@ -46,7 +46,7 @@ func Credentials() (x509Certificate *x509.Certificate, privateKey crypto.Signer,
 	var _ crypto.PrivateKey
 
 	// create private key
-	if privateKey, err = parlca.NewEd25519(); err != nil {
+	if privateKey, err = parlca.MakeEd25519(); err != nil {
 		return
 	}
 

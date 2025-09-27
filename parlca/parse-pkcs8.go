@@ -16,19 +16,25 @@ import (
 )
 
 // ParsePkcs8 parses an unencrypted private key in PKCS #8, ASN.1 binary DER form
+//   - —
+//   - at least two allocations
 func ParsePkcs8(privateKeyDer parl.PrivateKeyDer) (privateKey parl.PrivateKey, err error) {
-	var pub any
-	if pub, err = x509.ParsePKCS8PrivateKey(privateKeyDer); perrors.IsPF(&err, "x509.ParsePKCS8PrivateKey %w", err) {
+
+	// keyAny is return value from ParsePKCS8PrivateKey
+	//	- for rsa end ecdsa an allocated pointer
+	var keyAny any
+	if keyAny, err = x509.ParsePKCS8PrivateKey(privateKeyDer); perrors.IsPF(&err, "x509.ParsePKCS8PrivateKey %w", err) {
 		return
 	}
-	if pk, ok := pub.(*rsa.PrivateKey); ok {
-		privateKey = &RsaPrivateKey{PrivateKey: *pk}
-	} else if pk, ok := pub.(*ecdsa.PrivateKey); ok {
-		privateKey = &EcdsaPrivateKey{PrivateKey: *pk}
-	} else if pk, ok := pub.(ed25519.PrivateKey); ok {
+	if pk, ok := keyAny.(*rsa.PrivateKey); ok {
+		privateKey = &RsaPrivateKey{PrivateKey: pk}
+	} else if pk, ok := keyAny.(*ecdsa.PrivateKey); ok {
+		privateKey = &EcdsaPrivateKey{PrivateKey: pk}
+	} else if pk, ok := keyAny.(ed25519.PrivateKey); ok {
 		privateKey = &Ed25519PrivateKey{PrivateKey: pk}
 	} else {
-		err = perrors.ErrorfPF("Unknown private key type: %T", pub)
+		err = perrors.ErrorfPF("Unknown private key type: %T", keyAny)
 	}
+
 	return
 }

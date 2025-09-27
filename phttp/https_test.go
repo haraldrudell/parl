@@ -197,7 +197,7 @@ func LegacyRealCode(t *testing.T) (err error) {
 	)
 	var (
 		// serverSigner is binary and [crypto.Signer] used to run the server
-		serverSigner parl.PrivateKey
+		serverSigner parlca.Ed25519PrivateKey
 		// public key for creating server certificate
 		serverPublic crypto.PublicKey
 		template     x509.Certificate
@@ -217,12 +217,12 @@ func LegacyRealCode(t *testing.T) (err error) {
 		t.Fatalf("FAIL parlca.NewSelfSigned %s “%s”", x509.RSA, perrors.Short(err))
 	}
 	// expand certificate to [x509.Certificate[]
-	if caX509, err = caCert.Check(); err != nil {
+	if caX509, err = caCert.Validate(); err != nil {
 		t.Fatalf("FAIL: caCert.Check: %s", perrors.Short(err))
 	}
 	t.Log("Creating server private key")
 	// serverSigner is binary and [crypto.Signer] used to run the server
-	if serverSigner, err = parlca.NewEd25519(); err != nil {
+	if serverSigner, err = parlca.MakeEd25519(); err != nil {
 		t.Fatalf("FAIL server parlca.NewEd25519: “%q”", err)
 	}
 	t.Log("Creating server certificate")

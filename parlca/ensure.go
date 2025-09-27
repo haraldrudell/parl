@@ -18,8 +18,10 @@ import (
 	"github.com/haraldrudell/parl/ptime"
 )
 
-// hyphen is separator in self-signed ca name
-const hyphen = "-"
+const (
+	// certificate country: US
+	DefaultCountry = "US"
+)
 
 // EnsureTemplate ensures that cert can be signed
 //   - use as [x509.CreateCertificate] template argument
@@ -177,3 +179,12 @@ func shortHostname() (hostname string) {
 	}
 	return
 }
+
+const (
+	// hyphen is separator in self-signed ca name
+	hyphen = "-"
+	// certificate validity for 10 years
+	notAfterYears = 10
+	// ca appended to commonName
+	caSubjectSuffix = "ca"
+)

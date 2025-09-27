@@ -28,21 +28,22 @@ func BenchmarkSelfSigned(b *testing.B) {
 	var (
 		caCert       parl.CertificateAuthority
 		caX509       *x509.Certificate
-		serverSigner parl.PrivateKey
+		serverSigner Ed25519PrivateKey
 		template     x509.Certificate
 		certDER      parl.CertificateDer
 		err          error
 	)
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
+		_ = i
 		template = x509.Certificate{
 			IPAddresses: []net.IP{pnet.IPv4loopback, net.IPv6loopback},
 		}
 		EnsureServer(&template)
 		if caCert, err = NewSelfSigned(canonicalName, x509.RSA); err != nil {
 			b.Fatalf("FAIL parlca.NewSelfSigned %s “%s”", x509.RSA, perrors.Short(err))
-		} else if caX509, err = caCert.Check(); err != nil {
+		} else if caX509, err = caCert.Validate(); err != nil {
 			b.Fatalf("FAIL: caCert.Check: %s", perrors.Short(err))
-		} else if serverSigner, err = NewEd25519(); err != nil {
+		} else if serverSigner, err = MakeEd25519(); err != nil {
 			b.Fatalf("FAIL server parlca.NewEd25519: “%q”", err)
 		} else if certDER, err = caCert.Sign(&template, serverSigner.Public()); err != nil {
 			b.Fatalf("FAIL signing server certificate: “%s”", err)

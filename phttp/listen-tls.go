@@ -28,12 +28,12 @@ import (
 //   - httpServer: pointer to the http server’s populated struct
 //   - binaryCert: server certificate in binary form
 //   - — from [parlca.NewCertificate]
-//   - — from [parlca.LoadFromPem]
+//   - — from [parlca.ReadPemFromFile]
 //   - — from [x509.Certificate.Raw]
 //   - privateKey: server’s private key in binary form.
 //   - — implementation depends on signing algorithm
 //   - — from [parlca2.Credentials]
-//   - — from [parlca.LoadFromPem]
+//   - — from [parlca.ReadPemFromFile]
 //   - tlsListener: configured TLS listener.
 //   - — value is [net.Listener]: Accept/Close/Addr
 //   - — runtime value is package-private value

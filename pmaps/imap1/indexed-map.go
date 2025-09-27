@@ -6,6 +6,13 @@ ISC License
 package imap1
 
 // TODO 250922
+//	- improve indexing data structure
+//	- — Order Statistic Tree for O(log n) indexed access, O(log n) insert-delete
+//		and arbitrary order of V any
+//	- — implement doubly-linked list for O(1) step sequential traversal
+//	- — possibly adaptive radix tree O(k) indexed access, O(k) insert/delete, amortized O(1) step traversal
+//	- — benchmark all operations to pick winner
+//	- — problem to solve is that for slice at 1M insert/delete is 2,293× O(1) keyed access
 //   - implement thread-safe version
 //   - implement ordering function for different order than insertion order
 //   - implement ordering function to store K any
@@ -88,6 +95,20 @@ import (
 //   - iteration is via index held by consumer
 //   - if a value with lower index is concurrently deleted, a value will be
 //     missed in the iteration
+//   - —
+//   - index-finding operations:
+//   - expensive: Delete GetIndexForKey GetAndMakeNewest GetAndMakeOldest
+//   - — DeleteByIndex is inexpensive
+//   - it takes 21× linear search to build an index for the slice
+//   - — such index must be rebuilt on delete
+//   - — such index would improve index-finding operations 116×
+//   - indexed access of Go slice is 0.000017 ns
+//   - keyed access of Go map is 8.355 ns 491,471× indexed
+//   - linear search of slice is 968.9 ns 116× keyed
+//   - copy of 1M slice, done during Delete and DeleteByIndex, is 2,293× keyed access
+//   - building an index is not worth it: only for more than 21 index-finding operations per delete
+//   - — most likely there are none such operations
+//   - consumer should optimize the operations-pattern for performance
 type IndexedMap[K comparable, V any] struct {
 	// keyed provides O(1) keyed access to values
 	keyed map[K]V

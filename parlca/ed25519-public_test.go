@@ -14,16 +14,20 @@ import (
 )
 
 func TestEd25519Public(t *testing.T) {
-	var publicKey parl.PublicKey
-	//var publicKeyDer parl.PublicKeyDer
-	var pemBytes parl.PemBytes
-	var keyPair parl.PrivateKey
-	var err error
+	const (
+		expPem = "-----BEGIN PUBLIC KEY-----\n"
+	)
 
-	expPem := "-----BEGIN PUBLIC KEY-----\n"
+	var (
+		publicKey parl.PublicKey
+		//var publicKeyDer parl.PublicKeyDer
+		pemBytes parl.PemBytes
+		keyPair  Ed25519PrivateKey
+		err      error
+	)
 
 	// get public key
-	if keyPair, err = NewEd25519(); err != nil {
+	if keyPair, err = MakeEd25519(); err != nil {
 		t.Errorf("Error NewEd25519: %s", perrors.Short(err))
 		t.FailNow()
 	}

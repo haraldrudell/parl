@@ -14,14 +14,6 @@ import (
 	"github.com/haraldrudell/parl"
 )
 
-const (
-	copyright = "Generated on %s by github.com/haraldrudell/parl\n" +
-		"parl: (c) 2018-present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)\n"
-	fingerPrint  = "sha256 fingerprint: "
-	fingerPrint1 = "sha1 fingerprint: "
-	pemNewline   = "\n"
-)
-
 // PemText returns lead-in text for pem format block
 // - data is 1 or 2 copies of binary der data
 // - — 1: only sh256 fingerprint
@@ -31,12 +23,22 @@ func PemText(data ...[]byte) (pemText string) {
 
 	// calculate sha256 fingerprint
 	if len(data) > 0 {
-		var hashBytes = sha256.Sum256(data[0]) // [32]byte
+		// [32]byte
+		var hashBytes = sha256.Sum256(data[0])
 		pemText += fingerPrint + hex.EncodeToString(hashBytes[:4]) + pemNewline
 		if len(data) > 1 {
 			var hashBytes1 = sha1.Sum(data[1])
 			pemText += fingerPrint1 + hex.EncodeToString(hashBytes1[:4]) + pemNewline
 		}
 	}
+
 	return
 }
+
+const (
+	copyright = "Generated on %s by github.com/haraldrudell/parl\n" +
+		"parl: (c) 2018-present Harald Rudell <harald.rudell@gmail.com> (https://haraldrudell.github.io/haraldrudell/)\n"
+	fingerPrint  = "sha256 fingerprint: "
+	fingerPrint1 = "sha1 fingerprint: "
+	pemNewline   = "\n"
+)
