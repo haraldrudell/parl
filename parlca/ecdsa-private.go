@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parlca/calib"
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -74,7 +75,7 @@ func (key *EcdsaPrivateKey) PEM() (pemBytes parl.PemBytes, err error) {
 	if block.Bytes, err = key.DER(); err != nil {
 		return
 	}
-	pemBytes = append([]byte(PemText(block.Bytes)), pem.EncodeToMemory(&block)...)
+	pemBytes = append([]byte(calib.PemText(block.Bytes)), pem.EncodeToMemory(&block)...)
 	return
 }
 

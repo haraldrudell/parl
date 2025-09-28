@@ -12,6 +12,7 @@ import (
 	"slices"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parlca/calib"
 )
 
 // RsaPublicKey is container for public key in efficient binary form
@@ -51,7 +52,7 @@ func (key *RsaPublicKey) PEM() (pemBytes parl.PemBytes, err error) {
 	}
 	// two allocations here
 	pemBytes = pem.EncodeToMemory(&block)
-	pemBytes = slices.Insert(pemBytes, 0, []byte(PemText())...)
+	pemBytes = slices.Insert(pemBytes, 0, []byte(calib.PemText())...)
 	return
 }
 

@@ -41,11 +41,11 @@ func ParsePem(pemData parl.PemBytes) (
 	case pemPublicKeyType, pemRSAPublicKeyType:
 
 		// “PUBLIC KEY”
-		publicKey, err = ParsePkix(block.Bytes)
+		publicKey, err = parsePkix(block.Bytes)
 	case pemPrivateKeyType:
 
 		// “PRIVATE KEY”
-		privateKey, err = ParsePkcs8(block.Bytes)
+		privateKey, err = parsePkcs8(block.Bytes)
 	case pemCertificateType:
 
 		// “CERTIFICATE”

@@ -11,10 +11,12 @@ import (
 )
 
 // NewTLSConfig returns a TLS configuration that has
-// cert as a root certificate
-//   - this allows a client to access a server that has self-signed certificate
+// cert as the only root certificate
+//   - self-signed server-certificates needs this for http client to access a server
 func NewTLSConfig(cert *x509.Certificate) (tlsConfig *tls.Config) {
-	certPool := x509.NewCertPool()
+	var certPool = x509.NewCertPool()
 	certPool.AddCert(cert)
-	return &tls.Config{RootCAs: certPool}
+	tlsConfig = &tls.Config{RootCAs: certPool}
+
+	return
 }

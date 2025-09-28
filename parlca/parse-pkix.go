@@ -15,8 +15,8 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// ParsePkix parses a public key in PKIX, ASN.1 binary DER form
-func ParsePkix(publicKeyDer parl.PublicKeyDer) (publicKey parl.PublicKey, err error) {
+// parsePkix parses a public key in PKIX, ASN.1 binary DER form
+func parsePkix(publicKeyDer parl.PublicKeyDer) (publicKey parl.PublicKey, err error) {
 	var pub any
 	if pub, err = x509.ParsePKIXPublicKey(publicKeyDer); perrors.IsPF(&err, "x509.ParsePKIXPublicKey %w", err) {
 		return

@@ -23,12 +23,11 @@ import (
 // openssl x509 -in /etc/ssl/certs/VeriSign_Universal_Root_Certification_Authority.pem -inform pem -noout -text
 
 func TestSelfSigned(t *testing.T) {
-	// doWriteFiles writes keys and certificates to user’s home directory
-	const doWriteFiles = false
+	const (
+		// doWriteFiles writes keys and certificates to user’s home directory
+		doWriteFiles = false
+	)
 
-	if doWriteFiles {
-		defer t.Errorf("Logging on for write-files")
-	}
 	const (
 		ssDerExt                     = ".der"
 		ssPemExt                     = ".pem"
@@ -46,6 +45,10 @@ func TestSelfSigned(t *testing.T) {
 		privateKey      parl.PrivateKey
 		x509Certificate *x509.Certificate
 	)
+
+	if doWriteFiles {
+		t.Errorf("Logging on for write-files")
+	}
 
 	/*
 		// what data types must be provided?

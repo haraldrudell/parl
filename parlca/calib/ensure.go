@@ -3,7 +3,7 @@
 ISC License
 */
 
-package parlca
+package calib
 
 import (
 	"crypto/x509"

@@ -12,6 +12,7 @@ import (
 	"slices"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parlca/calib"
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -93,7 +94,7 @@ func (e *Ed25519PrivateKey) PEM() (pemBytes parl.PemBytes, err error) {
 	pemBytes = pem.EncodeToMemory(&block)
 	// allocation here
 	var seed = e.PrivateKey.Seed()
-	var text = PemText(seed)
+	var text = calib.PemText(seed)
 	pemBytes = slices.Insert(pemBytes, 0, []byte(text)...)
 	return
 }

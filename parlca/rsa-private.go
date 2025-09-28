@@ -13,6 +13,7 @@ import (
 	"slices"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parlca/calib"
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -90,7 +91,7 @@ func (k *RsaPrivateKey) Algo() (algo x509.PublicKeyAlgorithm) { return x509.RSA 
 
 // DER returns PKCS#8 binary form
 func (k *RsaPrivateKey) DER() (bytes parl.PrivateKeyDer, err error) {
-	if bytes, err = x509.MarshalPKCS8PrivateKey(&k.PrivateKey); err != nil {
+	if bytes, err = x509.MarshalPKCS8PrivateKey(k.PrivateKey); err != nil {
 		err = perrors.Errorf("x509.MarshalPKCS8PrivateKey: '%w'", err)
 	}
 	return
@@ -114,7 +115,7 @@ func (k *RsaPrivateKey) PEM() (pemBytes parl.PemBytes, err error) {
 		return
 	}
 	pemBytes = pem.EncodeToMemory(&block)
-	pemBytes = slices.Insert(pemBytes, 0, []byte(PemText(block.Bytes))...)
+	pemBytes = slices.Insert(pemBytes, 0, []byte(calib.PemText(block.Bytes))...)
 
 	return
 }

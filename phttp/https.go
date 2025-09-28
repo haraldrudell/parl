@@ -311,7 +311,6 @@ func (s *Https) closeErrsOn1() {
 }
 
 const (
-	httpsAddr           = ":https"
 	http11              = "http/1.1"
 	httpShutdownTimeout = 5 * time.Second
 )

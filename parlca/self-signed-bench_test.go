@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parlca/calib"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pnet"
 )
@@ -38,7 +39,7 @@ func BenchmarkSelfSigned(b *testing.B) {
 		template = x509.Certificate{
 			IPAddresses: []net.IP{pnet.IPv4loopback, net.IPv6loopback},
 		}
-		EnsureServer(&template)
+		calib.EnsureServer(&template)
 		if caCert, err = NewSelfSigned(canonicalName, x509.RSA); err != nil {
 			b.Fatalf("FAIL parlca.NewSelfSigned %s “%s”", x509.RSA, perrors.Short(err))
 		} else if caX509, err = caCert.Validate(); err != nil {

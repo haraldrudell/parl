@@ -18,7 +18,7 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/parlca"
-	"github.com/haraldrudell/parl/parlca/parlca2"
+	"github.com/haraldrudell/parl/parlca/calib"
 	"github.com/haraldrudell/parl/perrors"
 	"github.com/haraldrudell/parl/pnet"
 	"github.com/haraldrudell/parl/ptime"
@@ -55,6 +55,7 @@ func TestHttps(t *testing.T) {
 		shutdownCh      parl.AwaitableCh
 		errIterator     parl.ErrsIter
 		errList         []error
+		cert            parl.Certificate
 		x509Certificate *x509.Certificate
 		privateKey      crypto.Signer
 		t0, t1          time.Time
@@ -68,10 +69,17 @@ func TestHttps(t *testing.T) {
 
 	t0 = time.Now()
 
-	x509Certificate, privateKey, err = parlca2.Credentials()
+	cert, privateKey, _ /*caCertDER*/, _ /*caKey*/, err = parlca.CreateCredentials(x509.Ed25519, parlca.DefaultCAName)
+	if err != nil {
+		t.Fatalf("FAIL CreateCredentials err: ‘%s’", perrors.Short(err))
+	}
+	x509Certificate, err = cert.ParseCertificate()
+	if err != nil {
+		t.Fatalf("FAIL ParseCertificate err: ‘%s’", perrors.Short(err))
+	}
 
 	// httpsServer = NewHttps(certDER, serverSigner)
-	httpsServer = NewHttps(x509Certificate.Raw, privateKey)
+	httpsServer = NewHttps(cert.DER(), privateKey)
 
 	// add handler shared by all listeners counting requests
 	requestCounter = newShandler()
@@ -232,7 +240,7 @@ func LegacyRealCode(t *testing.T) (err error) {
 		IPAddresses: []net.IP{pnet.IPv4loopback, net.IPv6loopback},
 	}
 	// certificate use is server authentication
-	parlca.EnsureServer(&template)
+	calib.EnsureServer(&template)
 	// have ca sign the certificate into binary DER ASN.1 form
 	if certDER, err = caCert.Sign(&template, serverPublic); err != nil {
 		t.Fatalf("FAIL signing server certificate: “%s”", err)

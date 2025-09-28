@@ -11,6 +11,7 @@ import (
 	"crypto/x509"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parlca/calib"
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -71,7 +72,7 @@ func NewSelfSigned(
 	// cert is temporary x509 struct to create a binary byte-slice
 	var cert = x509.Certificate{}
 	cert.Issuer.CommonName = canonicalName
-	EnsureSelfSigned(&cert)
+	calib.EnsureSelfSigned(&cert)
 	if certificateDer, err = x509.CreateCertificate(
 		rand.Reader,
 		// template

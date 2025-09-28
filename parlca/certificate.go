@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/parlca/calib"
 	"github.com/haraldrudell/parl/perrors"
 )
 
@@ -114,7 +115,7 @@ func (c *Certificate) DER() (certificateDer parl.CertificateDer) { return c.der 
 func (c *Certificate) PEM() (pemBytes parl.PemBytes) {
 	return append(
 		// lead-in text for pem block sha256 and sha1 fingerprint
-		[]byte(PemText(c.der, c.der)),
+		[]byte(calib.PemText(c.der, c.der)),
 		// ==… CERTIFICATE…
 		pem.EncodeToMemory(&pem.Block{
 			Type:  pemCertificateType,

@@ -15,10 +15,10 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// ParsePkcs8 parses an unencrypted private key in PKCS #8, ASN.1 binary DER form
+// parsePkcs8 parses an unencrypted private key in PKCS #8, ASN.1 binary DER form
 //   - —
 //   - at least two allocations
-func ParsePkcs8(privateKeyDer parl.PrivateKeyDer) (privateKey parl.PrivateKey, err error) {
+func parsePkcs8(privateKeyDer parl.PrivateKeyDer) (privateKey parl.PrivateKey, err error) {
 
 	// keyAny is return value from ParsePKCS8PrivateKey
 	//	- for rsa end ecdsa an allocated pointer
