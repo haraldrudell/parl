@@ -24,7 +24,9 @@ import (
 //   - — if IPv6 is supported, “localhost” typically becomes “::” not “::1”
 //   - cancel: optional pointer that is set to a cancel function
 //     during listen invocation
-//   - invokes [net.ListenConfig.Listen]
+//   - err: socketAddr is invalid domain string like ‘%s’ or netip.Addr nil value
+//   - —
+//   - delegates to [net.ListenConfig.Listen] that supports context cancel
 //   - network value is not used by the kernel, it is a standard-library scoped
 //     helper
 //   - TODO 240616 possibly refactor cancel argument
@@ -50,6 +52,8 @@ func Listen(
 	var listenConfig = net.ListenConfig{}
 	var network = socketAddress.Network().String()
 	var addr = socketAddress.String()
+	// listen to empty string becomes TCPAddr with IP length 0 port 0
+	// which becomes any interface with high ephemeral port
 	if listener, err = listenConfig.Listen(ctx, network, addr); err != nil {
 		err = perrors.ErrorfPF("net.Listen %s %s: “%w”", network, addr, err)
 	}

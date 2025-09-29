@@ -3,7 +3,7 @@
 ISC License
 */
 
-package mains
+package malib
 
 const (
 	// as second argument to [BaseOptionData], indicates that yaml options -yamlFile -yamlKey should not be present

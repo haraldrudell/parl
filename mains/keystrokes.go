@@ -69,7 +69,7 @@ func NewKeystrokes(fieldp ...*Keystrokes) (keystrokes *Keystrokes) {
 //   - supports functional chaining
 //   - silent [SilentClose] does not echo anything on [os.Stdin] closing
 //   - addError if present receives errors from [os.Stdin.Read]
-func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...SilentType) (keystrokes *Keystrokes) {
+func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...malib.SilentType) (keystrokes *Keystrokes) {
 	keystrokes = k
 
 	// ensure only launched once
@@ -81,7 +81,7 @@ func (k *Keystrokes) Launch(errorSink parl.ErrorSink1, silent ...SilentType) (ke
 
 	var isSilent bool
 	if len(silent) > 0 {
-		isSilent = silent[0] == SilentClose
+		isSilent = silent[0] == malib.SilentClose
 	}
 
 	go k.stdinReaderThread(isSilent, errorSink)

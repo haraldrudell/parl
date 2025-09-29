@@ -23,12 +23,12 @@ import (
 //   - http.Server methods requires Server struct to be
 //     heap allocated
 //   - that means ErrorLog must be heap-allocated, too
-func NewErrorLog(logF parl.PrintfFunc) (errorLog *log.Logger) {
+func NewErrorLog(logFunc parl.PrintfFunc) (errorLog *log.Logger) {
 
 	// log.New requires an [io.Writer]
 	//	- this means heap allocation
 	var writer = printFuncWriter{
-		log: logF,
+		log: logFunc,
 	}
 
 	// [http.Server.ErrorLog] requires pointer to
@@ -53,6 +53,7 @@ var _ = (&http.Server{}).ErrorLog
 //   - must be used to initialize the writer field
 var _ = log.New
 
+// printFuncWriter implements an [io.Writer] logging to log
 type printFuncWriter struct {
 	log parl.PrintfFunc
 }
@@ -60,6 +61,7 @@ type printFuncWriter struct {
 // printFuncWriter is [io.Writer]
 var _ io.Writer = &printFuncWriter{}
 
+// Write converts write of bytes to log of string
 func (c *printFuncWriter) Write(p []byte) (n int, err error) {
 	n = len(p)
 	c.log(string(p))

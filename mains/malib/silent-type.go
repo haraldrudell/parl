@@ -3,7 +3,7 @@
 ISC License
 */
 
-package mains
+package malib
 
 const (
 	// do not echo to standard error on [os.Stdin] closing

@@ -18,15 +18,20 @@ import (
 )
 
 const (
+	NoAppName   = ""
 	DotLocalDir = ""
 )
 
 // ReadOrCreateCredentials does write-once server-credentials caching
 //   - appName: the app’s name used for naming files and directories
+//   - appName [NoAppName] "": use “test”
+//   - dirname: directory for pem format pki files
 //   - dirname [DotLocalDir] "": directory is: ~/.local/[appName]
-//   - algo:
-//   - canonicalName [DefaultCAName] "": CA certificate subject is “[hostname]ca-[date6]”
-//   - log: printing reports of certificate and keys being written to disk
+//   - algo: algorithm for keys and certificates
+//   - canonicalName: unique name for certificate authority
+//   - canonicalName [DefaultCAName] "": CA certificate subject is “[hostname]ca-[date6]” “hostca-251231”
+//   - log: printing filenames being written for certificates and keys
+//   - ipsAndDomains: the IP literals and domain names for which the certificate is valid
 //   - ipsAndDomains missing: IPs are “::1” “127.0.0.1” domains are “localhost”
 func ReadOrCreateCredentials(
 	appName,

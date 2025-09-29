@@ -10,35 +10,58 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
+
+	"github.com/haraldrudell/parl"
 )
 
 // ListenerOnce wraps [net.Listener]
 // making its Close method idempotent
 type ListenerOnce struct {
+	// net.Listener provides promoted method Addr()
 	net.Listener
+	// isClose is true if Close has been invoked
+	//	- atomic performance
 	isClose atomic.Bool
-	wg      sync.WaitGroup
+	// wg.Wait awaits close completion
+	//	- for Close loser threads
+	wg sync.WaitGroup
+	// limiter limits pending Accept threads across
+	// multiple listeners
+	//	- nil: no limit
+	limiter parl.Moderate
 }
 
 // ListenerOnce is [net.Listener]
 var _ net.Listener = &ListenerOnce{}
 
 // MakeListenerOnce returns [net.Listener] with
-// idempotent Close method
+// idempotent Close method and optional limiting of parallelism
 //   - —
-//   - this is sometimes required with [http.Server]
-//   - idempotent Close means a deferred Close can be invoked
-//     when an error state has made it uncertain whether Close
-//     was already invoked
+//   - [http.Server] design of Close Shutdown closes listeners multiple times
+//   - if Close were not idempotent, multiple Close is panic
+//   - with ListenerOnce, a deferred Close can be invoked regardless of state
 //   - [http.Server.Serve] has package-private implementation
-func MakeListenerOnce(listener net.Listener) (o ListenerOnce) {
+func MakeListenerOnce(listener net.Listener, limiter ...parl.Moderate) (o ListenerOnce) {
 
 	o = ListenerOnce{
 		Listener: listener,
 	}
+	if len(limiter) > 0 {
+		o.limiter = limiter[0]
+	}
+	// One means Close did not complete yet
 	o.wg.Add(1)
 
 	return
+}
+
+// Accept delegates to [net.Listener.Accept] possibly blocked
+// by awaiting limiter ticket
+func (o *ListenerOnce) Accept() (netConn net.Conn, err error) {
+	if o.limiter != nil {
+		defer o.limiter.Ticket().ReturnTicket()
+	}
+	return o.Listener.Accept()
 }
 
 // Close: only the first Close is effective and may receive error

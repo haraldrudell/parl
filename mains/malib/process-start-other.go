@@ -10,7 +10,6 @@ package malib
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -95,7 +94,7 @@ func systemUptime() (uptime time.Duration, err error) {
 
 	// read /proc/uptime
 	var data []byte
-	if data, err = ioutil.ReadFile(procUptime); perrors.Is(&err, "ioutil.ReadFile %w", err) {
+	if data, err = os.ReadFile(procUptime); perrors.Is(&err, "os.ReadFile %w", err) {
 		return
 	}
 
@@ -124,7 +123,7 @@ func processStartTicks(pid int) (clockTicks int64, err error) {
 	// read /proc/n/stat
 	var data []byte
 	var filename = fmt.Sprintf(filePrintf, pid)
-	if data, err = ioutil.ReadFile(filename); perrors.Is(&err, "ioutil.ReadFile %w", err) {
+	if data, err = os.ReadFile(filename); perrors.Is(&err, "os.ReadFile %w", err) {
 		return
 	}
 

@@ -46,7 +46,7 @@ func ListenTLS(
 	privateKey crypto.Signer,
 ) (tlsListener net.Listener, err error) {
 
-	// make ServeTLS execute srv.setupHTTP2_ServeTLS go 1.16.6
+	// make ServeTLS execute package-private srv.setupHTTP2_ServeTLS go 1.16.6
 	var badPath = "%"
 	if err = httpServer.ServeTLS(nil, badPath, badPath); err == nil {
 		err = perrors.New("missing error from srv.ServeTLS")
@@ -95,3 +95,7 @@ func ListenTLS(
 	return
 
 }
+
+const (
+	http11 = "http/1.1"
+)

@@ -31,7 +31,9 @@ var (
 	VPNRouteIPv6 = netip.MustParsePrefix("::/3")
 	// LocalHost is hostname for locahost usable with both IPv4 and IPv6
 	//	- routable without DNS
-	LocalHost = "localhost"
+	LocalHost    = "localhost"
+	LoopbackIpv6 = netip.MustParseAddr("::1")
+	LoopbackIpv4 = netip.MustParseAddr("127.0.0.1")
 )
 
 // IsDirect determines if the route is direct

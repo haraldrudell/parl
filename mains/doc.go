@@ -3,5 +3,5 @@
 ISC License
 */
 
-// Package mains contains functions for implementing a command-line utility or a service.
+// Package mains provides declarative/yaml options, keyboard interactivity and error/panic handling for command-line utilities and services © 2020–present Harald Rudell <harald.rudell@gmail.com>.
 package mains

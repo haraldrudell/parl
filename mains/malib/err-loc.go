@@ -3,7 +3,7 @@
 ISC License
 */
 
-package mains
+package malib
 
 const (
 	// displays error location for errors printed without stack trace

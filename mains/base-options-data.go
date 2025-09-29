@@ -8,6 +8,7 @@ package mains
 import (
 	"fmt"
 
+	"github.com/haraldrudell/parl/mains/malib"
 	"github.com/haraldrudell/parl/pflags"
 	"github.com/haraldrudell/parl/pos"
 )
@@ -19,13 +20,6 @@ const (
 	Version = "version"
 )
 
-// BaseOptionsType is the type that holds mains’ effective option values
-//   - -yamlFile -yamlKey -verbose -debug -silent -version -no-yaml
-type BaseOptionsType = struct {
-	YamlFile, YamlKey, Verbosity   string
-	Debug, Silent, Version, DoYaml bool
-}
-
 // BaseOptions is the value that holds mains’ effective option values
 //   - -yamlFile -yamlKey -verbose -debug -silent -version -no-yaml
 var BaseOptions BaseOptionsType
@@ -35,7 +29,7 @@ var BaseOptions BaseOptionsType
 //   - yaml: [YamlNo] means no yaml options
 //   - -verbose -debug -silent -version
 //   - if yaml == YamlYes: -yamlFile -yamlKey
-func BaseOptionData(program string, yaml ...YamlOption) (optionData []pflags.OptionData) {
+func BaseOptionData(program string, yaml ...malib.YamlOption) (optionData []pflags.OptionData) {
 
 	var nonYamlOptions = []pflags.OptionData{
 		{P: &BaseOptions.Version, Name: Version, Value: false, Usage: "displays version"},
@@ -45,7 +39,7 @@ func BaseOptionData(program string, yaml ...YamlOption) (optionData []pflags.Opt
 	}
 	optionData = nonYamlOptions
 
-	if len(yaml) == 0 || yaml[0] != YamlNo {
+	if len(yaml) == 0 || yaml[0] != malib.YamlNo {
 		var yamlOptions = []pflags.OptionData{
 			{P: &BaseOptions.YamlFile, Name: "yamlFile", Value: "", Usage: fmt.Sprintf("Use specific file other than %s.yaml %[1]s-%s.yaml in ~/apps .. /etc", program, pos.ShortHostname())},
 			{P: &BaseOptions.YamlKey, Name: "yamlKey", Value: "", Usage: "Other dictionary key than ‘options:’"},

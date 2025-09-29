@@ -3,7 +3,7 @@
 ISC License
 */
 
-package phttp
+package phlib
 
 import (
 	"crypto/tls"
@@ -12,15 +12,19 @@ import (
 	"github.com/haraldrudell/parl/perrors"
 )
 
-// NewTransport returns a transport using tlsConfig
-//   - based on [http.DefaultTransport]
+// NewTransport returns a transport with specific TLS configuration
+//   - NewTransport allows use of self-signed and client certificates
+//   - there is a process-wide shared [http.DefaultTransport]
+//   - shares
 func NewTransport(tlsConfig *tls.Config) (httpTransport *http.Transport) {
-	var defaultTransport *http.Transport
-	var ok bool
-	if defaultTransport, ok = http.DefaultTransport.(*http.Transport); !ok {
+
+	// clone default transport to httpTransport
+	if defaultTransport, ok := http.DefaultTransport.(*http.Transport); !ok {
 		panic(perrors.New("DefaultTransport not http.Transport type"))
+	} else {
+		// allocation
+		httpTransport = defaultTransport.Clone()
 	}
-	httpTransport = defaultTransport.Clone()
 
 	// ensure tlsConfig is used
 	httpTransport.TLSClientConfig = tlsConfig
@@ -29,3 +33,6 @@ func NewTransport(tlsConfig *tls.Config) (httpTransport *http.Transport) {
 
 	return
 }
+
+// var http.DefaultTransport http.RoundTripper
+var _ = http.DefaultTransport

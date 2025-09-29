@@ -61,6 +61,9 @@ type ModeratorCore struct {
 	ticketQueue chan struct{}
 }
 
+// ModeratorCore implements [Moderate]
+var _ Moderate = &ModeratorCore{}
+
 // NewModerator returns a parallelism limiter
 //   - parallelism > 0: the number of concurrent tickets issued
 //   - parallelism < 1: defaultnumber of tickets: 20

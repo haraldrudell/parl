@@ -3,7 +3,7 @@
 ISC License
 */
 
-package mains
+package malib
 
 const (
 	// NoArguments besides switches, zero trailing arguments is allowed

@@ -41,6 +41,16 @@ type SocketAddress interface {
 	fmt.Stringer
 }
 
+func NewSocketAddressString(network Network, addr string) (socketAddress SocketAddress) {
+	if a, e := netip.ParseAddrPort(addr); e == nil {
+		socketAddress = NewSocketAddressLiteral(network, a)
+		return
+	}
+	socketAddress = NewSocketAddress(network, addr)
+
+	return
+}
+
 func NewSocketAddressLiteral(network Network, addrPort netip.AddrPort) (socketAddress SocketAddress) {
 	return &saLit{network: network, addrPort: addrPort}
 }

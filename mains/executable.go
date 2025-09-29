@@ -82,7 +82,7 @@ type Executable struct {
 	//	- 250222 unused
 	ArgumentsUsage string
 	// controls command-line arguments after options eg. [mains.NoArguments]
-	Arguments ArgumentSpec
+	Arguments malib.ArgumentSpec
 
 	// process start time
 	//	- populated by [Executable.Init] no thread-safety
@@ -174,13 +174,13 @@ func (x *Executable) Init() (ex *Executable) {
 //	if err = yamlo.ApplyYaml(ex.Program, options.YamlFile, options.YamlKey, options.DoYaml, yamler.NewUnmarshaler(&y), optionData); err != nil {
 //	  return
 //	}
-func (x *Executable) LongErrors(isLongErrors bool, isErrorLocation ...ErrLoc) (x2 *Executable) {
-	x2 = x
+func (x *Executable) LongErrors(isLongErrors bool, isErrorLocation ...malib.ErrLoc) (ex *Executable) {
+	ex = x
 
 	parl.Debug("ex.LongErrors long: %t location: %t", isLongErrors, isErrorLocation)
 	x.IsLongErrors = isLongErrors
 	x.IsErrorLocation = len(isErrorLocation) == 0 ||
-		isErrorLocation[0] != NoLocation
+		isErrorLocation[0] != malib.NoLocation
 
 	return
 }
@@ -227,8 +227,8 @@ func (x *Executable) LongErrors(isLongErrors bool, isErrorLocation ...ErrLoc) (x
 //	  NoStdin bool
 //	}
 //	var y YamlData
-func (x *Executable) PrintBannerAndParseOptions(optionsList []pflags.OptionData) (ex1 *Executable) {
-	ex1 = x
+func (x *Executable) PrintBannerAndParseOptions(optionsList []pflags.OptionData) (ex *Executable) {
+	ex = x
 
 	// print program name and populated details
 	var banner = pstrings.FilteredJoin([]string{
@@ -254,12 +254,12 @@ func (x *Executable) PrintBannerAndParseOptions(optionsList []pflags.OptionData)
 	args := flag.Args() // command-line arguments not part of flags
 	count := len(args)
 	argsOk :=
-		count == 0 && (x.Arguments&NoArguments != 0) ||
-			count == 1 && (x.Arguments&OneArgument != 0) ||
-			count > 0 && (x.Arguments&ManyArguments != 0)
+		count == 0 && (x.Arguments&malib.NoArguments != 0) ||
+			count == 1 && (x.Arguments&malib.OneArgument != 0) ||
+			count > 0 && (x.Arguments&malib.ManyArguments != 0)
 	if !argsOk {
 		if count == 0 {
-			if x.Arguments&ManyArguments != 0 {
+			if x.Arguments&malib.ManyArguments != 0 {
 				parl.Log("There must be one or more arguments")
 			} else {
 				parl.Log("There must be one argument")
@@ -274,10 +274,10 @@ func (x *Executable) PrintBannerAndParseOptions(optionsList []pflags.OptionData)
 		pos.Exit(pos.StatusCodeUsage, nil)
 	}
 	x.ArgCount = count
-	if count == 1 && (x.Arguments&OneArgument != 0) {
+	if count == 1 && (x.Arguments&malib.OneArgument != 0) {
 		x.Arg = args[0]
 	}
-	if count > 0 && (x.Arguments&ManyArguments != 0) {
+	if count > 0 && (x.Arguments&malib.ManyArguments != 0) {
 		x.Args = args
 	}
 
@@ -296,8 +296,8 @@ func (x *Executable) PrintBannerAndParseOptions(optionsList []pflags.OptionData)
 //	  …
 //	  ConfigureLog().
 //	  ApplyYaml(…)
-func (x *Executable) ConfigureLog() (ex1 *Executable) {
-	ex1 = x
+func (x *Executable) ConfigureLog() (ex *Executable) {
+	ex = x
 
 	if BaseOptions.Silent {
 		parl.SetSilent(true)

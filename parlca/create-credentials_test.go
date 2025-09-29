@@ -13,7 +13,6 @@ import (
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/parlca"
-	"github.com/haraldrudell/parl/phttp"
 	"github.com/haraldrudell/parl/ptime"
 )
 
@@ -39,7 +38,6 @@ func TestCredentials(t *testing.T) {
 	t.Logf("Credentials generated in %s", ptime.Duration(t1.Sub(t0)))
 
 	// crdentials are tested by [phttp.Https] test
-	var _ phttp.Https
 	_ = cert
 	_ = privateKey
 }
