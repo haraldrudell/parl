@@ -23,7 +23,6 @@ import (
 
 const (
 	DefaultCloseTimeout = 3 * time.Second
-	DefaultAddr         = ":1034"
 	NoParLimit          = 0
 	DefaultParallelism  = 512
 )
@@ -135,6 +134,13 @@ func NewServerHandler(handler http.Handler, log ...parl.PrintfFunc) (c *Server) 
 //     the Go runtime temporary memory leaks from internal slices and maps
 //     becomes significant
 //   - CDavServer is always heap allocated due to http.Server code
+//   - [http.Server] logs:
+//   - — errors accepting connections
+//   - — unexpected behavior from handlers
+//   - — underlying FileSystem errors
+//   - — there is http.logf: error when listing directory, bad response.WriteHeader call
+//   - — http.Server.logf: bad WriteHeader calls, bad Content-Length, panic in Mux,
+//     TLS handshake error, Accept error
 func NewServer(
 	parallelism int,
 	ctx context.Context,
@@ -184,16 +190,7 @@ func (c *Server) Listen(binaryCert parl.CertificateDer, privateKey crypto.Signer
 	if len(addr) > 0 {
 		socketAddress = addr[0]
 	} else {
-		var addrPort netip.AddrPort
-		if addrPort, err = netip.ParseAddrPort(c.httpServer.Addr); perrors.IsPF(&err, "ParseAddrPort %w", err) {
-
-			// Server.Addr as address literal
-			socketAddress = pnet.NewSocketAddress(pnet.NetworkTCP, c.httpServer.Addr)
-		} else {
-
-			// server.Addr as domain
-			socketAddress = pnet.NewSocketAddressLiteral(pnet.NetworkTCP, addrPort)
-		}
+		socketAddress = pnet.NewSocketAddressFromString(pnet.NetworkTCP, c.httpServer.Addr)
 	}
 
 	// create TLS listener for https
@@ -270,11 +267,7 @@ func (c *Server) Close() (err error) {
 	}
 	// graceful shutdown timed out
 
-	if err = c.httpServer.Close(); err != nil {
-		err = perrors.ErrorfPF("http Close %w", err)
-	}
-
-	return
+	return c.CloseNow()
 }
 
 // CloseNow shuts down tearing down any active connections
@@ -283,7 +276,10 @@ func (c *Server) CloseNow() (err error) {
 	if !c.inShutdown.Load() {
 		c.inShutdown.Store(true)
 	}
-	return c.httpServer.Close()
+	if err = c.httpServer.Close(); err != nil {
+		err = perrors.ErrorfPF("http Close %w", err)
+	}
+	return
 }
 
 // getBaseContext is implementation for [http.Server.BaseContext]

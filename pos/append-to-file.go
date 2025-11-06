@@ -34,6 +34,8 @@ const (
 		os.O_SYNC
 	openFlagsExist             = os.O_APPEND | os.O_WRONLY
 	FilePermUw     os.FileMode = 0o200 // -w- --- ---
+	// for directories
+	FilePermUrwx os.FileMode = 0o700 // rww --- ---
 )
 
 // AppendToFile is [os.Open] for a write-only file that is created or appended to

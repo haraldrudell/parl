@@ -3,5 +3,5 @@
 ISC License
 */
 
-// Package plogt provides interceptable D for buffered output or status terminal
-package plogt
+// Package pelib provides supporting identifiers for the pencoding package.
+package pelib

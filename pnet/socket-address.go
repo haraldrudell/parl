@@ -41,7 +41,7 @@ type SocketAddress interface {
 	fmt.Stringer
 }
 
-func NewSocketAddressString(network Network, addr string) (socketAddress SocketAddress) {
+func NewSocketAddressFromString(network Network, addr string) (socketAddress SocketAddress) {
 	if a, e := netip.ParseAddrPort(addr); e == nil {
 		socketAddress = NewSocketAddressLiteral(network, a)
 		return

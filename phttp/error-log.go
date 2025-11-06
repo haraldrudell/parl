@@ -6,11 +6,11 @@ ISC License
 package phttp
 
 import (
-	"io"
 	"log"
 	"net/http"
 
 	"github.com/haraldrudell/parl"
+	"github.com/haraldrudell/parl/plog/plib"
 )
 
 // NewErrorLog can be assigned to [http.Server.ErrorLog]
@@ -27,16 +27,14 @@ func NewErrorLog(logFunc parl.PrintfFunc) (errorLog *log.Logger) {
 
 	// log.New requires an [io.Writer]
 	//	- this means heap allocation
-	var writer = printFuncWriter{
-		log: logFunc,
-	}
+	var writer = plib.NewWriter(logFunc)
 
 	// [http.Server.ErrorLog] requires pointer to
 	// concrete type [log.Logger]
 	//	- has private fields that must be initialized
 	//	- this costs allocation
 	//	- Server object must be heap-allocated, too
-	errorLog = log.New(&writer, logPrefix, logFlags)
+	errorLog = log.New(writer, logPrefix, logFlags)
 
 	return
 }
@@ -52,21 +50,6 @@ var _ = (&http.Server{}).ErrorLog
 //   - new function [log.New]
 //   - must be used to initialize the writer field
 var _ = log.New
-
-// printFuncWriter implements an [io.Writer] logging to log
-type printFuncWriter struct {
-	log parl.PrintfFunc
-}
-
-// printFuncWriter is [io.Writer]
-var _ io.Writer = &printFuncWriter{}
-
-// Write converts write of bytes to log of string
-func (c *printFuncWriter) Write(p []byte) (n int, err error) {
-	n = len(p)
-	c.log(string(p))
-	return
-}
 
 const (
 	// prefix appears at the beginning of each generated log line

@@ -39,10 +39,10 @@ type HttpClient struct{ http.Client }
 //   - [HttpClient.Do] issues request
 func NewHttpClient(tlsConfig *tls.Config) (httpClient *HttpClient) {
 	return &HttpClient{Client: http.Client{
-		Transport:     phlib.NewTransport(tlsConfig),
-		CheckRedirect: phlib.CheckRedirect,
-		Jar:           nil,
-		Timeout:       0,
+		Transport: phlib.NewTransport(tlsConfig),
+		//CheckRedirect: phlib.CheckRedirect,
+		Jar:     nil,
+		Timeout: 0,
 	}}
 }
 
