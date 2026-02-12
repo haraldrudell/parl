@@ -651,9 +651,15 @@ func AddrSlicetoPrefix(addrs []net.Addr) (prefixes []netip.Prefix, err error) {
 }
 
 // MaskToBits validates legacy [net.IPMask] and returns number of leading 1-bits
+//   - mask: a byte sequence describing netmask, underlying type byte-slice
+//   - — empty or nil is error
+//   - — length other than IPv4: 4 bytes or IPv6: 16 bytes is error
 //   - ones: the network prefix length in bits 0–128: “1.2.3.4/24”: 24, “::/3”: 3
+//   - — the number of leading one-bits in mask
+//   - — if mask is not zero or more one-bits followed by zero or more zero-bits,
+//     error is set and ones is zero
 //   - isIPv6 true: the mask length is for IPv6: 128 bits, otherwise IPv4: 32 bits
-//   - err any error condition:
+//   - err: any error condition:
 //   - — uninitialized: mask is nil or length zero
 //   - — bad length: mask byte-length does not match IPv4: 4 bytes 32 bits or
 //     IPv6: 16 bytes 128 bits
@@ -687,15 +693,15 @@ func MaskToBits(mask net.IPMask) (ones int, isIPv6 bool, err error) {
 	// for illegal mask not strictly ones followed by zeroes: [net.IPMask.Size] returns 0, 0
 	//	- Size does not check mask length to match IPv4 or IPv6
 	//	- Size does not explicitly check for nil or zero-length mask
-	switch len(mask) {
+	switch bits {
 	case 0: // uninitialized or invalid mask
 		if len(mask) == 0 {
 			err = perrors.NewPF("uninitialized mask nil or zero length")
 			return
 		}
 		err = perrors.ErrorfPF("mask has intermediate zeroes: %v", mask)
-	case net.IPv4len: // valid IPv4 mask
-	case net.IPv6len: // valid IPv6 mask
+	case net.IPv4len * 8: // valid IPv4 mask
+	case net.IPv6len * 8: // valid IPv6 mask
 		isIPv6 = true
 	default: // mask of bad length
 		err = perrors.ErrorfPF("invalid mask length: %d allowed: IPv4: %d bytes; IPv6: %d bytes",

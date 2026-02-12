@@ -9,13 +9,11 @@ module github.com/haraldrudell/parl
 //	- go1.24 supported 250211–2026-02 upon go1.26 released
 //	- go1.23 supported 240813–2025-08 upon go1.25 released
 //	- go1.23 is oldest supported Go release since 250211
-go 1.24.0
-
-toolchain go1.24.5
+go 1.25.0
 
 require (
 	github.com/google/uuid v1.6.0
-	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546
-	golang.org/x/sys v0.37.0
-	golang.org/x/text v0.30.0
+	golang.org/x/exp v0.0.0-20260211191109-2735e65f0518
+	golang.org/x/sys v0.41.0
+	golang.org/x/text v0.34.0
 )

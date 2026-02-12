@@ -136,6 +136,17 @@ func (g GoResult) Done(errp *error) {
 	g.done(*errp)
 }
 
+func (g GoResult) Donerr(err error) {
+
+	// get implementation
+	var gp = g.goResult
+	if gp == nil {
+		panic(perrors.NewPF("uninitialized GoResult"))
+	}
+
+	g.done(err)
+}
+
 // ReceiveError is a deferrable function receiving error values from goroutines
 //   - n: number of goroutines to wait for
 //   - n missing: wait for all goroutines.

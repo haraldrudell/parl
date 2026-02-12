@@ -15,6 +15,8 @@ const (
 	offsetHourDivisor = int(time.Hour / time.Second)
 	msHour            = "060102_15:04:05.000Z07"
 	msMinute          = "060102_15:04:05.000Z0700"
+	nsHour            = "060102_15:04:05.000000000Z07"
+	nsMinute          = "060102_15:04:05.000000000Z0700"
 )
 
 // Short provides a brief time-stamp in compact second-precision including time-zone.
@@ -42,6 +44,15 @@ func ShortSpace(tim ...time.Time) (s string) {
 //   - if tim is not specified, time.Now() in local time zone
 func ShortMs(tim ...time.Time) (s string) {
 	return timeAndFormat(tim, msHour, msMinute)
+}
+
+// ShortNs provides a brief time-stamp in compact nano-second-precision including time-zone.
+//   - sample: 060102_15:04:05.123456789-08
+//   - The timestamp does not contain space.
+//   - time zone is what is included in tim, typically time.Local
+//   - if tim is not specified, time.Now() in local time zone
+func ShortNs(tim ...time.Time) (s string) {
+	return timeAndFormat(tim, nsHour, nsMinute)
 }
 
 func timeAndFormat(tim []time.Time, hour, minute string) (s string) {

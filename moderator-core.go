@@ -85,16 +85,20 @@ func NewModeratorCore(parallelism int) (m *ModeratorCore) {
 
 // NewModeratorp returns a parallelism limiter
 func NewModeratorCorep(fieldp *ModeratorCore, parallelism int) (m *ModeratorCore) {
-	if parallelism <= 0 {
-		parallelism = defaultParallelism
-	}
+
+	// get m
 	if fieldp != nil {
 		m = fieldp
 	} else {
-		m = &ModeratorCore{
-			parallelism: parallelism,
-			ticketQueue: make(chan struct{}, parallelism),
-		}
+		m = &ModeratorCore{}
+	}
+
+	if parallelism <= 0 {
+		parallelism = defaultParallelism
+	}
+	*m = ModeratorCore{
+		parallelism: parallelism,
+		ticketQueue: make(chan struct{}, parallelism),
 	}
 	return
 }

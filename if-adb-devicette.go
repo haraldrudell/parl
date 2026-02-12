@@ -69,6 +69,10 @@ type Dent interface {
 	Size() (size uint32)
 }
 
+type AdbDentReceiver interface {
+	ReceiveDent(dent Dent) (err error)
+}
+
 // DevicetteFactory describes how Devicette objects are obtained.
 type DevicetteFactory interface {
 	// NewDevicette creates a Devicette interacting with remote adb Android Debug Bridge

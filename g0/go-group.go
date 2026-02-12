@@ -455,8 +455,8 @@ func (g *GoGroup) FirstFatal() (firstFatal *parl.OnceWaiterRO) {
 //     This is used prior to Wait when a thread-group was not used.
 //     Using the alternative Cancel would signal to threads to exit.
 func (g *GoGroup) EnableTermination(allowTermination ...parl.GoTermination) (mayTerminate parl.GoTermination) {
-	if g.isDebug.Load() {
-		(*g.log.Load())("%s:EnableTermination:%t", g.typeString(), allowTermination)
+	if g.isDebug.Load() && len(allowTermination) > 0 {
+		(*g.log.Load())("%s:EnableTermination:%t", g.typeString(), allowTermination[0] == parl.AllowTermination)
 	}
 
 	// if no argument or the thread-group already terminated

@@ -44,12 +44,14 @@ type Serverette interface {
 
 // Trackerette represents a server connection emitting device serial numbers
 type Trackerette interface {
-	// Serials emit serial number as online devices become available
-	Serials() (serials <-chan AndroidSerial)
+	// SerialsCh emit serial number as online devices become available
+	SerialsCh() (serials <-chan AndroidSerial)
 	// Errs is available once Serials close. It returns any errors
 	Errs() (err error)
 	// Cancel shuts down the Tracker
 	Cancel()
+	// WaitCh awaits tracker to exit
+	WaitCh() (endCh AwaitableCh)
 }
 
 // ServeretteFactory is a Server connection factory for Adbette implementations

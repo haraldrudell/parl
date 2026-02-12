@@ -479,6 +479,7 @@ const (
 	AggregateThread
 )
 
+// Donerr is Done where err is not a pointer
 type Donerr interface {
 	Donerr(err error)
 }
