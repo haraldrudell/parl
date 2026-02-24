@@ -110,8 +110,8 @@ type readResult struct {
 	err     error
 }
 
-// newReadResult returns a reader with observable progress
-//   - n is read buffer size
+// newReadResult returns a reader with inspectable progress
+//   - n: read buffer size
 //   - result.IsReady closes once the reading thread is ready
 //   - result.Ch sends the result object once a Read completes
 //   - — result.P and result.Err contains Read result

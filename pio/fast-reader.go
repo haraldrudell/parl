@@ -7,7 +7,6 @@ package pio
 
 import (
 	"io"
-	"sync"
 
 	"github.com/haraldrudell/parl"
 	"github.com/haraldrudell/parl/perrors"
@@ -19,7 +18,7 @@ type FastReader struct {
 	// reader being drained quickly
 	reader io.Reader
 	// bufferLock makes bufList thread-safe
-	bufferLock sync.Mutex
+	bufferLock parl.Mutex
 	// slice-away list of unread buffers
 	// - each bufferList element has:
 	//	- — len up to 4 KiB
@@ -29,32 +28,51 @@ type FastReader struct {
 	// buffer from a reader
 	//	- non-nil while direct-copy active
 	//	- behind bufferLock
-	readerP []byte
+	waitingReaderP []byte
 	// bytes written to readerP from a reader
 	//	- non-zero if thread wrote to readerP
 	//	- written behind bufferLock
 	readerN parl.Atomic64[int]
 	// readLock makes [FastReader.Read] critical section
-	readLock sync.Mutex
+	readLock parl.Mutex
 	// allows reader threads to wait when no data is available
 	readerWait parl.CyclicAwaitable
 	// thread-safe error container
 	err parl.AtomicError
 }
 
-// NewFastReader returns a unbound-buffered reader draining its provided reader quickly
-//   - because the underlyign reader should be reead even if there are no Read invocations,
-//     NewFastReader has a thread fastReaderDrainThread
+// NewFastReader returns a unbounded buffered reader draining its provided reader quickly
+//
+// Why:
+//   - FastReader is a reader with a thread that immediately reads the entire underlying channel
+//     into memory.
+//     Basically, [io.ReadAll] in a separate thread
+//   - FastReader reads underlying stream to end regardless of Read invocations
+//
+// Note:
+//   - [NewFastReader] new method starts a goroutine fastReaderDrainThread
+//   - [NewFastReader.Read] is blocking but io.EOF is not awaitable
+//   - [FastReader.Buffer] re-allocates and returns the entire buffer as a single slice
+//   - because there is a goroutine, FastReader is heap-allocated
+//   - the [FastReader.Read] returns maximum-length byte-slices from their initial allocation
+//
+// # TODO 260224 deprecate
+//
+// Design:
 //   - [FastReader.Read] is the only operational method
 //   - — any available data upon Read is immediately returned
 //   - — once the buffer is empty, any error is returned
-//   - — errors are: io.EOF, os.ErrClosed or any error from underlying reader
-//   - — otherwise the Read blocks until data or error
+//   - — errors are: [io.EOF], [os.ErrClosed] or error from the underlying reader
+//   - — otherwise, the Read blocks until data or error
 //   - the thread exits on error:
 //   - — to release resources the underlying reader must be read until error
 //   - — Close of the underlying reader is necessary
 //   - [FastReader.Buffer] returns a copy of the buffer for testing
 //   - [FastReader.Length] returns the number of buffered bytes for testing
+//   - storage is slice-of-slices
+//   - FastReader features thread-to-thread transfer
+//   - uses efficient sliding-window slices
+//   - not used 260224
 func NewFastReader(reader io.Reader) (fastReader io.Reader) {
 	r := FastReader{
 		reader:     reader,
@@ -68,8 +86,7 @@ func NewFastReader(reader io.Reader) (fastReader io.Reader) {
 //   - returns bytes first, errors second
 //   - thread-safe
 func (r *FastReader) Read(p []byte) (n int, err error) {
-	r.readLock.Lock()
-	defer r.readLock.Unlock()
+	defer r.readLock.Lock().Unlock()
 
 	// read from data or announce reader buffer
 	if n, err = r.readerEvent(p); n > 0 || err != nil {
@@ -97,8 +114,7 @@ func (r *FastReader) Read(p []byte) (n int, err error) {
 // Length returns the number of bytes curently buffered
 //   - thread-safe
 func (r *FastReader) Length() (length int) {
-	r.bufferLock.Lock()
-	defer r.bufferLock.Unlock()
+	defer r.bufferLock.Lock().Unlock()
 
 	for _, buffer := range r.bufferList {
 		length += len(buffer)
@@ -109,8 +125,7 @@ func (r *FastReader) Length() (length int) {
 // Buffer returns a copy of currently buffered data
 //   - thread-safe
 func (r *FastReader) Buffer() (buffer []byte) {
-	r.bufferLock.Lock()
-	defer r.bufferLock.Unlock()
+	defer r.bufferLock.Lock().Unlock()
 
 	var length int
 	for _, b := range r.bufferList {
@@ -167,18 +182,17 @@ func (r *FastReader) fastReaderDrainThread() {
 func (r *FastReader) saveBytes(p []byte) (pOut []byte) {
 	var p0 = p
 	var pSlicing int
-	r.bufferLock.Lock()
-	defer r.bufferLock.Unlock()
+	defer r.bufferLock.Lock().Unlock()
 
-	// try off-loading directly to waiting reader
-	if !r.readerWait.IsClosed() && r.readerP != nil {
+	// try off-loading entire or part of p directly to waiting reader
+	if !r.readerWait.IsClosed() && r.waitingReaderP != nil {
 		// nr is bytes to copy: greater than zero
-		var nr = min(len(p), len(r.readerP))
+		var nr = min(len(p), len(r.waitingReaderP))
 
 		// transfer to reader p
-		copy(r.readerP[:nr], p)
+		copy(r.waitingReaderP[:nr], p)
 		r.readerN.Store(nr)
-		r.readerP = nil
+		r.waitingReaderP = nil
 		r.readerWait.Close()
 
 		// update p
@@ -191,6 +205,10 @@ func (r *FastReader) saveBytes(p []byte) (pOut []byte) {
 		pSlicing = nr
 		p = p[nr:]
 	}
+	// all bytes of p could not be off-loaded to a thread
+	//	- p is the bytes remaining to write
+	//	- p0 is original p
+	//	- pSlicing is number of bytes already written
 
 	// try appending to active buffer
 	if activeBuffer := len(r.bufferList) - 1; activeBuffer >= 0 {
@@ -264,7 +282,7 @@ func (r *FastReader) readerEvent(p []byte) (n int, err error) {
 	}
 
 	// publish p so the thread can write directly to it
-	r.readerP = p
+	r.waitingReaderP = p
 	r.readerN.Store(0)
 	r.readerWait.Open()
 

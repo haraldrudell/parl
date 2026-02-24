@@ -21,7 +21,8 @@ func TestNewFastReader(t *testing.T) {
 		// timeout when debugging
 		//timeout = 0
 		// timeout when testing
-		timeout = time.Millisecond
+		//	- 200 ms accounts for any thread being suspended
+		timeout = 200 * time.Millisecond
 	)
 	var (
 		byte1 = []byte{1}
@@ -66,6 +67,8 @@ func TestNewFastReader(t *testing.T) {
 	<-result.isReady
 	dataSource.Close()
 	if !result.awaitCh(timeout) {
+		// TODO 260224 test failed during pushparl
+		//	- Read timeout awaiting Close
 		t.Fatal("Read timeout awaiting Close")
 	}
 	if result.err != io.EOF {
