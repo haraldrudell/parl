@@ -15,7 +15,9 @@ import (
 // SpinLock is a lock that does not suspend threads
 //
 // Why:
-//   - non-suspend of threads is the unique value proposition
+//   - non-suspend of threads is the unique value proposition of SpinLock
+//   - — SpinLock is carefully designed to work with the Go runtime
+//     without hangs or panics
 //   - — if maximum performance is required from the critical section
 //     at the cost of high cpu, spin-lock prevents the all-thread suspend of Mutex
 //   - — in particular, a worker thread receiving work items may suffer from
@@ -44,8 +46,8 @@ import (
 //
 // Design:
 //   - exponential back-off up to 600 ns between lock-attempts
-//   - invokes runtime_canSpin for Go stop-the-world garbage collection
-//   - core delay-mechanic runtime_doSpin 68.7 ns
+//   - invokes runtime_canSpin and has a safe-point for Go stop-the-world garbage collection
+//   - core delay-mechanic is runtime_doSpin 68.7 ns
 //   - initialization-free, functional chaining, deferrable
 //   - written 260218 by Harald Rudell
 type SpinLock struct {
@@ -66,7 +68,7 @@ func (s *SpinLock) Lock() (m2 Unlocker) {
 	m2 = s
 
 	// channel has a loop checking the atomic once per loop
-	//	- in the loop, channel invokes procyield(30), 6–10 ns
+	//	- in the loop, channel invokes procyield(30), expected 6–10 ns
 	//	- after 4 loops the thread is suspended
 	//	- total duration has been said to be 120–150 ns
 
@@ -109,15 +111,24 @@ func (s *SpinLock) Lock() (m2 Unlocker) {
 		//	- with exponential back-off benchmark result is 1.913 µs
 
 		// P-M-G
-		//	- P is logical proocessor context 256 slots. Go has GoMaxProcs of them
-		//	- M is the OS thread. OS assigns an execution unit to M
-		//	- G is the goroutine. Go selects M
+		//	- P is logical processor context 256 slots. Go has GoMaxProcs of them.
+		//		P is a Go structure that contains a runqueue of candidate G
+		//	- M is Go structure kept by the OS thread. OS assigns an execution unit to M
+		//	- — when Go starts its OS thread-pool, is creates M
+		//	- — When an M Go OS thread is to run goroutines, it requests a P.
+		//		Then M gets G from P’s run-queue
+		//	- — when M executes a blocking kernel call, P is assigned to another M
+		//	- — M can grow to 10,000
+		//	- G is the goroutine. There can be over 150M limited by virtual memory
 
 		//	- Mutex suspend releases M which takes 150 ms to resume
 		//	- runtime.Gosched 168 μs releases G the goroutine
 		//	- — M and P are still present and execute another goroutine
 		//	- safepoints, eg. function calls, allows stop-the-world gv to run
-		//	- GC releases P M and parks G
+		//	- GC parks G, holds on to M and uses P for its own threads.
+		//		Therefore, the GC stop-the-world latency is short.
+		//		GC never returns M and P, it borrows them
+		//	- GC latency is no more than 50 µs
 		//	- GC uses its goroutine to complete GC
 		//	- other pauses may happen:
 		//	- Go pauses gioroutines after 10 ms
@@ -125,15 +136,20 @@ func (s *SpinLock) Lock() (m2 Unlocker) {
 
 		// can spin returns false when other goroutines should run
 		// 	- latency of runtime_canSpin is 12.5 ns
+		//	- true when:
+		//	- there are multiple execution units
+		//	- every four invocations
+		//	- goroutine run queue waiting for processor is not empty
+		// - may happen every few seconds but at least every 2 minutes
 		if !runtime_canSpin(1) {
-			// This allows the GC to finish its STW phase
+			// This allows for other goroutines to run on this goroutine’s P and M
 			//	- typical latency 168 μs
-			// - may happen every few seconds max 2 minutes
+			//	- releases P for other goroutines but comes back on any P
 			runtime.Gosched()
 		}
 
-		// runtime_doSpin latency: 68.7 ns
-		//	- not true: spin for 6–10 ns
+		// runtime_doSpin latency: 68.7 ns on 2021 processor
+		//	- expwected latency was 6–10 ns, but it is much longer
 		for i := range spinCount {
 			_ = i
 
@@ -153,8 +169,15 @@ func (s *SpinLock) Lock() (m2 Unlocker) {
 // Unlock releases the held lock
 func (s *SpinLock) Unlock() { s.lock.Store(spinUnlocked) }
 
+// safePoint is guaranteed to have a Go function prologue
+//   - the safe point allows Go garbage collector to run stop-the-world
+//   - assembly contains the BLS Arm instruction
 func safePoint() { safePoint2() }
 
+// safePoint2 is an empty funciton that is not inlines
+//   - this causes the caller to get a stack-checking
+//     Go function prologue
+//
 //go:noinline
 func safePoint2() {}
 
@@ -174,7 +197,8 @@ const (
 	maxSpinCount = 8
 )
 
-// runtime_doSpin spins for 6–10 ns depending on processor speed 2026
+// runtime_doSpin spins measured latency 68.7 ns on 2021 processor
+//   - expected 6–10 ns is mush slower
 //
 //go:linkname runtime_doSpin sync.runtime_doSpin
 func runtime_doSpin()

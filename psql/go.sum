@@ -6,8 +6,8 @@ github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e h1:ijClszYn+mADRFY17k
 github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e/go.mod h1:boTsfXsheKC2y+lKOCMpSfarhxDeIzfZG1jqGcPl3cA=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/haraldrudell/parl/sqliter v0.4.244 h1:Hx5OGHWURFwBAK7mtSyNghaXnmBeHgsJ0ampkahIas0=
-github.com/haraldrudell/parl/sqliter v0.4.244/go.mod h1:DZDDMxblcNdYcBsR6tPhuZkuf3VWPFOavyX5YkXKnfw=
+github.com/haraldrudell/parl/sqliter v0.4.245 h1:Iyzv+Tdb2pZfOWR0fl0Kj58JFO5GMIreldxdcciEI2U=
+github.com/haraldrudell/parl/sqliter v0.4.245/go.mod h1:AbTCBp99YjFOu0d6YLA1aA0qnWVHIKyPU3X+6+96mgY=
 github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs4luLUK2k=
 github.com/hashicorp/golang-lru/v2 v2.0.7/go.mod h1:QeFd9opnmA6QUJc5vARoKUSoFhyfM2/ZepoAG6RGpeM=
 github.com/kisielk/sqlstruct v0.0.0-20201105191214-5f3e10d3ab46/go.mod h1:yyMNCyc/Ib3bDTKd379tNMpB/7/H5TjM2Y9QJ5THLbE=
