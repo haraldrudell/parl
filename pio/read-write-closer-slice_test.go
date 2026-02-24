@@ -145,6 +145,8 @@ func (r *readResult) read(reader io.Reader) {
 // awaitCh awaits a pending readResult.read with optional timeout
 //   - isChClosed true: Read concluded
 func (r *readResult) awaitCh(timeout time.Duration) (isChClosed bool) {
+	// C is non-nil if timeout exists
+	//	- nil C is awaited indefinitely
 	var C <-chan time.Time
 	if timeout > 0 {
 		var timer = time.NewTimer(timeout)

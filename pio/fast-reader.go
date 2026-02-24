@@ -15,29 +15,32 @@ import (
 
 // FastReader is an unbound-buffered reader draining a provided reader quickly
 type FastReader struct {
-	// reader being drained quickly
+	// reader is the underlying reader being drained quickly
 	reader io.Reader
-	// bufferLock makes bufList thread-safe
+	// bufferLock makes bufferList bufferList0 thread-safe waitingReaderP
 	bufferLock parl.Mutex
 	// slice-away list of unread buffers
 	// - each bufferList element has:
 	//	- — len up to 4 KiB
 	//	- — cap 4 KiB
-	//	- behind bufLock
+	//	- behind bufferLock
 	bufferList, bufferList0 [][]byte
-	// buffer from a reader
+	// waitingReaderP is an offered buffer from a reader
 	//	- non-nil while direct-copy active
 	//	- behind bufferLock
 	waitingReaderP []byte
-	// bytes written to readerP from a reader
+	// readerN is bytes written to readerP from a reader
 	//	- non-zero if thread wrote to readerP
 	//	- written behind bufferLock
 	readerN parl.Atomic64[int]
 	// readLock makes [FastReader.Read] critical section
 	readLock parl.Mutex
-	// allows reader threads to wait when no data is available
+	// readerWait allows reader threads to wait when no data is available
+	//	- always closed upon thread exit
 	readerWait parl.CyclicAwaitable
-	// thread-safe error container
+	// err is thread-safe single-error container
+	//	- updated whenever the thread exits
+	//	- typically [io.EOF] but any read error or thread panic
 	err parl.AtomicError
 }
 
@@ -90,7 +93,8 @@ func (r *FastReader) Read(p []byte) (n int, err error) {
 
 	// read from data or announce reader buffer
 	if n, err = r.readerEvent(p); n > 0 || err != nil {
-		return // bytes read from r.data or error return
+		// bytes read from r.data or error return
+		return
 	}
 	// thread can now transfer data to p/readerP
 
@@ -100,7 +104,8 @@ func (r *FastReader) Read(p []byte) (n int, err error) {
 
 	// collect any direct-copy bytes by thread
 	if n = r.readerN.Load(); n > 0 {
-		return // direct copy return
+		// direct copy return
+		return
 	}
 
 	// it’s error
@@ -138,11 +143,13 @@ func (r *FastReader) Buffer() (buffer []byte) {
 	return
 }
 
-// fastReaderDrainThread incokes reader.Read even if no [FastReader.Read] is present
-//   - thread exit on error from reader.Read
+// fastReaderDrainThread invokes reader.Read even if no [FastReader.Read] is present
+//   - upon thread exit, r.err has been set
+//   - — error from reader, most often io.EOF
+//   - — possible panic
 func (r *FastReader) fastReaderDrainThread() {
 	var err error
-	defer parl.DeferredErrorSink(&r.err, &err)
+	defer r.fastReaderDefer(&err)
 	defer parl.RecoverErr(func() parl.DA { return parl.A() }, &err)
 
 	var p []byte
@@ -152,7 +159,8 @@ func (r *FastReader) fastReaderDrainThread() {
 		}
 
 		// blocks here until data or reader closing
-		var n, err = r.reader.Read(p)
+		var n int
+		n, err = r.reader.Read(p)
 
 		// handle incoming data
 		if n > 0 {
@@ -160,14 +168,17 @@ func (r *FastReader) fastReaderDrainThread() {
 		}
 
 		if err != nil {
-			// store prior to triggering possibly awaiting reader
-			r.err.AddError(err)
-			r.readerWait.Close()
-			// err was already stored
-			err = nil
 			return
 		}
 	}
+}
+
+func (r *FastReader) fastReaderDefer(errp *error) {
+	var err = *errp
+	if err != nil {
+		r.err.AddError(err)
+	}
+	r.readerWait.Close()
 }
 
 // saveBuffer saves the contents of p to the internal buffer
@@ -285,6 +296,13 @@ func (r *FastReader) readerEvent(p []byte) (n int, err error) {
 	r.waitingReaderP = p
 	r.readerN.Store(0)
 	r.readerWait.Open()
+
+	// adress race condition with thread exiting after last error check
+	// the thread only returns with error, most often io.EOF
+	if err, _ = r.err.Error(); err != nil {
+		r.readerWait.Close()
+		return
+	}
 
 	return
 }
