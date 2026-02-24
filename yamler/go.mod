@@ -7,8 +7,8 @@ go 1.25.0
 replace github.com/haraldrudell/parl => ../../parl
 
 require (
-	github.com/haraldrudell/parl v0.4.243
-	golang.org/x/exp v0.0.0-20260211191109-2735e65f0518
+	github.com/haraldrudell/parl v0.4.244
+	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	gopkg.in/yaml.v3 v3.0.1
 )
 
