@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 
 	_ "unsafe"
+
+	"golang.org/x/sys/cpu"
 )
 
 // SpinLock is a lock that does not suspend threads
@@ -22,6 +24,7 @@ import (
 //     at the cost of high cpu, spin-lock prevents the all-thread suspend of Mutex
 //   - — in particular, a worker thread receiving work items may suffer from
 //     excessive suspend with Mutex
+//   - is inspectable via [SpinLock.IsHeld]
 //   - a fast lock, parallel ≈1.06 µs BenchmarkUnboundedQueueAdd
 //   - does not suspend threads like sync.Mutex
 //   - — the problem with Mutex is a long thread wake-up-latency 165 ms BenchmarkUnblock
@@ -29,6 +32,11 @@ import (
 //   - atomic invocation-counters are too slow due to [atomic.Add] 646.5 ns BenchmarkAddP
 //   - successful parallel [atomic.CompareAndSwap] is 2.285 µs BenchmarkCASP
 //   - use of [atomic.Pointer] requires allocation on each write, maybe 10 µs
+//   - [spinlocks] has it that:
+//   - — for critical sections 100 ns or less, use spinlock
+//   - — for critical sections 1 µs or less, use Go sync.Mutex.
+//     Spins for around 400 ns before suspend.
+//   - — otherwise, use direct suspend lock
 //   - in 2026 with 10 exeuction units, lock is the fastest
 //
 // Notes:
@@ -50,16 +58,29 @@ import (
 //   - core delay-mechanic is runtime_doSpin 68.7 ns
 //   - initialization-free, functional chaining, deferrable
 //   - written 260218 by Harald Rudell
+//
+// [spinlocks]: https://howtech.substack.com/p/spinlocks-vs-mutexes-when-to-spin
 type SpinLock struct {
 	// lock atomic is the lock
 	//	- values: spinUnlocked spinLocked
+	//	- SpinLock struct is to be surrounded by
+	//		[cpu.CacheLinePad] to ensure every atomic
+	//		is on its own cache-line
 	lock atomic.Uint32
 }
 
-// IsHeld returns true if the lock is currently held
+// CacheLinePad is a separator ensuring cpu cache-line separation
+var _ cpu.CacheLinePad
+
+// IsHeld returns true if the lock is currently held. Thread-safe
 func (s *SpinLock) IsHeld() (isHeld bool) { return s.lock.Load() == spinLocked }
 
-// Lock acquires the lock blocking
+// Lock acquires the lock blocking. Thread-safe
+//   - runtime.Gosched yields to other goroutines, can take 168 µs.
+//     Can be avoided by using [SpinLock.LockNoGosched]
+//   - invokes a safe-point so that Go stop-the-world garbage collection
+//     will not deadlock
+//   - spins using low-power processor instructions YIELD arm64 or PAUSE amd64
 //
 // Usage:
 //
@@ -149,7 +170,7 @@ func (s *SpinLock) Lock() (m2 Unlocker) {
 		}
 
 		// runtime_doSpin latency: 68.7 ns on 2021 processor
-		//	- expwected latency was 6–10 ns, but it is much longer
+		//	- expected latency was 6–10 ns, but it is much longer
 		for i := range spinCount {
 			_ = i
 
@@ -166,17 +187,66 @@ func (s *SpinLock) Lock() (m2 Unlocker) {
 	return
 }
 
-// Unlock releases the held lock
+// LockNoGosched is similar to Lock but does not invoke [runtime.Gosched]
+// while spinning. Thread-safe
+//   - runtime.Gosched yields to other goroutines, can take 168 µs
+//   - when there is only one execution unit,
+//     Lock must yield for other goroutines not to deadlock
+//   - invokes a safe-point so that Go stop-the-world garbage collection
+//     will not deadlock
+//   - spins using low-power processor instructions YIELD arm64 or PAUSE amd64
+//
+// Usage:
+//
+//	if defer lock.LockNoGosched().Unlock()
+func (s *SpinLock) LockNoGosched() (m2 Unlocker) {
+	m2 = s
+
+	var spinCount = 1
+	var ncpu int
+	for s.lock.Load() == spinLocked || !s.lock.CompareAndSwap(spinUnlocked, spinLocked) {
+		if ncpu == 0 {
+			ncpu = runtime.GOMAXPROCS(0)
+		}
+		if ncpu == 1 && !runtime_canSpin(1) {
+			runtime.Gosched()
+		}
+		for i := range spinCount {
+			_ = i
+			safePoint()
+			runtime_doSpin()
+		}
+		if spinCount < maxSpinCount {
+			spinCount <<= 1
+		}
+	}
+
+	return
+}
+
+// Unlock releases the held lock. Thread-safe
 func (s *SpinLock) Unlock() { s.lock.Store(spinUnlocked) }
+
+// TryLock attempts to acquire the lock without spinning. Thread-safe
+//
+// Usage:
+//
+//	if !lock.TryLock() {
+//	  return
+//	}
+//	defer lock.Unlock()
+func (s *SpinLock) TryLock() (acquired bool) {
+	return s.lock.Load() != spinLocked && s.lock.CompareAndSwap(spinUnlocked, spinLocked)
+}
 
 // safePoint is guaranteed to have a Go function prologue
 //   - the safe point allows Go garbage collector to run stop-the-world
 //   - assembly contains the BLS Arm instruction
 func safePoint() { safePoint2() }
 
-// safePoint2 is an empty funciton that is not inlines
-//   - this causes the caller to get a stack-checking
-//     Go function prologue
+// safePoint2 is an empty function that is not inlined
+//   - this causes a caller to get a stack-checking
+//     Go-function prologue
 //
 //go:noinline
 func safePoint2() {}
@@ -198,10 +268,13 @@ const (
 )
 
 // runtime_doSpin spins measured latency 68.7 ns on 2021 processor
-//   - expected 6–10 ns is mush slower
+//   - expected latency is 6–10 ns but measured to being much slower
 //
 //go:linkname runtime_doSpin sync.runtime_doSpin
 func runtime_doSpin()
 
+// runtime_canSpin returns true for as long as the Go runtime
+// using varying factors thinks spinning should continue
+//
 //go:linkname runtime_canSpin sync.runtime_canSpin
 func runtime_canSpin(i int) bool
