@@ -10,8 +10,8 @@ replace github.com/haraldrudell/parl/psql => ../psql
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/haraldrudell/parl v0.4.246
-	github.com/haraldrudell/parl/psql v0.4.246
+	github.com/haraldrudell/parl v0.4.247
+	github.com/haraldrudell/parl/psql v0.4.247
 	modernc.org/sqlite v1.46.1
 )
 
@@ -23,7 +23,7 @@ require (
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
-	modernc.org/libc v1.68.0 // indirect
+	modernc.org/libc v1.68.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )

@@ -18,39 +18,46 @@ import (
 //
 // Why:
 //   - non-suspend of threads is the unique value proposition of SpinLock
+//   - — maximum performance from a critical section at the expense of
+//     retaining the execution unit during any wait.
+//     Spin-lock avoids the all-held-thread suspend of [sync.Mutex]
+//   - — [SpinLock.LockNoGosched] option that also withholds the
+//     execution unit from other goroutines
 //   - — SpinLock is carefully designed to work with the Go runtime
-//     without hangs or panics
-//   - — if maximum performance is required from the critical section
-//     at the cost of high cpu, spin-lock prevents the all-thread suspend of Mutex
-//   - — in particular, a worker thread receiving work items may suffer from
-//     excessive suspend with Mutex
+//     and garbage collector without hangs or panics
+//   - — a case for SpinLock is avoiding worker threads receiving work items
+//     suffering from excessive suspend by [sync.Mutex]
+//   - — a good Go architecture employs a thread-worker pool as small as possible
+//     drawing from an unbounded work-item queue
+//   - — alternatively, a back-pressure design uses bounded channel
 //   - is inspectable via [SpinLock.IsHeld]
 //   - a fast lock, parallel ≈1.06 µs BenchmarkUnboundedQueueAdd
-//   - does not suspend threads like sync.Mutex
-//   - — the problem with Mutex is a long thread wake-up-latency 165 ms BenchmarkUnblock
-//   - compared to atomic access, lock provides when another thread’s operations has concluded
-//   - atomic invocation-counters are too slow due to [atomic.Add] 646.5 ns BenchmarkAddP
-//   - successful parallel [atomic.CompareAndSwap] is 2.285 µs BenchmarkCASP
-//   - use of [atomic.Pointer] requires allocation on each write, maybe 10 µs
+//   - the problem with [sync.Mutex] is a long thread wake-up-latency 165 ms BenchmarkUnblock
 //   - [spinlocks] has it that:
 //   - — for critical sections 100 ns or less, use spinlock
-//   - — for critical sections 1 µs or less, use Go sync.Mutex.
-//     Spins for around 400 ns before suspend.
+//   - — for critical sections 1 µs or less, use Go [sync.Mutex] that
+//     spins for around 400 ns before suspending the thread.
 //   - — otherwise, use direct suspend lock
 //   - in 2026 with 10 exeuction units, lock is the fastest
 //
+// Atomic alternatives:
+//   - unlike atomic access, a lock provides when another thread’s operations has concluded
+//   - atomic invocation-counters are too slow due to [atomic.AddUint64] 646.5 ns BenchmarkAddP
+//   - successful parallel [atomic.CompareAndSwapUint64] is 2.285 µs BenchmarkCASP
+//   - use of [atomic.Pointer] requires allocation on each write, maybe 10 µs
+//
 // Notes:
-//   - if wait exceeds 10 µs, SpinLock causes high cpu
-//   - sync.Mutex spins for 100 ns before suspend
+//   - if wait exceeds 10 µs, SpinLock unfavorably holds on to the execution unit
+//   - sync.Mutex spins for 400 ns before suspend
 //   - — if a thread holding the lock is suspended as threads are every 10 ms,
 //     the tread may remain suspended for 150 ms.
-//     Mutex then suspends all holding threads, too.
+//     Mutex then suspends all other holding threads, too.
 //     Mutex is designed to be better than spin-lock
 //   - computer science has max recommended critical-section latency
 //     two context switch overhead: 10 µs
 //   - spin-lock latency ≈ work×number of contenders, ie. holding goroutines
 //   - critical section latency 100 ns, 10 goroutines: 100 ns × 10 ≈ 1 µs
-//   - — the execution unit count is not the number to use
+//   - — the execution unit count is not the number to use here
 //
 // Design:
 //   - exponential back-off up to 600 ns between lock-attempts
