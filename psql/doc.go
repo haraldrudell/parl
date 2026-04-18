@@ -20,4 +20,6 @@ ISC License
 //   - convenience method for single-value queries: [DBMap.QueryInt] [DBMap.QueryString]
 //   - [SqlExec] pprovides statement execution prior to obtaining a cached database, ie. for
 //     seamlessly preparing the schema
+//
+// psql is a submodule because go-sqlmock is a heavy package
 package psql

@@ -11,6 +11,12 @@ go 1.25.0
 // find . -name go.mod -exec egrep -Hn '^(toolchain|go)' {} ';'
 
 // go work use -r .
+//	- omaps requires github.com/google/btree
+//	- psql requires github.com/DATA-DOG/go-sqlmock
+//	- pterm requires golang.org/x/term
+//	- sqliter requires modernc.org/sqlite
+//	- watchfs requires github.com/fsnotify/fsnotify
+//	- yamler requires gopkg.in/yaml.v3
 use (
 	.
 	./omaps

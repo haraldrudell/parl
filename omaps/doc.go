@@ -5,5 +5,6 @@ ISC License
 
 // Package omaps provides ordered Go hash-maps with order provided by B-Tree m-ary self-balancing ordered trees.
 //
-// separate module due to the github.com/google/btree dependency
+// omaps is a submodule due to requiring github.com/google/btree
+//   - the btree package is very heavy to parse
 package omaps

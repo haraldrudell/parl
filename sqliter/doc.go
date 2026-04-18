@@ -29,4 +29,7 @@ ISC License
 //   - data-source that do not create database-files [OpenDataSourceNamerRO] for querying existing
 //     databases
 //   - retrieval of actionable SQLite3 error codes [Code]
+//
+// sqliter is a submodule due to requiring
+// modernc.org/sqlite
 package sqliter
