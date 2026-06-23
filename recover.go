@@ -133,6 +133,10 @@ func A() DA { return pruntime.NewCodeLocation(parlAFrames) }
 // NoIsPanic is a stand-in nil value when noPanic is not present
 var NoIsPanic *bool
 
+func DoDoRecovery(deferredAnnotation annotationLiteral, errp *error, isPanicp *bool, recoverValue any) {
+	doRecovery(noAnnotation, deferredAnnotation, errp, recoverOnErrrorNone, isPanicp, recoverValue)
+}
+
 // doRecovery implements recovery for Recovery andd Recovery2
 //   - annotation: typically empty, can be string of some distinguishing property
 //   - — “copy command i/o stderr”

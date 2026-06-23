@@ -78,5 +78,5 @@ func (o *OnceCh) Ch() (ch AwaitableCh) { return o.done.awaitable.Ch() }
 // IsInvoked indicates that a winner was selected
 func (o *OnceCh) IsInvoked() (isInvoked bool) { return o.winner.Load() }
 
-// IsClosed indicates that a winner was selected and the winneer invoked done
+// IsClosed indicates that a winner was selected and the winner invoked done
 func (o *OnceCh) IsClosed() (isClosed bool) { return o.done.awaitable.IsClosed() }
